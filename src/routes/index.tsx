@@ -11,15 +11,19 @@ import {
   Search,
   SkipBack,
   SkipForward,
+  ListMusic,
+  Settings2,
   Sparkles,
   Volume2,
 } from "lucide-react";
 
+import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
+import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
 import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { useLibrary, trackLabel, type Track } from "@/lib/library";
+import { useLibrary, trackLabel, settingsToBrief, type Track } from "@/lib/library";
 import { recommendTracks, searchTracks } from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
 import { cn } from "@/lib/utils";
@@ -44,19 +48,37 @@ export const Route = createFileRoute("/")({
   component: MusicApp,
 });
 
-type Tab = "foryou" | "search" | "likes" | "history";
+type Tab = "foryou" | "search" | "likes" | "playlists" | "history";
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Sparkles }> = [
   { id: "foryou", label: "For you", icon: Sparkles },
   { id: "search", label: "Search", icon: Search },
   { id: "likes", label: "Favourites", icon: Heart },
+  { id: "playlists", label: "Playlists", icon: ListMusic },
   { id: "history", label: "Recent", icon: History },
 ];
 
 function MusicApp() {
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
-  const { hydrated, likes, history, toggleLike, logPlay, clearHistory } = useLibrary();
+  const {
+    hydrated,
+    likes,
+    history,
+    playlists,
+    settings,
+    toggleLike,
+    logPlay,
+    clearHistory,
+    createPlaylist,
+    renamePlaylist,
+    deletePlaylist,
+    addToPlaylist,
+    removeFromPlaylist,
+    reorderPlaylist,
+    updateSettings,
+    resetSettings,
+  } = useLibrary();
 
   const [tab, setTab] = useState<Tab>("foryou");
   const [query, setQuery] = useState("");
@@ -70,6 +92,7 @@ function MusicApp() {
   const [index, setIndex] = useState(0);
   const [volume, setVolume] = useState(80);
   const [showVideo, setShowVideo] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const current = queue[index];
   const currentRef = useRef<Track | undefined>(undefined);
@@ -110,13 +133,14 @@ function MusicApp() {
           liked: likes.slice(0, 20).map(trackLabel),
           recent: history.slice(0, 20).map(trackLabel),
           ...(mood ? { mood } : {}),
+          brief: settingsToBrief(settings, mood),
         },
       });
       setRecLoading(false);
       if (res.error) setMessage(res.error);
       else setRecs(res.tracks as Track[]);
     },
-    [runRecommend, likes, history],
+    [runRecommend, likes, history, settings],
   );
 
   const bootstrapped = useRef(false);
@@ -142,6 +166,7 @@ function MusicApp() {
     foryou: recs,
     search: results,
     likes,
+    playlists: [],
     history,
   };
   const visible = listForTab[tab];
@@ -221,6 +246,14 @@ function MusicApp() {
               {recLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Refresh picks
             </Button>
+            <Button
+              variant="secondary"
+              className="rounded-full"
+              onClick={() => setShowSettings((v) => !v)}
+            >
+              <Settings2 className="mr-2 h-4 w-4" />
+              {showSettings ? "Hide tuning" : "Tune picks"}
+            </Button>
             {["late night", "upbeat workout", "focus", "sad hours", "throwbacks"].map((mood) => (
               <button
                 key={mood}
@@ -235,6 +268,18 @@ function MusicApp() {
           </div>
         )}
 
+        {tab === "foryou" && showSettings && (
+          <div className="mb-5">
+            <RecSettingsPanel
+              settings={settings}
+              onChange={updateSettings}
+              onReset={resetSettings}
+              onApply={() => void loadRecommendations()}
+              loading={recLoading}
+            />
+          </div>
+        )}
+
         {tab === "history" && history.length > 0 && (
           <div className="mb-4 flex justify-end">
             <Button variant="ghost" size="sm" onClick={clearHistory}>
@@ -243,7 +288,19 @@ function MusicApp() {
           </div>
         )}
 
-        {recLoading && tab === "foryou" ? (
+        {tab === "playlists" ? (
+          <PlaylistsPanel
+            playlists={playlists}
+            currentId={current?.id}
+            isPlaying={player.isPlaying}
+            onCreate={(name) => createPlaylist(name)}
+            onRename={renamePlaylist}
+            onDelete={deletePlaylist}
+            onRemoveTrack={removeFromPlaylist}
+            onReorder={reorderPlaylist}
+            onPlay={(tracks, i) => startQueue(tracks, i)}
+          />
+        ) : recLoading && tab === "foryou" ? (
           <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
             <p className="text-sm">Reading your taste and picking songs…</p>
@@ -262,6 +319,12 @@ function MusicApp() {
               startQueue(visible, i);
             }}
             onToggleLike={toggleLike}
+            playlists={playlists}
+            onAddToPlaylist={addToPlaylist}
+            onCreatePlaylistWith={(track) => {
+              const name = window.prompt("Playlist name", "New playlist");
+              if (name?.trim()) createPlaylist(name.trim(), [track]);
+            }}
             emptyMessage={
               tab === "likes"
                 ? "Tap the heart on a song to build your favourites — they train your picks."
