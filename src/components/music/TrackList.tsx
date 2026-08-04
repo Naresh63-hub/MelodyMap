@@ -1,5 +1,13 @@
-import { Heart, Play, Pause } from "lucide-react";
-import type { Track } from "@/lib/library";
+import { Heart, Play, Pause, Plus } from "lucide-react";
+import type { Playlist, Track } from "@/lib/library";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -10,6 +18,9 @@ type Props = {
   onPlay: (track: Track, index: number) => void;
   onToggleLike: (track: Track) => void;
   emptyMessage?: string;
+  playlists?: Playlist[];
+  onAddToPlaylist?: (playlistId: string, track: Track) => void;
+  onCreatePlaylistWith?: (track: Track) => void;
 };
 
 export function TrackList({
@@ -20,7 +31,11 @@ export function TrackList({
   onPlay,
   onToggleLike,
   emptyMessage,
+  playlists,
+  onAddToPlaylist,
+  onCreatePlaylistWith,
 }: Props) {
+
   if (tracks.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border/70 px-5 py-10 text-center text-sm text-muted-foreground">
