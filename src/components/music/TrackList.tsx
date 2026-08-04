@@ -109,6 +109,34 @@ export function TrackList({
             >
               <Heart className={cn("h-4 w-4", liked && "fill-accent text-accent")} />
             </button>
+
+            {onAddToPlaylist && (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  aria-label="Add to playlist"
+                  className="rounded-full p-2 text-muted-foreground transition-colors hover:text-primary"
+                >
+                  <Plus className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Add to playlist</DropdownMenuLabel>
+                  {(playlists ?? []).map((p) => (
+                    <DropdownMenuItem key={p.id} onSelect={() => onAddToPlaylist(p.id, track)}>
+                      {p.name}
+                    </DropdownMenuItem>
+                  ))}
+                  {onCreatePlaylistWith && (
+                    <>
+                      {(playlists ?? []).length > 0 && <DropdownMenuSeparator />}
+                      <DropdownMenuItem onSelect={() => onCreatePlaylistWith(track)}>
+                        New playlist…
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
           </li>
         );
       })}
