@@ -93,17 +93,23 @@ export function useYouTubePlayer(options: { onEnded: () => void }) {
     return () => window.clearInterval(timer);
   }, []);
 
+  const load = useCallback((id: string) => playerRef.current?.loadVideoById(id), []);
+  const play = useCallback(() => playerRef.current?.playVideo(), []);
+  const pause = useCallback(() => playerRef.current?.pauseVideo(), []);
+  const seek = useCallback((seconds: number) => playerRef.current?.seekTo(seconds, true), []);
+  const setVolume = useCallback((v: number) => playerRef.current?.setVolume(v), []);
+
   return {
     containerRef,
     ready,
     isPlaying,
     position,
     duration,
-    load: (id: string) => playerRef.current?.loadVideoById(id),
-    play: () => playerRef.current?.playVideo(),
-    pause: () => playerRef.current?.pauseVideo(),
-    seek: (seconds: number) => playerRef.current?.seekTo(seconds, true),
-    setVolume: (v: number) => playerRef.current?.setVolume(v),
+    load,
+    play,
+    pause,
+    seek,
+    setVolume,
   };
 }
 
