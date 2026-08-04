@@ -82,11 +82,13 @@ function MusicApp() {
   const { load, setVolume: applyVolume, play } = player;
 
   useEffect(() => {
-    if (!player.ready || !current) return;
-    load(current.id);
+    const track = currentRef.current;
+    if (!player.ready || !track) return;
+    load(track.id);
     play();
-    logPlay(current);
-  }, [current?.id, player.ready, load, play, logPlay, current]);
+    logPlay(track);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id, player.ready, load, play, logPlay]);
 
   useEffect(() => {
     if (player.ready) applyVolume(volume);
