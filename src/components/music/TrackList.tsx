@@ -21,6 +21,7 @@ type Props = {
   playlists?: Playlist[];
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
   onCreatePlaylistWith?: (track: Track) => void;
+  onAddToQueue?: (track: Track) => void;
 };
 
 export function TrackList({
