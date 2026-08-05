@@ -139,10 +139,78 @@ export function PlaylistsPanel({
                 </Button>
               </div>
 
+              {open.tracks.length > 0 && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl bg-surface/60 px-3 py-2">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={selected.length > 0 && selected.length === open.tracks.length}
+                      onCheckedChange={(v) =>
+                        setSelected(v ? open.tracks.map((t) => t.id) : [])
+                      }
+                      aria-label="Select all tracks"
+                    />
+                    {selected.length > 0 ? `${selected.length} selected` : "Select all"}
+                  </label>
+                  {selected.length > 0 && (
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="ml-auto"
+                        onClick={() => {
+                          onAddToQueue(selectedTracks);
+                          setSelected([]);
+                        }}
+                      >
+                        Add to queue
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="secondary" size="sm">
+                            Move to…
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Move to playlist</DropdownMenuLabel>
+                          {playlists
+                            .filter((p) => p.id !== open.id)
+                            .map((p) => (
+                              <DropdownMenuItem
+                                key={p.id}
+                                onSelect={() => {
+                                  onMoveMany(open.id, p.id, selected);
+                                  setSelected([]);
+                                }}
+                              >
+                                {p.name}
+                              </DropdownMenuItem>
+                            ))}
+                          {playlists.length < 2 && (
+                            <DropdownMenuItem disabled>No other playlist</DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => {
+                          onRemoveMany(open.id, selected);
+                          setSelected([]);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
               {open.tracks.length === 0 ? (
                 <p className="px-2 py-6 text-center text-sm text-muted-foreground">
                   Empty — add songs with the + button on any track.
                 </p>
+
               ) : (
                 <ul className="flex flex-col gap-1">
                   {open.tracks.map((track, index) => {
