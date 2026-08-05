@@ -101,6 +101,9 @@ function MusicApp() {
   const current = queue[index];
   const currentRef = useRef<Track | undefined>(undefined);
   currentRef.current = current;
+  const queueRef = useRef<Track[]>([]);
+  queueRef.current = queue;
+
 
   const player = useYouTubePlayer({
     onEnded: () => {
