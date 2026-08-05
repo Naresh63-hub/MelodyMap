@@ -1,7 +1,15 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { GripVertical, ListMusic, Pause, Play, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Playlist, Track } from "@/lib/library";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +21,9 @@ type Props = {
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onRemoveTrack: (id: string, trackId: string) => void;
+  onRemoveMany: (id: string, trackIds: string[]) => void;
+  onMoveMany: (fromId: string, toId: string, trackIds: string[]) => void;
+  onAddToQueue: (tracks: Track[]) => void;
   onReorder: (id: string, from: number, to: number) => void;
   onPlay: (tracks: Track[], index: number) => void;
 };
@@ -25,6 +36,9 @@ export function PlaylistsPanel({
   onRename,
   onDelete,
   onRemoveTrack,
+  onRemoveMany,
+  onMoveMany,
+  onAddToQueue,
   onReorder,
   onPlay,
 }: Props) {
@@ -32,8 +46,17 @@ export function PlaylistsPanel({
   const [openId, setOpenId] = useState<string | null>(playlists[0]?.id ?? null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelected([]);
+  }, [openId]);
 
   const open = playlists.find((p) => p.id === openId) ?? null;
+  const selectedTracks = (open?.tracks ?? []).filter((t) => selected.includes(t.id));
+  const toggleSelected = (id: string) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
 
   return (
     <div className="space-y-4">
