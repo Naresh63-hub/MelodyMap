@@ -12,11 +12,13 @@ import {
   SkipBack,
   SkipForward,
   ListMusic,
+  ListVideo,
   Settings2,
   Sparkles,
   Volume2,
 } from "lucide-react";
 
+import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
 import { TrackList } from "@/components/music/TrackList";
@@ -75,6 +77,8 @@ function MusicApp() {
     deletePlaylist,
     addToPlaylist,
     removeFromPlaylist,
+    removeManyFromPlaylist,
+    moveTracksToPlaylist,
     reorderPlaylist,
     updateSettings,
     resetSettings,
@@ -352,6 +356,9 @@ function MusicApp() {
             onRename={renamePlaylist}
             onDelete={deletePlaylist}
             onRemoveTrack={removeFromPlaylist}
+            onRemoveMany={removeManyFromPlaylist}
+            onMoveMany={moveTracksToPlaylist}
+            onAddToQueue={enqueue}
             onReorder={reorderPlaylist}
             onPlay={(tracks, i) => startQueue(tracks, i)}
           />
@@ -376,6 +383,7 @@ function MusicApp() {
             onToggleLike={toggleLike}
             playlists={playlists}
             onAddToPlaylist={addToPlaylist}
+            onAddToQueue={(track) => enqueue([track])}
             onCreatePlaylistWith={(track) => {
               const name = window.prompt("Playlist name", "New playlist");
               if (name?.trim()) createPlaylist(name.trim(), [track]);
@@ -392,6 +400,27 @@ function MusicApp() {
           />
         )}
       </main>
+
+      {showQueue && (
+        <QueuePanel
+          tracks={queue}
+          index={index}
+          isPlaying={player.isPlaying}
+          continuous={continuous}
+          loadingMore={extending}
+          onToggleContinuous={() => setContinuous((v) => !v)}
+          onJump={(i) => setIndex(i)}
+          onRemove={(i) => {
+            setQueue((prev) => prev.filter((_, x) => x !== i));
+            if (i < index) setIndex((x) => Math.max(0, x - 1));
+          }}
+          onClear={() => {
+            setQueue([]);
+            setIndex(0);
+          }}
+          onClose={() => setShowQueue(false)}
+        />
+      )}
 
       {/* Player */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
@@ -448,6 +477,15 @@ function MusicApp() {
                 aria-label="Next track"
               >
                 <SkipForward className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Up next queue"
+                onClick={() => setShowQueue((v) => !v)}
+                className={cn(showQueue && "text-primary")}
+              >
+                <ListVideo className="h-5 w-5" />
               </Button>
               {current && (
                 <Button
