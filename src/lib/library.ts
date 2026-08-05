@@ -165,6 +165,36 @@ export function useLibrary() {
     [savePlaylists],
   );
 
+  const removeManyFromPlaylist = useCallback(
+    (id: string, trackIds: string[]) =>
+      savePlaylists((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, tracks: p.tracks.filter((t) => !trackIds.includes(t.id)) } : p,
+        ),
+      ),
+    [savePlaylists],
+  );
+
+  /** Moves selected tracks from one playlist into another (no duplicates). */
+  const moveTracksToPlaylist = useCallback(
+    (fromId: string, toId: string, trackIds: string[]) =>
+      savePlaylists((prev) => {
+        const source = prev.find((p) => p.id === fromId);
+        if (!source || fromId === toId) return prev;
+        const moving = source.tracks.filter((t) => trackIds.includes(t.id));
+        return prev.map((p) => {
+          if (p.id === fromId)
+            return { ...p, tracks: p.tracks.filter((t) => !trackIds.includes(t.id)) };
+          if (p.id === toId) {
+            const fresh = moving.filter((t) => !p.tracks.some((x) => x.id === t.id));
+            return { ...p, tracks: [...p.tracks, ...fresh] };
+          }
+          return p;
+        });
+      }),
+    [savePlaylists],
+  );
+
   const reorderPlaylist = useCallback(
     (id: string, from: number, to: number) =>
       savePlaylists((prev) =>
