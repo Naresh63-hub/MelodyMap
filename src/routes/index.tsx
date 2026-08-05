@@ -12,11 +12,13 @@ import {
   SkipBack,
   SkipForward,
   ListMusic,
+  ListVideo,
   Settings2,
   Sparkles,
   Volume2,
 } from "lucide-react";
 
+import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
 import { TrackList } from "@/components/music/TrackList";
@@ -75,6 +77,8 @@ function MusicApp() {
     deletePlaylist,
     addToPlaylist,
     removeFromPlaylist,
+    removeManyFromPlaylist,
+    moveTracksToPlaylist,
     reorderPlaylist,
     updateSettings,
     resetSettings,
@@ -93,14 +97,28 @@ function MusicApp() {
   const [volume, setVolume] = useState(80);
   const [showVideo, setShowVideo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [continuous, setContinuous] = useState(true);
+  const [extending, setExtending] = useState(false);
+
 
   const current = queue[index];
   const currentRef = useRef<Track | undefined>(undefined);
   currentRef.current = current;
+  const queueRef = useRef<Track[]>([]);
+  queueRef.current = queue;
+
 
   const player = useYouTubePlayer({
-    onEnded: () => setIndex((i) => (i + 1 < queue.length ? i + 1 : i)),
+    onEnded: () => {
+      if (index + 1 < queue.length) {
+        setIndex(index + 1);
+        return;
+      }
+      if (continuous) void extendQueue();
+    },
   });
+
 
   const { load, setVolume: applyVolume, play } = player;
 
@@ -124,10 +142,8 @@ function MusicApp() {
     setIndex(startAt);
   }, []);
 
-  const loadRecommendations = useCallback(
+  const fetchPicks = useCallback(
     async (mood?: string) => {
-      setRecLoading(true);
-      setMessage(null);
       const res = await runRecommend({
         data: {
           liked: likes.slice(0, 20).map(trackLabel),
@@ -136,12 +152,55 @@ function MusicApp() {
           brief: settingsToBrief(settings, mood),
         },
       });
+      return res;
+    },
+    [runRecommend, likes, history, settings],
+  );
+
+  const loadRecommendations = useCallback(
+    async (mood?: string) => {
+      setRecLoading(true);
+      setMessage(null);
+      const res = await fetchPicks(mood);
       setRecLoading(false);
       if (res.error) setMessage(res.error);
       else setRecs(res.tracks as Track[]);
     },
-    [runRecommend, likes, history, settings],
+    [fetchPicks],
   );
+
+  const enqueue = useCallback((tracks: Track[]) => {
+    if (tracks.length === 0) return;
+    setQueue((prev) => {
+      const fresh = tracks.filter((t) => !prev.some((x) => x.id === t.id));
+      return [...prev, ...fresh];
+    });
+    setShowQueue(true);
+  }, []);
+
+  /** Continuous mode: fetch a fresh batch of picks and append them to the queue. */
+  const extendingRef = useRef(false);
+  const extendQueue = useCallback(async () => {
+    if (extendingRef.current) return;
+    extendingRef.current = true;
+    setExtending(true);
+    const res = await fetchPicks();
+    setExtending(false);
+    extendingRef.current = false;
+    if (res.error || res.tracks.length === 0) {
+      if (res.error) setMessage(res.error);
+      return;
+    }
+    const incoming = res.tracks as Track[];
+    setRecs(incoming);
+    const prev = queueRef.current;
+    const fresh = incoming.filter((t) => !prev.some((x) => x.id === t.id));
+    if (fresh.length === 0) return;
+    setQueue([...prev, ...fresh]);
+    setIndex(prev.length);
+
+  }, [fetchPicks]);
+
 
   const bootstrapped = useRef(false);
   useEffect(() => {
@@ -297,6 +356,9 @@ function MusicApp() {
             onRename={renamePlaylist}
             onDelete={deletePlaylist}
             onRemoveTrack={removeFromPlaylist}
+            onRemoveMany={removeManyFromPlaylist}
+            onMoveMany={moveTracksToPlaylist}
+            onAddToQueue={enqueue}
             onReorder={reorderPlaylist}
             onPlay={(tracks, i) => startQueue(tracks, i)}
           />
@@ -321,6 +383,7 @@ function MusicApp() {
             onToggleLike={toggleLike}
             playlists={playlists}
             onAddToPlaylist={addToPlaylist}
+            onAddToQueue={(track) => enqueue([track])}
             onCreatePlaylistWith={(track) => {
               const name = window.prompt("Playlist name", "New playlist");
               if (name?.trim()) createPlaylist(name.trim(), [track]);
@@ -341,6 +404,26 @@ function MusicApp() {
       {/* Player */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
         <div className="mx-auto max-w-5xl px-4 py-3 sm:px-6">
+      {showQueue && (
+    <QueuePanel
+      tracks={queue}
+      index={index}
+      isPlaying={player.isPlaying}
+      continuous={continuous}
+      loadingMore={extending}
+      onToggleContinuous={() => setContinuous((v) => !v)}
+      onJump={(i) => setIndex(i)}
+      onRemove={(i) => {
+        setQueue((prev) => prev.filter((_, x) => x !== i));
+        if (i < index) setIndex((x) => Math.max(0, x - 1));
+      }}
+      onClear={() => {
+        setQueue([]);
+        setIndex(0);
+      }}
+      onClose={() => setShowQueue(false)}
+    />
+  )}
           <div
             className={cn(
               "mx-auto mb-3 aspect-video w-full max-w-md overflow-hidden rounded-xl bg-black",
@@ -393,6 +476,15 @@ function MusicApp() {
                 aria-label="Next track"
               >
                 <SkipForward className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Up next queue"
+                onClick={() => setShowQueue((v) => !v)}
+                className={cn(showQueue && "text-primary")}
+              >
+                <ListVideo className="h-5 w-5" />
               </Button>
               {current && (
                 <Button
