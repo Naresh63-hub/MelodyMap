@@ -93,6 +93,10 @@ function MusicApp() {
   const [volume, setVolume] = useState(80);
   const [showVideo, setShowVideo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
+  const [continuous, setContinuous] = useState(true);
+  const [extending, setExtending] = useState(false);
+
 
   const current = queue[index];
   const currentRef = useRef<Track | undefined>(undefined);
