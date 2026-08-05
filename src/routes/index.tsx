@@ -186,13 +186,12 @@ function MusicApp() {
     }
     const incoming = res.tracks as Track[];
     setRecs(incoming);
-    setQueue((prev) => {
-      const fresh = incoming.filter((t) => !prev.some((x) => x.id === t.id));
-      if (fresh.length === 0) return prev;
-      const next = [...prev, ...fresh];
-      setIndex(prev.length);
-      return next;
-    });
+    const prev = queueRef.current;
+    const fresh = incoming.filter((t) => !prev.some((x) => x.id === t.id));
+    if (fresh.length === 0) return;
+    setQueue([...prev, ...fresh]);
+    setIndex(prev.length);
+
   }, [fetchPicks]);
 
 
