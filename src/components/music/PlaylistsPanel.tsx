@@ -244,7 +244,13 @@ export function PlaylistsPanel({
                             : "",
                         )}
                       >
+                        <Checkbox
+                          checked={selected.includes(track.id)}
+                          onCheckedChange={() => toggleSelected(track.id)}
+                          aria-label={`Select ${track.title}`}
+                        />
                         <span className="cursor-grab text-muted-foreground active:cursor-grabbing">
+
                           <GripVertical className="h-4 w-4" />
                         </span>
                         <button
