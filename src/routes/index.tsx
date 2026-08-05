@@ -99,8 +99,15 @@ function MusicApp() {
   currentRef.current = current;
 
   const player = useYouTubePlayer({
-    onEnded: () => setIndex((i) => (i + 1 < queue.length ? i + 1 : i)),
+    onEnded: () => {
+      if (index + 1 < queue.length) {
+        setIndex(index + 1);
+        return;
+      }
+      if (continuous) void extendQueue();
+    },
   });
+
 
   const { load, setVolume: applyVolume, play } = player;
 
