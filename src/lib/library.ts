@@ -237,6 +237,8 @@ export function useLibrary() {
     deletePlaylist,
     addToPlaylist,
     removeFromPlaylist,
+    removeManyFromPlaylist,
+    moveTracksToPlaylist,
     reorderPlaylist,
     updateSettings,
     resetSettings,
