@@ -401,30 +401,29 @@ function MusicApp() {
         )}
       </main>
 
-      {showQueue && (
-        <QueuePanel
-          tracks={queue}
-          index={index}
-          isPlaying={player.isPlaying}
-          continuous={continuous}
-          loadingMore={extending}
-          onToggleContinuous={() => setContinuous((v) => !v)}
-          onJump={(i) => setIndex(i)}
-          onRemove={(i) => {
-            setQueue((prev) => prev.filter((_, x) => x !== i));
-            if (i < index) setIndex((x) => Math.max(0, x - 1));
-          }}
-          onClear={() => {
-            setQueue([]);
-            setIndex(0);
-          }}
-          onClose={() => setShowQueue(false)}
-        />
-      )}
-
       {/* Player */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
         <div className="mx-auto max-w-5xl px-4 py-3 sm:px-6">
+      {showQueue && (
+    <QueuePanel
+      tracks={queue}
+      index={index}
+      isPlaying={player.isPlaying}
+      continuous={continuous}
+      loadingMore={extending}
+      onToggleContinuous={() => setContinuous((v) => !v)}
+      onJump={(i) => setIndex(i)}
+      onRemove={(i) => {
+        setQueue((prev) => prev.filter((_, x) => x !== i));
+        if (i < index) setIndex((x) => Math.max(0, x - 1));
+      }}
+      onClear={() => {
+        setQueue([]);
+        setIndex(0);
+      }}
+      onClose={() => setShowQueue(false)}
+    />
+  )}
           <div
             className={cn(
               "mx-auto mb-3 aspect-video w-full max-w-md overflow-hidden rounded-xl bg-black",
