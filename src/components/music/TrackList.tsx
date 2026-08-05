@@ -35,6 +35,7 @@ export function TrackList({
   playlists,
   onAddToPlaylist,
   onCreatePlaylistWith,
+  onAddToQueue,
 }: Props) {
 
   if (tracks.length === 0) {
