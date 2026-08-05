@@ -121,6 +121,14 @@ export function TrackList({
                   <Plus className="h-4 w-4" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {onAddToQueue && (
+                    <>
+                      <DropdownMenuItem onSelect={() => onAddToQueue(track)}>
+                        Add to queue
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuLabel>Add to playlist</DropdownMenuLabel>
                   {(playlists ?? []).map((p) => (
                     <DropdownMenuItem key={p.id} onSelect={() => onAddToPlaylist(p.id, track)}>
