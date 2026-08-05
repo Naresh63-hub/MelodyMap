@@ -135,10 +135,8 @@ function MusicApp() {
     setIndex(startAt);
   }, []);
 
-  const loadRecommendations = useCallback(
+  const fetchPicks = useCallback(
     async (mood?: string) => {
-      setRecLoading(true);
-      setMessage(null);
       const res = await runRecommend({
         data: {
           liked: likes.slice(0, 20).map(trackLabel),
@@ -147,12 +145,56 @@ function MusicApp() {
           brief: settingsToBrief(settings, mood),
         },
       });
+      return res;
+    },
+    [runRecommend, likes, history, settings],
+  );
+
+  const loadRecommendations = useCallback(
+    async (mood?: string) => {
+      setRecLoading(true);
+      setMessage(null);
+      const res = await fetchPicks(mood);
       setRecLoading(false);
       if (res.error) setMessage(res.error);
       else setRecs(res.tracks as Track[]);
     },
-    [runRecommend, likes, history, settings],
+    [fetchPicks],
   );
+
+  const enqueue = useCallback((tracks: Track[]) => {
+    if (tracks.length === 0) return;
+    setQueue((prev) => {
+      const fresh = tracks.filter((t) => !prev.some((x) => x.id === t.id));
+      return [...prev, ...fresh];
+    });
+    setShowQueue(true);
+  }, []);
+
+  /** Continuous mode: fetch a fresh batch of picks and append them to the queue. */
+  const extendingRef = useRef(false);
+  const extendQueue = useCallback(async () => {
+    if (extendingRef.current) return;
+    extendingRef.current = true;
+    setExtending(true);
+    const res = await fetchPicks();
+    setExtending(false);
+    extendingRef.current = false;
+    if (res.error || res.tracks.length === 0) {
+      if (res.error) setMessage(res.error);
+      return;
+    }
+    const incoming = res.tracks as Track[];
+    setRecs(incoming);
+    setQueue((prev) => {
+      const fresh = incoming.filter((t) => !prev.some((x) => x.id === t.id));
+      if (fresh.length === 0) return prev;
+      const next = [...prev, ...fresh];
+      setIndex(prev.length);
+      return next;
+    });
+  }, [fetchPicks]);
+
 
   const bootstrapped = useRef(false);
   useEffect(() => {
