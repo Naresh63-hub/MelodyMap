@@ -143,6 +143,7 @@ function MusicApp() {
   }, [volume, player.ready, applyVolume]);
 
   const likedIds = useMemo(() => new Set(likes.map((t) => t.id)), [likes]);
+  const dislikedIds = useMemo(() => new Set(dislikes.map((t) => t.id)), [dislikes]);
 
   const startQueue = useCallback((tracks: Track[], startAt: number) => {
     setQueue(tracks);
@@ -155,14 +156,17 @@ function MusicApp() {
         data: {
           liked: likes.slice(0, 20).map(trackLabel),
           recent: history.slice(0, 20).map(trackLabel),
+          disliked: dislikes.slice(0, 20).map(trackLabel),
+          count: 30,
           ...(mood ? { mood } : {}),
           brief: settingsToBrief(settings, mood),
         },
       });
       return res;
     },
-    [runRecommend, likes, history, settings],
+    [runRecommend, likes, history, dislikes, settings],
   );
+
 
   const loadRecommendations = useCallback(
     async (mood?: string) => {
