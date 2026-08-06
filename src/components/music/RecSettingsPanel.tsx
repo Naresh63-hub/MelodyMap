@@ -95,6 +95,35 @@ export function RecSettingsPanel({ settings, onChange, onReset, onApply, loading
             </div>
           </div>
 
+          <div>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Languages
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {LANGUAGES.map((lang) => {
+                const on = settings.languages.includes(lang);
+                return (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => toggleLanguage(lang)}
+                    aria-pressed={on}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs transition-colors",
+                      on
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {lang}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+
+
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="w-28 shrink-0 text-xs text-muted-foreground">Familiar → Deep</span>
