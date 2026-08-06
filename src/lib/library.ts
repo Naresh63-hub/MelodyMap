@@ -108,12 +108,14 @@ function uid() {
 export function useLibrary() {
   const [hydrated, setHydrated] = useState(false);
   const [likes, setLikes] = useState<Track[]>([]);
+  const [dislikes, setDislikes] = useState<Track[]>([]);
   const [history, setHistory] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [settings, setSettings] = useState<RecSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     setLikes(read<Track[]>(LIKES_KEY, []));
+    setDislikes(read<Track[]>(DISLIKES_KEY, []));
     setHistory(read<Track[]>(HISTORY_KEY, []));
     setPlaylists(read<Playlist[]>(PLAYLISTS_KEY, []));
     setSettings({ ...DEFAULT_SETTINGS, ...read<Partial<RecSettings>>(SETTINGS_KEY, {}) });
@@ -121,6 +123,11 @@ export function useLibrary() {
   }, []);
 
   const toggleLike = useCallback((track: Track) => {
+    setDislikes((prev) => {
+      const next = prev.filter((t) => t.id !== track.id);
+      write(DISLIKES_KEY, next);
+      return next;
+    });
     setLikes((prev) => {
       const next = prev.some((t) => t.id === track.id)
         ? prev.filter((t) => t.id !== track.id)
@@ -130,13 +137,31 @@ export function useLibrary() {
     });
   }, []);
 
+  /** Thumbs-down: removes from favourites and tells the AI to avoid this song. */
+  const toggleDislike = useCallback((track: Track) => {
+    setLikes((prev) => {
+      const next = prev.filter((t) => t.id !== track.id);
+      write(LIKES_KEY, next);
+      return next;
+    });
+    setDislikes((prev) => {
+      const next = prev.some((t) => t.id === track.id)
+        ? prev.filter((t) => t.id !== track.id)
+        : [track, ...prev].slice(0, 200);
+      write(DISLIKES_KEY, next);
+      return next;
+    });
+  }, []);
+
   const logPlay = useCallback((track: Track) => {
     setHistory((prev) => {
-      const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 100);
+      const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 200);
       write(HISTORY_KEY, next);
       return next;
     });
   }, []);
+
+
 
   const clearHistory = useCallback(() => {
     setHistory([]);
