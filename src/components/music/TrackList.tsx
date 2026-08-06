@@ -1,4 +1,4 @@
-import { Heart, Play, Pause, Plus } from "lucide-react";
+import { Heart, Play, Pause, Plus, ThumbsDown } from "lucide-react";
 import type { Playlist, Track } from "@/lib/library";
 import {
   DropdownMenu,
@@ -15,8 +15,11 @@ type Props = {
   currentId?: string | undefined;
   isPlaying: boolean;
   likedIds: Set<string>;
+  dislikedIds?: Set<string>;
   onPlay: (track: Track, index: number) => void;
   onToggleLike: (track: Track) => void;
+  onToggleDislike?: (track: Track) => void;
+  onArtistClick?: (artist: string) => void;
   emptyMessage?: string;
   playlists?: Playlist[];
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
@@ -29,14 +32,18 @@ export function TrackList({
   currentId,
   isPlaying,
   likedIds,
+  dislikedIds,
   onPlay,
   onToggleLike,
+  onToggleDislike,
+  onArtistClick,
   emptyMessage,
   playlists,
   onAddToPlaylist,
   onCreatePlaylistWith,
   onAddToQueue,
 }: Props) {
+
 
   if (tracks.length === 0) {
     return (
