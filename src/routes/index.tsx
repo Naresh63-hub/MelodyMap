@@ -27,7 +27,7 @@ import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { useLibrary, trackLabel, settingsToBrief, type Track } from "@/lib/library";
+import { useLibrary, trackLabel, settingsToBrief, MOODS, type Track } from "@/lib/library";
 import { useMediaSession } from "@/lib/use-media-session";
 import { recommendTracks, searchTracks } from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
