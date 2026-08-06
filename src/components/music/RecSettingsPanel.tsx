@@ -21,6 +21,14 @@ export function RecSettingsPanel({ settings, onChange, onReset, onApply, loading
         : [...settings.genres, genre],
     });
 
+  const toggleLanguage = (lang: string) =>
+    onChange({
+      languages: settings.languages.includes(lang)
+        ? settings.languages.filter((l) => l !== lang)
+        : [...settings.languages, lang],
+    });
+
+
   return (
     <section className="rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
