@@ -2,7 +2,7 @@ import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { GENRES, MOODS, type RecSettings } from "@/lib/library";
+import { GENRES, LANGUAGES, MOODS, type RecSettings } from "@/lib/library";
 import { cn } from "@/lib/utils";
 
 type Props = {
