@@ -70,11 +70,14 @@ function MusicApp() {
   const {
     hydrated,
     likes,
+    dislikes,
     history,
     playlists,
     settings,
     toggleLike,
+    toggleDislike,
     logPlay,
+
     clearHistory,
     createPlaylist,
     renamePlaylist,
