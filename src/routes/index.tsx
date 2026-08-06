@@ -15,20 +15,24 @@ import {
   ListVideo,
   Settings2,
   Sparkles,
+  ThumbsDown,
   Volume2,
 } from "lucide-react";
 
 import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
+import { ScrubBar } from "@/components/music/ScrubBar";
 import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useLibrary, trackLabel, settingsToBrief, type Track } from "@/lib/library";
+import { useMediaSession } from "@/lib/use-media-session";
 import { recommendTracks, searchTracks } from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
 import { cn } from "@/lib/utils";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
