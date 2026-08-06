@@ -320,6 +320,10 @@ export function settingsToBrief(settings: RecSettings, extraMood?: string) {
     moods.length ? `Lean into these moods: ${moods.join(", ")}.` : "",
     avoid.length ? `Avoid: ${avoid.join(", ")}.` : "",
     settings.genres.length ? `Preferred genres: ${settings.genres.join(", ")}.` : "",
+    settings.languages.length
+      ? `Only songs in these languages: ${settings.languages.join(", ")}.`
+      : "",
+
     `Familiarity vs discovery: ${settings.discovery}% deep cuts, ${100 - settings.discovery}% familiar hits.`,
     `Energy level target: ${settings.energy}/100.`,
     settings.instrumentalOnly ? "Only instrumental tracks, no vocals." : "",
