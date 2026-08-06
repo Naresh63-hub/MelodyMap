@@ -558,7 +558,7 @@ function MusicApp() {
                 variant="ghost"
                 size="icon"
                 disabled={!canPrev}
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                onClick={goPrev}
                 aria-label="Previous track"
               >
                 <SkipBack className="h-5 w-5" />
@@ -567,7 +567,7 @@ function MusicApp() {
                 size="icon"
                 className="h-11 w-11 rounded-full"
                 disabled={!current}
-                onClick={() => (player.isPlaying ? player.pause() : player.play())}
+                onClick={togglePlay}
                 aria-label={player.isPlaying ? "Pause" : "Play"}
               >
                 {player.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
@@ -575,8 +575,8 @@ function MusicApp() {
               <Button
                 variant="ghost"
                 size="icon"
-                disabled={!canNext}
-                onClick={() => setIndex((i) => i + 1)}
+                disabled={!canNext && !continuous}
+                onClick={goNext}
                 aria-label="Next track"
               >
                 <SkipForward className="h-5 w-5" />
@@ -591,21 +591,37 @@ function MusicApp() {
                 <ListVideo className="h-5 w-5" />
               </Button>
               {current && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => toggleLike(current)}
-                  aria-label="Favourite this song"
-                >
-                  <Heart
-                    className={cn(
-                      "h-5 w-5",
-                      likedIds.has(current.id) && "fill-accent text-accent",
-                    )}
-                  />
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => toggleLike(current)}
+                    aria-label="Favourite this song"
+                  >
+                    <Heart
+                      className={cn(
+                        "h-5 w-5",
+                        likedIds.has(current.id) && "fill-accent text-accent",
+                      )}
+                    />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={dislikeCurrent}
+                    aria-label="Not for me — play something else"
+                  >
+                    <ThumbsDown
+                      className={cn(
+                        "h-5 w-5",
+                        dislikedIds.has(current.id) && "fill-destructive text-destructive",
+                      )}
+                    />
+                  </Button>
+                </>
               )}
             </div>
+
           </div>
 
           <div className="mt-2 flex items-center gap-3">
