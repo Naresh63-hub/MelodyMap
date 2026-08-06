@@ -612,14 +612,14 @@ function MusicApp() {
             <span className="w-10 text-right text-[11px] tabular-nums text-muted-foreground">
               {formatTime(player.position)}
             </span>
-            <Slider
-              value={[player.duration ? (player.position / player.duration) * 100 : 0]}
-              max={100}
-              step={0.5}
-              onValueChange={([v]) => player.seek(((v ?? 0) / 100) * player.duration)}
+            <ScrubBar
+              position={player.position}
+              duration={player.duration}
+              thumbnail={current?.thumbnail}
+              onSeek={(s) => player.seek(s)}
               className="flex-1"
-              aria-label="Seek"
             />
+
             <span className="w-10 text-[11px] tabular-nums text-muted-foreground">
               {formatTime(player.duration)}
             </span>
