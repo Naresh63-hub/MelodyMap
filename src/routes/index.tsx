@@ -410,7 +410,7 @@ function MusicApp() {
               <Settings2 className="mr-2 h-4 w-4" />
               {showSettings ? "Hide tuning" : "Tune picks"}
             </Button>
-            {["late night", "upbeat workout", "focus", "sad hours", "throwbacks"].map((mood) => (
+            {MOODS.map((mood) => (
               <button
                 key={mood}
                 type="button"
