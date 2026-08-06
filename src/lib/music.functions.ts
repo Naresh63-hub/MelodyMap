@@ -78,7 +78,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
       return { tracks: [], error: "Could not read the recommendations." };
     }
 
-    const valid = picks.filter((p) => p.title && p.artist).slice(0, 12);
+    const valid = picks.filter((p) => p.title && p.artist).slice(0, count);
     const resolved = await Promise.all(
       valid.map(async (p) => {
         try {
