@@ -220,17 +220,34 @@ function MusicApp() {
     void loadRecommendations();
   }, [hydrated, loadRecommendations]);
 
-  const onSearch = async (event: React.FormEvent) => {
+  const searchFor = useCallback(
+    async (term: string) => {
+      if (!term.trim()) return;
+      setTab("search");
+      setSearching(true);
+      setMessage(null);
+      const res = await runSearch({ data: { query: term.trim(), limit: 50 } });
+      setSearching(false);
+      if (res.error) setMessage(res.error);
+      setResults(res.tracks as Track[]);
+    },
+    [runSearch],
+  );
+
+  const onSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!query.trim()) return;
-    setTab("search");
-    setSearching(true);
-    setMessage(null);
-    const res = await runSearch({ data: { query: query.trim(), limit: 25 } });
-    setSearching(false);
-    if (res.error) setMessage(res.error);
-    setResults(res.tracks as Track[]);
+    void searchFor(query);
   };
+
+  /** Opens a "songs by this artist" view. */
+  const openArtist = useCallback(
+    (artist: string) => {
+      setQuery(artist);
+      void searchFor(`${artist} songs`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [searchFor],
+  );
 
   const listForTab: Record<Tab, Track[]> = {
     foryou: recs,
@@ -243,6 +260,75 @@ function MusicApp() {
 
   const canPrev = index > 0;
   const canNext = index + 1 < queue.length;
+
+  const goNext = useCallback(() => {
+    if (queueRef.current.length === 0) return;
+    setIndex((i) => {
+      if (i + 1 < queueRef.current.length) return i + 1;
+      if (continuous) void extendQueue();
+      return i;
+    });
+  }, [continuous, extendQueue]);
+
+  const goPrev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+
+  const togglePlay = useCallback(() => {
+    if (player.isPlaying) player.pause();
+    else player.play();
+  }, [player]);
+
+  /** Thumbs-down: teaches the feed and jumps to the next song. */
+  const dislikeCurrent = useCallback(() => {
+    const track = currentRef.current;
+    if (!track) return;
+    toggleDislike(track);
+    setRecs((prev) => prev.filter((t) => t.id !== track.id));
+    goNext();
+  }, [toggleDislike, goNext]);
+
+  const mediaHandlers = useMemo(
+    () => ({
+      onPlay: () => player.play(),
+      onPause: () => player.pause(),
+      onNext: goNext,
+      onPrev: goPrev,
+      onSeek: (s: number) => player.seek(s),
+    }),
+    [player, goNext, goPrev],
+  );
+  useMediaSession(current, player.isPlaying, player.position, player.duration, mediaHandlers);
+
+  // Keyboard shortcuts: space play/pause, ←/→ seek 5s, J/L seek 10s, N/P track, K play/pause
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable))
+        return;
+      const key = e.key.toLowerCase();
+      const seekBy = (s: number) => player.seek(Math.max(0, player.position + s));
+      if (e.code === "Space" || key === "k") {
+        e.preventDefault();
+        togglePlay();
+      } else if (key === "arrowright") {
+        e.preventDefault();
+        seekBy(5);
+      } else if (key === "arrowleft") {
+        e.preventDefault();
+        seekBy(-5);
+      } else if (key === "l") {
+        seekBy(10);
+      } else if (key === "j") {
+        seekBy(-10);
+      } else if (key === "n") {
+        goNext();
+      } else if (key === "p") {
+        goPrev();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [player, togglePlay, goNext, goPrev]);
+
 
   return (
     <div className="min-h-screen pb-40">
