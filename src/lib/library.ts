@@ -31,28 +31,56 @@ export const GENRES = [
   "Metal",
 ] as const;
 
+export const LANGUAGES = [
+  "Hindi",
+  "Telugu",
+  "Tamil",
+  "Malayalam",
+  "Kannada",
+  "Punjabi",
+  "English",
+  "Korean",
+  "Spanish",
+  "Arabic",
+] as const;
+
 export type RecSettings = {
   moods: Record<string, number>; // 0-100 weighting per mood
   genres: string[];
+  languages: string[];
   discovery: number; // 0 = familiar, 100 = deep cuts
   energy: number; // 0 = calm, 100 = high energy
   instrumentalOnly: boolean;
 };
 
-export const MOODS = ["late night", "upbeat workout", "focus", "sad hours", "throwbacks"] as const;
+export const MOODS = [
+  "late night",
+  "upbeat workout",
+  "focus",
+  "sad hours",
+  "throwbacks",
+  "romantic",
+  "happy",
+  "party",
+  "chill",
+  "devotional",
+] as const;
 
 export const DEFAULT_SETTINGS: RecSettings = {
   moods: Object.fromEntries(MOODS.map((m) => [m, 50])),
   genres: [],
+  languages: [],
   discovery: 40,
   energy: 50,
   instrumentalOnly: false,
 };
 
 const LIKES_KEY = "vinyl.likes.v1";
+const DISLIKES_KEY = "vinyl.dislikes.v1";
 const HISTORY_KEY = "vinyl.history.v1";
 const PLAYLISTS_KEY = "vinyl.playlists.v1";
 const SETTINGS_KEY = "vinyl.recsettings.v1";
+
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -80,12 +108,14 @@ function uid() {
 export function useLibrary() {
   const [hydrated, setHydrated] = useState(false);
   const [likes, setLikes] = useState<Track[]>([]);
+  const [dislikes, setDislikes] = useState<Track[]>([]);
   const [history, setHistory] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [settings, setSettings] = useState<RecSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
     setLikes(read<Track[]>(LIKES_KEY, []));
+    setDislikes(read<Track[]>(DISLIKES_KEY, []));
     setHistory(read<Track[]>(HISTORY_KEY, []));
     setPlaylists(read<Playlist[]>(PLAYLISTS_KEY, []));
     setSettings({ ...DEFAULT_SETTINGS, ...read<Partial<RecSettings>>(SETTINGS_KEY, {}) });
@@ -93,6 +123,11 @@ export function useLibrary() {
   }, []);
 
   const toggleLike = useCallback((track: Track) => {
+    setDislikes((prev) => {
+      const next = prev.filter((t) => t.id !== track.id);
+      write(DISLIKES_KEY, next);
+      return next;
+    });
     setLikes((prev) => {
       const next = prev.some((t) => t.id === track.id)
         ? prev.filter((t) => t.id !== track.id)
@@ -102,13 +137,31 @@ export function useLibrary() {
     });
   }, []);
 
+  /** Thumbs-down: removes from favourites and tells the AI to avoid this song. */
+  const toggleDislike = useCallback((track: Track) => {
+    setLikes((prev) => {
+      const next = prev.filter((t) => t.id !== track.id);
+      write(LIKES_KEY, next);
+      return next;
+    });
+    setDislikes((prev) => {
+      const next = prev.some((t) => t.id === track.id)
+        ? prev.filter((t) => t.id !== track.id)
+        : [track, ...prev].slice(0, 200);
+      write(DISLIKES_KEY, next);
+      return next;
+    });
+  }, []);
+
   const logPlay = useCallback((track: Track) => {
     setHistory((prev) => {
-      const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 100);
+      const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 200);
       write(HISTORY_KEY, next);
       return next;
     });
   }, []);
+
+
 
   const clearHistory = useCallback(() => {
     setHistory([]);
@@ -226,11 +279,14 @@ export function useLibrary() {
   return {
     hydrated,
     likes,
+    dislikes,
     history,
     playlists,
     settings,
     toggleLike,
+    toggleDislike,
     logPlay,
+
     clearHistory,
     createPlaylist,
     renamePlaylist,
@@ -264,6 +320,10 @@ export function settingsToBrief(settings: RecSettings, extraMood?: string) {
     moods.length ? `Lean into these moods: ${moods.join(", ")}.` : "",
     avoid.length ? `Avoid: ${avoid.join(", ")}.` : "",
     settings.genres.length ? `Preferred genres: ${settings.genres.join(", ")}.` : "",
+    settings.languages.length
+      ? `Only songs in these languages: ${settings.languages.join(", ")}.`
+      : "",
+
     `Familiarity vs discovery: ${settings.discovery}% deep cuts, ${100 - settings.discovery}% familiar hits.`,
     `Energy level target: ${settings.energy}/100.`,
     settings.instrumentalOnly ? "Only instrumental tracks, no vocals." : "",

@@ -15,20 +15,24 @@ import {
   ListVideo,
   Settings2,
   Sparkles,
+  ThumbsDown,
   Volume2,
 } from "lucide-react";
 
 import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
+import { ScrubBar } from "@/components/music/ScrubBar";
 import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { useLibrary, trackLabel, settingsToBrief, type Track } from "@/lib/library";
+import { useLibrary, trackLabel, settingsToBrief, MOODS, type Track } from "@/lib/library";
+import { useMediaSession } from "@/lib/use-media-session";
 import { recommendTracks, searchTracks } from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
 import { cn } from "@/lib/utils";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -66,11 +70,14 @@ function MusicApp() {
   const {
     hydrated,
     likes,
+    dislikes,
     history,
     playlists,
     settings,
     toggleLike,
+    toggleDislike,
     logPlay,
+
     clearHistory,
     createPlaylist,
     renamePlaylist,
@@ -136,6 +143,7 @@ function MusicApp() {
   }, [volume, player.ready, applyVolume]);
 
   const likedIds = useMemo(() => new Set(likes.map((t) => t.id)), [likes]);
+  const dislikedIds = useMemo(() => new Set(dislikes.map((t) => t.id)), [dislikes]);
 
   const startQueue = useCallback((tracks: Track[], startAt: number) => {
     setQueue(tracks);
@@ -148,14 +156,17 @@ function MusicApp() {
         data: {
           liked: likes.slice(0, 20).map(trackLabel),
           recent: history.slice(0, 20).map(trackLabel),
+          disliked: dislikes.slice(0, 20).map(trackLabel),
+          count: 30,
           ...(mood ? { mood } : {}),
           brief: settingsToBrief(settings, mood),
         },
       });
       return res;
     },
-    [runRecommend, likes, history, settings],
+    [runRecommend, likes, history, dislikes, settings],
   );
+
 
   const loadRecommendations = useCallback(
     async (mood?: string) => {
@@ -209,17 +220,34 @@ function MusicApp() {
     void loadRecommendations();
   }, [hydrated, loadRecommendations]);
 
-  const onSearch = async (event: React.FormEvent) => {
+  const searchFor = useCallback(
+    async (term: string) => {
+      if (!term.trim()) return;
+      setTab("search");
+      setSearching(true);
+      setMessage(null);
+      const res = await runSearch({ data: { query: term.trim(), limit: 50 } });
+      setSearching(false);
+      if (res.error) setMessage(res.error);
+      setResults(res.tracks as Track[]);
+    },
+    [runSearch],
+  );
+
+  const onSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!query.trim()) return;
-    setTab("search");
-    setSearching(true);
-    setMessage(null);
-    const res = await runSearch({ data: { query: query.trim(), limit: 25 } });
-    setSearching(false);
-    if (res.error) setMessage(res.error);
-    setResults(res.tracks as Track[]);
+    void searchFor(query);
   };
+
+  /** Opens a "songs by this artist" view. */
+  const openArtist = useCallback(
+    (artist: string) => {
+      setQuery(artist);
+      void searchFor(`${artist} songs`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    [searchFor],
+  );
 
   const listForTab: Record<Tab, Track[]> = {
     foryou: recs,
@@ -232,6 +260,75 @@ function MusicApp() {
 
   const canPrev = index > 0;
   const canNext = index + 1 < queue.length;
+
+  const goNext = useCallback(() => {
+    if (queueRef.current.length === 0) return;
+    setIndex((i) => {
+      if (i + 1 < queueRef.current.length) return i + 1;
+      if (continuous) void extendQueue();
+      return i;
+    });
+  }, [continuous, extendQueue]);
+
+  const goPrev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
+
+  const togglePlay = useCallback(() => {
+    if (player.isPlaying) player.pause();
+    else player.play();
+  }, [player]);
+
+  /** Thumbs-down: teaches the feed and jumps to the next song. */
+  const dislikeCurrent = useCallback(() => {
+    const track = currentRef.current;
+    if (!track) return;
+    toggleDislike(track);
+    setRecs((prev) => prev.filter((t) => t.id !== track.id));
+    goNext();
+  }, [toggleDislike, goNext]);
+
+  const mediaHandlers = useMemo(
+    () => ({
+      onPlay: () => player.play(),
+      onPause: () => player.pause(),
+      onNext: goNext,
+      onPrev: goPrev,
+      onSeek: (s: number) => player.seek(s),
+    }),
+    [player, goNext, goPrev],
+  );
+  useMediaSession(current, player.isPlaying, player.position, player.duration, mediaHandlers);
+
+  // Keyboard shortcuts: space play/pause, ←/→ seek 5s, J/L seek 10s, N/P track, K play/pause
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable))
+        return;
+      const key = e.key.toLowerCase();
+      const seekBy = (s: number) => player.seek(Math.max(0, player.position + s));
+      if (e.code === "Space" || key === "k") {
+        e.preventDefault();
+        togglePlay();
+      } else if (key === "arrowright") {
+        e.preventDefault();
+        seekBy(5);
+      } else if (key === "arrowleft") {
+        e.preventDefault();
+        seekBy(-5);
+      } else if (key === "l") {
+        seekBy(10);
+      } else if (key === "j") {
+        seekBy(-10);
+      } else if (key === "n") {
+        goNext();
+      } else if (key === "p") {
+        goPrev();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [player, togglePlay, goNext, goPrev]);
+
 
   return (
     <div className="min-h-screen pb-40">
@@ -313,7 +410,7 @@ function MusicApp() {
               <Settings2 className="mr-2 h-4 w-4" />
               {showSettings ? "Hide tuning" : "Tune picks"}
             </Button>
-            {["late night", "upbeat workout", "focus", "sad hours", "throwbacks"].map((mood) => (
+            {MOODS.map((mood) => (
               <button
                 key={mood}
                 type="button"
@@ -373,6 +470,7 @@ function MusicApp() {
             currentId={current?.id}
             isPlaying={player.isPlaying}
             likedIds={likedIds}
+            dislikedIds={dislikedIds}
             onPlay={(track, i) => {
               if (current?.id === track.id) {
                 player.isPlaying ? player.pause() : player.play();
@@ -381,6 +479,12 @@ function MusicApp() {
               startQueue(visible, i);
             }}
             onToggleLike={toggleLike}
+            onToggleDislike={(track) => {
+              toggleDislike(track);
+              setRecs((prev) => prev.filter((t) => t.id !== track.id));
+            }}
+            onArtistClick={openArtist}
+
             playlists={playlists}
             onAddToPlaylist={addToPlaylist}
             onAddToQueue={(track) => enqueue([track])}
@@ -454,7 +558,7 @@ function MusicApp() {
                 variant="ghost"
                 size="icon"
                 disabled={!canPrev}
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                onClick={goPrev}
                 aria-label="Previous track"
               >
                 <SkipBack className="h-5 w-5" />
@@ -463,7 +567,7 @@ function MusicApp() {
                 size="icon"
                 className="h-11 w-11 rounded-full"
                 disabled={!current}
-                onClick={() => (player.isPlaying ? player.pause() : player.play())}
+                onClick={togglePlay}
                 aria-label={player.isPlaying ? "Pause" : "Play"}
               >
                 {player.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
@@ -471,8 +575,8 @@ function MusicApp() {
               <Button
                 variant="ghost"
                 size="icon"
-                disabled={!canNext}
-                onClick={() => setIndex((i) => i + 1)}
+                disabled={!canNext && !continuous}
+                onClick={goNext}
                 aria-label="Next track"
               >
                 <SkipForward className="h-5 w-5" />
@@ -487,35 +591,51 @@ function MusicApp() {
                 <ListVideo className="h-5 w-5" />
               </Button>
               {current && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => toggleLike(current)}
-                  aria-label="Favourite this song"
-                >
-                  <Heart
-                    className={cn(
-                      "h-5 w-5",
-                      likedIds.has(current.id) && "fill-accent text-accent",
-                    )}
-                  />
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => toggleLike(current)}
+                    aria-label="Favourite this song"
+                  >
+                    <Heart
+                      className={cn(
+                        "h-5 w-5",
+                        likedIds.has(current.id) && "fill-accent text-accent",
+                      )}
+                    />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={dislikeCurrent}
+                    aria-label="Not for me — play something else"
+                  >
+                    <ThumbsDown
+                      className={cn(
+                        "h-5 w-5",
+                        dislikedIds.has(current.id) && "fill-destructive text-destructive",
+                      )}
+                    />
+                  </Button>
+                </>
               )}
             </div>
+
           </div>
 
           <div className="mt-2 flex items-center gap-3">
             <span className="w-10 text-right text-[11px] tabular-nums text-muted-foreground">
               {formatTime(player.position)}
             </span>
-            <Slider
-              value={[player.duration ? (player.position / player.duration) * 100 : 0]}
-              max={100}
-              step={0.5}
-              onValueChange={([v]) => player.seek(((v ?? 0) / 100) * player.duration)}
+            <ScrubBar
+              position={player.position}
+              duration={player.duration}
+              thumbnail={current?.thumbnail}
+              onSeek={(s) => player.seek(s)}
               className="flex-1"
-              aria-label="Seek"
             />
+
             <span className="w-10 text-[11px] tabular-nums text-muted-foreground">
               {formatTime(player.duration)}
             </span>
