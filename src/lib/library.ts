@@ -279,11 +279,14 @@ export function useLibrary() {
   return {
     hydrated,
     likes,
+    dislikes,
     history,
     playlists,
     settings,
     toggleLike,
+    toggleDislike,
     logPlay,
+
     clearHistory,
     createPlaylist,
     renamePlaylist,
