@@ -87,24 +87,36 @@ export function TrackList({
               </span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => onPlay(track, index)}
-              className="min-w-0 flex-1 text-left"
-            >
-              <p
-                className={cn(
-                  "truncate text-sm font-semibold",
-                  active ? "text-primary" : "text-foreground",
-                )}
+            <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => onPlay(track, index)}
+                className="block w-full min-w-0 text-left"
               >
-                {track.title}
-              </p>
+                <p
+                  className={cn(
+                    "truncate text-sm font-semibold",
+                    active ? "text-primary" : "text-foreground",
+                  )}
+                >
+                  {track.title}
+                </p>
+              </button>
               <p className="truncate text-xs text-muted-foreground">
-                {track.artist}
+                {onArtistClick ? (
+                  <button
+                    type="button"
+                    onClick={() => onArtistClick(track.artist)}
+                    className="underline-offset-2 hover:text-primary hover:underline"
+                  >
+                    {track.artist}
+                  </button>
+                ) : (
+                  track.artist
+                )}
                 {track.reason ? ` · ${track.reason}` : ""}
               </p>
-            </button>
+            </div>
 
             <span className="hidden text-xs tabular-nums text-muted-foreground sm:block">
               {track.duration}
@@ -118,6 +130,23 @@ export function TrackList({
             >
               <Heart className={cn("h-4 w-4", liked && "fill-accent text-accent")} />
             </button>
+
+            {onToggleDislike && (
+              <button
+                type="button"
+                onClick={() => onToggleDislike(track)}
+                aria-label="Not for me"
+                className="rounded-full p-2 text-muted-foreground transition-colors hover:text-destructive"
+              >
+                <ThumbsDown
+                  className={cn(
+                    "h-4 w-4",
+                    dislikedIds?.has(track.id) && "fill-destructive text-destructive",
+                  )}
+                />
+              </button>
+            )}
+
 
             {onAddToPlaylist && (
               <DropdownMenu>
