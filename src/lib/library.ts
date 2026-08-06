@@ -31,28 +31,56 @@ export const GENRES = [
   "Metal",
 ] as const;
 
+export const LANGUAGES = [
+  "Hindi",
+  "Telugu",
+  "Tamil",
+  "Malayalam",
+  "Kannada",
+  "Punjabi",
+  "English",
+  "Korean",
+  "Spanish",
+  "Arabic",
+] as const;
+
 export type RecSettings = {
   moods: Record<string, number>; // 0-100 weighting per mood
   genres: string[];
+  languages: string[];
   discovery: number; // 0 = familiar, 100 = deep cuts
   energy: number; // 0 = calm, 100 = high energy
   instrumentalOnly: boolean;
 };
 
-export const MOODS = ["late night", "upbeat workout", "focus", "sad hours", "throwbacks"] as const;
+export const MOODS = [
+  "late night",
+  "upbeat workout",
+  "focus",
+  "sad hours",
+  "throwbacks",
+  "romantic",
+  "happy",
+  "party",
+  "chill",
+  "devotional",
+] as const;
 
 export const DEFAULT_SETTINGS: RecSettings = {
   moods: Object.fromEntries(MOODS.map((m) => [m, 50])),
   genres: [],
+  languages: [],
   discovery: 40,
   energy: 50,
   instrumentalOnly: false,
 };
 
 const LIKES_KEY = "vinyl.likes.v1";
+const DISLIKES_KEY = "vinyl.dislikes.v1";
 const HISTORY_KEY = "vinyl.history.v1";
 const PLAYLISTS_KEY = "vinyl.playlists.v1";
 const SETTINGS_KEY = "vinyl.recsettings.v1";
+
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
