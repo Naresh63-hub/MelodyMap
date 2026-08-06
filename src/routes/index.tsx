@@ -470,6 +470,7 @@ function MusicApp() {
             currentId={current?.id}
             isPlaying={player.isPlaying}
             likedIds={likedIds}
+            dislikedIds={dislikedIds}
             onPlay={(track, i) => {
               if (current?.id === track.id) {
                 player.isPlaying ? player.pause() : player.play();
@@ -478,6 +479,12 @@ function MusicApp() {
               startQueue(visible, i);
             }}
             onToggleLike={toggleLike}
+            onToggleDislike={(track) => {
+              toggleDislike(track);
+              setRecs((prev) => prev.filter((t) => t.id !== track.id));
+            }}
+            onArtistClick={openArtist}
+
             playlists={playlists}
             onAddToPlaylist={addToPlaylist}
             onAddToQueue={(track) => enqueue([track])}
