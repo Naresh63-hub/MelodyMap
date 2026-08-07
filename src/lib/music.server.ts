@@ -128,8 +128,9 @@ export async function searchYouTube(
 
     tracks.push({
       id,
-      title: text(r["title"]),
+      title,
       artist: text(r["ownerText"]) || text(r["longBylineText"]) || "Unknown artist",
+
       duration,
       thumbnail:
         (thumbs[thumbs.length - 1]?.["url"] as string | undefined) ??
