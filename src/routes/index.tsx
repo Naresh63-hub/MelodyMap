@@ -105,6 +105,8 @@ function MusicApp() {
 
   const [tab, setTab] = useState<Tab>("foryou");
   const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
   const [recs, setRecs] = useState<Track[]>([]);
@@ -119,6 +121,7 @@ function MusicApp() {
   const [showQueue, setShowQueue] = useState(false);
   const [continuous, setContinuous] = useState(true);
   const [extending, setExtending] = useState(false);
+  const [resumed, setResumed] = useState(false);
 
 
   const current = queue[index];
@@ -139,18 +142,51 @@ function MusicApp() {
   });
 
 
-  const { load, setVolume: applyVolume, play } = player;
+  const { load, cue, setVolume: applyVolume, play } = player;
+
+  /** Restore the last session's queue and seek position (paused until you hit play). */
+  const resumeRef = useRef<number | null>(null);
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const saved = readPlayback();
+    if (!saved) {
+      setResumed(true);
+      return;
+    }
+    resumeRef.current = saved.position;
+    setQueue(saved.queue);
+    setIndex(Math.min(saved.index, saved.queue.length - 1));
+  }, []);
 
   useEffect(() => {
     const track = currentRef.current;
     if (!player.ready || !track) return;
+    const resumeAt = resumeRef.current;
+    if (resumeAt !== null) {
+      resumeRef.current = null;
+      cue(track.id, resumeAt);
+      setResumed(true);
+      return;
+    }
     load(track.id);
     play();
     logPlay(track);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, player.ready, load, play, logPlay]);
+  }, [current?.id, player.ready, load, cue, play, logPlay]);
+
+  /** Persist queue + seek position so reopening the app picks up where it stopped. */
+  useEffect(() => {
+    if (!resumed || queue.length === 0) return;
+    const timer = window.setInterval(() => {
+      writePlayback({ queue, index, position: player.position });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [resumed, queue, index, player.position]);
 
   useEffect(() => {
+
     if (player.ready) applyVolume(volume);
   }, [volume, player.ready, applyVolume]);
 
