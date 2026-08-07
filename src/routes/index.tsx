@@ -272,6 +272,7 @@ function MusicApp() {
     async (term: string) => {
       if (!term.trim()) return;
       setTab("search");
+      setShowSuggestions(false);
       setSearching(true);
       setMessage(null);
       const res = await runSearch({ data: { query: term.trim(), limit: 50 } });
@@ -282,10 +283,30 @@ function MusicApp() {
     [runSearch],
   );
 
+  /** Debounced YouTube autocomplete for the search box. */
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void runSuggest({ data: { query: term } }).then((res) => {
+        if (!cancelled) setSuggestions(res.suggestions);
+      });
+    }, 220);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, runSuggest]);
+
   const onSearch = (event: React.FormEvent) => {
     event.preventDefault();
     void searchFor(query);
   };
+
 
   /** Opens a "songs by this artist" view. */
   const openArtist = useCallback(
