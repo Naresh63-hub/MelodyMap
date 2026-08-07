@@ -14,6 +14,18 @@ export const searchTracks = createServerFn({ method: "POST" })
     }
   });
 
+export const suggestSearch = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ query: z.string().min(1).max(120) }).parse(input))
+  .handler(async ({ data }) => {
+    const { suggestQueries } = await import("./music.server");
+    try {
+      return { suggestions: await suggestQueries(data.query) };
+    } catch {
+      return { suggestions: [] as string[] };
+    }
+  });
+
+
 const RecommendInput = z.object({
   liked: z.array(z.string()).max(40),
   recent: z.array(z.string()).max(40),
