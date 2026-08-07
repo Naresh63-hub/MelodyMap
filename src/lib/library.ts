@@ -105,6 +105,26 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const PLAYBACK_KEY = "vinyl.playback.v1";
+
+export type SavedPlayback = {
+  queue: Track[];
+  index: number;
+  position: number;
+};
+
+/** Last queue + seek position, so reopening the app resumes where you left off. */
+export function readPlayback(): SavedPlayback | null {
+  const saved = read<SavedPlayback | null>(PLAYBACK_KEY, null);
+  if (!saved || !Array.isArray(saved.queue) || saved.queue.length === 0) return null;
+  return saved;
+}
+
+export function writePlayback(value: SavedPlayback) {
+  write(PLAYBACK_KEY, { ...value, queue: value.queue.slice(0, 100) });
+}
+
+
 export function useLibrary() {
   const [hydrated, setHydrated] = useState(false);
   const [likes, setLikes] = useState<Track[]>([]);
