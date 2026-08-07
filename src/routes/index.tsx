@@ -77,6 +77,8 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Sparkles }> = [
 function MusicApp() {
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
+  const runSuggest = useServerFn(suggestSearch);
+
   const {
     hydrated,
     likes,
