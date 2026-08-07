@@ -96,6 +96,13 @@ export function useYouTubePlayer(options: { onEnded: () => void }) {
   }, []);
 
   const load = useCallback((id: string) => playerRef.current?.loadVideoById(id), []);
+  /** Loads without autoplay — used to resume the last session at its saved position. */
+  const cue = useCallback(
+    (id: string, startSeconds = 0) =>
+      playerRef.current?.cueVideoById({ videoId: id, startSeconds }),
+    [],
+  );
+
   const play = useCallback(() => playerRef.current?.playVideo(), []);
   const pause = useCallback(() => playerRef.current?.pauseVideo(), []);
   const seek = useCallback((seconds: number) => playerRef.current?.seekTo(seconds, true), []);
