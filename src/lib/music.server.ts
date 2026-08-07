@@ -121,8 +121,11 @@ export async function searchYouTube(
     if (typeof id !== "string" || seen.has(id)) continue;
     const duration = text(r["lengthText"]);
     if (!duration) continue; // skip live streams / shorts
+    const title = text(r["title"]);
+    if (musicOnly && !looksLikeMusic(title, durationSeconds(duration))) continue;
     const thumbs = ((r["thumbnail"] as AnyRecord | undefined)?.["thumbnails"] ?? []) as AnyRecord[];
     seen.add(id);
+
     tracks.push({
       id,
       title: text(r["title"]),
