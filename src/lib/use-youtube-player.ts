@@ -4,6 +4,8 @@ type YTPlayer = {
   playVideo: () => void;
   pauseVideo: () => void;
   loadVideoById: (id: string) => void;
+  cueVideoById: (opts: { videoId: string; startSeconds?: number }) => void;
+
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   setVolume: (v: number) => void;
   getCurrentTime: () => number;
@@ -94,6 +96,13 @@ export function useYouTubePlayer(options: { onEnded: () => void }) {
   }, []);
 
   const load = useCallback((id: string) => playerRef.current?.loadVideoById(id), []);
+  /** Loads without autoplay — used to resume the last session at its saved position. */
+  const cue = useCallback(
+    (id: string, startSeconds = 0) =>
+      playerRef.current?.cueVideoById({ videoId: id, startSeconds }),
+    [],
+  );
+
   const play = useCallback(() => playerRef.current?.playVideo(), []);
   const pause = useCallback(() => playerRef.current?.pauseVideo(), []);
   const seek = useCallback((seconds: number) => playerRef.current?.seekTo(seconds, true), []);
@@ -106,6 +115,8 @@ export function useYouTubePlayer(options: { onEnded: () => void }) {
     position,
     duration,
     load,
+    cue,
+
     play,
     pause,
     seek,

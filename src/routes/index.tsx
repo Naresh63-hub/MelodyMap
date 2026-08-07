@@ -19,6 +19,7 @@ import {
   Volume2,
 } from "lucide-react";
 
+import { Equalizer, SpinningArt } from "@/components/music/NowPlayingViz";
 import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
@@ -27,11 +28,20 @@ import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { useLibrary, trackLabel, settingsToBrief, MOODS, type Track } from "@/lib/library";
+import {
+  useLibrary,
+  trackLabel,
+  settingsToBrief,
+  readPlayback,
+  writePlayback,
+  MOODS,
+  type Track,
+} from "@/lib/library";
 import { useMediaSession } from "@/lib/use-media-session";
-import { recommendTracks, searchTracks } from "@/lib/music.functions";
+import { recommendTracks, searchTracks, suggestSearch } from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
 import { cn } from "@/lib/utils";
+
 
 
 export const Route = createFileRoute("/")({
@@ -67,6 +77,8 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Sparkles }> = [
 function MusicApp() {
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
+  const runSuggest = useServerFn(suggestSearch);
+
   const {
     hydrated,
     likes,
@@ -93,6 +105,8 @@ function MusicApp() {
 
   const [tab, setTab] = useState<Tab>("foryou");
   const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
   const [recs, setRecs] = useState<Track[]>([]);
@@ -107,6 +121,7 @@ function MusicApp() {
   const [showQueue, setShowQueue] = useState(false);
   const [continuous, setContinuous] = useState(true);
   const [extending, setExtending] = useState(false);
+  const [resumed, setResumed] = useState(false);
 
 
   const current = queue[index];
@@ -127,18 +142,51 @@ function MusicApp() {
   });
 
 
-  const { load, setVolume: applyVolume, play } = player;
+  const { load, cue, setVolume: applyVolume, play } = player;
+
+  /** Restore the last session's queue and seek position (paused until you hit play). */
+  const resumeRef = useRef<number | null>(null);
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const saved = readPlayback();
+    if (!saved) {
+      setResumed(true);
+      return;
+    }
+    resumeRef.current = saved.position;
+    setQueue(saved.queue);
+    setIndex(Math.min(saved.index, saved.queue.length - 1));
+  }, []);
 
   useEffect(() => {
     const track = currentRef.current;
     if (!player.ready || !track) return;
+    const resumeAt = resumeRef.current;
+    if (resumeAt !== null) {
+      resumeRef.current = null;
+      cue(track.id, resumeAt);
+      setResumed(true);
+      return;
+    }
     load(track.id);
     play();
     logPlay(track);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, player.ready, load, play, logPlay]);
+  }, [current?.id, player.ready, load, cue, play, logPlay]);
+
+  /** Persist queue + seek position so reopening the app picks up where it stopped. */
+  useEffect(() => {
+    if (!resumed || queue.length === 0) return;
+    const timer = window.setInterval(() => {
+      writePlayback({ queue, index, position: player.position });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [resumed, queue, index, player.position]);
 
   useEffect(() => {
+
     if (player.ready) applyVolume(volume);
   }, [volume, player.ready, applyVolume]);
 
@@ -224,6 +272,7 @@ function MusicApp() {
     async (term: string) => {
       if (!term.trim()) return;
       setTab("search");
+      setShowSuggestions(false);
       setSearching(true);
       setMessage(null);
       const res = await runSearch({ data: { query: term.trim(), limit: 50 } });
@@ -234,10 +283,30 @@ function MusicApp() {
     [runSearch],
   );
 
+  /** Debounced YouTube autocomplete for the search box. */
+  useEffect(() => {
+    const term = query.trim();
+    if (term.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void runSuggest({ data: { query: term } }).then((res) => {
+        if (!cancelled) setSuggestions(res.suggestions);
+      });
+    }, 220);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, runSuggest]);
+
   const onSearch = (event: React.FormEvent) => {
     event.preventDefault();
     void searchFor(query);
   };
+
 
   /** Opens a "songs by this artist" view. */
   const openArtist = useCallback(
@@ -349,20 +418,47 @@ function MusicApp() {
           </div>
         </div>
 
-        <form onSubmit={onSearch} className="flex gap-2">
+        <form onSubmit={onSearch} className="relative flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => window.setTimeout(() => setShowSuggestions(false), 150)}
               placeholder="Search any song, artist or album…"
               className="h-12 rounded-full border-border bg-card pl-10 text-base"
+              autoComplete="off"
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="absolute inset-x-0 top-14 z-40 overflow-hidden rounded-2xl border border-border bg-popover shadow-lift">
+                {suggestions.map((s) => (
+                  <li key={s}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setQuery(s);
+                        void searchFor(s);
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                      <Search className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{s}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <Button type="submit" size="lg" className="h-12 rounded-full px-6 font-semibold">
             {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
           </Button>
         </form>
+
 
         <nav className="flex flex-wrap gap-2">
           {TABS.map(({ id, label, icon: Icon }) => (
@@ -538,20 +634,15 @@ function MusicApp() {
           </div>
 
           <div className="flex items-center gap-3">
-            <img
-              src={current?.thumbnail ?? "https://i.ytimg.com/vi/none/hqdefault.jpg"}
-              alt=""
-              className={cn(
-                "h-12 w-12 shrink-0 rounded-lg object-cover",
-                !current && "opacity-30",
-              )}
-            />
+            <SpinningArt src={current?.thumbnail} playing={player.isPlaying} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">
-                {current?.title ?? "Pick a song to start"}
+              <p className="flex items-center gap-2 truncate text-sm font-semibold">
+                <Equalizer active={player.isPlaying} className="h-3.5 shrink-0" />
+                <span className="truncate">{current?.title ?? "Pick a song to start"}</span>
               </p>
               <p className="truncate text-xs text-muted-foreground">{current?.artist ?? "—"}</p>
             </div>
+
 
             <div className="flex items-center gap-1">
               <Button

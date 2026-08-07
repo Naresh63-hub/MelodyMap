@@ -29,7 +29,18 @@ export function useMediaSession(
       });
     }
     ms.playbackState = isPlaying ? "playing" : "paused";
-    const set = (action: MediaSessionAction, fn: (() => void) | null) => {
+    if (duration > 0 && "setPositionState" in ms) {
+      try {
+        ms.setPositionState({
+          duration,
+          position: Math.min(position, duration),
+          playbackRate: 1,
+        });
+      } catch {
+        /* position state unsupported */
+      }
+    }
+    const set = (action: MediaSessionAction, fn: MediaSessionActionHandler | null) => {
       try {
         ms.setActionHandler(action, fn);
       } catch {
@@ -38,17 +49,30 @@ export function useMediaSession(
     };
     set("play", handlers.onPlay);
     set("pause", handlers.onPause);
+    set("stop", handlers.onPause);
     set("nexttrack", handlers.onNext);
     set("previoustrack", handlers.onPrev);
-    set("seekbackward", () => handlers.onSeek(Math.max(0, position - 10)));
-    set("seekforward", () => handlers.onSeek(position + 10));
+    set("seekbackward", (details) =>
+      handlers.onSeek(Math.max(0, position - (details?.seekOffset ?? 10))),
+    );
+    set("seekforward", (details) => handlers.onSeek(position + (details?.seekOffset ?? 10)));
+    set("seekto", (details) => {
+      if (typeof details?.seekTime === "number") handlers.onSeek(details.seekTime);
+    });
     return () => {
-      set("play", null);
-      set("pause", null);
-      set("nexttrack", null);
-      set("previoustrack", null);
-      set("seekbackward", null);
-      set("seekforward", null);
+      for (const action of [
+        "play",
+        "pause",
+        "stop",
+        "nexttrack",
+        "previoustrack",
+        "seekbackward",
+        "seekforward",
+        "seekto",
+      ] as MediaSessionAction[]) {
+        set(action, null);
+      }
     };
   }, [track, isPlaying, position, duration, handlers]);
 }
+
