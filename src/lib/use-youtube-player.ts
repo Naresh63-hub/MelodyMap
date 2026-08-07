@@ -115,6 +115,8 @@ export function useYouTubePlayer(options: { onEnded: () => void }) {
     position,
     duration,
     load,
+    cue,
+
     play,
     pause,
     seek,
