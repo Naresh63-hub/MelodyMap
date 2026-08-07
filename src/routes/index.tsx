@@ -634,20 +634,15 @@ function MusicApp() {
           </div>
 
           <div className="flex items-center gap-3">
-            <img
-              src={current?.thumbnail ?? "https://i.ytimg.com/vi/none/hqdefault.jpg"}
-              alt=""
-              className={cn(
-                "h-12 w-12 shrink-0 rounded-lg object-cover",
-                !current && "opacity-30",
-              )}
-            />
+            <SpinningArt src={current?.thumbnail} playing={player.isPlaying} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">
-                {current?.title ?? "Pick a song to start"}
+              <p className="flex items-center gap-2 truncate text-sm font-semibold">
+                <Equalizer active={player.isPlaying} className="h-3.5 shrink-0" />
+                <span className="truncate">{current?.title ?? "Pick a song to start"}</span>
               </p>
               <p className="truncate text-xs text-muted-foreground">{current?.artist ?? "—"}</p>
             </div>
+
 
             <div className="flex items-center gap-1">
               <Button
