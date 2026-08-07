@@ -418,20 +418,47 @@ function MusicApp() {
           </div>
         </div>
 
-        <form onSubmit={onSearch} className="flex gap-2">
+        <form onSubmit={onSearch} className="relative flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => window.setTimeout(() => setShowSuggestions(false), 150)}
               placeholder="Search any song, artist or album…"
               className="h-12 rounded-full border-border bg-card pl-10 text-base"
+              autoComplete="off"
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="absolute inset-x-0 top-14 z-40 overflow-hidden rounded-2xl border border-border bg-popover shadow-lift">
+                {suggestions.map((s) => (
+                  <li key={s}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setQuery(s);
+                        void searchFor(s);
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    >
+                      <Search className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{s}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <Button type="submit" size="lg" className="h-12 rounded-full px-6 font-semibold">
             {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
           </Button>
         </form>
+
 
         <nav className="flex flex-wrap gap-2">
           {TABS.map(({ id, label, icon: Icon }) => (
