@@ -4,6 +4,8 @@ type YTPlayer = {
   playVideo: () => void;
   pauseVideo: () => void;
   loadVideoById: (id: string) => void;
+  cueVideoById: (opts: { videoId: string; startSeconds?: number }) => void;
+
   seekTo: (seconds: number, allowSeekAhead: boolean) => void;
   setVolume: (v: number) => void;
   getCurrentTime: () => number;
