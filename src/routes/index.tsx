@@ -79,6 +79,8 @@ function MusicApp() {
   const runRecommend = useServerFn(recommendTracks);
   const runSuggest = useServerFn(suggestSearch);
 
+  const auth = useAuth();
+
   const {
     hydrated,
     likes,
@@ -101,7 +103,8 @@ function MusicApp() {
     reorderPlaylist,
     updateSettings,
     resetSettings,
-  } = useLibrary();
+  } = useLibrary(auth.userId);
+
 
   const [tab, setTab] = useState<Tab>("foryou");
   const [query, setQuery] = useState("");
