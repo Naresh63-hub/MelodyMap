@@ -19,7 +19,9 @@ import {
   Volume2,
 } from "lucide-react";
 
+import { AccountMenu } from "@/components/music/AccountMenu";
 import { Equalizer, SpinningArt } from "@/components/music/NowPlayingViz";
+
 import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
@@ -37,7 +39,9 @@ import {
   MOODS,
   type Track,
 } from "@/lib/library";
+import { useAuth } from "@/lib/auth";
 import { useMediaSession } from "@/lib/use-media-session";
+
 import { recommendTracks, searchTracks, suggestSearch } from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
 import { cn } from "@/lib/utils";
@@ -79,6 +83,8 @@ function MusicApp() {
   const runRecommend = useServerFn(recommendTracks);
   const runSuggest = useServerFn(suggestSearch);
 
+  const auth = useAuth();
+
   const {
     hydrated,
     likes,
@@ -101,7 +107,8 @@ function MusicApp() {
     reorderPlaylist,
     updateSettings,
     resetSettings,
-  } = useLibrary();
+  } = useLibrary(auth.userId);
+
 
   const [tab, setTab] = useState<Tab>("foryou");
   const [query, setQuery] = useState("");
@@ -410,13 +417,23 @@ function MusicApp() {
               className={cn("h-6 w-6 text-primary", player.isPlaying && "animate-spin-slow")}
             />
           </span>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold sm:text-3xl">Midnight Vinyl</h1>
             <p className="text-xs text-muted-foreground">
-              Free listening with recommendations that learn your taste
+              {auth.userId
+                ? "Your feed syncs to your account"
+                : "Free listening with recommendations that learn your taste"}
             </p>
           </div>
+          <AccountMenu
+            userId={auth.userId}
+            email={auth.email}
+            profile={auth.profile}
+            onUpdateProfile={auth.updateProfile}
+            onSignOut={auth.signOut}
+          />
         </div>
+
 
         <form onSubmit={onSearch} className="relative flex gap-2">
           <div className="relative flex-1">
