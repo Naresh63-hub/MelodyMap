@@ -19,7 +19,9 @@ import {
   Volume2,
 } from "lucide-react";
 
+import { AccountMenu } from "@/components/music/AccountMenu";
 import { Equalizer, SpinningArt } from "@/components/music/NowPlayingViz";
+
 import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
