@@ -125,7 +125,30 @@ export function writePlayback(value: SavedPlayback) {
 }
 
 
-export function useLibrary() {
+type LibraryDoc = {
+  likes: Track[];
+  dislikes: Track[];
+  history: Track[];
+  playlists: Playlist[];
+  settings: RecSettings;
+};
+
+function mergeById<T extends { id: string }>(a: T[], b: T[], max: number): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of [...a, ...b]) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out.slice(0, max);
+}
+
+/**
+ * Local-first library. When a listener is signed in, the same data syncs to
+ * their account so the feed follows them to any device.
+ */
+export function useLibrary(userId?: string | null) {
   const [hydrated, setHydrated] = useState(false);
   const [likes, setLikes] = useState<Track[]>([]);
   const [dislikes, setDislikes] = useState<Track[]>([]);
@@ -141,6 +164,78 @@ export function useLibrary() {
     setSettings({ ...DEFAULT_SETTINGS, ...read<Partial<RecSettings>>(SETTINGS_KEY, {}) });
     setHydrated(true);
   }, []);
+
+  /** Pull the account copy once per sign-in and merge it with what's on device. */
+  const pulled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!hydrated || !userId || pulled.current === userId) return;
+    pulled.current = userId;
+    let cancelled = false;
+    void import("@/integrations/supabase/client").then(async ({ supabase }) => {
+      const { data } = await supabase
+        .from("user_library")
+        .select("data")
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (cancelled || !data?.data) return;
+      const doc = data.data as Partial<LibraryDoc>;
+      setLikes((prev) => {
+        const next = mergeById(doc.likes ?? [], prev, 200);
+        write(LIKES_KEY, next);
+        return next;
+      });
+      setDislikes((prev) => {
+        const next = mergeById(doc.dislikes ?? [], prev, 200);
+        write(DISLIKES_KEY, next);
+        return next;
+      });
+      setHistory((prev) => {
+        const next = mergeById(prev, doc.history ?? [], 200);
+        write(HISTORY_KEY, next);
+        return next;
+      });
+      setPlaylists((prev) => {
+        const next = mergeById(doc.playlists ?? [], prev, 200);
+        write(PLAYLISTS_KEY, next);
+        return next;
+      });
+      if (doc.settings) {
+        const next = { ...DEFAULT_SETTINGS, ...doc.settings };
+        setSettings(next);
+        write(SETTINGS_KEY, next);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      pulled.current = null;
+    }
+  }, [userId]);
+
+  /** Push changes back to the account, debounced so typing/likes don't spam it. */
+  useEffect(() => {
+    if (!hydrated || !userId || pulled.current !== userId) return;
+    const timer = window.setTimeout(() => {
+      void import("@/integrations/supabase/client").then(({ supabase }) =>
+        supabase.from("user_library").upsert({
+          user_id: userId,
+          data: {
+            likes,
+            dislikes,
+            history: history.slice(0, 100),
+            playlists,
+            settings,
+          } satisfies LibraryDoc,
+        }),
+      );
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [hydrated, userId, likes, dislikes, history, playlists, settings]);
+
 
   const toggleLike = useCallback((track: Track) => {
     setDislikes((prev) => {
