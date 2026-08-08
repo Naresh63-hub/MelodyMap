@@ -39,7 +39,9 @@ import {
   MOODS,
   type Track,
 } from "@/lib/library";
+import { useAuth } from "@/lib/auth";
 import { useMediaSession } from "@/lib/use-media-session";
+
 import { recommendTracks, searchTracks, suggestSearch } from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
 import { cn } from "@/lib/utils";
