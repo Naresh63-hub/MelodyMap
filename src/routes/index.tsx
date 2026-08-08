@@ -410,13 +410,23 @@ function MusicApp() {
               className={cn("h-6 w-6 text-primary", player.isPlaying && "animate-spin-slow")}
             />
           </span>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold sm:text-3xl">Midnight Vinyl</h1>
             <p className="text-xs text-muted-foreground">
-              Free listening with recommendations that learn your taste
+              {auth.userId
+                ? "Your feed syncs to your account"
+                : "Free listening with recommendations that learn your taste"}
             </p>
           </div>
+          <AccountMenu
+            userId={auth.userId}
+            email={auth.email}
+            profile={auth.profile}
+            onUpdateProfile={auth.updateProfile}
+            onSignOut={auth.signOut}
+          />
         </div>
+
 
         <form onSubmit={onSearch} className="relative flex gap-2">
           <div className="relative flex-1">
