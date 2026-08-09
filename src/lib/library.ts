@@ -272,12 +272,14 @@ export function useLibrary(userId?: string | null) {
             history: history.slice(0, 100),
             playlists,
             settings,
+            stats,
           } satisfies LibraryDoc,
         }),
       );
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [hydrated, userId, likes, dislikes, history, playlists, settings]);
+  }, [hydrated, userId, likes, dislikes, history, playlists, settings, stats]);
+
 
 
   const toggleLike = useCallback((track: Track) => {
