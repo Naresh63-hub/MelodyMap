@@ -630,7 +630,43 @@ function MusicApp() {
           </div>
         )}
 
-        {tab === "playlists" ? (
+        {tab === "mixes" ? (
+          <MixesPanel
+            active={mix}
+            tracks={visibleMix}
+            loading={mixLoading}
+            currentId={current?.id}
+            isPlaying={player.isPlaying}
+            likedIds={likedIds}
+            dislikedIds={dislikedIds}
+            playlists={playlists}
+            onSelect={(id) => {
+              setMix(id);
+              if (id !== "replay" && mixTracks[id].length === 0) void loadMix(id);
+            }}
+            onRefresh={() => {
+              if (mix !== "replay") void loadMix(mix);
+            }}
+            onPlayAll={() => startQueue(visibleMix, 0)}
+            onPlay={(track, i) => {
+              if (current?.id === track.id) {
+                player.isPlaying ? player.pause() : player.play();
+                return;
+              }
+              startQueue(visibleMix, i);
+            }}
+            onToggleLike={toggleLike}
+            onToggleDislike={toggleDislike}
+            onArtistClick={openArtist}
+            onAddToPlaylist={addToPlaylist}
+            onAddToQueue={(track) => enqueue([track])}
+            onCreatePlaylistWith={(track) => {
+              const name = window.prompt("Playlist name", "New playlist");
+              if (name?.trim()) createPlaylist(name.trim(), [track]);
+            }}
+          />
+        ) : tab === "playlists" ? (
+
           <PlaylistsPanel
             playlists={playlists}
             currentId={current?.id}
