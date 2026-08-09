@@ -407,12 +407,17 @@ function MusicApp() {
 
   const goNext = useCallback(() => {
     if (queueRef.current.length === 0) return;
+    const track = currentRef.current;
+    const { position, duration } = progressRef.current;
+    // Leaving a song less than 60% in is a skip — a strong negative signal.
+    if (track && duration > 0 && position < duration * 0.6) logSkip(track);
     setIndex((i) => {
       if (i + 1 < queueRef.current.length) return i + 1;
       if (continuous) void extendQueue();
       return i;
     });
-  }, [continuous, extendQueue]);
+  }, [continuous, extendQueue, logSkip]);
+
 
   const goPrev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
 
