@@ -5,6 +5,7 @@ import {
   Disc3,
   Heart,
   History,
+  Layers,
   Loader2,
   Pause,
   Play,
@@ -22,6 +23,7 @@ import {
 import { AccountMenu } from "@/components/music/AccountMenu";
 import { Equalizer, SpinningArt } from "@/components/music/NowPlayingViz";
 
+import { MixesPanel, type MixId } from "@/components/music/MixesPanel";
 import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
@@ -36,15 +38,25 @@ import {
   settingsToBrief,
   readPlayback,
   writePlayback,
+  replayMix,
+  topArtists,
+  skippedLabels,
+  sequenceBrief,
   MOODS,
   type Track,
 } from "@/lib/library";
 import { useAuth } from "@/lib/auth";
 import { useMediaSession } from "@/lib/use-media-session";
 
-import { recommendTracks, searchTracks, suggestSearch } from "@/lib/music.functions";
+import {
+  buildMix,
+  recommendTracks,
+  searchTracks,
+  suggestSearch,
+} from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
 import { cn } from "@/lib/utils";
+
 
 
 
@@ -68,10 +80,11 @@ export const Route = createFileRoute("/")({
   component: MusicApp,
 });
 
-type Tab = "foryou" | "search" | "likes" | "playlists" | "history";
+type Tab = "foryou" | "mixes" | "search" | "likes" | "playlists" | "history";
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Sparkles }> = [
   { id: "foryou", label: "For you", icon: Sparkles },
+  { id: "mixes", label: "Mixes", icon: Layers },
   { id: "search", label: "Search", icon: Search },
   { id: "likes", label: "Favourites", icon: Heart },
   { id: "playlists", label: "Playlists", icon: ListMusic },
@@ -81,6 +94,8 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Sparkles }> = [
 function MusicApp() {
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
+  const runMix = useServerFn(buildMix);
+
   const runSuggest = useServerFn(suggestSearch);
 
   const auth = useAuth();
@@ -92,9 +107,13 @@ function MusicApp() {
     history,
     playlists,
     settings,
+    stats,
+    logSkip,
+    logComplete,
     toggleLike,
     toggleDislike,
     logPlay,
+
 
     clearHistory,
     createPlaylist,
@@ -130,6 +149,48 @@ function MusicApp() {
   const [extending, setExtending] = useState(false);
   const [resumed, setResumed] = useState(false);
 
+  const [mix, setMix] = useState<MixId>("discover");
+  const [mixTracks, setMixTracks] = useState<Record<"discover" | "newrelease", Track[]>>({
+    discover: [],
+    newrelease: [],
+  });
+  const [mixLoading, setMixLoading] = useState(false);
+
+  /** Replay Mix is pure behaviour — no AI needed, just what you keep replaying. */
+  const replayTracks = useMemo(() => replayMix(stats), [stats]);
+
+  /** Builds a Discover or New Release mix from the listener's behavioural profile. */
+  const loadMix = useCallback(
+    async (kind: "discover" | "newrelease") => {
+      setMixLoading(true);
+      setMessage(null);
+      const res = await runMix({
+        data: {
+          kind,
+          liked: likes.slice(0, 20).map(trackLabel),
+          recent: history.slice(0, 20).map(trackLabel),
+          sequence: sequenceBrief(history, stats),
+          skipped: skippedLabels(stats),
+          artists: topArtists(stats, likes),
+          brief: settingsToBrief(settings),
+          count: 20,
+        },
+      });
+      setMixLoading(false);
+      if (res.error) setMessage(res.error);
+      setMixTracks((prev) => ({ ...prev, [kind]: res.tracks as Track[] }));
+    },
+    [runMix, likes, history, stats, settings],
+  );
+
+  /** Build the selected mix the first time the tab is opened. */
+  const mixOnce = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    if (tab !== "mixes" || mix === "replay" || mixOnce.current[mix]) return;
+    mixOnce.current[mix] = true;
+    void loadMix(mix);
+  }, [tab, mix, loadMix]);
+
 
   const current = queue[index];
   const currentRef = useRef<Track | undefined>(undefined);
@@ -140,6 +201,8 @@ function MusicApp() {
 
   const player = useYouTubePlayer({
     onEnded: () => {
+      const track = currentRef.current;
+      if (track) logComplete(track);
       if (index + 1 < queue.length) {
         setIndex(index + 1);
         return;
@@ -148,8 +211,12 @@ function MusicApp() {
     },
   });
 
+  /** Live progress, so a manual skip can be told apart from a finished song. */
+  const progressRef = useRef({ position: 0, duration: 0 });
+  progressRef.current = { position: player.position, duration: player.duration };
 
   const { load, cue, setVolume: applyVolume, play } = player;
+
 
   /** Restore the last session's queue and seek position (paused until you hit play). */
   const resumeRef = useRef<number | null>(null);
@@ -212,6 +279,8 @@ function MusicApp() {
           liked: likes.slice(0, 20).map(trackLabel),
           recent: history.slice(0, 20).map(trackLabel),
           disliked: dislikes.slice(0, 20).map(trackLabel),
+          sequence: sequenceBrief(history, stats),
+          skipped: skippedLabels(stats),
           count: 30,
           ...(mood ? { mood } : {}),
           brief: settingsToBrief(settings, mood),
@@ -219,8 +288,9 @@ function MusicApp() {
       });
       return res;
     },
-    [runRecommend, likes, history, dislikes, settings],
+    [runRecommend, likes, history, dislikes, stats, settings],
   );
+
 
 
   const loadRecommendations = useCallback(
@@ -325,8 +395,11 @@ function MusicApp() {
     [searchFor],
   );
 
+  const visibleMix = mix === "replay" ? replayTracks : mixTracks[mix];
+
   const listForTab: Record<Tab, Track[]> = {
     foryou: recs,
+    mixes: visibleMix,
     search: results,
     likes,
     playlists: [],
@@ -334,17 +407,23 @@ function MusicApp() {
   };
   const visible = listForTab[tab];
 
+
   const canPrev = index > 0;
   const canNext = index + 1 < queue.length;
 
   const goNext = useCallback(() => {
     if (queueRef.current.length === 0) return;
+    const track = currentRef.current;
+    const { position, duration } = progressRef.current;
+    // Leaving a song less than 60% in is a skip — a strong negative signal.
+    if (track && duration > 0 && position < duration * 0.6) logSkip(track);
     setIndex((i) => {
       if (i + 1 < queueRef.current.length) return i + 1;
       if (continuous) void extendQueue();
       return i;
     });
-  }, [continuous, extendQueue]);
+  }, [continuous, extendQueue, logSkip]);
+
 
   const goPrev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
 
@@ -557,7 +636,43 @@ function MusicApp() {
           </div>
         )}
 
-        {tab === "playlists" ? (
+        {tab === "mixes" ? (
+          <MixesPanel
+            active={mix}
+            tracks={visibleMix}
+            loading={mixLoading}
+            currentId={current?.id}
+            isPlaying={player.isPlaying}
+            likedIds={likedIds}
+            dislikedIds={dislikedIds}
+            playlists={playlists}
+            onSelect={(id) => {
+              setMix(id);
+              if (id !== "replay" && mixTracks[id].length === 0) void loadMix(id);
+            }}
+            onRefresh={() => {
+              if (mix !== "replay") void loadMix(mix);
+            }}
+            onPlayAll={() => startQueue(visibleMix, 0)}
+            onPlay={(track, i) => {
+              if (current?.id === track.id) {
+                player.isPlaying ? player.pause() : player.play();
+                return;
+              }
+              startQueue(visibleMix, i);
+            }}
+            onToggleLike={toggleLike}
+            onToggleDislike={toggleDislike}
+            onArtistClick={openArtist}
+            onAddToPlaylist={addToPlaylist}
+            onAddToQueue={(track) => enqueue([track])}
+            onCreatePlaylistWith={(track) => {
+              const name = window.prompt("Playlist name", "New playlist");
+              if (name?.trim()) createPlaylist(name.trim(), [track]);
+            }}
+          />
+        ) : tab === "playlists" ? (
+
           <PlaylistsPanel
             playlists={playlists}
             currentId={current?.id}

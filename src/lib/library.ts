@@ -80,6 +80,19 @@ const DISLIKES_KEY = "vinyl.dislikes.v1";
 const HISTORY_KEY = "vinyl.history.v1";
 const PLAYLISTS_KEY = "vinyl.playlists.v1";
 const SETTINGS_KEY = "vinyl.recsettings.v1";
+const STATS_KEY = "vinyl.stats.v1";
+
+/** Behavioural signal per song: how often it's replayed vs skipped, and when. */
+export type PlayStat = {
+  track: Track;
+  plays: number;
+  skips: number;
+  completions: number;
+  lastAt: number;
+};
+
+export type Stats = Record<string, PlayStat>;
+
 
 
 function read<T>(key: string, fallback: T): T {
@@ -131,7 +144,26 @@ type LibraryDoc = {
   history: Track[];
   playlists: Playlist[];
   settings: RecSettings;
+  stats?: Stats;
 };
+
+function mergeStats(a: Stats, b: Stats): Stats {
+  const out: Stats = { ...a };
+  for (const [id, s] of Object.entries(b)) {
+    const prev = out[id];
+    out[id] = prev
+      ? {
+          track: prev.track,
+          plays: Math.max(prev.plays, s.plays),
+          skips: Math.max(prev.skips, s.skips),
+          completions: Math.max(prev.completions, s.completions),
+          lastAt: Math.max(prev.lastAt, s.lastAt),
+        }
+      : s;
+  }
+  return out;
+}
+
 
 function mergeById<T extends { id: string }>(a: T[], b: T[], max: number): T[] {
   const seen = new Set<string>();
@@ -155,6 +187,7 @@ export function useLibrary(userId?: string | null) {
   const [history, setHistory] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [settings, setSettings] = useState<RecSettings>(DEFAULT_SETTINGS);
+  const [stats, setStats] = useState<Stats>({});
 
   useEffect(() => {
     setLikes(read<Track[]>(LIKES_KEY, []));
@@ -162,8 +195,10 @@ export function useLibrary(userId?: string | null) {
     setHistory(read<Track[]>(HISTORY_KEY, []));
     setPlaylists(read<Playlist[]>(PLAYLISTS_KEY, []));
     setSettings({ ...DEFAULT_SETTINGS, ...read<Partial<RecSettings>>(SETTINGS_KEY, {}) });
+    setStats(read<Stats>(STATS_KEY, {}));
     setHydrated(true);
   }, []);
+
 
   /** Pull the account copy once per sign-in and merge it with what's on device. */
   const pulled = useRef<string | null>(null);
@@ -199,12 +234,20 @@ export function useLibrary(userId?: string | null) {
         write(PLAYLISTS_KEY, next);
         return next;
       });
+      if (doc.stats) {
+        setStats((prev) => {
+          const next = mergeStats(prev, doc.stats ?? {});
+          write(STATS_KEY, next);
+          return next;
+        });
+      }
       if (doc.settings) {
         const next = { ...DEFAULT_SETTINGS, ...doc.settings };
         setSettings(next);
         write(SETTINGS_KEY, next);
       }
     });
+
     return () => {
       cancelled = true;
     };
@@ -229,12 +272,14 @@ export function useLibrary(userId?: string | null) {
             history: history.slice(0, 100),
             playlists,
             settings,
+            stats,
           } satisfies LibraryDoc,
         }),
       );
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [hydrated, userId, likes, dislikes, history, playlists, settings]);
+  }, [hydrated, userId, likes, dislikes, history, playlists, settings, stats]);
+
 
 
   const toggleLike = useCallback((track: Track) => {
@@ -268,13 +313,36 @@ export function useLibrary(userId?: string | null) {
     });
   }, []);
 
-  const logPlay = useCallback((track: Track) => {
-    setHistory((prev) => {
-      const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 200);
-      write(HISTORY_KEY, next);
+  /** Bumps a song's behavioural counters (plays / skips / completions). */
+  const bump = useCallback((track: Track, field: "plays" | "skips" | "completions") => {
+    setStats((prev) => {
+      const existing = prev[track.id];
+      const entry: PlayStat = existing
+        ? { ...existing, track, [field]: existing[field] + 1, lastAt: Date.now() }
+        : { track, plays: 0, skips: 0, completions: 0, lastAt: Date.now(), [field]: 1 };
+      const next = { ...prev, [track.id]: entry };
+      write(STATS_KEY, next);
       return next;
     });
   }, []);
+
+  const logPlay = useCallback(
+    (track: Track) => {
+      setHistory((prev) => {
+        const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 200);
+        write(HISTORY_KEY, next);
+        return next;
+      });
+      bump(track, "plays");
+    },
+    [bump],
+  );
+
+  /** A song left early counts as a skip; one heard to the end counts as a completion. */
+  const logSkip = useCallback((track: Track) => bump(track, "skips"), [bump]);
+  const logComplete = useCallback((track: Track) => bump(track, "completions"), [bump]);
+
+
 
 
 
@@ -398,8 +466,12 @@ export function useLibrary(userId?: string | null) {
     history,
     playlists,
     settings,
+    stats,
+    logSkip,
+    logComplete,
     toggleLike,
     toggleDislike,
+
     logPlay,
 
     clearHistory,
@@ -445,4 +517,61 @@ export function settingsToBrief(settings: RecSettings, extraMood?: string) {
   ].filter(Boolean);
 
   return parts.join(" ");
+}
+
+const WEEKS_4 = 28 * 24 * 60 * 60 * 1000;
+
+/** Replay Mix: songs you've had on repeat over the last few weeks. */
+export function replayMix(stats: Stats, limit = 30): Track[] {
+  const now = Date.now();
+  return Object.values(stats)
+    .filter((s) => now - s.lastAt < WEEKS_4 && s.plays + s.completions > 1)
+    .sort((a, b) => {
+      const score = (s: PlayStat) => s.plays * 2 + s.completions * 3 - s.skips * 2;
+      return score(b) - score(a) || b.lastAt - a.lastAt;
+    })
+    .slice(0, limit)
+    .map((s) => s.track);
+}
+
+/** Artists you actually listen to, ranked by plays then likes. */
+export function topArtists(stats: Stats, likes: Track[], limit = 12): string[] {
+  const score = new Map<string, number>();
+  for (const s of Object.values(stats)) {
+    const artist = s.track.artist;
+    if (!artist) continue;
+    score.set(artist, (score.get(artist) ?? 0) + s.plays + s.completions * 2 - s.skips);
+  }
+  for (const t of likes) {
+    if (t.artist) score.set(t.artist, (score.get(t.artist) ?? 0) + 3);
+  }
+  return [...score.entries()]
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([artist]) => artist);
+}
+
+/** Songs you keep skipping — a strong negative signal for the next picks. */
+export function skippedLabels(stats: Stats, limit = 15): string[] {
+  return Object.values(stats)
+    .filter((s) => s.skips >= 2 && s.skips > s.completions)
+    .sort((a, b) => b.skips - a.skips)
+    .slice(0, limit)
+    .map((s) => trackLabel(s.track));
+}
+
+/** Recent listening as an ordered sequence with the action taken on each track. */
+export function sequenceBrief(history: Track[], stats: Stats, limit = 15): string[] {
+  return history.slice(0, limit).map((t) => {
+    const s = stats[t.id];
+    const action = !s
+      ? "played"
+      : s.skips > s.completions
+        ? "skipped"
+        : s.plays > 1
+          ? `replayed x${s.plays}`
+          : "played";
+    return `${trackLabel(t)} — ${action}`;
+  });
 }
