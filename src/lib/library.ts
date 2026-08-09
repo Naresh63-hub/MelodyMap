@@ -234,12 +234,20 @@ export function useLibrary(userId?: string | null) {
         write(PLAYLISTS_KEY, next);
         return next;
       });
+      if (doc.stats) {
+        setStats((prev) => {
+          const next = mergeStats(prev, doc.stats ?? {});
+          write(STATS_KEY, next);
+          return next;
+        });
+      }
       if (doc.settings) {
         const next = { ...DEFAULT_SETTINGS, ...doc.settings };
         setSettings(next);
         write(SETTINGS_KEY, next);
       }
     });
+
     return () => {
       cancelled = true;
     };
