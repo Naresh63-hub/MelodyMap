@@ -107,9 +107,13 @@ function MusicApp() {
     history,
     playlists,
     settings,
+    stats,
+    logSkip,
+    logComplete,
     toggleLike,
     toggleDislike,
     logPlay,
+
 
     clearHistory,
     createPlaylist,
