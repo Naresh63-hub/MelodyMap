@@ -183,7 +183,13 @@ function MusicApp() {
     [runMix, likes, history, stats, settings],
   );
 
-
+  /** Build the selected mix the first time the tab is opened. */
+  const mixOnce = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    if (tab !== "mixes" || mix === "replay" || mixOnce.current[mix]) return;
+    mixOnce.current[mix] = true;
+    void loadMix(mix);
+  }, [tab, mix, loadMix]);
 
 
   const current = queue[index];
