@@ -466,8 +466,12 @@ export function useLibrary(userId?: string | null) {
     history,
     playlists,
     settings,
+    stats,
+    logSkip,
+    logComplete,
     toggleLike,
     toggleDislike,
+
     logPlay,
 
     clearHistory,
