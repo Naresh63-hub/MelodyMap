@@ -87,7 +87,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
     } catch (err) {
       const message = String(err);
       if (message.includes("429")) return { tracks: [], error: "Too many requests — try again shortly." };
-      if (message.includes("402")) return { tracks: [], error: "AI credits are exhausted." };
+      if (message.includes("402") || /credit|payment_required/i.test(message))
+        return { tracks: [], error: "AI credits are exhausted — add credits to keep generating picks." };
       return { tracks: [], error: "Recommendations are unavailable right now." };
     }
 
@@ -193,7 +194,8 @@ export const buildMix = createServerFn({ method: "POST" })
     } catch (err) {
       const message = String(err);
       if (message.includes("429")) return { tracks: [], error: "Too many requests — try again shortly." };
-      if (message.includes("402")) return { tracks: [], error: "AI credits are exhausted." };
+      if (message.includes("402") || /credit|payment_required/i.test(message))
+        return { tracks: [], error: "AI credits are exhausted — add credits to keep generating picks." };
       return { tracks: [], error: "Mixes are unavailable right now." };
     }
 
