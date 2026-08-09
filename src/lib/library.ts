@@ -144,7 +144,26 @@ type LibraryDoc = {
   history: Track[];
   playlists: Playlist[];
   settings: RecSettings;
+  stats?: Stats;
 };
+
+function mergeStats(a: Stats, b: Stats): Stats {
+  const out: Stats = { ...a };
+  for (const [id, s] of Object.entries(b)) {
+    const prev = out[id];
+    out[id] = prev
+      ? {
+          track: prev.track,
+          plays: Math.max(prev.plays, s.plays),
+          skips: Math.max(prev.skips, s.skips),
+          completions: Math.max(prev.completions, s.completions),
+          lastAt: Math.max(prev.lastAt, s.lastAt),
+        }
+      : s;
+  }
+  return out;
+}
+
 
 function mergeById<T extends { id: string }>(a: T[], b: T[], max: number): T[] {
   const seen = new Set<string>();
