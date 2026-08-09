@@ -149,6 +149,42 @@ function MusicApp() {
   const [extending, setExtending] = useState(false);
   const [resumed, setResumed] = useState(false);
 
+  const [mix, setMix] = useState<MixId>("discover");
+  const [mixTracks, setMixTracks] = useState<Record<"discover" | "newrelease", Track[]>>({
+    discover: [],
+    newrelease: [],
+  });
+  const [mixLoading, setMixLoading] = useState(false);
+
+  /** Replay Mix is pure behaviour — no AI needed, just what you keep replaying. */
+  const replayTracks = useMemo(() => replayMix(stats), [stats]);
+
+  /** Builds a Discover or New Release mix from the listener's behavioural profile. */
+  const loadMix = useCallback(
+    async (kind: "discover" | "newrelease") => {
+      setMixLoading(true);
+      setMessage(null);
+      const res = await runMix({
+        data: {
+          kind,
+          liked: likes.slice(0, 20).map(trackLabel),
+          recent: history.slice(0, 20).map(trackLabel),
+          sequence: sequenceBrief(history, stats),
+          skipped: skippedLabels(stats),
+          artists: topArtists(stats, likes),
+          brief: settingsToBrief(settings),
+          count: 20,
+        },
+      });
+      setMixLoading(false);
+      if (res.error) setMessage(res.error);
+      setMixTracks((prev) => ({ ...prev, [kind]: res.tracks as Track[] }));
+    },
+    [runMix, likes, history, stats, settings],
+  );
+
+
+
 
   const current = queue[index];
   const currentRef = useRef<Track | undefined>(undefined);
