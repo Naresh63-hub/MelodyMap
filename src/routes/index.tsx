@@ -380,14 +380,18 @@ function MusicApp() {
     [searchFor],
   );
 
+  const visibleMix = mix === "replay" ? replayTracks : mixTracks[mix];
+
   const listForTab: Record<Tab, Track[]> = {
     foryou: recs,
+    mixes: visibleMix,
     search: results,
     likes,
     playlists: [],
     history,
   };
   const visible = listForTab[tab];
+
 
   const canPrev = index > 0;
   const canNext = index + 1 < queue.length;
