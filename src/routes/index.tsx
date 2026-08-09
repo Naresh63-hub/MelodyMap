@@ -273,6 +273,8 @@ function MusicApp() {
           liked: likes.slice(0, 20).map(trackLabel),
           recent: history.slice(0, 20).map(trackLabel),
           disliked: dislikes.slice(0, 20).map(trackLabel),
+          sequence: sequenceBrief(history, stats),
+          skipped: skippedLabels(stats),
           count: 30,
           ...(mood ? { mood } : {}),
           brief: settingsToBrief(settings, mood),
@@ -280,8 +282,9 @@ function MusicApp() {
       });
       return res;
     },
-    [runRecommend, likes, history, dislikes, settings],
+    [runRecommend, likes, history, dislikes, stats, settings],
   );
+
 
 
   const loadRecommendations = useCallback(
