@@ -313,13 +313,36 @@ export function useLibrary(userId?: string | null) {
     });
   }, []);
 
-  const logPlay = useCallback((track: Track) => {
-    setHistory((prev) => {
-      const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 200);
-      write(HISTORY_KEY, next);
+  /** Bumps a song's behavioural counters (plays / skips / completions). */
+  const bump = useCallback((track: Track, field: "plays" | "skips" | "completions") => {
+    setStats((prev) => {
+      const existing = prev[track.id];
+      const entry: PlayStat = existing
+        ? { ...existing, track, [field]: existing[field] + 1, lastAt: Date.now() }
+        : { track, plays: 0, skips: 0, completions: 0, lastAt: Date.now(), [field]: 1 };
+      const next = { ...prev, [track.id]: entry };
+      write(STATS_KEY, next);
       return next;
     });
   }, []);
+
+  const logPlay = useCallback(
+    (track: Track) => {
+      setHistory((prev) => {
+        const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 200);
+        write(HISTORY_KEY, next);
+        return next;
+      });
+      bump(track, "plays");
+    },
+    [bump],
+  );
+
+  /** A song left early counts as a skip; one heard to the end counts as a completion. */
+  const logSkip = useCallback((track: Track) => bump(track, "skips"), [bump]);
+  const logComplete = useCallback((track: Track) => bump(track, "completions"), [bump]);
+
+
 
 
 
