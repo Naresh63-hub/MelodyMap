@@ -187,6 +187,7 @@ export function useLibrary(userId?: string | null) {
   const [history, setHistory] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [settings, setSettings] = useState<RecSettings>(DEFAULT_SETTINGS);
+  const [stats, setStats] = useState<Stats>({});
 
   useEffect(() => {
     setLikes(read<Track[]>(LIKES_KEY, []));
@@ -194,8 +195,10 @@ export function useLibrary(userId?: string | null) {
     setHistory(read<Track[]>(HISTORY_KEY, []));
     setPlaylists(read<Playlist[]>(PLAYLISTS_KEY, []));
     setSettings({ ...DEFAULT_SETTINGS, ...read<Partial<RecSettings>>(SETTINGS_KEY, {}) });
+    setStats(read<Stats>(STATS_KEY, {}));
     setHydrated(true);
   }, []);
+
 
   /** Pull the account copy once per sign-in and merge it with what's on device. */
   const pulled = useRef<string | null>(null);
