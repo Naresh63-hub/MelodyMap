@@ -30,6 +30,8 @@ const RecommendInput = z.object({
   liked: z.array(z.string()).max(40),
   recent: z.array(z.string()).max(40),
   disliked: z.array(z.string()).max(40).optional(),
+  sequence: z.array(z.string()).max(20).optional(),
+  skipped: z.array(z.string()).max(20).optional(),
   mood: z.string().max(120).optional(),
   brief: z.string().max(800).optional(),
   count: z.number().min(1).max(40).optional(),
@@ -48,9 +50,16 @@ export const recommendTracks = createServerFn({ method: "POST" })
     const count = data.count ?? 30;
     const hasTaste = data.liked.length > 0 || data.recent.length > 0;
     const prompt = [
+      "You map the sonic DNA of a listener's taste — tempo, pitch, instrumentation, vocal texture and energy — and read their behaviour sequentially: the order they play, replay and skip tracks.",
       hasTaste
         ? `Songs this listener loved:\n${data.liked.slice(0, 20).join("\n") || "(none yet)"}\n\nRecently played:\n${data.recent.slice(0, 20).join("\n") || "(none yet)"}`
         : "The listener is brand new. Suggest widely loved, high-quality songs across a few popular genres.",
+      data.sequence?.length
+        ? `Their last sessions in order, with what they did with each track:\n${data.sequence.join("\n")}`
+        : "",
+      data.skipped?.length
+        ? `Repeatedly skipped — steer away from this sound:\n${data.skipped.join("\n")}`
+        : "",
       data.disliked?.length
         ? `They disliked these songs — never suggest them or very similar tracks:\n${data.disliked.slice(0, 20).join("\n")}`
         : "",
@@ -58,10 +67,12 @@ export const recommendTracks = createServerFn({ method: "POST" })
       data.brief ? `Tuning preferences: ${data.brief}` : "",
       "",
       `Recommend ${count} songs they would likely love next. Respect the tuning preferences above. Do not repeat songs already listed.`,
+      "Balance the batch roughly: 40% comfort picks that sit right in their current taste, 30% older songs or forgotten favourites they likely have not heard in years, 30% completely new artists that sound strikingly close to their sonic profile. Never make it feel repetitive, and never jump to something jarring or off-profile.",
       'Reply with ONLY a JSON array like: [{"title":"Song name","artist":"Artist name","reason":"why, max 8 words"}]',
     ]
       .filter(Boolean)
       .join("\n");
+
 
 
 
