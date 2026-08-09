@@ -5,6 +5,7 @@ import {
   Disc3,
   Heart,
   History,
+  Layers,
   Loader2,
   Pause,
   Play,
@@ -22,6 +23,7 @@ import {
 import { AccountMenu } from "@/components/music/AccountMenu";
 import { Equalizer, SpinningArt } from "@/components/music/NowPlayingViz";
 
+import { MixesPanel, type MixId } from "@/components/music/MixesPanel";
 import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
@@ -36,15 +38,25 @@ import {
   settingsToBrief,
   readPlayback,
   writePlayback,
+  replayMix,
+  topArtists,
+  skippedLabels,
+  sequenceBrief,
   MOODS,
   type Track,
 } from "@/lib/library";
 import { useAuth } from "@/lib/auth";
 import { useMediaSession } from "@/lib/use-media-session";
 
-import { recommendTracks, searchTracks, suggestSearch } from "@/lib/music.functions";
+import {
+  buildMix,
+  recommendTracks,
+  searchTracks,
+  suggestSearch,
+} from "@/lib/music.functions";
 import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
 import { cn } from "@/lib/utils";
+
 
 
 
