@@ -195,6 +195,8 @@ function MusicApp() {
 
   const player = useYouTubePlayer({
     onEnded: () => {
+      const track = currentRef.current;
+      if (track) logComplete(track);
       if (index + 1 < queue.length) {
         setIndex(index + 1);
         return;
@@ -203,8 +205,12 @@ function MusicApp() {
     },
   });
 
+  /** Live progress, so a manual skip can be told apart from a finished song. */
+  const progressRef = useRef({ position: 0, duration: 0 });
+  progressRef.current = { position: player.position, duration: player.duration };
 
   const { load, cue, setVolume: applyVolume, play } = player;
+
 
   /** Restore the last session's queue and seek position (paused until you hit play). */
   const resumeRef = useRef<number | null>(null);
