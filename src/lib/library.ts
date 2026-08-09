@@ -518,3 +518,60 @@ export function settingsToBrief(settings: RecSettings, extraMood?: string) {
 
   return parts.join(" ");
 }
+
+const WEEKS_4 = 28 * 24 * 60 * 60 * 1000;
+
+/** Replay Mix: songs you've had on repeat over the last few weeks. */
+export function replayMix(stats: Stats, limit = 30): Track[] {
+  const now = Date.now();
+  return Object.values(stats)
+    .filter((s) => now - s.lastAt < WEEKS_4 && s.plays + s.completions > 1)
+    .sort((a, b) => {
+      const score = (s: PlayStat) => s.plays * 2 + s.completions * 3 - s.skips * 2;
+      return score(b) - score(a) || b.lastAt - a.lastAt;
+    })
+    .slice(0, limit)
+    .map((s) => s.track);
+}
+
+/** Artists you actually listen to, ranked by plays then likes. */
+export function topArtists(stats: Stats, likes: Track[], limit = 12): string[] {
+  const score = new Map<string, number>();
+  for (const s of Object.values(stats)) {
+    const artist = s.track.artist;
+    if (!artist) continue;
+    score.set(artist, (score.get(artist) ?? 0) + s.plays + s.completions * 2 - s.skips);
+  }
+  for (const t of likes) {
+    if (t.artist) score.set(t.artist, (score.get(t.artist) ?? 0) + 3);
+  }
+  return [...score.entries()]
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([artist]) => artist);
+}
+
+/** Songs you keep skipping — a strong negative signal for the next picks. */
+export function skippedLabels(stats: Stats, limit = 15): string[] {
+  return Object.values(stats)
+    .filter((s) => s.skips >= 2 && s.skips > s.completions)
+    .sort((a, b) => b.skips - a.skips)
+    .slice(0, limit)
+    .map((s) => trackLabel(s.track));
+}
+
+/** Recent listening as an ordered sequence with the action taken on each track. */
+export function sequenceBrief(history: Track[], stats: Stats, limit = 15): string[] {
+  return history.slice(0, limit).map((t) => {
+    const s = stats[t.id];
+    const action = !s
+      ? "played"
+      : s.skips > s.completions
+        ? "skipped"
+        : s.plays > 1
+          ? `replayed x${s.plays}`
+          : "played";
+    return `${trackLabel(t)} — ${action}`;
+  });
+}
