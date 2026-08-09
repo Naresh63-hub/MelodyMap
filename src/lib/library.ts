@@ -80,6 +80,19 @@ const DISLIKES_KEY = "vinyl.dislikes.v1";
 const HISTORY_KEY = "vinyl.history.v1";
 const PLAYLISTS_KEY = "vinyl.playlists.v1";
 const SETTINGS_KEY = "vinyl.recsettings.v1";
+const STATS_KEY = "vinyl.stats.v1";
+
+/** Behavioural signal per song: how often it's replayed vs skipped, and when. */
+export type PlayStat = {
+  track: Track;
+  plays: number;
+  skips: number;
+  completions: number;
+  lastAt: number;
+};
+
+export type Stats = Record<string, PlayStat>;
+
 
 
 function read<T>(key: string, fallback: T): T {
