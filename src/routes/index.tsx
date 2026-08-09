@@ -80,10 +80,11 @@ export const Route = createFileRoute("/")({
   component: MusicApp,
 });
 
-type Tab = "foryou" | "search" | "likes" | "playlists" | "history";
+type Tab = "foryou" | "mixes" | "search" | "likes" | "playlists" | "history";
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Sparkles }> = [
   { id: "foryou", label: "For you", icon: Sparkles },
+  { id: "mixes", label: "Mixes", icon: Layers },
   { id: "search", label: "Search", icon: Search },
   { id: "likes", label: "Favourites", icon: Heart },
   { id: "playlists", label: "Playlists", icon: ListMusic },
@@ -93,6 +94,8 @@ const TABS: Array<{ id: Tab; label: string; icon: typeof Sparkles }> = [
 function MusicApp() {
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
+  const runMix = useServerFn(buildMix);
+
   const runSuggest = useServerFn(suggestSearch);
 
   const auth = useAuth();
