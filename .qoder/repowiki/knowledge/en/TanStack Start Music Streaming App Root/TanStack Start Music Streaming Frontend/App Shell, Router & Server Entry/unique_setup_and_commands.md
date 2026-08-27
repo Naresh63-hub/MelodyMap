@@ -1,0 +1,1 @@
+The Node server entry must be invoked via the framework's standard adapter (the exported default `fetch`); the streaming proxy only activates when the request path starts with `/api/stream/` and resolves the actual stream URL through `./lib/stream.server.resolveStreamUrl` at request time.

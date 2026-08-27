@@ -24,8 +24,12 @@ export function useMediaSession(
       ms.metadata = new MediaMetadata({
         title: track.title,
         artist: track.artist,
-        album: "Midnight Vinyl",
-        artwork: [{ src: track.thumbnail, sizes: "480x360", type: "image/jpeg" }],
+        album: "MelodyMap",
+        artwork: [
+          { src: track.thumbnail, sizes: "96x96", type: "image/jpeg" },
+          { src: track.thumbnail, sizes: "256x256", type: "image/jpeg" },
+          { src: track.thumbnail, sizes: "480x360", type: "image/jpeg" },
+        ],
       });
     }
     ms.playbackState = isPlaying ? "playing" : "paused";
@@ -36,15 +40,15 @@ export function useMediaSession(
           position: Math.min(position, duration),
           playbackRate: 1,
         });
-      } catch {
-        /* position state unsupported */
+      } catch (err) {
+        console.warn("[MelodyMap] setPositionState failed:", err);
       }
     }
     const set = (action: MediaSessionAction, fn: MediaSessionActionHandler | null) => {
       try {
         ms.setActionHandler(action, fn);
-      } catch {
-        /* unsupported action */
+      } catch (err) {
+        console.warn(`[MelodyMap] setActionHandler(${action}) failed:`, err);
       }
     };
     set("play", handlers.onPlay);

@@ -1,0 +1,1 @@
+Run `supabase db push` to apply migrations against the project identified in `config.toml`; use `supabase db diff` to generate new timestamped migration files under `migrations/`.

@@ -1,0 +1,1 @@
+TanStack Start (React Router + React Query), Vite 8 + Nitro (Cloudflare target), Supabase JS client, Tailwind CSS v4, Radix UI, Zod, React Hook Form, and Bun as the lockfile/runtime manager.

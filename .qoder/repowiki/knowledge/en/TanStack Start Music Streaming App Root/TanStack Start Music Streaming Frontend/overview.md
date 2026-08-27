@@ -1,0 +1,1 @@
+Wires TanStack Start routes, React Query, Supabase auth middleware, and music streaming libraries into a single app shell that renders music UI components and serves server-side audio proxying.

@@ -5,19 +5,50 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { lovable } from "@/integrations/lovable/index";
+import { LanguageArtistPicker } from "@/components/music/ui/LanguageArtistPicker";
 import { supabase } from "@/integrations/supabase/client";
+import { DEFAULT_SETTINGS, SETTINGS_KEY, type RecSettings } from "@/lib/library";
+
+/** Reads saved languages/artists so the picker is pre-filled on return visits. */
+function readSavedPick(): { languages: string[]; artists: string[] } {
+  if (typeof window === "undefined") return { languages: [], artists: [] };
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Partial<RecSettings>) : {};
+    return {
+      languages: parsed.languages ?? [],
+      artists: parsed.artists ?? [],
+    };
+  } catch {
+    return { languages: [], artists: [] };
+  }
+}
+
+/** Seeds the app's settings with the languages/artists picked at sign-in. */
+function persistPick(languages: string[], artists: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_KEY);
+    const current = raw ? (JSON.parse(raw) as Partial<RecSettings>) : {};
+    window.localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ ...DEFAULT_SETTINGS, ...current, languages, artists }),
+    );
+  } catch {
+    /* storage unavailable — the pick just won't be seeded */
+  }
+}
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in — Midnight Vinyl" },
+      { title: "Sign in — MelodyMap" },
       {
         name: "description",
         content:
-          "Sign in to Midnight Vinyl to sync your favourites, playlists and AI music picks across devices.",
+          "Sign in to MelodyMap to sync your favourites, playlists and AI music picks across devices.",
       },
-      { property: "og:title", content: "Sign in — Midnight Vinyl" },
+      { property: "og:title", content: "Sign in — MelodyMap" },
       {
         property: "og:description",
         content: "Sync your favourites, playlists and AI picks across every device.",
@@ -37,6 +68,14 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [languages, setLanguages] = useState<string[]>([]);
+  const [artists, setArtists] = useState<string[]>([]);
+
+  useEffect(() => {
+    const saved = readSavedPick();
+    setLanguages(saved.languages);
+    setArtists(saved.artists);
+  }, []);
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -48,6 +87,8 @@ function AuthPage() {
     event.preventDefault();
     setBusy(true);
     setNote(null);
+    // Seed language-based song picks before leaving the page.
+    persistPick(languages, artists);
     if (mode === "signup") {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
@@ -83,26 +124,25 @@ function AuthPage() {
 
   const google = async () => {
     setNote(null);
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin },
     });
-    if (result.error) {
+    if (error) {
       setNote("Google sign-in failed. Please try again.");
       return;
     }
-    if (result.redirected) return;
-    void navigate({ to: "/", replace: true });
   };
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-vinyl shadow-player">
+          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-melodymap shadow-player">
             <Disc3 className="h-7 w-7 text-primary" />
           </span>
           <div>
-            <h1 className="text-2xl font-bold">Midnight Vinyl</h1>
+            <h1 className="text-2xl font-bold">MelodyMap</h1>
             <p className="text-xs text-muted-foreground">
               Sync your favourites, playlists and picks everywhere
             </p>
@@ -163,6 +203,18 @@ function AuthPage() {
                 placeholder="At least 6 characters"
               />
             </div>
+
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3.5">
+              <LanguageArtistPicker
+                languages={languages}
+                artists={artists}
+                onChange={(patch) => {
+                  if (patch.languages) setLanguages(patch.languages);
+                  if (patch.artists) setArtists(patch.artists);
+                }}
+              />
+            </div>
+
             <Button type="submit" className="w-full font-semibold" disabled={busy}>
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

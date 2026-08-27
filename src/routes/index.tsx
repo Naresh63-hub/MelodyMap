@@ -2,36 +2,41 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Disc3,
+  Download,
   Heart,
-  History,
-  Layers,
   Loader2,
+  Maximize2,
+  MessageSquare,
   Pause,
   Play,
-  Search,
+  Repeat,
+  Shuffle,
   SkipBack,
   SkipForward,
-  ListMusic,
-  ListVideo,
-  Settings2,
-  Sparkles,
   ThumbsDown,
   Volume2,
+  VolumeX,
 } from "lucide-react";
 
-import { AccountMenu } from "@/components/music/AccountMenu";
 import { Equalizer, SpinningArt } from "@/components/music/NowPlayingViz";
-
+import { Sidebar, type NavTab, NAV_ITEMS } from "@/components/music/layout/Sidebar";
+import { SearchHeader } from "@/components/music/layout/SearchHeader";
+import { HomeSections } from "@/components/music/ui/HomeSections";
+import { FullScreenPlayer } from "@/components/music/ui/FullScreenPlayer";
+import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
+import { LyricsPanel } from "@/components/music/ui/LyricsPanel";
+import { SearchResults } from "@/components/music/ui/SearchResults";
 import { MixesPanel, type MixId } from "@/components/music/MixesPanel";
-import { QueuePanel } from "@/components/music/QueuePanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
+import { QueuePanel } from "@/components/music/QueuePanel";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
 import { ScrubBar } from "@/components/music/ScrubBar";
+import { SleepTimer } from "@/components/music/SleepTimer";
 import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
+
+import { useAuth } from "@/lib/auth";
 import {
   useLibrary,
   trackLabel,
@@ -45,61 +50,41 @@ import {
   MOODS,
   type Track,
 } from "@/lib/library";
-import { useAuth } from "@/lib/auth";
-import { useMediaSession } from "@/lib/use-media-session";
-
 import {
   buildMix,
+  newSongs,
+  podcastPicks,
   recommendTracks,
   searchTracks,
   suggestSearch,
 } from "@/lib/music.functions";
-import { formatTime, useYouTubePlayer } from "@/lib/use-youtube-player";
+import { formatTime, useAudioPlayer } from "@/lib/use-audio-player";
+import { useMediaSession } from "@/lib/use-media-session";
+import { getBlob, listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
 import { cn } from "@/lib/utils";
-
-
-
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Midnight Vinyl — Free Music Player with AI Picks" },
+      { title: "MelodyMap — Your Music. Your Mood. Your Map." },
       {
         name: "description",
-        content:
-          "Stream any song for free and get AI recommendations that learn your taste. No account, no subscription.",
-      },
-      { property: "og:title", content: "Midnight Vinyl — Free Music Player with AI Picks" },
-      {
-        property: "og:description",
-        content:
-          "Stream any song for free and get AI recommendations that learn your taste. No account, no subscription.",
+        content: "Stream any song for free with AI-powered recommendations that learn your taste.",
       },
     ],
   }),
   component: MusicApp,
 });
 
-type Tab = "foryou" | "mixes" | "search" | "likes" | "playlists" | "history";
-
-const TABS: Array<{ id: Tab; label: string; icon: typeof Sparkles }> = [
-  { id: "foryou", label: "For you", icon: Sparkles },
-  { id: "mixes", label: "Mixes", icon: Layers },
-  { id: "search", label: "Search", icon: Search },
-  { id: "likes", label: "Favourites", icon: Heart },
-  { id: "playlists", label: "Playlists", icon: ListMusic },
-  { id: "history", label: "Recent", icon: History },
-];
-
 function MusicApp() {
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
   const runMix = useServerFn(buildMix);
-
+  const runNewSongs = useServerFn(newSongs);
+  const runPodcastPicks = useServerFn(podcastPicks);
   const runSuggest = useServerFn(suggestSearch);
 
   const auth = useAuth();
-
   const {
     hydrated,
     likes,
@@ -113,8 +98,6 @@ function MusicApp() {
     toggleLike,
     toggleDislike,
     logPlay,
-
-
     clearHistory,
     createPlaylist,
     renamePlaylist,
@@ -128,8 +111,9 @@ function MusicApp() {
     resetSettings,
   } = useLibrary(auth.userId);
 
-
-  const [tab, setTab] = useState<Tab>("foryou");
+  // --- UI state ---
+  const [tab, setTab] = useState<NavTab>("foryou");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -138,68 +122,80 @@ function MusicApp() {
   const [recs, setRecs] = useState<Track[]>([]);
   const [recLoading, setRecLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
   const [queue, setQueue] = useState<Track[]>([]);
   const [index, setIndex] = useState(0);
   const [volume, setVolume] = useState(80);
-  const [showVideo, setShowVideo] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [continuous, setContinuous] = useState(true);
   const [extending, setExtending] = useState(false);
   const [resumed, setResumed] = useState(false);
-
   const [mix, setMix] = useState<MixId>("discover");
-  const [mixTracks, setMixTracks] = useState<Record<"discover" | "newrelease", Track[]>>({
-    discover: [],
-    newrelease: [],
-  });
+  const [mixTracks, setMixTracks] = useState<
+    Record<"discover" | "newrelease" | "explore", Track[]>
+  >({ discover: [], newrelease: [], explore: [] });
   const [mixLoading, setMixLoading] = useState(false);
+  const [showFullScreen, setShowFullScreen] = useState(false);
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const [isMuted, setIsMuted] = useState(false);
+  const [prevVolume, setPrevVolume] = useState(80);
 
-  /** Replay Mix is pure behaviour — no AI needed, just what you keep replaying. */
-  const replayTracks = useMemo(() => replayMix(stats), [stats]);
-
-  /** Builds a Discover or New Release mix from the listener's behavioural profile. */
-  const loadMix = useCallback(
-    async (kind: "discover" | "newrelease") => {
-      setMixLoading(true);
-      setMessage(null);
-      const res = await runMix({
-        data: {
-          kind,
-          liked: likes.slice(0, 20).map(trackLabel),
-          recent: history.slice(0, 20).map(trackLabel),
-          sequence: sequenceBrief(history, stats),
-          skipped: skippedLabels(stats),
-          artists: topArtists(stats, likes),
-          brief: settingsToBrief(settings),
-          count: 20,
-        },
-      });
-      setMixLoading(false);
-      if (res.error) setMessage(res.error);
-      setMixTracks((prev) => ({ ...prev, [kind]: res.tracks as Track[] }));
-    },
-    [runMix, likes, history, stats, settings],
-  );
-
-  /** Build the selected mix the first time the tab is opened. */
-  const mixOnce = useRef<Record<string, boolean>>({});
+  // Refresh downloads on mount
   useEffect(() => {
-    if (tab !== "mixes" || mix === "replay" || mixOnce.current[mix]) return;
-    mixOnce.current[mix] = true;
-    void loadMix(mix);
-  }, [tab, mix, loadMix]);
+    void listDownloads().then((items: DownloadInfo[]) => {
+      setDownloadedIds(new Set(items.map((t: DownloadInfo) => t.track.id)));
+    });
+  }, []);
 
+  const handleDownload = async (track: Track) => {
+    setDownloadingIds((prev) => new Set([...prev, track.id]));
+    try {
+      const res = await fetch(`/api/stream/${encodeURIComponent(track.id)}`);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      await saveDownload(track, blob);
+      setDownloadedIds((prev) => new Set([...prev, track.id]));
+      setMessage(`Downloaded "${track.title}" for offline listening`);
+    } catch {
+      setMessage("Failed to download song");
+    } finally {
+      setDownloadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(track.id);
+        return next;
+      });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  };
 
+  const handleRemoveDownload = async (track: Track) => {
+    await removeDownload(track.id);
+    setDownloadedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(track.id);
+      return next;
+    });
+    setMessage(`Removed offline copy of "${track.title}"`);
+    setTimeout(() => setMessage(null), 3000);
+  };
+
+  // --- Derived ---
+  const replayTracks = useMemo(() => replayMix(stats), [stats]);
   const current = queue[index];
   const currentRef = useRef<Track | undefined>(undefined);
   currentRef.current = current;
   const queueRef = useRef<Track[]>([]);
   queueRef.current = queue;
+  const likedIds = useMemo(() => new Set(likes.map((t) => t.id)), [likes]);
+  const dislikedIds = useMemo(() => new Set(dislikes.map((t) => t.id)), [dislikes]);
+  const canPrev = index > 0;
+  const canNext = index + 1 < queue.length;
+  const visibleMix = mix === "replay" ? replayTracks : mixTracks[mix];
 
-
-  const player = useYouTubePlayer({
+  // --- Player ---
+  const player = useAudioPlayer({
     onEnded: () => {
       const track = currentRef.current;
       if (track) logComplete(track);
@@ -209,18 +205,187 @@ function MusicApp() {
       }
       if (continuous) void extendQueue();
     },
+    onError: (msg) => {
+      setMessage(msg);
+      setTimeout(() => setMessage(null), 3000);
+      if (canNext) goNext();
+    },
   });
 
-  /** Live progress, so a manual skip can be told apart from a finished song. */
-  const progressRef = useRef({ position: 0, duration: 0 });
-  progressRef.current = { position: player.position, duration: player.duration };
+  const { load, cue, setVolume: applyVolume, play, pause } = player;
 
-  const { load, cue, setVolume: applyVolume, play } = player;
+  const togglePlay = useCallback(() => {
+    if (!current) return;
+    if (player.isPlaying) {
+      pause();
+    } else {
+      play();
+    }
+  }, [current, player.isPlaying, pause, play]);
 
+  const toggleMute = useCallback(() => {
+    if (isMuted) {
+      setVolume(prevVolume);
+      applyVolume(prevVolume);
+      setIsMuted(false);
+    } else {
+      setPrevVolume(volume);
+      setVolume(0);
+      applyVolume(0);
+      setIsMuted(true);
+    }
+  }, [isMuted, volume, prevVolume, applyVolume]);
 
-  /** Restore the last session's queue and seek position (paused until you hit play). */
-  const resumeRef = useRef<number | null>(null);
-  const restored = useRef(false);
+  const startQueue = useCallback(
+    (tracks: Track[], startIndex = 0) => {
+      if (tracks.length === 0) return;
+      setQueue(tracks);
+      setIndex(startIndex);
+    },
+    [],
+  );
+
+  const enqueue = useCallback((tracks: Track[]) => {
+    setQueue((prev) => [...prev, ...tracks]);
+  }, []);
+
+  const loadMix = useCallback(
+    async (kind: "discover" | "newrelease" | "explore") => {
+      setMixLoading(true);
+      try {
+        const res = await runMix({
+          data: {
+            kind,
+            liked: likes.slice(0, 20).map(trackLabel),
+            recent: history.slice(0, 20).map(trackLabel),
+            sequence: sequenceBrief(history, stats),
+            skipped: skippedLabels(stats),
+            artists: topArtists(stats, likes),
+            brief: settingsToBrief(settings),
+            count: 20,
+          },
+        });
+        if (res.tracks) {
+          setMixTracks((prev) => ({ ...prev, [kind]: res.tracks as Track[] }));
+        }
+      } finally {
+        setMixLoading(false);
+      }
+    },
+    [runMix, likes, history, stats, settings],
+  );
+
+  const loadRecommendations = useCallback(
+    async (mood?: string) => {
+      setRecLoading(true);
+      try {
+        const res = await runRecommend({
+          data: {
+            liked: likes.slice(0, 20).map(trackLabel),
+            recent: history.slice(0, 20).map(trackLabel),
+            disliked: dislikes.slice(0, 20).map(trackLabel),
+            sequence: sequenceBrief(history, stats),
+            skipped: skippedLabels(stats),
+            count: 30,
+            ...(mood ? { mood } : {}),
+            brief: settingsToBrief(settings),
+            artists: topArtists(stats, likes),
+          },
+        });
+        if (res.tracks) {
+          setRecs(res.tracks as Track[]);
+        }
+      } finally {
+        setRecLoading(false);
+      }
+    },
+    [runRecommend, likes, history, dislikes, stats, settings],
+  );
+
+  const extendQueue = useCallback(async () => {
+    if (extending) return;
+    setExtending(true);
+    try {
+      const res = await runRecommend({
+        data: {
+          liked: likes.slice(0, 20).map(trackLabel),
+          recent: history.slice(0, 20).map(trackLabel),
+          disliked: dislikes.slice(0, 20).map(trackLabel),
+          sequence: sequenceBrief(history, stats),
+          skipped: skippedLabels(stats),
+          count: 10,
+          brief: settingsToBrief(settings),
+          artists: topArtists(stats, likes),
+        },
+      });
+      if (res.tracks && res.tracks.length > 0) {
+        setQueue((prev) => [...prev, ...(res.tracks as Track[])]);
+      }
+    } finally {
+      setExtending(false);
+    }
+  }, [extending, runRecommend, likes, history, dislikes, stats, settings]);
+
+  const searchFor = useCallback(
+    async (term: string) => {
+      if (!term.trim()) return;
+      setTab("search");
+      setShowSuggestions(false);
+      setSearching(true);
+      setMessage(null);
+      try {
+        const res = await runSearch({ data: { query: term.trim(), limit: 50 } });
+        if (res.error) setMessage(res.error);
+        if (res.tracks) setResults(res.tracks as Track[]);
+      } finally {
+        setSearching(false);
+      }
+    },
+    [runSearch],
+  );
+
+  const openArtist = useCallback(
+    (artist: string) => {
+      setQuery(artist);
+      void searchFor(`${artist} songs`);
+    },
+    [searchFor],
+  );
+
+  const goNext = useCallback(() => {
+    const q = queueRef.current;
+    if (index + 1 < q.length) {
+      setIndex(index + 1);
+    } else if (continuous) {
+      void extendQueue();
+    }
+  }, [index, continuous, extendQueue]);
+
+  const goPrev = useCallback(() => {
+    if (index > 0) {
+      setIndex(index - 1);
+    }
+  }, [index]);
+
+  const dislikeCurrent = useCallback(() => {
+    const track = currentRef.current;
+    if (!track) return;
+    toggleDislike(track);
+    setRecs((prev) => prev.filter((t) => t.id !== track.id));
+    goNext();
+  }, [toggleDislike, goNext]);
+
+  const onSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    void searchFor(query);
+  };
+
+  // --- Effects ---
+  useEffect(() => {
+    if (tab !== "mixes" || mix === "replay") return;
+    void loadMix(mix);
+  }, [tab, mix, loadMix]);
+
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
@@ -231,8 +396,11 @@ function MusicApp() {
     }
     resumeRef.current = saved.position;
     setQueue(saved.queue);
-    setIndex(Math.min(saved.index, saved.queue.length - 1));
+    setIndex(Math.min(saved.index, Math.max(0, saved.queue.length - 1)));
   }, []);
+
+  const restored = useRef(false);
+  const resumeRef = useRef<number | null>(null);
 
   useEffect(() => {
     const track = currentRef.current;
@@ -247,10 +415,8 @@ function MusicApp() {
     load(track.id);
     play();
     logPlay(track);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, player.ready, load, cue, play, logPlay]);
 
-  /** Persist queue + seek position so reopening the app picks up where it stopped. */
   useEffect(() => {
     if (!resumed || queue.length === 0) return;
     const timer = window.setInterval(() => {
@@ -260,83 +426,8 @@ function MusicApp() {
   }, [resumed, queue, index, player.position]);
 
   useEffect(() => {
-
     if (player.ready) applyVolume(volume);
   }, [volume, player.ready, applyVolume]);
-
-  const likedIds = useMemo(() => new Set(likes.map((t) => t.id)), [likes]);
-  const dislikedIds = useMemo(() => new Set(dislikes.map((t) => t.id)), [dislikes]);
-
-  const startQueue = useCallback((tracks: Track[], startAt: number) => {
-    setQueue(tracks);
-    setIndex(startAt);
-  }, []);
-
-  const fetchPicks = useCallback(
-    async (mood?: string) => {
-      const res = await runRecommend({
-        data: {
-          liked: likes.slice(0, 20).map(trackLabel),
-          recent: history.slice(0, 20).map(trackLabel),
-          disliked: dislikes.slice(0, 20).map(trackLabel),
-          sequence: sequenceBrief(history, stats),
-          skipped: skippedLabels(stats),
-          count: 30,
-          ...(mood ? { mood } : {}),
-          brief: settingsToBrief(settings, mood),
-        },
-      });
-      return res;
-    },
-    [runRecommend, likes, history, dislikes, stats, settings],
-  );
-
-
-
-  const loadRecommendations = useCallback(
-    async (mood?: string) => {
-      setRecLoading(true);
-      setMessage(null);
-      const res = await fetchPicks(mood);
-      setRecLoading(false);
-      if (res.error) setMessage(res.error);
-      else setRecs(res.tracks as Track[]);
-    },
-    [fetchPicks],
-  );
-
-  const enqueue = useCallback((tracks: Track[]) => {
-    if (tracks.length === 0) return;
-    setQueue((prev) => {
-      const fresh = tracks.filter((t) => !prev.some((x) => x.id === t.id));
-      return [...prev, ...fresh];
-    });
-    setShowQueue(true);
-  }, []);
-
-  /** Continuous mode: fetch a fresh batch of picks and append them to the queue. */
-  const extendingRef = useRef(false);
-  const extendQueue = useCallback(async () => {
-    if (extendingRef.current) return;
-    extendingRef.current = true;
-    setExtending(true);
-    const res = await fetchPicks();
-    setExtending(false);
-    extendingRef.current = false;
-    if (res.error || res.tracks.length === 0) {
-      if (res.error) setMessage(res.error);
-      return;
-    }
-    const incoming = res.tracks as Track[];
-    setRecs(incoming);
-    const prev = queueRef.current;
-    const fresh = incoming.filter((t) => !prev.some((x) => x.id === t.id));
-    if (fresh.length === 0) return;
-    setQueue([...prev, ...fresh]);
-    setIndex(prev.length);
-
-  }, [fetchPicks]);
-
 
   const bootstrapped = useRef(false);
   useEffect(() => {
@@ -345,22 +436,6 @@ function MusicApp() {
     void loadRecommendations();
   }, [hydrated, loadRecommendations]);
 
-  const searchFor = useCallback(
-    async (term: string) => {
-      if (!term.trim()) return;
-      setTab("search");
-      setShowSuggestions(false);
-      setSearching(true);
-      setMessage(null);
-      const res = await runSearch({ data: { query: term.trim(), limit: 50 } });
-      setSearching(false);
-      if (res.error) setMessage(res.error);
-      setResults(res.tracks as Track[]);
-    },
-    [runSearch],
-  );
-
-  /** Debounced YouTube autocomplete for the search box. */
   useEffect(() => {
     const term = query.trim();
     if (term.length < 2) {
@@ -379,86 +454,18 @@ function MusicApp() {
     };
   }, [query, runSuggest]);
 
-  const onSearch = (event: React.FormEvent) => {
-    event.preventDefault();
-    void searchFor(query);
-  };
+  useMediaSession(current, player.isPlaying, player.position, player.duration, {
+    onPlay: () => player.play(),
+    onPause: () => player.pause(),
+    onNext: goNext,
+    onPrev: goPrev,
+    onSeek: (s: number) => player.seek(s),
+  });
 
-
-  /** Opens a "songs by this artist" view. */
-  const openArtist = useCallback(
-    (artist: string) => {
-      setQuery(artist);
-      void searchFor(`${artist} songs`);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
-    [searchFor],
-  );
-
-  const visibleMix = mix === "replay" ? replayTracks : mixTracks[mix];
-
-  const listForTab: Record<Tab, Track[]> = {
-    foryou: recs,
-    mixes: visibleMix,
-    search: results,
-    likes,
-    playlists: [],
-    history,
-  };
-  const visible = listForTab[tab];
-
-
-  const canPrev = index > 0;
-  const canNext = index + 1 < queue.length;
-
-  const goNext = useCallback(() => {
-    if (queueRef.current.length === 0) return;
-    const track = currentRef.current;
-    const { position, duration } = progressRef.current;
-    // Leaving a song less than 60% in is a skip — a strong negative signal.
-    if (track && duration > 0 && position < duration * 0.6) logSkip(track);
-    setIndex((i) => {
-      if (i + 1 < queueRef.current.length) return i + 1;
-      if (continuous) void extendQueue();
-      return i;
-    });
-  }, [continuous, extendQueue, logSkip]);
-
-
-  const goPrev = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
-
-  const togglePlay = useCallback(() => {
-    if (player.isPlaying) player.pause();
-    else player.play();
-  }, [player]);
-
-  /** Thumbs-down: teaches the feed and jumps to the next song. */
-  const dislikeCurrent = useCallback(() => {
-    const track = currentRef.current;
-    if (!track) return;
-    toggleDislike(track);
-    setRecs((prev) => prev.filter((t) => t.id !== track.id));
-    goNext();
-  }, [toggleDislike, goNext]);
-
-  const mediaHandlers = useMemo(
-    () => ({
-      onPlay: () => player.play(),
-      onPause: () => player.pause(),
-      onNext: goNext,
-      onPrev: goPrev,
-      onSeek: (s: number) => player.seek(s),
-    }),
-    [player, goNext, goPrev],
-  );
-  useMediaSession(current, player.isPlaying, player.position, player.duration, mediaHandlers);
-
-  // Keyboard shortcuts: space play/pause, ←/→ seek 5s, J/L seek 10s, N/P track, K play/pause
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable))
-        return;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
       const key = e.key.toLowerCase();
       const seekBy = (s: number) => player.seek(Math.max(0, player.position + s));
       if (e.code === "Space" || key === "k") {
@@ -470,330 +477,416 @@ function MusicApp() {
       } else if (key === "arrowleft") {
         e.preventDefault();
         seekBy(-5);
-      } else if (key === "l") {
-        seekBy(10);
-      } else if (key === "j") {
-        seekBy(-10);
-      } else if (key === "n") {
-        goNext();
-      } else if (key === "p") {
-        goPrev();
-      }
+      } else if (key === "l") seekBy(10);
+      else if (key === "j") seekBy(-10);
+      else if (key === "n") goNext();
+      else if (key === "p") goPrev();
+      else if (key === "m") toggleMute();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [player, togglePlay, goNext, goPrev]);
+  }, [player, togglePlay, goNext, goPrev, toggleMute]);
 
+  // --- Track list for each tab ---
+  const listForTab: Record<string, Track[]> = useMemo(
+    () => ({
+      likes,
+      history,
+      search: results,
+      foryou: recs,
+    }),
+    [likes, history, results, recs],
+  );
+  const visible = listForTab[tab] ?? [];
 
   return (
-    <div className="min-h-screen pb-40">
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-96 bg-hero-glow" aria-hidden />
+    <div className="flex h-screen overflow-hidden bg-background text-foreground selection:bg-pink-500/30">
+      {/* Sidebar on desktop */}
+      <Sidebar
+        activeTab={tab}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        onNavigate={(t: NavTab) => setTab(t)}
+        isSynced={!!auth.userId}
+        userName={auth.profile?.display_name ?? auth.email?.split("@")[0] ?? "Listener"}
+        userInitial={auth.email?.[0]?.toUpperCase() ?? "L"}
+        userAvatar={auth.profile?.avatar_url}
+        currentTitle={current?.title}
+        currentArtist={current?.artist}
+        currentThumbnail={current?.thumbnail}
+        isPlaying={player.isPlaying}
+        onPlayPause={togglePlay}
+        onNext={goNext}
+      />
 
-      <header className="relative mx-auto flex max-w-5xl flex-col gap-6 px-4 pt-10 sm:px-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-vinyl shadow-player">
-            <Disc3
-              className={cn("h-6 w-6 text-primary", player.isPlaying && "animate-spin-slow")}
-            />
-          </span>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold sm:text-3xl">Midnight Vinyl</h1>
-            <p className="text-xs text-muted-foreground">
-              {auth.userId
-                ? "Your feed syncs to your account"
-                : "Free listening with recommendations that learn your taste"}
-            </p>
+      {/* Main column */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#0a0a10]">
+        <SearchHeader
+          query={query}
+          onQueryChange={setQuery}
+          suggestions={suggestions}
+          showSuggestions={showSuggestions}
+          onShowSuggestions={setShowSuggestions}
+          onSearch={onSearch}
+          onSuggestionClick={(s) => {
+            setQuery(s);
+            void searchFor(s);
+          }}
+          searching={searching}
+          activeTab={tab}
+          onNavigate={(t: NavTab) => setTab(t)}
+          userId={auth.userId}
+          email={auth.email}
+          profile={auth.profile}
+          onUpdateProfile={auth.updateProfile}
+          onSignOut={auth.signOut}
+          onOpenSettings={() => setShowSettings((v) => !v)}
+        />
+
+        <main className="relative flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-96 bg-hero-glow opacity-80" aria-hidden />
+
+          <div className="relative w-full px-4 py-6 sm:px-8 xl:px-12 2xl:px-16 pb-32">
+            {message && (
+              <div className="pointer-events-none fixed bottom-28 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <p className="rounded-full border border-white/10 bg-[#1a1a2e]/95 px-5 py-2.5 text-xs font-medium text-white/80 shadow-2xl backdrop-blur-md">
+                  {message}
+                </p>
+              </div>
+            )}
+
+            {/* FOR YOU TAB */}
+            {tab === "foryou" && (
+              <div className="space-y-6">
+                {/* Greeting & Moods */}
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-white">
+                      Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {auth.profile?.display_name?.split(" ")[0] || "Listener"} 👋
+                    </h1>
+                    <p className="text-xs text-white/40 mt-0.5">Your personalized feed based on your mood & tastes</p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full bg-white/[0.06] text-white/70 hover:bg-white/10 hover:text-white border-white/10"
+                      onClick={() => void loadRecommendations()}
+                      disabled={recLoading}
+                    >
+                      {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                      Refresh picks
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full bg-white/[0.06] text-white/70 hover:bg-white/10 hover:text-white border-white/10"
+                      onClick={() => setShowSettings((v) => !v)}
+                    >
+                      Tune picks
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Mood chips */}
+                <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
+                  {MOODS.map((mood) => (
+                    <button
+                      key={mood}
+                      type="button"
+                      onClick={() => void loadRecommendations(mood)}
+                      disabled={recLoading}
+                      className="shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-white/50 transition-all hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white/80"
+                    >
+                      {mood}
+                    </button>
+                  ))}
+                </div>
+
+                {showSettings && (
+                  <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5 backdrop-blur-md">
+                    <RecSettingsPanel
+                      settings={settings}
+                      onChange={updateSettings}
+                      onReset={resetSettings}
+                      onApply={() => void loadRecommendations()}
+                      loading={recLoading}
+                      onOpenLanguages={() => setTab("languages")}
+                    />
+                  </div>
+                )}
+
+                {/* Home Sections Grid */}
+                <HomeSections
+                  recentlyPlayed={history.slice(0, 12)}
+                  trending={recs.slice(0, 12)}
+                  newReleases={mixTracks.newrelease.slice(0, 12)}
+                  recommended={recs.slice(12, 24)}
+                  onPlayTrack={(track, i) => {
+                    if (current?.id === track.id) {
+                      player.isPlaying ? pause() : play();
+                      return;
+                    }
+                    startQueue(recs, i);
+                  }}
+                  onToggleLike={toggleLike}
+                  likedIds={likedIds}
+                  currentId={current?.id ?? undefined}
+                  isPlaying={player.isPlaying}
+                  loading={recLoading && recs.length === 0}
+                />
+              </div>
+            )}
+
+            {/* SEARCH TAB */}
+            {tab === "search" && (
+              <SearchResults
+                results={results}
+                loading={searching}
+                query={query}
+                onPlayTrack={(track, i) => {
+                  if (current?.id === track.id) {
+                    player.isPlaying ? pause() : play();
+                    return;
+                  }
+                  startQueue(results, i);
+                }}
+                onToggleLike={toggleLike}
+                likedIds={likedIds}
+                currentId={current?.id ?? undefined}
+                isPlaying={player.isPlaying}
+              />
+            )}
+
+            {/* MIXES TAB */}
+            {tab === "mixes" && (
+              <MixesPanel
+                active={mix}
+                tracks={visibleMix}
+                loading={mixLoading}
+                currentId={current?.id}
+                isPlaying={player.isPlaying}
+                likedIds={likedIds}
+                dislikedIds={dislikedIds}
+                playlists={playlists}
+                onSelect={(id) => {
+                  setMix(id);
+                  if (id !== "replay" && mixTracks[id].length === 0) void loadMix(id);
+                }}
+                onRefresh={() => {
+                  if (mix !== "replay") void loadMix(mix);
+                }}
+                onPlayAll={() => startQueue(visibleMix, 0)}
+                onPlay={(track, i) => {
+                  if (current?.id === track.id) {
+                    player.isPlaying ? pause() : play();
+                    return;
+                  }
+                  startQueue(visibleMix, i);
+                }}
+                onToggleLike={toggleLike}
+                onToggleDislike={toggleDislike}
+                onArtistClick={openArtist}
+                onAddToPlaylist={addToPlaylist}
+                onAddToQueue={(track) => enqueue([track])}
+                onCreatePlaylistWith={(track) => {
+                  const name = window.prompt("Playlist name", "New playlist");
+                  if (name?.trim()) createPlaylist(name.trim(), [track]);
+                }}
+              />
+            )}
+
+            {/* PLAYLISTS TAB */}
+            {tab === "playlists" && (
+              <PlaylistsPanel
+                playlists={playlists}
+                currentId={current?.id}
+                isPlaying={player.isPlaying}
+                onCreate={(name) => createPlaylist(name)}
+                onRename={renamePlaylist}
+                onDelete={deletePlaylist}
+                onRemoveTrack={removeFromPlaylist}
+                onRemoveMany={removeManyFromPlaylist}
+                onMoveMany={moveTracksToPlaylist}
+                onAddToQueue={enqueue}
+                onReorder={reorderPlaylist}
+                onPlay={(tracks, i) => startQueue(tracks, i)}
+              />
+            )}
+
+            {/* LANGUAGES TAB */}
+            {tab === "languages" && (
+              <LanguagesPanel
+                settings={settings}
+                onChangeSettings={updateSettings}
+                onPlay={(tracks, i) => startQueue(tracks, i)}
+                currentId={current?.id}
+                isPlaying={player.isPlaying}
+                likedIds={likedIds}
+                dislikedIds={dislikedIds}
+                playlists={playlists}
+                onToggleLike={toggleLike}
+                onToggleDislike={toggleDislike}
+                onArtistClick={openArtist}
+                onAddToPlaylist={addToPlaylist}
+                onAddToQueue={(track) => enqueue([track])}
+                onCreatePlaylistWith={(track) => {
+                  const name = window.prompt("Playlist name", "New playlist");
+                  if (name?.trim()) createPlaylist(name.trim(), [track]);
+                }}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                onDownload={(track) => void handleDownload(track)}
+                onRemoveDownload={(track) => void handleRemoveDownload(track)}
+              />
+            )}
+
+            {/* FAVOURITES / HISTORY TABS (TrackList) */}
+            {(tab === "likes" || tab === "history") && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-white">
+                    {tab === "likes" ? "Your Favourites" : "Recently Played"}
+                  </h2>
+                  {tab === "history" && history.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearHistory} className="text-xs text-white/50 hover:text-white">
+                      Clear history
+                    </Button>
+                  )}
+                </div>
+
+                <TrackList
+                  tracks={visible}
+                  currentId={current?.id}
+                  isPlaying={player.isPlaying}
+                  likedIds={likedIds}
+                  dislikedIds={dislikedIds}
+                  downloadedIds={downloadedIds}
+                  downloadingIds={downloadingIds}
+                  onDownload={(track) => void handleDownload(track)}
+                  onRemoveDownload={(track) => void handleRemoveDownload(track)}
+                  onPlay={(track, i) => {
+                    if (current?.id === track.id) {
+                      player.isPlaying ? pause() : play();
+                      return;
+                    }
+                    startQueue(visible, i);
+                  }}
+                  onToggleLike={toggleLike}
+                  onToggleDislike={(track) => {
+                    toggleDislike(track);
+                    setRecs((prev) => prev.filter((t) => t.id !== track.id));
+                  }}
+                  onArtistClick={openArtist}
+                  playlists={playlists}
+                  onAddToPlaylist={addToPlaylist}
+                  onAddToQueue={(track) => enqueue([track])}
+                  onCreatePlaylistWith={(track) => {
+                    const name = window.prompt("Playlist name", "New playlist");
+                    if (name?.trim()) createPlaylist(name.trim(), [track]);
+                  }}
+                  emptyMessage={
+                    tab === "likes"
+                      ? "Tap the heart on any song to save your favourites."
+                      : "Songs you listen to will appear here."
+                  }
+                />
+              </div>
+            )}
           </div>
-          <AccountMenu
-            userId={auth.userId}
-            email={auth.email}
-            profile={auth.profile}
-            onUpdateProfile={auth.updateProfile}
-            onSignOut={auth.signOut}
-          />
+        </main>
+      </div>
+
+      {/* BOTTOM PLAYER BAR */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-white/5 bg-[#0a0a14]/95 backdrop-blur-2xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.9)]">
+        {/* Top ambient glow line */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pink-500/40 to-transparent animate-pulse" />
+
+        {/* Mobile bottom tabs */}
+        <div className="flex items-center justify-around border-b border-white/5 py-1.5 px-2 lg:hidden">
+          {NAV_ITEMS.filter((t) => ["foryou", "mixes", "languages", "likes", "history"].includes(t.id)).map(
+            ({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 p-1.5 rounded-lg text-[10px] font-medium transition-colors",
+                  tab === id ? "text-pink-400 font-semibold" : "text-white/40 hover:text-white/70",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span>{label}</span>
+              </button>
+            ),
+          )}
         </div>
 
-
-        <form onSubmit={onSearch} className="relative flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setShowSuggestions(true);
+        <div className="mx-auto w-full px-4 py-2.5 sm:px-8 xl:px-12 2xl:px-16">
+          {showQueue && (
+            <QueuePanel
+              tracks={queue}
+              index={index}
+              isPlaying={player.isPlaying}
+              continuous={continuous}
+              loadingMore={extending}
+              onToggleContinuous={() => setContinuous((v) => !v)}
+              onJump={(i) => setIndex(i)}
+              onRemove={(i) => {
+                setQueue((prev) => prev.filter((_, x) => x !== i));
+                if (i < index) setIndex((x) => Math.max(0, x - 1));
               }}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => window.setTimeout(() => setShowSuggestions(false), 150)}
-              placeholder="Search any song, artist or album…"
-              className="h-12 rounded-full border-border bg-card pl-10 text-base"
-              autoComplete="off"
+              onClear={() => {
+                setQueue([]);
+                setIndex(0);
+              }}
+              onClose={() => setShowQueue(false)}
             />
-            {showSuggestions && suggestions.length > 0 && (
-              <ul className="absolute inset-x-0 top-14 z-40 overflow-hidden rounded-2xl border border-border bg-popover shadow-lift">
-                {suggestions.map((s) => (
-                  <li key={s}>
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        setQuery(s);
-                        void searchFor(s);
-                      }}
-                      className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                    >
-                      <Search className="h-3.5 w-3.5 shrink-0" />
-                      <span className="truncate">{s}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <Button type="submit" size="lg" className="h-12 rounded-full px-6 font-semibold">
-            {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-          </Button>
-        </form>
+          )}
 
-
-        <nav className="flex flex-wrap gap-2">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors",
-                tab === id
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      <main className="relative mx-auto mt-8 max-w-5xl px-4 sm:px-6">
-        {message && (
-          <p className="mb-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-foreground">
-            {message}
-          </p>
-        )}
-
-        {tab === "foryou" && (
-          <div className="mb-5 flex flex-wrap items-center gap-2">
-            <Button
-              variant="secondary"
-              className="rounded-full"
-              onClick={() => void loadRecommendations()}
-              disabled={recLoading}
-            >
-              {recLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Refresh picks
-            </Button>
-            <Button
-              variant="secondary"
-              className="rounded-full"
-              onClick={() => setShowSettings((v) => !v)}
-            >
-              <Settings2 className="mr-2 h-4 w-4" />
-              {showSettings ? "Hide tuning" : "Tune picks"}
-            </Button>
-            {MOODS.map((mood) => (
-              <button
-                key={mood}
-                type="button"
-                onClick={() => void loadRecommendations(mood)}
-                disabled={recLoading}
-                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-primary"
-              >
-                {mood}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {tab === "foryou" && showSettings && (
-          <div className="mb-5">
-            <RecSettingsPanel
-              settings={settings}
-              onChange={updateSettings}
-              onReset={resetSettings}
-              onApply={() => void loadRecommendations()}
-              loading={recLoading}
-            />
-          </div>
-        )}
-
-        {tab === "history" && history.length > 0 && (
-          <div className="mb-4 flex justify-end">
-            <Button variant="ghost" size="sm" onClick={clearHistory}>
-              Clear history
-            </Button>
-          </div>
-        )}
-
-        {tab === "mixes" ? (
-          <MixesPanel
-            active={mix}
-            tracks={visibleMix}
-            loading={mixLoading}
-            currentId={current?.id}
-            isPlaying={player.isPlaying}
-            likedIds={likedIds}
-            dislikedIds={dislikedIds}
-            playlists={playlists}
-            onSelect={(id) => {
-              setMix(id);
-              if (id !== "replay" && mixTracks[id].length === 0) void loadMix(id);
-            }}
-            onRefresh={() => {
-              if (mix !== "replay") void loadMix(mix);
-            }}
-            onPlayAll={() => startQueue(visibleMix, 0)}
-            onPlay={(track, i) => {
-              if (current?.id === track.id) {
-                player.isPlaying ? player.pause() : player.play();
-                return;
-              }
-              startQueue(visibleMix, i);
-            }}
-            onToggleLike={toggleLike}
-            onToggleDislike={toggleDislike}
-            onArtistClick={openArtist}
-            onAddToPlaylist={addToPlaylist}
-            onAddToQueue={(track) => enqueue([track])}
-            onCreatePlaylistWith={(track) => {
-              const name = window.prompt("Playlist name", "New playlist");
-              if (name?.trim()) createPlaylist(name.trim(), [track]);
-            }}
-          />
-        ) : tab === "playlists" ? (
-
-          <PlaylistsPanel
-            playlists={playlists}
-            currentId={current?.id}
-            isPlaying={player.isPlaying}
-            onCreate={(name) => createPlaylist(name)}
-            onRename={renamePlaylist}
-            onDelete={deletePlaylist}
-            onRemoveTrack={removeFromPlaylist}
-            onRemoveMany={removeManyFromPlaylist}
-            onMoveMany={moveTracksToPlaylist}
-            onAddToQueue={enqueue}
-            onReorder={reorderPlaylist}
-            onPlay={(tracks, i) => startQueue(tracks, i)}
-          />
-        ) : recLoading && tab === "foryou" ? (
-          <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <p className="text-sm">Reading your taste and picking songs…</p>
-          </div>
-        ) : (
-          <TrackList
-            tracks={visible}
-            currentId={current?.id}
-            isPlaying={player.isPlaying}
-            likedIds={likedIds}
-            dislikedIds={dislikedIds}
-            onPlay={(track, i) => {
-              if (current?.id === track.id) {
-                player.isPlaying ? player.pause() : player.play();
-                return;
-              }
-              startQueue(visible, i);
-            }}
-            onToggleLike={toggleLike}
-            onToggleDislike={(track) => {
-              toggleDislike(track);
-              setRecs((prev) => prev.filter((t) => t.id !== track.id));
-            }}
-            onArtistClick={openArtist}
-
-            playlists={playlists}
-            onAddToPlaylist={addToPlaylist}
-            onAddToQueue={(track) => enqueue([track])}
-            onCreatePlaylistWith={(track) => {
-              const name = window.prompt("Playlist name", "New playlist");
-              if (name?.trim()) createPlaylist(name.trim(), [track]);
-            }}
-            emptyMessage={
-              tab === "likes"
-                ? "Tap the heart on a song to build your favourites — they train your picks."
-                : tab === "history"
-                  ? "Songs you play show up here."
-                  : tab === "search"
-                    ? "Search for anything to start listening."
-                    : "No picks yet. Hit refresh."
-            }
-          />
-        )}
-      </main>
-
-      {/* Player */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-card/95 backdrop-blur">
-        <div className="mx-auto max-w-5xl px-4 py-3 sm:px-6">
-      {showQueue && (
-    <QueuePanel
-      tracks={queue}
-      index={index}
-      isPlaying={player.isPlaying}
-      continuous={continuous}
-      loadingMore={extending}
-      onToggleContinuous={() => setContinuous((v) => !v)}
-      onJump={(i) => setIndex(i)}
-      onRemove={(i) => {
-        setQueue((prev) => prev.filter((_, x) => x !== i));
-        if (i < index) setIndex((x) => Math.max(0, x - 1));
-      }}
-      onClear={() => {
-        setQueue([]);
-        setIndex(0);
-      }}
-      onClose={() => setShowQueue(false)}
-    />
-  )}
-          <div
-            className={cn(
-              "mx-auto mb-3 aspect-video w-full max-w-md overflow-hidden rounded-xl bg-black",
-              !showVideo && "sr-only h-0",
-            )}
-          >
-            <div ref={player.containerRef} />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <SpinningArt src={current?.thumbnail} playing={player.isPlaying} />
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2 truncate text-sm font-semibold">
-                <Equalizer active={player.isPlaying} className="h-3.5 shrink-0" />
-                <span className="truncate">{current?.title ?? "Pick a song to start"}</span>
-              </p>
-              <p className="truncate text-xs text-muted-foreground">{current?.artist ?? "—"}</p>
+          {/* 3-Column Grid Player Layout */}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+            {/* Left: Track Info */}
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="relative cursor-pointer shrink-0" onClick={() => setShowFullScreen(true)}>
+                <SpinningArt
+                  src={current?.thumbnail}
+                  playing={player.isPlaying}
+                  className="h-12 w-12 rounded-xl shadow-lg shadow-purple-500/20"
+                />
+              </div>
+              <div className="min-w-0">
+                <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-white">
+                  {player.isPlaying && <Equalizer active className="h-3 w-3 shrink-0 text-pink-400" />}
+                  <span className="truncate">{current?.title ?? "Pick a song to start"}</span>
+                </p>
+                <p className="truncate text-xs text-white/50 hover:text-white/80 cursor-pointer" onClick={() => current && openArtist(current.artist)}>
+                  {current?.artist ?? "—"}
+                </p>
+              </div>
             </div>
 
-
-            <div className="flex items-center gap-1">
+            {/* Center: Transport Controls */}
+            <div className="flex items-center justify-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
                 disabled={!canPrev}
                 onClick={goPrev}
                 aria-label="Previous track"
+                className="text-white/60 hover:text-white transition-transform hover:scale-110"
               >
                 <SkipBack className="h-5 w-5" />
               </Button>
               <Button
                 size="icon"
-                className="h-11 w-11 rounded-full"
+                className="h-11 w-11 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-500 text-white shadow-lg shadow-purple-500/30 transition-transform hover:scale-105 active:scale-95"
                 disabled={!current}
                 onClick={togglePlay}
                 aria-label={player.isPlaying ? "Pause" : "Play"}
               >
-                {player.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                {player.isPlaying ? <Pause className="h-5 w-5 fill-current" /> : <Play className="ml-0.5 h-5 w-5 fill-current" />}
               </Button>
               <Button
                 variant="ghost"
@@ -801,54 +894,113 @@ function MusicApp() {
                 disabled={!canNext && !continuous}
                 onClick={goNext}
                 aria-label="Next track"
+                className="text-white/60 hover:text-white transition-transform hover:scale-110"
               >
                 <SkipForward className="h-5 w-5" />
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Up next queue"
-                onClick={() => setShowQueue((v) => !v)}
-                className={cn(showQueue && "text-primary")}
-              >
-                <ListVideo className="h-5 w-5" />
-              </Button>
+            </div>
+
+            {/* Right: Actions & Volume */}
+            <div className="flex items-center justify-end gap-1 sm:gap-2">
+              <SleepTimer onSleep={() => pause()} />
+
               {current && (
                 <>
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => toggleLike(current)}
-                    aria-label="Favourite this song"
+                    onClick={() =>
+                      downloadedIds.has(current.id)
+                        ? void handleRemoveDownload(current)
+                        : void handleDownload(current)
+                    }
+                    className="text-white/50 hover:text-white"
+                    aria-label="Download"
                   >
-                    <Heart
-                      className={cn(
-                        "h-5 w-5",
-                        likedIds.has(current.id) && "fill-accent text-accent",
-                      )}
-                    />
+                    {downloadingIds.has(current.id) ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-pink-400" />
+                    ) : downloadedIds.has(current.id) ? (
+                      <Download className="h-4 w-4 text-pink-400" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
                   </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => toggleLike(current)}
+                    className="text-white/50 hover:text-pink-400"
+                    aria-label="Favourite"
+                  >
+                    <Heart className={cn("h-4 w-4", likedIds.has(current.id) && "fill-pink-400 text-pink-400")} />
+                  </Button>
+
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={dislikeCurrent}
-                    aria-label="Not for me — play something else"
+                    className="text-white/50 hover:text-red-400"
+                    aria-label="Dislike"
                   >
-                    <ThumbsDown
-                      className={cn(
-                        "h-5 w-5",
-                        dislikedIds.has(current.id) && "fill-destructive text-destructive",
-                      )}
-                    />
+                    <ThumbsDown className={cn("h-4 w-4", dislikedIds.has(current.id) && "fill-red-400 text-red-400")} />
                   </Button>
                 </>
               )}
-            </div>
 
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowLyrics((v) => !v)}
+                className={cn("text-white/50 hover:text-white", showLyrics && "text-pink-400")}
+                aria-label="Lyrics"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowQueue((v) => !v)}
+                className={cn("text-white/50 hover:text-white", showQueue && "text-pink-400")}
+                aria-label="Queue"
+              >
+                <Equalizer active={showQueue} className="h-4 w-4" />
+              </Button>
+
+              {/* Volume Slider on desktop */}
+              <div className="hidden items-center gap-1.5 md:flex pl-2">
+                <button type="button" onClick={toggleMute} className="text-white/50 hover:text-white">
+                  {isMuted || volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                </button>
+                <Slider
+                  value={[isMuted ? 0 : volume]}
+                  max={100}
+                  onValueChange={([v]) => {
+                    if (isMuted) setIsMuted(false);
+                    setVolume(v ?? 0);
+                    applyVolume(v ?? 0);
+                  }}
+                  className="w-20"
+                  aria-label="Volume"
+                />
+              </div>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowFullScreen(true)}
+                className="hidden sm:flex text-white/50 hover:text-white"
+                aria-label="Full screen player"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
-          <div className="mt-2 flex items-center gap-3">
-            <span className="w-10 text-right text-[11px] tabular-nums text-muted-foreground">
+          {/* Scrubber Bar */}
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="w-8 text-right text-[11px] tabular-nums text-white/40">
               {formatTime(player.position)}
             </span>
             <ScrubBar
@@ -858,30 +1010,48 @@ function MusicApp() {
               onSeek={(s) => player.seek(s)}
               className="flex-1"
             />
-
-            <span className="w-10 text-[11px] tabular-nums text-muted-foreground">
+            <span className="w-8 text-[11px] tabular-nums text-white/40">
               {formatTime(player.duration)}
             </span>
-            <div className="hidden items-center gap-2 sm:flex">
-              <Volume2 className="h-4 w-4 text-muted-foreground" />
-              <Slider
-                value={[volume]}
-                max={100}
-                onValueChange={([v]) => setVolume(v ?? 0)}
-                className="w-24"
-                aria-label="Volume"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowVideo((v) => !v)}
-              className="text-[11px] text-muted-foreground underline-offset-2 hover:text-primary hover:underline"
-            >
-              {showVideo ? "Hide video" : "Show video"}
-            </button>
           </div>
         </div>
       </div>
+
+      {/* FULL SCREEN PLAYER MODAL */}
+      {showFullScreen && (
+        <FullScreenPlayer
+          track={current ?? null}
+          isPlaying={player.isPlaying}
+          liked={likedIds.has(current?.id ?? "")}
+          position={player.position}
+          duration={player.duration}
+          volume={volume}
+          onTogglePlay={togglePlay}
+          onToggleLike={() => current && toggleLike(current)}
+          onNext={goNext}
+          onPrevious={goPrev}
+          onSeek={(s) => player.seek(s)}
+          onVolumeChange={(v) => {
+            setVolume(v);
+            applyVolume(v);
+          }}
+          onClose={() => setShowFullScreen(false)}
+          canNext={canNext}
+          canPrevious={canPrev}
+        />
+      )}
+
+      {/* LYRICS PANEL */}
+      {showLyrics && current && (
+        <LyricsPanel
+          trackId={current.id}
+          trackTitle={current.title}
+          trackArtist={current.artist}
+          currentTime={player.position}
+          isPlaying={player.isPlaying}
+          onClose={() => setShowLyrics(false)}
+        />
+      )}
     </div>
   );
 }

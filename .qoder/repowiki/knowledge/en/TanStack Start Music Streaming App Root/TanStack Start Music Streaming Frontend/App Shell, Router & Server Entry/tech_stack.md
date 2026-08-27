@@ -1,0 +1,1 @@
+TanStack Start (`createStart`, `createCsrfMiddleware`, `createMiddleware`) for SSR/edge routing, TanStack Router with file-based route tree (`routeTree.gen`), TanStack React Query for data fetching, and a custom Node `fetch` adapter serving HTTP responses.

@@ -7,6 +7,10 @@ export type Track = {
   duration: string;
   thumbnail: string;
   reason?: string;
+  /** Direct audio URL (e.g. Deezer preview) — bypasses the YouTube stream proxy. */
+  previewUrl?: string;
+  /** Source provider: "youtube" (default) or "deezer". */
+  source?: "youtube" | "deezer";
 };
 
 export type Playlist = {
@@ -44,10 +48,90 @@ export const LANGUAGES = [
   "Arabic",
 ] as const;
 
+export const PODCAST_TOPICS = [
+  "Tech",
+  "Cinema",
+  "History",
+  "Motivation",
+  "Business",
+  "Science",
+  "Health",
+  "Comedy",
+  "True Crime",
+  "Sports",
+  "News",
+  "Finance",
+  "Psychology",
+  "Travel",
+] as const;
+
+/** Popular artists/singers by language, for quick picking on login & in settings. */
+export const SUGGESTED_ARTISTS = [
+  // Hindi / Bollywood
+  "Arijit Singh",
+  "Shreya Ghoshal",
+  "Atif Aslam",
+  "Kishore Kumar",
+  "Lata Mangeshkar",
+  "Neha Kakkar",
+  "Badshah",
+  "Jubin Nautiyal",
+  // Telugu
+  "Sid Sriram",
+  "S. P. Balasubrahmanyam",
+  "Shreya Ghoshal",
+  "Anirudh Ravichander",
+  "Armaan Malik",
+  // Tamil
+  "A. R. Rahman",
+  "Anirudh Ravichander",
+  "Ilaiyaraaja",
+  "S. Janaki",
+  "Sid Sriram",
+  // Malayalam
+  "K. J. Yesudas",
+  "Vineeth Sreenivasan",
+  "Shreya Ghoshal",
+  // Kannada
+  "S. P. Balasubrahmanyam",
+  "Vijay Prakash",
+  "Armaan Malik",
+  // Punjabi
+  "Diljit Dosanjh",
+  "Sidhu Moose Wala",
+  "Karan Aujla",
+  "Arijit Singh",
+  // English / International
+  "Taylor Swift",
+  "Ed Sheeran",
+  "Adele",
+  "Coldplay",
+  "Billie Eilish",
+  "The Weeknd",
+  // Korean
+  "BTS",
+  "BLACKPINK",
+  "NewJeans",
+  "IU",
+  // Spanish
+  "Bad Bunny",
+  "Shakira",
+  "Rosalía",
+  // Arabic
+  "Amr Diab",
+  "Nancy Ajram",
+  "Fairuz",
+] as const;
+
 export type RecSettings = {
   moods: Record<string, number>; // 0-100 weighting per mood
   genres: string[];
   languages: string[];
+  /** Favorite artists/singers — drives language-based song picks. */
+  artists: string[];
+  podcastTopics: string[]; // topics the podcast mix should chase
+  injectInterval: number; // insert a fresh release into the queue every N songs (0 = off)
+  notifyNewDrops: boolean; // browser notification when a favourite artist drops a song
   discovery: number; // 0 = familiar, 100 = deep cuts
   energy: number; // 0 = calm, 100 = high energy
   instrumentalOnly: boolean;
@@ -70,17 +154,21 @@ export const DEFAULT_SETTINGS: RecSettings = {
   moods: Object.fromEntries(MOODS.map((m) => [m, 50])),
   genres: [],
   languages: [],
+  artists: [],
+  podcastTopics: [],
+  injectInterval: 5,
+  notifyNewDrops: false,
   discovery: 40,
   energy: 50,
   instrumentalOnly: false,
 };
 
-const LIKES_KEY = "vinyl.likes.v1";
-const DISLIKES_KEY = "vinyl.dislikes.v1";
-const HISTORY_KEY = "vinyl.history.v1";
-const PLAYLISTS_KEY = "vinyl.playlists.v1";
-const SETTINGS_KEY = "vinyl.recsettings.v1";
-const STATS_KEY = "vinyl.stats.v1";
+const LIKES_KEY = "melodymap.likes.v1";
+const DISLIKES_KEY = "melodymap.dislikes.v1";
+const HISTORY_KEY = "melodymap.history.v1";
+const PLAYLISTS_KEY = "melodymap.playlists.v1";
+export const SETTINGS_KEY = "melodymap.recsettings.v1";
+const STATS_KEY = "melodymap.stats.v1";
 
 /** Behavioural signal per song: how often it's replayed vs skipped, and when. */
 export type PlayStat = {
@@ -100,7 +188,8 @@ function read<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
+  } catch (err) {
+    console.warn(`[MelodyMap] Failed to read "${key}" from localStorage:`, err);
     return fallback;
   }
 }
@@ -109,8 +198,8 @@ function write(key: string, value: unknown) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* storage full or blocked */
+  } catch (err) {
+    console.warn(`[MelodyMap] Failed to write "${key}" to localStorage (quota?):`, err);
   }
 }
 
@@ -118,7 +207,7 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
-const PLAYBACK_KEY = "vinyl.playback.v1";
+const PLAYBACK_KEY = "melodymap.playback.v1";
 
 export type SavedPlayback = {
   queue: Track[];
@@ -135,6 +224,37 @@ export function readPlayback(): SavedPlayback | null {
 
 export function writePlayback(value: SavedPlayback) {
   write(PLAYBACK_KEY, { ...value, queue: value.queue.slice(0, 100) });
+}
+
+
+const EPISODE_KEY = "melodymap.episodePositions.v1";
+
+export type EpisodePosition = {
+  position: number;
+  duration: number;
+  updatedAt: number;
+};
+
+/** Per-episode listening positions, so a podcast can offer to resume. */
+export function readEpisodePositions(): Record<string, EpisodePosition> {
+  const saved = read<Record<string, EpisodePosition> | null>(EPISODE_KEY, null);
+  if (!saved || typeof saved !== "object" || Array.isArray(saved)) return {};
+  return saved;
+}
+
+export function writeEpisodePosition(videoId: string, position: number, duration: number) {
+  // Never delete here — a track loaded but not yet played reports position 0,
+  // and we don't want that wiping a saved spot. Clear via clearEpisodePosition.
+  if (position <= 5 || duration <= 0) return;
+  const all = readEpisodePositions();
+  all[videoId] = { position, duration, updatedAt: Date.now() };
+  write(EPISODE_KEY, all);
+}
+
+export function clearEpisodePosition(videoId: string) {
+  const all = readEpisodePositions();
+  delete all[videoId];
+  write(EPISODE_KEY, all);
 }
 
 
@@ -262,9 +382,12 @@ export function useLibrary(userId?: string | null) {
   /** Push changes back to the account, debounced so typing/likes don't spam it. */
   useEffect(() => {
     if (!hydrated || !userId || pulled.current !== userId) return;
-    const timer = window.setTimeout(() => {
-      void import("@/integrations/supabase/client").then(({ supabase }) =>
-        supabase.from("user_library").upsert({
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        if (cancelled) return;
+        const { error } = await supabase.from("user_library").upsert({
           user_id: userId,
           data: {
             likes,
@@ -274,10 +397,16 @@ export function useLibrary(userId?: string | null) {
             settings,
             stats,
           } satisfies LibraryDoc,
-        }),
-      );
+        });
+        if (error) console.warn("[MelodyMap] Library sync failed:", error.message);
+      } catch (err) {
+        console.warn("[MelodyMap] Library sync error:", err);
+      }
     }, 1200);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [hydrated, userId, likes, dislikes, history, playlists, settings, stats]);
 
 
@@ -509,6 +638,9 @@ export function settingsToBrief(settings: RecSettings, extraMood?: string) {
     settings.genres.length ? `Preferred genres: ${settings.genres.join(", ")}.` : "",
     settings.languages.length
       ? `Only songs in these languages: ${settings.languages.join(", ")}.`
+      : "",
+    settings.artists.length
+      ? `Favorite artists and singers: ${settings.artists.join(", ")}. Prioritize their songs.`
       : "",
 
     `Familiarity vs discovery: ${settings.discovery}% deep cuts, ${100 - settings.discovery}% familiar hits.`,

@@ -1,0 +1,1 @@
+PostgreSQL schema managed via Supabase CLI migrations; uses native `auth.users` integration, PL/pgSQL triggers/functions, and PostgreSQL Row Level Security policies.

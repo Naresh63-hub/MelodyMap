@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 320" fill="none">
+  <defs>
+    <linearGradient id="grad-main" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00b8d4"/>
+      <stop offset="35%" stop-color="#1565c0"/>
+      <stop offset="65%" stop-color="#6a1b9a"/>
+      <stop offset="100%" stop-color="#c2185b"/>
+    </linearGradient>
+    <linearGradient id="grad-word" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#6a1b9a"/>
+      <stop offset="100%" stop-color="#c2185b"/>
+    </linearGradient>
+    <linearGradient id="grad-wave-l" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#00b8d4" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#1565c0" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="grad-wave-r" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#6a1b9a" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#c2185b" stop-opacity="0.5"/>
+    </linearGradient>
+    <linearGradient id="grad-pin" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#c2185b"/>
+      <stop offset="100%" stop-color="#6a1b9a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- White background -->
+  <rect width="800" height="320" fill="#ffffff"/>
+
+  <!-- ICON -->
+  <g transform="translate(30, 20) scale(0.55)">
+    <rect x="62" y="195" width="7" height="50" rx="3.5" fill="url(#grad-wave-l)"/>
+    <rect x="78" y="170" width="7" height="100" rx="3.5" fill="url(#grad-wave-l)"/>
+    <rect x="94" y="155" width="7" height="130" rx="3.5" fill="url(#grad-wave-l)"/>
+    <rect x="110" y="165" width="7" height="110" rx="3.5" fill="url(#grad-wave-l)"/>
+    <rect x="395" y="165" width="7" height="110" rx="3.5" fill="url(#grad-wave-r)"/>
+    <rect x="411" y="155" width="7" height="130" rx="3.5" fill="url(#grad-wave-r)"/>
+    <rect x="427" y="170" width="7" height="100" rx="3.5" fill="url(#grad-wave-r)"/>
+    <rect x="443" y="195" width="7" height="50" rx="3.5" fill="url(#grad-wave-r)"/>
+    <path d="M 140 120 L 140 340 C 140 365 155 385 180 390 C 200 394 215 380 215 360 C 215 345 205 335 190 335 L 175 335 L 175 155 L 250 155 L 250 120 Z" fill="url(#grad-main)"/>
+    <path d="M 332 120 L 332 340 C 332 365 347 385 372 390 C 392 394 407 380 407 360 C 407 345 397 335 382 335 L 367 335 L 367 155 L 290 155 L 290 120 Z" fill="url(#grad-main)"/>
+    <path d="M 250 120 L 210 230 L 250 280 L 290 230 L 250 120 Z" fill="url(#grad-main)" opacity="0.85"/>
+    <path d="M 235 200 L 268 225 L 235 250 Z" fill="#ffffff" opacity="0.95"/>
+    <g transform="translate(370, 80) scale(0.55)">
+      <path d="M 24 0 C 10.7 0 0 10.7 0 24 C 0 42 24 64 24 64 C 24 64 48 42 48 24 C 48 10.7 37.3 0 24 0 Z" fill="url(#grad-pin)"/>
+      <circle cx="24" cy="22" r="8" fill="#ffffff" opacity="0.6"/>
+    </g>
+    <path d="M 388 118 C 380 135 370 145 355 150" stroke="#c2185b" stroke-width="2.5" stroke-dasharray="6 4" fill="none" opacity="0.4"/>
+  </g>
+
+  <!-- WORDMARK -->
+  <text x="340" y="195" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="96" font-weight="800" letter-spacing="-2">
+    <tspan fill="#1a1a2e">Melody</tspan><tspan fill="url(#grad-word)">Map</tspan>
+  </text>
+
+  <!-- TAGLINE -->
+  <text x="342" y="240" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" font-weight="500" letter-spacing="4" fill="#64748b">
+    YOUR MUSIC. YOUR MOOD. YOUR MAP.
+  </text>
+</svg>

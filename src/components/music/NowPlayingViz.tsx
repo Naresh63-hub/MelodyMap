@@ -23,31 +23,38 @@ export function SpinningArt({
   src,
   playing,
   alt = "",
+  className,
 }: {
   src?: string | undefined;
   playing: boolean;
   alt?: string;
+  className?: string;
 }) {
   return (
-    <span className="relative flex h-12 w-12 shrink-0 items-center justify-center">
+    <span
+      className={cn(
+        "relative flex h-12 w-12 shrink-0 items-center justify-center",
+        className,
+      )}
+    >
       <span
         className={cn(
-          "absolute inset-0 rounded-full bg-vinyl transition-opacity duration-500",
+          "absolute inset-0 rounded-full bg-melodymap transition-opacity duration-500",
           playing ? "animate-spin-slow opacity-100 shadow-player" : "opacity-60",
         )}
         aria-hidden
       />
       <img
-        src={src ?? "https://i.ytimg.com/vi/none/hqdefault.jpg"}
+        src={src ?? "/icons/icon-192.png"}
         alt={alt}
         className={cn(
-          "relative h-9 w-9 rounded-full object-cover ring-1 ring-border",
+          "relative h-[75%] w-[75%] rounded-full object-cover ring-1 ring-border",
           playing && "animate-spin-slow",
           !src && "opacity-30",
         )}
       />
       <span
-        className="absolute h-2 w-2 rounded-full bg-background ring-1 ring-border"
+        className="absolute h-[16%] w-[16%] rounded-full bg-background ring-1 ring-border"
         aria-hidden
       />
     </span>

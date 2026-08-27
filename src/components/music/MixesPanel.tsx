@@ -1,11 +1,11 @@
-import { Compass, Loader2, Play, RefreshCw, Repeat, Sparkle } from "lucide-react";
+import { Compass, Loader2, Play, RefreshCw, Repeat, Sparkle, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { TrackList } from "@/components/music/TrackList";
 import type { Playlist, Track } from "@/lib/library";
 import { cn } from "@/lib/utils";
 
-export type MixId = "discover" | "newrelease" | "replay";
+export type MixId = "discover" | "newrelease" | "replay" | "explore" ;
 
 export const MIXES: Array<{
   id: MixId;
@@ -31,6 +31,12 @@ export const MIXES: Array<{
     blurb: "The songs you've had on repeat these last few weeks.",
     icon: Repeat,
   },
+  {
+    id: "explore",
+    name: "New Songs",
+    blurb: "Fresh tracks and new releases trending right now.",
+    icon: Sparkles,
+  },
 ];
 
 type Props = {
@@ -52,6 +58,12 @@ type Props = {
   onAddToPlaylist: (playlistId: string, track: Track) => void;
   onCreatePlaylistWith: (track: Track) => void;
   onAddToQueue: (track: Track) => void;
+  downloadedIds?: Set<string>;
+  downloadingIds?: Set<string>;
+  onDownload?: (track: Track) => void;
+  onRemoveDownload?: (track: Track) => void;
+  drops?: Array<{ artist: string; title: string; videoId: string; thumbnail: string }> | undefined;
+  onPlayDrop?: ((drop: { artist: string; title: string; videoId: string; thumbnail: string }) => void) | undefined;
 };
 
 export function MixesPanel({
@@ -73,24 +85,36 @@ export function MixesPanel({
   onAddToPlaylist,
   onCreatePlaylistWith,
   onAddToQueue,
+  downloadedIds,
+  downloadingIds,
+  onDownload,
+  onRemoveDownload,
+  drops,
+  onPlayDrop,
 }: Props) {
   const mix = MIXES.find((m) => m.id === active) ?? MIXES[0]!;
 
   return (
     <div>
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {MIXES.map(({ id, name, blurb, icon: Icon }) => (
           <button
             key={id}
             type="button"
             onClick={() => onSelect(id)}
             className={cn(
-              "rounded-2xl border p-4 text-left transition-colors",
+              "relative rounded-2xl border p-4 text-left transition-colors",
               id === active
                 ? "border-primary bg-surface"
                 : "border-border bg-card hover:border-primary/50",
             )}
           >
+            {id === "newrelease" && drops && drops.length > 0 && (
+              <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                <Sparkles className="h-3 w-3" />
+                {drops.length} new
+              </span>
+            )}
             <span
               className={cn(
                 "mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full",
@@ -104,6 +128,46 @@ export function MixesPanel({
           </button>
         ))}
       </div>
+
+      {drops && drops.length > 0 && active === "newrelease" && (
+        <div className="mb-4 rounded-2xl border border-primary/30 bg-primary/10 p-4">
+          <p className="flex items-center gap-2 text-sm font-semibold">
+            <Sparkles className="h-4 w-4 text-primary" />
+            New from your artists
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            They dropped fresh tracks this week — tap play to hear the newest one.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {drops.map((drop) => (
+              <li
+                key={drop.videoId}
+                className="flex items-center gap-3 rounded-xl bg-card/70 p-2"
+              >
+                <img
+                  src={drop.thumbnail}
+                  alt=""
+                  className="h-10 w-16 shrink-0 rounded-md object-cover"
+                  loading="lazy"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{drop.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">{drop.artist}</p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="shrink-0 rounded-full"
+                  onClick={() => onPlayDrop?.(drop)}
+                >
+                  <Play className="mr-1.5 h-3.5 w-3.5" />
+                  Play
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <h2 className="mr-auto text-lg font-bold">{mix.name}</h2>
@@ -148,12 +212,18 @@ export function MixesPanel({
           onAddToPlaylist={onAddToPlaylist}
           onCreatePlaylistWith={onCreatePlaylistWith}
           onAddToQueue={onAddToQueue}
+          downloadedIds={downloadedIds}
+          downloadingIds={downloadingIds}
+          onDownload={onDownload}
+          onRemoveDownload={onRemoveDownload}
           emptyMessage={
             active === "replay"
               ? "Play a few songs more than once and your Replay Mix fills up here."
               : active === "newrelease"
                 ? "Listen to a few artists first — this mix tracks their newest drops."
-                : "Hit Rebuild to generate a mix of artists you've never heard."
+                : active === "explore"
+                  ? "Fresh new tracks will show up here — hit Rebuild."
+                  : "Hit Rebuild to generate a mix of artists you've never heard."
           }
         />
       )}

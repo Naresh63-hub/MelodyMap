@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0a14"/>
+      <stop offset="100%" stop-color="#1a0533"/>
+    </linearGradient>
+    <linearGradient id="grad-main" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00e5ff"/>
+      <stop offset="35%" stop-color="#2979ff"/>
+      <stop offset="65%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <linearGradient id="grad-pin" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="grad-wave-l" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#2979ff" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="grad-wave-r" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+
+  <!-- Sound wave bars left -->
+  <rect x="62" y="195" width="7" height="50" rx="3.5" fill="url(#grad-wave-l)"/>
+  <rect x="78" y="170" width="7" height="100" rx="3.5" fill="url(#grad-wave-l)"/>
+  <rect x="94" y="155" width="7" height="130" rx="3.5" fill="url(#grad-wave-l)"/>
+  <rect x="110" y="165" width="7" height="110" rx="3.5" fill="url(#grad-wave-l)"/>
+
+  <!-- Sound wave bars right -->
+  <rect x="395" y="165" width="7" height="110" rx="3.5" fill="url(#grad-wave-r)"/>
+  <rect x="411" y="155" width="7" height="130" rx="3.5" fill="url(#grad-wave-r)"/>
+  <rect x="427" y="170" width="7" height="100" rx="3.5" fill="url(#grad-wave-r)"/>
+  <rect x="443" y="195" width="7" height="50" rx="3.5" fill="url(#grad-wave-r)"/>
+
+  <!-- M music note left stem -->
+  <path d="M 140 120 L 140 340 C 140 365 155 385 180 390 C 200 394 215 380 215 360 C 215 345 205 335 190 335 L 175 335 L 175 155 L 250 155 L 250 120 Z" fill="url(#grad-main)"/>
+  <!-- M music note right stem -->
+  <path d="M 332 120 L 332 340 C 332 365 347 385 372 390 C 392 394 407 380 407 360 C 407 345 397 335 382 335 L 367 335 L 367 155 L 290 155 L 290 120 Z" fill="url(#grad-main)"/>
+  <!-- Center V -->
+  <path d="M 250 120 L 210 230 L 250 280 L 290 230 L 250 120 Z" fill="url(#grad-main)" opacity="0.85"/>
+  <!-- Play triangle -->
+  <path d="M 235 200 L 268 225 L 235 250 Z" fill="#ffffff" opacity="0.95"/>
+  <!-- Map pin -->
+  <g transform="translate(370, 80) scale(0.55)">
+    <path d="M 24 0 C 10.7 0 0 10.7 0 24 C 0 42 24 64 24 64 C 24 64 48 42 48 24 C 48 10.7 37.3 0 24 0 Z" fill="url(#grad-pin)"/>
+    <circle cx="24" cy="22" r="8" fill="#0a0a14" opacity="0.6"/>
+  </g>
+  <!-- Dashed trail -->
+  <path d="M 388 118 C 380 135 370 145 355 150" stroke="#ec4899" stroke-width="2.5" stroke-dasharray="6 4" fill="none" opacity="0.5"/>
+</svg>

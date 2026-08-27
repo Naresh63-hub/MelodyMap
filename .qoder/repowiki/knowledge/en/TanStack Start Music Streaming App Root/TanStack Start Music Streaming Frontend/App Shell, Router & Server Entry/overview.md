@@ -1,0 +1,1 @@
+Bootstraps the TanStack Start application by wiring the router with React Query, registering request and function middleware (CSRF, Supabase auth, error handling), and exposing a Node server entry that proxies YouTube audio streams.

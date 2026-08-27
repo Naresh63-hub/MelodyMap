@@ -1,0 +1,5 @@
+Three entry points form the app shell:
+- `src/router.tsx` builds a TanStack Router instance via `createRouter`, injects a per-request `QueryClient` into router context, enables scroll restoration and disables default preloading.
+- `src/start.ts` is the TanStack Start client/server bootstrap: it composes `functionMiddleware` (Supabase auth attacher) and `requestMiddleware` (global error handler + CSRF protection scoped to `serverFn` handlers) and exports the `startInstance`.
+- `src/server.ts` is the Node `fetch` adapter. It lazily imports `@tanstack/react-start/server-entry` once and forwards requests through it, while intercepting `/api/stream/*` paths to proxy YouTube audio as chunked, range-aware `ReadableStream`s (1 MiB chunks with retry) so browsers can seek and download despite upstream throttling and missing CORS headers. It also normalizes h3-swallowed SSR errors into HTML 500 pages using `renderErrorPage` and `consumeLastCapturedError`.
+Dependency direction is one-way: `server.ts` depends on `start.ts`'s generated server entry; `router.tsx` is consumed by the client build and has no runtime dependency on the server.

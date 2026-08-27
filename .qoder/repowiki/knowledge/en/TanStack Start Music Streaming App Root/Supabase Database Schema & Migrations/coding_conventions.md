@@ -1,0 +1,5 @@
+- Each migration file is named with a Unix-timestamp prefix followed by a UUID slug to guarantee ordering and uniqueness.
+- Every table that stores user data enables Row Level Security and defines policies that restrict access to the current user via `auth.uid()`.
+- GRANT statements explicitly separate `authenticated` (SELECT/INSERT/UPDATE/DELETE) from `service_role` (ALL) permissions for each table.
+- Timestamp columns are kept in sync using a shared `touch_updated_at()` trigger function rather than ad-hoc application logic.
+- User-facing PL/pgSQL functions created by migrations revoke execute permission from `PUBLIC`, `anon`, and `authenticated`, restricting invocation to privileged roles.
