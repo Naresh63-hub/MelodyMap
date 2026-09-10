@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { MessageSquare, X, Search } from "lucide-react";
+import { MessageSquare, X, Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getTrackLyrics } from "@/lib/music.functions";
 
 type LyricLine = {
   time: number; // in seconds
@@ -15,14 +16,9 @@ type Props = {
   trackArtist: string;
   currentTime: number;
   isPlaying: boolean;
+  onSeek?: (timeSeconds: number) => void;
   onClose: () => void;
 };
-
-// Placeholder lyrics — in production, replace with a real lyrics API.
-// Shows "Lyrics not available" for unknown tracks instead of mock data.
-const PLACEHOLDER_LYRICS: LyricLine[] = [
-  { time: 0, text: "♪ Instrumental ♪" },
-];
 
 export function LyricsPanel({
   trackId,
@@ -30,14 +26,58 @@ export function LyricsPanel({
   trackArtist,
   currentTime,
   isPlaying,
+  onSeek,
   onClose,
 }: Props) {
-  const [lyrics] = useState<LyricLine[]>(PLACEHOLDER_LYRICS);
+  const [lyrics, setLyrics] = useState<LyricLine[]>([]);
+  const [plainLyrics, setPlainLyrics] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const lineRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const lineRefs = useRef<(HTMLElement | null)[]>([]);
   const rafRef = useRef<number | null>(null);
+
+  // Fetch real lyrics on track change
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLyrics([]);
+    setPlainLyrics(null);
+
+    void getTrackLyrics({
+      data: {
+        title: trackTitle,
+        artist: trackArtist,
+      },
+    })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.lyrics) {
+          if (res.lyrics.synced && res.lyrics.synced.length > 0) {
+            setLyrics(res.lyrics.synced);
+          } else if (res.lyrics.plain) {
+            setPlainLyrics(res.lyrics.plain);
+            // Break plain lyrics into readable non-timed chunks
+            const lines = res.lyrics.plain
+              .split("\n")
+              .map((l) => l.trim())
+              .filter(Boolean)
+              .map((text, i) => ({ time: i * 4, text }));
+            setLyrics(lines);
+          } else if (res.lyrics.instrumental) {
+            setLyrics([{ time: 0, text: "♪ Instrumental Track ♪" }]);
+          }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [trackTitle, trackArtist, trackId]);
 
   // Find current line based on time
   useEffect(() => {
@@ -54,14 +94,26 @@ export function LyricsPanel({
     }
   }, [currentTime, lyrics, currentLineIndex]);
 
+  const userScrollingRef = useRef(false);
+  const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleUserScroll = () => {
+    userScrollingRef.current = true;
+    if (userScrollTimeoutRef.current) clearTimeout(userScrollTimeoutRef.current);
+    userScrollTimeoutRef.current = setTimeout(() => {
+      userScrollingRef.current = false;
+    }, 3500);
+  };
+
   // Auto-scroll to current line using requestAnimationFrame for smoothness
   useEffect(() => {
+    if (userScrollingRef.current) return;
     if (lineRefs.current[currentLineIndex] && containerRef.current) {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => {
         const container = containerRef.current;
         const line = lineRefs.current[currentLineIndex];
-        if (!container || !line) return;
+        if (!container || !line || userScrollingRef.current) return;
         const containerHeight = container.clientHeight;
         const lineTop = line.offsetTop;
         const lineHeight = line.clientHeight;
@@ -130,10 +182,18 @@ export function LyricsPanel({
       {/* Lyrics content */}
       <div
         ref={containerRef}
+        onScroll={handleUserScroll}
+        onTouchStart={handleUserScroll}
+        onWheel={handleUserScroll}
         className="flex-1 overflow-y-auto p-4 scrollbar-premium"
         style={{ height: "calc(100% - 140px)" }}
       >
-        {filteredLyrics.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
+            <Loader2 className="h-8 w-8 text-purple-400 animate-spin" />
+            <p className="text-xs text-white/50">Fetching synchronized lyrics...</p>
+          </div>
+        ) : filteredLyrics.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <MessageSquare className="h-12 w-12 text-white/20 mb-3" />
             <p className="text-sm text-white/40">
@@ -148,18 +208,22 @@ export function LyricsPanel({
               const actualIndex = lyrics.indexOf(line);
               const isActive = actualIndex === currentLineIndex;
               return (
-                <div
+                <button
                   key={`${line.time}-${index}`}
-                  ref={(el) => { lineRefs.current[actualIndex] = el; }}
+                  type="button"
+                  ref={(el) => {
+                    lineRefs.current[actualIndex] = el;
+                  }}
+                  onClick={() => onSeek?.(line.time)}
                   className={cn(
-                    "text-center transition-all duration-300 py-2 px-4 rounded-lg",
+                    "w-full text-center transition-all duration-300 py-2.5 px-4 rounded-xl cursor-pointer select-none",
                     isActive
-                      ? "text-white font-semibold text-lg scale-105 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-cyan-500/5 border border-purple-500/20 shadow-[0_0_20px_rgba(168,85,247,0.15)]"
-                      : "text-white/50 text-base hover:text-white/70 hover:bg-white/[0.02]",
+                      ? "text-white font-bold text-lg scale-105 bg-gradient-to-r from-pink-500/15 via-purple-500/20 to-cyan-500/10 border border-purple-500/30 shadow-[0_0_25px_rgba(168,85,247,0.25)]"
+                      : "text-white/40 text-sm hover:text-white/80 hover:bg-white/[0.04]",
                   )}
                 >
                   {line.text}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -169,7 +233,11 @@ export function LyricsPanel({
       {/* Footer info */}
       <div className="border-t border-white/5 p-3 text-center">
         <p className="text-[10px] text-white/30">
-          {isPlaying ? "♪ Syncing with playback ♪" : "Paused - lyrics ready"}
+          {loading
+            ? "Loading..."
+            : isPlaying
+              ? "♪ Synced with playback · Tap line to jump ♪"
+              : "Paused · Tap line to jump"}
         </p>
       </div>
     </div>

@@ -16,55 +16,55 @@ export function usePullToRefresh(onRefresh: () => Promise<void>) {
   const startY = useRef(0);
   const pulling = useRef(false);
   const ref = useRef<HTMLDivElement | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const distanceRef = useRef(pullDistance);
+  distanceRef.current = pullDistance;
+  const onRefreshRef = useRef(onRefresh);
+  onRefreshRef.current = onRefresh;
 
   const THRESHOLD = 80; // px needed to trigger refresh
   const MAX_PULL = 120; // cap the visual pull distance
 
-  const onTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      const el = ref.current;
-      if (!el || el.scrollTop > 5) return; // only pull when at top
-      const touch = e.touches[0];
-      if (!touch) return;
-      startY.current = touch.clientY;
-      pulling.current = true;
-    },
-    [],
-  );
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    const el = ref.current;
+    if (!el || el.scrollTop > 5) return; // only pull when at top
+    const touch = e.touches[0];
+    if (!touch) return;
+    startY.current = touch.clientY;
+    pulling.current = true;
+  }, []);
 
-  const onTouchMove = useCallback(
-    (e: React.TouchEvent) => {
-      if (!pulling.current || state === "refreshing") return;
-      const el = ref.current;
-      if (!el || el.scrollTop > 5) {
-        pulling.current = false;
-        setPullDistance(0);
-        return;
-      }
-      const touch = e.touches[0];
-      if (!touch) return;
-      const dy = touch.clientY - startY.current;
-      if (dy <= 0) {
-        setPullDistance(0);
-        return;
-      }
-      // Rubber-band: diminishing returns past the threshold
-      const dampened = Math.min(MAX_PULL, dy * 0.55);
-      setPullDistance(dampened);
-      if (dampened > THRESHOLD) setState("pulled");
-      else setState("idle");
-    },
-    [state],
-  );
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!pulling.current || stateRef.current === "refreshing") return;
+    const el = ref.current;
+    if (!el || el.scrollTop > 5) {
+      pulling.current = false;
+      setPullDistance(0);
+      return;
+    }
+    const touch = e.touches[0];
+    if (!touch) return;
+    const dy = touch.clientY - startY.current;
+    if (dy <= 0) {
+      setPullDistance(0);
+      return;
+    }
+    // Rubber-band: diminishing returns past the threshold
+    const dampened = Math.min(MAX_PULL, dy * 0.55);
+    setPullDistance(dampened);
+    if (dampened > THRESHOLD) setState("pulled");
+    else setState("idle");
+  }, []);
 
   const onTouchEnd = useCallback(async () => {
     if (!pulling.current) return;
     pulling.current = false;
-    if (pullDistance > THRESHOLD && state !== "refreshing") {
+    if (distanceRef.current > THRESHOLD && stateRef.current !== "refreshing") {
       setState("refreshing");
       setPullDistance(40); // hold the spinner visible
       try {
-        await onRefresh();
+        await onRefreshRef.current();
       } finally {
         setState("idle");
         setPullDistance(0);
@@ -73,7 +73,7 @@ export function usePullToRefresh(onRefresh: () => Promise<void>) {
       setPullDistance(0);
       setState("idle");
     }
-  }, [pullDistance, state, onRefresh]);
+  }, []);
 
   return {
     ref,

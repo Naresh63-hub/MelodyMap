@@ -1,80 +1,434 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-
 import { getBlob } from "@/lib/offline";
+import {
+  EQUALIZER_FREQUENCIES,
+  EQUALIZER_PRESETS,
+  loadEqualizerSettings,
+  saveEqualizerSettings,
+  type EqualizerPreset,
+  type EqualizerSettings,
+} from "@/lib/equalizer";
+
+export type NextTrackInfo = {
+  id: string;
+  previewUrl?: string | undefined;
+};
 
 /**
- * HTML5-Audio-backed player. Mirrors the surface of the old YouTube
- * iframe player so the rest of the app is untouched, but streams a
- * direct audio URL instead — no ads, and playback keeps running when the
- * app is backgrounded or the screen is locked.
- *
- * Network playback goes through our same-origin /api/stream proxy, which
- * resolves the stream server-side and serves bounded ranges — throttled
- * YouTube URLs that would silently fail (or 403 on open-ended ranges) in
- * the browser just work here, and seeking still functions.
+ * HTML5-Audio + Web Audio API backed player with Spotify-like background playback,
+ * screen-off & lockscreen continuous playback, 10-band hardware equalizer, sound presets,
+ * gapless pre-buffering, speed adjustment, offline caching, and robust stream resolution.
  */
 export function useAudioPlayer(options: {
   onEnded: () => void;
   onError?: (message: string) => void;
+  getNextTrack?: () => NextTrackInfo | undefined;
 }) {
-  const streamUrl = (id: string) => `/api/stream/${encodeURIComponent(id)}`;
-
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  if (typeof document !== "undefined" && !audioRef.current) {
-    audioRef.current = new Audio();
-    audioRef.current.preload = "auto";
+  const prebufferAudioRef = useRef<HTMLAudioElement | null>(null);
+  const prebufferedTrackIdRef = useRef<string | null>(null);
+
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const filterNodesRef = useRef<BiquadFilterNode[]>([]);
+
+  // Equalizer & sound profile state
+  const [equalizerSettings, setEqualizerSettingsState] = useState<EqualizerSettings>(loadEqualizerSettings);
+  const equalizerSettingsRef = useRef(equalizerSettings);
+  equalizerSettingsRef.current = equalizerSettings;
+
+  const streamUrl = useCallback((id: string, quality?: string) => {
+    const q = quality || equalizerSettingsRef.current.quality || "high";
+    return `/api/stream/${encodeURIComponent(id)}?quality=${encodeURIComponent(q)}`;
+  }, []);
+
+  // Initialize and attach core audio + prebuffer elements to DOM
+  if (typeof document !== "undefined") {
+    if (!audioRef.current) {
+      let el = document.getElementById("melodymap-core-audio") as HTMLAudioElement | null;
+      if (!el) {
+        el = document.createElement("audio");
+        el.id = "melodymap-core-audio";
+        el.setAttribute("playsinline", "true");
+        el.setAttribute("webkit-playsinline", "true");
+        el.setAttribute("x-webkit-airplay", "allow");
+        el.crossOrigin = "anonymous";
+        el.preload = "auto";
+        el.volume = 1;
+        el.muted = false;
+        el.style.position = "fixed";
+        el.style.bottom = "0";
+        el.style.left = "0";
+        el.style.width = "0";
+        el.style.height = "0";
+        el.style.opacity = "0";
+        el.style.pointerEvents = "none";
+        try {
+          document.body.appendChild(el);
+        } catch {}
+      } else {
+        el.crossOrigin = "anonymous";
+        el.muted = false;
+      }
+      audioRef.current = el;
+    }
+
+    if (!prebufferAudioRef.current) {
+      let pEl = document.getElementById("melodymap-prebuffer-audio") as HTMLAudioElement | null;
+      if (!pEl) {
+        pEl = document.createElement("audio");
+        pEl.id = "melodymap-prebuffer-audio";
+        pEl.crossOrigin = "anonymous";
+        pEl.preload = "auto";
+        pEl.muted = true;
+        pEl.volume = 0;
+        pEl.style.display = "none";
+        try {
+          document.body.appendChild(pEl);
+        } catch {}
+      }
+      prebufferAudioRef.current = pEl;
+    }
   }
 
   const endedRef = useRef(options.onEnded);
   endedRef.current = options.onEnded;
   const onErrorRef = useRef(options.onError);
   onErrorRef.current = options.onError;
+  const getNextTrackRef = useRef(options.getNextTrack);
+  getNextTrackRef.current = options.getNextTrack;
+
   /** True when playback should auto-start as soon as a stream is ready. */
   const wantPlayRef = useRef(false);
-  /** Object URLs we created for offline blobs — revoked when replaced or on unmount. */
+  /** Object URLs created for offline blobs. */
   const objectUrlRef = useRef<string | null>(null);
 
   const [ready] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+
+  const currentTrackIdRef = useRef<string | null>(null);
+  const mainGainRef = useRef<GainNode | null>(null);
+  const prebufferGainRef = useRef<GainNode | null>(null);
+
+  // Initialize Web Audio API 10-band equalizer graph on user interaction
+  const initWebAudio = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (!audioCtxRef.current) {
+      try {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        audioCtxRef.current = ctx;
+
+        const source = ctx.createMediaElementSource(audio);
+        sourceNodeRef.current = source;
+
+        const mainGain = ctx.createGain();
+        mainGain.gain.value = 1;
+        mainGainRef.current = mainGain;
+        source.connect(mainGain);
+
+        // Build 10-band biquad filter chain
+        const currentSettings = equalizerSettingsRef.current;
+        const filters = EQUALIZER_FREQUENCIES.map((band, idx) => {
+          const filter = ctx.createBiquadFilter();
+          filter.frequency.value = band.frequency;
+          if (idx === 0) {
+            filter.type = "lowshelf";
+          } else if (idx === EQUALIZER_FREQUENCIES.length - 1) {
+            filter.type = "highshelf";
+          } else {
+            filter.type = "peaking";
+            filter.Q.value = 1.4;
+          }
+          filter.gain.value = currentSettings.enabled ? (currentSettings.gains[idx] ?? 0) : 0;
+          return filter;
+        });
+
+        filterNodesRef.current = filters;
+
+        // Connect main gain -> filter[0] -> ... -> destination
+        if (filters.length > 0 && filters[0]) {
+          mainGain.connect(filters[0]);
+          let prevNode: AudioNode = filters[0];
+          for (let i = 1; i < filters.length; i++) {
+            const f = filters[i];
+            if (f) {
+              prevNode.connect(f);
+              prevNode = f;
+            }
+          }
+          prevNode.connect(ctx.destination);
+        } else {
+          mainGain.connect(ctx.destination);
+        }
+      } catch (err) {
+        console.warn("[WebAudio] Equalizer init notice:", err);
+      }
+    }
+
+    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+  }, []);
+
+  // Update physical filter gains when equalizer settings change
+  useEffect(() => {
+    const filters = filterNodesRef.current;
+    if (!filters || filters.length === 0) return;
+    filters.forEach((filter, idx) => {
+      const targetGain = equalizerSettings.enabled ? (equalizerSettings.gains[idx] ?? 0) : 0;
+      try {
+        filter.gain.value = targetGain;
+      } catch {}
+    });
+  }, [equalizerSettings]);
+
+  const applyEqualizerGains = useCallback(
+    (settings: EqualizerSettings) => {
+      saveEqualizerSettings(settings);
+      setEqualizerSettingsState(settings);
+      initWebAudio();
+      const filters = filterNodesRef.current;
+      if (filters && filters.length > 0) {
+        filters.forEach((filter, idx) => {
+          const targetGain = settings.enabled ? (settings.gains[idx] ?? 0) : 0;
+          try {
+            filter.gain.value = targetGain;
+          } catch {}
+        });
+      }
+    },
+    [initWebAudio],
+  );
+
+  const setEqualizerPreset = useCallback(
+    (preset: EqualizerPreset) => {
+      const gains = EQUALIZER_PRESETS[preset]?.gains || EQUALIZER_PRESETS.flat.gains;
+      const next: EqualizerSettings = {
+        ...equalizerSettings,
+        enabled: true,
+        preset,
+        gains: [...gains],
+      };
+      applyEqualizerGains(next);
+    },
+    [equalizerSettings, applyEqualizerGains],
+  );
+
+  const setBandGain = useCallback(
+    (bandIndex: number, gain: number) => {
+      const nextGains = [...equalizerSettings.gains];
+      nextGains[bandIndex] = Math.max(-12, Math.min(12, gain));
+      const next: EqualizerSettings = {
+        ...equalizerSettings,
+        enabled: true,
+        preset: "custom",
+        gains: nextGains,
+      };
+      applyEqualizerGains(next);
+    },
+    [equalizerSettings, applyEqualizerGains],
+  );
+
+  const toggleEqualizer = useCallback(
+    (enabled?: boolean) => {
+      const nextEnabled = enabled !== undefined ? enabled : !equalizerSettings.enabled;
+      const next: EqualizerSettings = {
+        ...equalizerSettings,
+        enabled: nextEnabled,
+      };
+      applyEqualizerGains(next);
+    },
+    [equalizerSettings, applyEqualizerGains],
+  );
+
+  const setCrossfadeDuration = useCallback(
+    (seconds: number) => {
+      const next: EqualizerSettings = {
+        ...equalizerSettings,
+        crossfade: Math.max(0, Math.min(8, seconds)),
+      };
+      applyEqualizerGains(next);
+    },
+    [equalizerSettings, applyEqualizerGains],
+  );
+
+  /** Point the audio element at a resolved stream URL with smooth playback */
+  const setStream = useCallback(
+    (url: string, startAt = 0) => {
+      const audio = audioRef.current;
+      if (!audio || !url || url.includes("/api/stream/undefined") || url.endsWith("/api/stream/")) return;
+
+      initWebAudio();
+      setIsLoading(true);
+
+      if (startAt > 0) {
+        const seekToStart = () => {
+          audio.currentTime = startAt;
+          audio.removeEventListener("loadedmetadata", seekToStart);
+        };
+        audio.addEventListener("loadedmetadata", seekToStart);
+      }
+
+      try {
+        audio.pause();
+      } catch {}
+
+      audio.muted = false;
+      audio.src = url;
+      audio.playbackRate = playbackSpeed;
+      audio.load();
+
+      if (wantPlayRef.current) {
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            if (
+              err.name === "NotAllowedError" ||
+              err.name === "AbortError" ||
+              err.name === "NotSupportedError"
+            ) {
+              return;
+            }
+            console.warn("[MelodyMap] play() error:", err);
+            onErrorRef.current?.("Tap play to start playback.");
+          });
+        }
+      }
+    },
+    [playbackSpeed, initWebAudio],
+  );
+
+  const setAudioQuality = useCallback(
+    (quality: "saver" | "standard" | "high") => {
+      const next: EqualizerSettings = {
+        ...equalizerSettings,
+        quality,
+      };
+      applyEqualizerGains(next);
+
+      // Seamlessly hot-swap active stream at current position
+      const audio = audioRef.current;
+      const activeId = currentTrackIdRef.current;
+      if (audio && activeId && audio.src && audio.src.includes("/api/stream/")) {
+        const cur = audio.currentTime || 0;
+        const newUrl = streamUrl(activeId, quality);
+        setStream(newUrl, cur);
+      }
+    },
+    [equalizerSettings, applyEqualizerGains, streamUrl, setStream],
+  );
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-    const onTime = () => {
-      setPosition(audio.currentTime || 0);
-      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+    const onPlay = () => {
+      audio.muted = false;
+      initWebAudio();
+      setIsPlaying(true);
+      setIsLoading(false);
     };
+    const onPlaying = () => {
+      setIsPlaying(true);
+      setIsLoading(false);
+    };
+    const onWaiting = () => {
+      if (wantPlayRef.current) setIsLoading(true);
+    };
+    const onCanPlay = () => {
+      setIsLoading(false);
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      setIsLoading(false);
+    };
+    const onTime = () => {
+      const cur = audio.currentTime || 0;
+      const dur = Number.isFinite(audio.duration) ? audio.duration : 0;
+      setPosition(cur);
+      setDuration(dur);
+      if (cur > 0) setIsLoading(false);
+
+      // Gapless Pre-buffering: when current song has <= 25s left, pre-buffer upcoming track
+      if (dur > 0 && dur - cur <= 25 && prebufferAudioRef.current) {
+        const nextTrack = getNextTrackRef.current?.();
+        if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
+          prebufferedTrackIdRef.current = nextTrack.id;
+          const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
+          prebufferAudioRef.current.src = nextUrl;
+          prebufferAudioRef.current.load();
+        }
+      }
+    };
+
+    // CRITICAL FOR SPOTIFY-LIKE SCREEN-OFF CONTINUOUS PLAYBACK:
+    // When song ends with screen locked, synchronously switch .src & call .play()
+    // inside the same event loop frame so mobile OS grants immediate autoplay permission!
     const onEnded = () => {
       setIsPlaying(false);
+      setIsLoading(false);
+
+      // Notify parent component
       endedRef.current();
+
+      // Synchronous background advance
+      const nextTrack = getNextTrackRef.current?.();
+      if (nextTrack && wantPlayRef.current) {
+        const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
+        audio.src = nextUrl;
+        audio.playbackRate = playbackSpeed;
+        audio.load();
+        const p = audio.play();
+        if (p !== undefined) {
+          p.catch((err) => {
+            console.warn("[BackgroundPlayback] Synchronous next auto-play notice:", err);
+          });
+        }
+      }
     };
+
     const onError = () => {
       setIsPlaying(false);
-      const message = "This song is unavailable. Skipping...";
-      onErrorRef.current?.(message);
-      
-      // Disabled auto-advance for now - let user manually skip restricted songs
-      // if (onAutoAdvanceRef.current) {
-      //   setTimeout(() => {
-      //     onAutoAdvanceRef.current?.();
-      //   }, 3000);
-      // }
+      setIsLoading(false);
+      if (
+        audio.error &&
+        audio.error.code !== 1 &&
+        audio.error.code !== 20 &&
+        audio.src &&
+        !audio.src.includes("/api/stream/undefined") &&
+        !audio.src.endsWith("/api/stream/")
+      ) {
+        console.warn("[MelodyMap] Audio element error:", audio.error.code, audio.error.message);
+        const message = "Could not load audio stream. Tap play to retry.";
+        onErrorRef.current?.(message);
+      }
     };
 
     audio.addEventListener("play", onPlay);
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("canplay", onCanPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("durationchange", onTime);
     audio.addEventListener("loadedmetadata", onTime);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
+
     return () => {
       audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("canplay", onCanPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("durationchange", onTime);
@@ -82,9 +436,9 @@ export function useAudioPlayer(options: {
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
-  }, []);
+  }, [playbackSpeed, initWebAudio, streamUrl]);
 
-  /** Cleanup: pause audio, revoke blob URLs on unmount. */
+  /** Cleanup on unmount */
   useEffect(() => {
     return () => {
       const audio = audioRef.current;
@@ -97,30 +451,13 @@ export function useAudioPlayer(options: {
         URL.revokeObjectURL(objectUrlRef.current);
         objectUrlRef.current = null;
       }
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+      }
     };
   }, []);
 
-  /** Point the audio element at a resolved stream URL. */
-  const setStream = useCallback((url: string, startAt = 0) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (startAt > 0) {
-      const seekToStart = () => {
-        audio.currentTime = startAt;
-        audio.removeEventListener("loadedmetadata", seekToStart);
-      };
-      audio.addEventListener("loadedmetadata", seekToStart);
-    }
-    audio.src = url;
-    if (wantPlayRef.current) {
-      void audio.play().catch((err) => {
-        console.warn("[MelodyMap] play() failed:", err);
-        onErrorRef.current?.("Playback blocked. Tap play to resume.");
-      });
-    }
-  }, []);
-
-  /** Use a downloaded blob when available — plays with no connection. */
+  /** Use downloaded blob when available */
   const playOffline = useCallback(
     async (id: string, startAt = 0): Promise<boolean> => {
       try {
@@ -139,47 +476,52 @@ export function useAudioPlayer(options: {
     [setStream],
   );
 
-  /** Load a track and start playing (used when the user picks a song). */
+  /** Load a track and auto-play */
   const load = useCallback(
     async (id: string, directUrl?: string) => {
       wantPlayRef.current = true;
-      if (await playOffline(id)) return; // downloaded copy wins
-      
+      currentTrackIdRef.current = id;
+      if (await playOffline(id)) return;
       if (directUrl) {
         setStream(directUrl);
         return;
       }
-
       setStream(streamUrl(id));
     },
-    [setStream, playOffline],
+    [setStream, playOffline, streamUrl],
   );
 
-  /** Load a track at a position without autoplay (used to resume a session). */
+  /** Cue a track at specific second without autoplay */
   const cue = useCallback(
     async (id: string, startSeconds = 0, directUrl?: string) => {
       wantPlayRef.current = false;
-      if (await playOffline(id, startSeconds)) return; // downloaded copy wins
-      
+      currentTrackIdRef.current = id;
+      if (await playOffline(id, startSeconds)) return;
       if (directUrl) {
         setStream(directUrl, startSeconds);
         return;
       }
-
       setStream(streamUrl(id), startSeconds);
     },
-    [setStream, playOffline],
+    [setStream, playOffline, streamUrl],
   );
 
   const play = useCallback(() => {
     wantPlayRef.current = true;
+    initWebAudio();
     const audio = audioRef.current;
-    if (audio?.src) {
-      void audio.play().catch((err) => {
-        console.warn("[MelodyMap] play() failed:", err);
-      });
+    if (audio && audio.src && audio.src.length > 0 && !audio.src.endsWith("/")) {
+      audio.muted = false;
+      const p = audio.play();
+      if (p !== undefined) {
+        p.catch((err) => {
+          if (err.name !== "AbortError" && err.name !== "NotAllowedError") {
+            console.warn("[MelodyMap] play() error:", err);
+          }
+        });
+      }
     }
-  }, []);
+  }, [initWebAudio]);
 
   const pause = useCallback(() => {
     wantPlayRef.current = false;
@@ -188,9 +530,36 @@ export function useAudioPlayer(options: {
 
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
-    if (!audio || !Number.isFinite(audio.duration)) return;
-    const max = audio.duration > 0 ? audio.duration : seconds;
-    audio.currentTime = Math.max(0, Math.min(seconds, max));
+    if (!audio) return;
+    const max = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : seconds;
+    const target = Math.max(0, Math.min(seconds, max));
+    audio.currentTime = target;
+    setPosition(target);
+  }, []);
+
+  const skipForward = useCallback((seconds = 30) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const max = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : audio.currentTime + seconds;
+    const target = Math.min(audio.currentTime + seconds, max);
+    audio.currentTime = target;
+    setPosition(target);
+  }, []);
+
+  const skipBackward = useCallback((seconds = 15) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const target = Math.max(0, audio.currentTime - seconds);
+    audio.currentTime = target;
+    setPosition(target);
+  }, []);
+
+  const setSpeed = useCallback((speed: number) => {
+    setPlaybackSpeed(speed);
+    const audio = audioRef.current;
+    if (audio) {
+      audio.playbackRate = speed;
+    }
   }, []);
 
   const setVolume = useCallback((v: number) => {
@@ -201,13 +570,24 @@ export function useAudioPlayer(options: {
   return {
     ready,
     isPlaying,
+    isLoading,
     position,
     duration,
+    playbackSpeed,
+    equalizerSettings,
+    setEqualizerPreset,
+    setBandGain,
+    toggleEqualizer,
+    setCrossfadeDuration,
+    setAudioQuality,
     load,
     cue,
     play,
     pause,
     seek,
+    skipForward,
+    skipBackward,
+    setSpeed,
     setVolume,
   };
 }

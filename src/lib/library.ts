@@ -166,9 +166,174 @@ export const DEFAULT_SETTINGS: RecSettings = {
 const LIKES_KEY = "melodymap.likes.v1";
 const DISLIKES_KEY = "melodymap.dislikes.v1";
 const HISTORY_KEY = "melodymap.history.v1";
+const PODCAST_HISTORY_KEY = "melodymap.podcast_history.v1";
 const PLAYLISTS_KEY = "melodymap.playlists.v1";
 export const SETTINGS_KEY = "melodymap.recsettings.v1";
 const STATS_KEY = "melodymap.stats.v1";
+
+const NON_MUSIC_KEYWORDS = [
+  "podcast",
+  "podcasts",
+  "episode",
+  "ep.",
+  "ep ",
+  "#ep",
+  "interview",
+  "reaction",
+  "review",
+  "vlog",
+  "talk show",
+  "talkshow",
+  "audiobook",
+  "documentary",
+  "news",
+  "discussion",
+  "debate",
+  "speech",
+  "lecture",
+  "commentary",
+  "chapter",
+  "session",
+  "full movie",
+  "trailer",
+  "teaser",
+  "making of",
+  "standup",
+  "comedy show",
+  "livestream",
+  "live stream",
+  "raj shamani",
+  "ranveer allahbadia",
+  "beerbiceps",
+  "prakhar",
+  "samay raina",
+  "huberman",
+  "rogan",
+  "lex fridman",
+];
+
+const COMPILATION_KEYWORDS = [
+  "jukebox",
+  "audio playlist",
+  "compilation",
+  "non-stop",
+  "nonstop",
+  "mega mix",
+  "megamix",
+  "best of",
+  "greatest hits",
+  "top 10",
+  "top 20",
+  "top 30",
+  "top 40",
+  "top 50",
+  "top 100",
+  "superhit",
+  "full album",
+  "hits collection",
+  "audio jukebox",
+  "collection",
+  "bundle",
+  "all songs",
+  "discography",
+  "medley",
+  "soundtrack collection",
+  "all hit songs",
+  "continuous mix",
+];
+
+const PODCAST_POSITIVE_KEYWORDS = [
+  "podcast",
+  "episode",
+  "ep.",
+  "ep ",
+  "#ep",
+  "interview",
+  "discussion",
+  "conversation",
+  "audiobook",
+  "talk show",
+  "talkshow",
+  "series",
+  "huberman",
+  "rogan",
+  "lex fridman",
+  "beerbiceps",
+  "raj shamani",
+  "ranveer allahbadia",
+  "prakhar",
+  "samay raina",
+  "audio show",
+  "storytelling",
+  "stories",
+  "lecture",
+  "documentary",
+  "masterclass",
+  "deep dive",
+];
+
+const JUNK_MEDIA_KEYWORDS = [
+  "trailer",
+  "teaser",
+  "gameplay",
+  "reaction",
+  "review",
+  "vlog",
+  "shorts",
+  "tiktok",
+  "unboxing",
+  "prank",
+  "making of",
+  "behind the scenes",
+  "tutorial",
+  "comedy scene",
+  "funny clips",
+  "status video",
+  "whatsapp status",
+];
+
+export function parseDurationSecs(dur: string | undefined): number {
+  if (!dur) return 0;
+  const parts = dur.split(":").map((p) => Number(p));
+  if (parts.some((n) => Number.isNaN(n))) return 0;
+  return parts.reduce((acc, n) => acc * 60 + n, 0);
+}
+
+/**
+ * Strict validator to guarantee a track is a single, pure musical song.
+ */
+export function isMusicTrack(track: Track | undefined | null): boolean {
+  if (!track || !track.title) return false;
+  const title = track.title.toLowerCase();
+  const artist = (track.artist || "").toLowerCase();
+  if (NON_MUSIC_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
+  if (COMPILATION_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
+  if (JUNK_MEDIA_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
+  const secs = parseDurationSecs(track.duration);
+  if (secs > 0 && (secs < 45 || secs > 480)) return false;
+  return true;
+}
+
+/**
+ * Strict validator to guarantee a track is a genuine podcast episode.
+ */
+export function isPodcastTrack(track: Track | undefined | null): boolean {
+  if (!track || !track.title) return false;
+  const title = track.title.toLowerCase();
+  const artist = (track.artist || "").toLowerCase();
+
+  // Reject junk non-audio media
+  if (JUNK_MEDIA_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
+
+  const secs = parseDurationSecs(track.duration);
+  const hasPodcastSignal = PODCAST_POSITIVE_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw));
+
+  if (hasPodcastSignal) return true;
+  // If no explicit keyword, must be long-form audio (>= 5 mins) and NOT a standard music song
+  if (secs >= 300 && !isMusicTrack(track)) return true;
+
+  return false;
+}
 
 /** Behavioural signal per song: how often it's replayed vs skipped, and when. */
 export type PlayStat = {
@@ -180,8 +345,6 @@ export type PlayStat = {
 };
 
 export type Stats = Record<string, PlayStat>;
-
-
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -219,7 +382,15 @@ export type SavedPlayback = {
 export function readPlayback(): SavedPlayback | null {
   const saved = read<SavedPlayback | null>(PLAYBACK_KEY, null);
   if (!saved || !Array.isArray(saved.queue) || saved.queue.length === 0) return null;
-  return saved;
+  const validQueue = saved.queue.filter(
+    (t) => t && typeof t.id === "string" && t.id.trim().length > 0 && t.id !== "undefined",
+  );
+  if (validQueue.length === 0) return null;
+  return {
+    ...saved,
+    queue: validQueue,
+    index: Math.min(Math.max(0, saved.index || 0), validQueue.length - 1),
+  };
 }
 
 export function writePlayback(value: SavedPlayback) {
@@ -296,6 +467,9 @@ function mergeById<T extends { id: string }>(a: T[], b: T[], max: number): T[] {
   return out.slice(0, max);
 }
 
+import { areSameTrack, trackExistsIn } from "@/lib/track-dedup";
+import type { TrackLike } from "@/lib/track-dedup";
+
 /**
  * Local-first library. When a listener is signed in, the same data syncs to
  * their account so the feed follows them to any device.
@@ -305,14 +479,36 @@ export function useLibrary(userId?: string | null) {
   const [likes, setLikes] = useState<Track[]>([]);
   const [dislikes, setDislikes] = useState<Track[]>([]);
   const [history, setHistory] = useState<Track[]>([]);
+  const [podcastHistory, setPodcastHistory] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [settings, setSettings] = useState<RecSettings>(DEFAULT_SETTINGS);
   const [stats, setStats] = useState<Stats>({});
 
   useEffect(() => {
-    setLikes(read<Track[]>(LIKES_KEY, []));
+    // 1. Sanitize likes: keep only pure music tracks
+    const rawLikes = read<Track[]>(LIKES_KEY, []);
+    const musicLikes = rawLikes.filter(isMusicTrack);
+    setLikes(musicLikes);
+    if (musicLikes.length !== rawLikes.length) {
+      write(LIKES_KEY, musicLikes);
+    }
+
     setDislikes(read<Track[]>(DISLIKES_KEY, []));
-    setHistory(read<Track[]>(HISTORY_KEY, []));
+
+    // 2. Sanitize history: split into music vs podcast history
+    const rawHistory = read<Track[]>(HISTORY_KEY, []);
+    const musicHistory = rawHistory.filter(isMusicTrack);
+    const extractedPodcasts = rawHistory.filter(isPodcastTrack);
+
+    const rawPodcastHistory = read<Track[]>(PODCAST_HISTORY_KEY, []);
+    const combinedPodcasts = mergeById(rawPodcastHistory, extractedPodcasts, 200);
+
+    setHistory(musicHistory);
+    setPodcastHistory(combinedPodcasts);
+
+    write(HISTORY_KEY, musicHistory);
+    write(PODCAST_HISTORY_KEY, combinedPodcasts);
+
     setPlaylists(read<Playlist[]>(PLAYLISTS_KEY, []));
     setSettings({ ...DEFAULT_SETTINGS, ...read<Partial<RecSettings>>(SETTINGS_KEY, {}) });
     setStats(read<Stats>(STATS_KEY, {}));
@@ -335,7 +531,7 @@ export function useLibrary(userId?: string | null) {
       if (cancelled || !data?.data) return;
       const doc = data.data as Partial<LibraryDoc>;
       setLikes((prev) => {
-        const next = mergeById(doc.likes ?? [], prev, 200);
+        const next = mergeById((doc.likes ?? []).filter(isMusicTrack), prev, 200);
         write(LIKES_KEY, next);
         return next;
       });
@@ -345,7 +541,7 @@ export function useLibrary(userId?: string | null) {
         return next;
       });
       setHistory((prev) => {
-        const next = mergeById(prev, doc.history ?? [], 200);
+        const next = mergeById(prev, (doc.history ?? []).filter(isMusicTrack), 200);
         write(HISTORY_KEY, next);
         return next;
       });
@@ -413,13 +609,13 @@ export function useLibrary(userId?: string | null) {
 
   const toggleLike = useCallback((track: Track) => {
     setDislikes((prev) => {
-      const next = prev.filter((t) => t.id !== track.id);
+      const next = prev.filter((t) => !areSameTrack(t, track as TrackLike));
       write(DISLIKES_KEY, next);
       return next;
     });
     setLikes((prev) => {
-      const next = prev.some((t) => t.id === track.id)
-        ? prev.filter((t) => t.id !== track.id)
+      const next = trackExistsIn(prev, track as TrackLike)
+        ? prev.filter((t) => !areSameTrack(t, track as TrackLike))
         : [track, ...prev].slice(0, 200);
       write(LIKES_KEY, next);
       return next;
@@ -429,13 +625,13 @@ export function useLibrary(userId?: string | null) {
   /** Thumbs-down: removes from favourites and tells the AI to avoid this song. */
   const toggleDislike = useCallback((track: Track) => {
     setLikes((prev) => {
-      const next = prev.filter((t) => t.id !== track.id);
+      const next = prev.filter((t) => !areSameTrack(t, track as TrackLike));
       write(LIKES_KEY, next);
       return next;
     });
     setDislikes((prev) => {
-      const next = prev.some((t) => t.id === track.id)
-        ? prev.filter((t) => t.id !== track.id)
+      const next = trackExistsIn(prev, track as TrackLike)
+        ? prev.filter((t) => !areSameTrack(t, track as TrackLike))
         : [track, ...prev].slice(0, 200);
       write(DISLIKES_KEY, next);
       return next;
@@ -450,6 +646,19 @@ export function useLibrary(userId?: string | null) {
         ? { ...existing, track, [field]: existing[field] + 1, lastAt: Date.now() }
         : { track, plays: 0, skips: 0, completions: 0, lastAt: Date.now(), [field]: 1 };
       const next = { ...prev, [track.id]: entry };
+
+      // Cap to 200 most recent entries to prevent localStorage quota exhaustion
+      const values = Object.values(next);
+      if (values.length > 200) {
+        values.sort((a, b) => b.lastAt - a.lastAt);
+        const capped: Stats = {};
+        for (const item of values.slice(0, 200)) {
+          if (item.track?.id) capped[item.track.id] = item;
+        }
+        write(STATS_KEY, capped);
+        return capped;
+      }
+
       write(STATS_KEY, next);
       return next;
     });
@@ -457,11 +666,19 @@ export function useLibrary(userId?: string | null) {
 
   const logPlay = useCallback(
     (track: Track) => {
-      setHistory((prev) => {
-        const next = [track, ...prev.filter((t) => t.id !== track.id)].slice(0, 200);
-        write(HISTORY_KEY, next);
-        return next;
-      });
+      if (isMusicTrack(track)) {
+        setHistory((prev) => {
+          const next = [track, ...prev.filter((t) => !areSameTrack(t, track as TrackLike))].slice(0, 200);
+          write(HISTORY_KEY, next);
+          return next;
+        });
+      } else {
+        setPodcastHistory((prev) => {
+          const next = [track, ...prev.filter((t) => !areSameTrack(t, track as TrackLike))].slice(0, 200);
+          write(PODCAST_HISTORY_KEY, next);
+          return next;
+        });
+      }
       bump(track, "plays");
     },
     [bump],
@@ -471,13 +688,14 @@ export function useLibrary(userId?: string | null) {
   const logSkip = useCallback((track: Track) => bump(track, "skips"), [bump]);
   const logComplete = useCallback((track: Track) => bump(track, "completions"), [bump]);
 
-
-
-
-
   const clearHistory = useCallback(() => {
     setHistory([]);
     write(HISTORY_KEY, []);
+  }, []);
+
+  const clearPodcastHistory = useCallback(() => {
+    setPodcastHistory([]);
+    write(PODCAST_HISTORY_KEY, []);
   }, []);
 
   const savePlaylists = useCallback((updater: (prev: Playlist[]) => Playlist[]) => {
@@ -512,7 +730,7 @@ export function useLibrary(userId?: string | null) {
     (id: string, track: Track) =>
       savePlaylists((prev) =>
         prev.map((p) =>
-          p.id === id && !p.tracks.some((t) => t.id === track.id)
+          p.id === id && !trackExistsIn(p.tracks, track as TrackLike)
             ? { ...p, tracks: [...p.tracks, track] }
             : p,
         ),
@@ -593,6 +811,7 @@ export function useLibrary(userId?: string | null) {
     likes,
     dislikes,
     history,
+    podcastHistory,
     playlists,
     settings,
     stats,
@@ -604,6 +823,7 @@ export function useLibrary(userId?: string | null) {
     logPlay,
 
     clearHistory,
+    clearPodcastHistory,
     createPlaylist,
     renamePlaylist,
     deletePlaylist,

@@ -35,3 +35,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary / Scratch Artifacts
+scratch/
+report/
+maglev-tour/
+*.exe
+*-player-script.js
+probe*
+resp.json
+test-ytdlp.cjs
+test.m4a
+

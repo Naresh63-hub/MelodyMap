@@ -26,7 +26,8 @@ export type NavTab =
   | "search"
   | "likes"
   | "playlists"
-  | "history";
+  | "history"
+  | "library";
 
 type NavSection = {
   label: string;
@@ -67,9 +68,9 @@ type Props = {
   userInitial?: string;
   userAvatar?: string | null;
   // Mini-player props
-  currentTitle?: string;
-  currentArtist?: string;
-  currentThumbnail?: string;
+  currentTitle?: string | null;
+  currentArtist?: string | null;
+  currentThumbnail?: string | null;
   isPlaying?: boolean;
   onPlayPause?: () => void;
   onNext?: () => void;

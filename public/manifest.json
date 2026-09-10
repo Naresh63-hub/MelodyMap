@@ -1,25 +1,33 @@
 {
-  "name": "MelodyMap — Free Music Player",
+  "name": "MelodyMap — Audio Music & Podcasts",
   "short_name": "MelodyMap",
-  "description": "Stream any song for free with AI-powered recommendations that learn your taste.",
+  "description": "Stream any song or podcast for free with AI-powered recommendations that map your sonic taste.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0f",
   "theme_color": "#7c3aed",
-  "categories": ["music", "entertainment"],
+  "categories": ["music", "podcasts", "entertainment"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

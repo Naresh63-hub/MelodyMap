@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -47,6 +55,8 @@ export function PlaylistsPanel({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const deleteTarget = deleteConfirmId ? playlists.find((p) => p.id === deleteConfirmId) ?? null : null;
 
   useEffect(() => {
     setSelected([]);
@@ -130,10 +140,7 @@ export function PlaylistsPanel({
                   variant="ghost"
                   size="icon"
                   aria-label="Delete playlist"
-                  onClick={() => {
-                    onDelete(open.id);
-                    setOpenId(null);
-                  }}
+                  onClick={() => setDeleteConfirmId(open.id)}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -308,6 +315,35 @@ export function PlaylistsPanel({
           )}
         </>
       )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <DialogContent className="sm:max-w-md bg-[#12121e] border-white/10 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Delete playlist?</DialogTitle>
+            <DialogDescription className="text-white/50">
+              This cannot be undone. {deleteTarget?.tracks.length ?? 0} track{deleteTarget?.tracks.length === 1 ? "" : "s"} will be removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" className="text-white/60 hover:text-white" onClick={() => setDeleteConfirmId(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (deleteConfirmId) {
+                  onDelete(deleteConfirmId);
+                  setOpenId(null);
+                }
+                setDeleteConfirmId(null);
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

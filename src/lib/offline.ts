@@ -15,6 +15,7 @@ type DownloadRecord = {
   id: string;
   track: Track;
   blob: Blob;
+  imageBlob?: Blob | undefined;
   size: number;
   savedAt: number;
 };
@@ -55,14 +56,23 @@ function txDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
-export async function saveDownload(track: Track, blob: Blob): Promise<void> {
+export async function saveDownload(track: Track, blob: Blob, imageBlob?: Blob): Promise<void> {
+  let finalImageBlob = imageBlob;
+  if (!finalImageBlob && track.thumbnail && track.thumbnail.startsWith("http")) {
+    try {
+      const imgRes = await fetch(track.thumbnail);
+      if (imgRes.ok) finalImageBlob = await imgRes.blob();
+    } catch {
+      // image caching is best-effort
+    }
+  }
+
   // Check storage quota before saving
   if (typeof navigator !== "undefined" && "storage" in navigator && "estimate" in navigator.storage) {
     try {
       const est = await navigator.storage.estimate();
       const quota = est.quota ?? 0;
       const usage = est.usage ?? 0;
-      // Warn if less than 100MB remaining
       if (quota > 0 && quota - usage < blob.size + 100 * 1024 * 1024) {
         console.warn("[MelodyMap] Storage running low:", formatBytes(quota - usage), "remaining");
       }
@@ -76,7 +86,8 @@ export async function saveDownload(track: Track, blob: Blob): Promise<void> {
     id: track.id,
     track,
     blob,
-    size: blob.size,
+    imageBlob: finalImageBlob,
+    size: blob.size + (finalImageBlob?.size ?? 0),
     savedAt: Date.now(),
   } satisfies DownloadRecord);
   await txDone(tx);
@@ -106,7 +117,19 @@ export async function listDownloads(): Promise<DownloadInfo[]> {
     const tx = db.transaction(STORE, "readonly");
     const all = await request<DownloadRecord[]>(tx.objectStore(STORE).getAll());
     return (all ?? [])
-      .map(({ track, size, savedAt }) => ({ track, size, savedAt }))
+      .map(({ track, blob, imageBlob, size, savedAt }) => {
+        let localThumb = track.thumbnail;
+        if (imageBlob) {
+          try {
+            localThumb = URL.createObjectURL(imageBlob);
+          } catch {}
+        }
+        return {
+          track: { ...track, thumbnail: localThumb },
+          size,
+          savedAt,
+        };
+      })
       .sort((a, b) => b.savedAt - a.savedAt);
   } catch {
     return [];

@@ -1,23 +1,22 @@
-const CACHE_VERSION = "melodymap-v1";
-const SHELL_CACHE = "melodymap-shell-v1";
+const CACHE_VERSION = "melodymap-v2";
+const SHELL_CACHE = "melodymap-shell-v2";
 
 // App shell: the HTML, JS, CSS that make up the UI.
 const SHELL_ASSETS = ["/", "/manifest.json"];
 
 // Install: pre-cache the app shell so the app loads offline.
 self.addEventListener("install", (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
       .then((cache) =>
-        // Best-effort: skip missing assets instead of failing the whole install
         Promise.allSettled(SHELL_ASSETS.map((url) => cache.add(url)))
       )
-      .then(() => self.skipWaiting()),
   );
 });
 
-// Activate: clean up old caches (including previous versions).
+// Activate: clean up ALL old caches immediately.
 const ACTIVE_CACHES = new Set([CACHE_VERSION, SHELL_CACHE]);
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -32,15 +31,12 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Fetch: network-first for API calls, cache-first for shell assets,
-// and a special pass-through for audio streams (no caching — they're huge).
+// Fetch: network-first strategy for HTML & API, pass-through for streams.
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Audio streams go straight to the network (via the proxy).
-  // Caching multi-MB audio blobs would blow the quota and isn't useful
-  // because the offline-download feature handles that in IndexedDB.
+  // Audio streams go straight to the network (no caching)
   if (
     url.pathname.startsWith("/api/stream") ||
     url.pathname.startsWith("/api/range") ||
@@ -49,15 +45,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // API calls (search, recommendations, etc.) — network-first, fall back to cache.
-  if (url.pathname.startsWith("/api/")) {
+  // API calls & Page Navigation (HTML) — Network-first, fall back to cache when offline
+  if (url.pathname.startsWith("/api/") || request.mode === "navigate" || request.destination === "document") {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          // Only cache successful GET responses
           if (res.ok && request.method === "GET") {
             const clone = res.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
+            const targetCache = url.pathname.startsWith("/api/") ? CACHE_VERSION : SHELL_CACHE;
+            caches.open(targetCache).then((cache) => cache.put(request, clone));
           }
           return res;
         })
@@ -66,20 +62,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Everything else (app shell, images, fonts) — cache-first, then network.
+  // Static assets (scripts, styles, images, fonts) — Network-first with cache fallback
   event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ||
-        fetch(request).then((res) => {
-          // Only cache successful GET responses for shell assets
-          if (res.ok && request.method === "GET") {
-            const clone = res.clone();
-            caches.open(SHELL_CACHE).then((cache) => cache.put(request, clone));
-          }
-          return res;
-        }),
-    ),
+    fetch(request)
+      .then((res) => {
+        if (res.ok && request.method === "GET") {
+          const clone = res.clone();
+          caches.open(SHELL_CACHE).then((cache) => cache.put(request, clone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(request)),
   );
 });
 

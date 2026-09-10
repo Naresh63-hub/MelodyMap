@@ -1,4 +1,5 @@
 import { Infinity as InfinityIcon, Loader2, Pause, Play, X, GripVertical, Music2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/library";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ type Props = {
   onRemove: (index: number) => void;
   onClear: () => void;
   onClose: () => void;
+  onReorder?: (from: number, to: number) => void;
 };
 
 export function QueuePanel({
@@ -28,7 +30,10 @@ export function QueuePanel({
   onRemove,
   onClear,
   onClose,
+  onReorder,
 }: Props) {
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
   const upcoming = tracks.length - index - 1;
 
   return (
@@ -93,9 +98,29 @@ export function QueuePanel({
           {tracks.map((track, i) => {
             const active = i === index;
             const isPast = i < index;
+            const isDragging = dragIndex === i;
+            const isOver = overIndex === i;
             return (
               <li
                 key={`${track.id}-${i}`}
+                draggable
+                onDragStart={() => setDragIndex(i)}
+                onDragEnd={() => {
+                  setDragIndex(null);
+                  setOverIndex(null);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setOverIndex(i);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragIndex !== null && dragIndex !== i && onReorder) {
+                    onReorder(dragIndex, i);
+                  }
+                  setDragIndex(null);
+                  setOverIndex(null);
+                }}
                 className={cn(
                   "group flex items-center gap-3 rounded-xl px-3 py-2 transition-all duration-200 button-press focus-ring-neon",
                   active 
@@ -103,9 +128,13 @@ export function QueuePanel({
                     : isPast 
                       ? "opacity-40" 
                       : "hover:bg-white/[0.04] border border-transparent hover:border-white/5",
+                  isDragging && "opacity-30 scale-95",
+                  isOver && dragIndex !== null && dragIndex !== i && "ring-2 ring-purple-500 bg-purple-500/20",
                 )}
               >
-                <GripVertical className="h-4 w-4 text-white/20 cursor-move" />
+                <span className="cursor-grab active:cursor-grabbing p-1 text-white/30 hover:text-white transition-colors">
+                  <GripVertical className="h-4 w-4" />
+                </span>
                 <span className="w-6 shrink-0 text-center text-xs tabular-nums text-white/30">
                   {active ? (
                     isPlaying ? (

@@ -77,17 +77,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" },
       { name: "theme-color", content: "#7c3aed" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
-      { name: "apple-mobile-web-app-title", content: "MelodyMap" },
+      { name: "apple-mobile-web-app-title", content: "MyMusic" },
       { name: "mobile-web-app-capable", content: "yes" },
-      { name: "application-name", content: "MelodyMap" },
+      { name: "application-name", content: "MyMusic" },
       { name: "msapplication-TileColor", content: "#7c3aed" },
-      { title: "MelodyMap — Your Music. Your Mood. Your Map." },
+      { name: "msapplication-tap-highlight", content: "no" },
+      { name: "format-detection", content: "telephone=no" },
+      { title: "MyMusic — Your Music. Your Mood." },
       { name: "description", content: "Stream any song for free with AI-powered recommendations that learn your taste. No account needed." },
-      { property: "og:title", content: "MelodyMap — Your Music. Your Mood. Your Map." },
+      { property: "og:title", content: "MyMusic — Your Music. Your Mood." },
       { property: "og:description", content: "Stream any song for free with AI-powered recommendations that learn your taste." },
       { property: "og:type", content: "website" },
       { property: "og:image", content: "/icons/icon-512.png" },
@@ -107,7 +109,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "icon", href: "/icons/icon.svg", type: "image/svg+xml" },
       { rel: "apple-touch-icon", href: "/icons/icon-192.png" },
+      { rel: "apple-touch-icon", sizes: "192x192", href: "/icons/icon-192.png" },
+      { rel: "apple-touch-icon", sizes: "512x512", href: "/icons/icon-512.png" },
       { rel: "manifest", href: "/manifest.json" },
+      { rel: "mask-icon", href: "/icons/icon.svg", color: "#7c3aed" },
     ],
   }),
   shellComponent: RootShell,
@@ -133,20 +138,33 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
-  // Register the service worker for PWA / offline support.
+  // Register the service worker for PWA / offline support and check updates.
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        /* SW registration failed — the app still works, just not offline */
-      });
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => {
+          reg.update().catch((err) => {
+            if (import.meta.env.DEV) {
+              console.debug("[MelodyMap] SW update check skipped:", err);
+            }
+          });
+        })
+        .catch((err) => {
+          if (import.meta.env.DEV) {
+            console.debug("[MelodyMap] SW registration failed:", err);
+          }
+        });
     }
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <main id="main-content" role="main" className="min-h-screen w-full">
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </main>
       </ErrorBoundary>
     </QueryClientProvider>
   );

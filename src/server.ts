@@ -116,75 +116,90 @@ function chunkedBody(
   });
 }
 
+const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
+
+function isAllowedUpstreamUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host.endsWith(".googlevideo.com") ||
+      host.endsWith(".youtube.com") ||
+      host.endsWith(".ytimg.com") ||
+      host === "googlevideo.com" ||
+      host === "youtube.com"
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function handleStreamProxy(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
   const PREFIX = "/api/stream/";
   if (!url.pathname.startsWith(PREFIX)) return null;
 
-  const videoId = decodeURIComponent(url.pathname.slice(PREFIX.length));
-  if (!videoId) return new Response("Missing video id", { status: 400 });
+  const rawId = url.pathname.slice(PREFIX.length).split("?")[0];
+  const videoId = decodeURIComponent(rawId ?? "").trim();
+  const quality = (url.searchParams.get("quality") || "high") as "saver" | "standard" | "high";
+
+  if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
+    return new Response("Invalid or missing video id", { status: 400 });
+  }
 
   const { resolveStreamUrlWithMeta } = await import("./lib/stream.server");
-  const stream = await resolveStreamUrlWithMeta(videoId);
-  if (!stream) return new Response("Stream not found", { status: 404 });
+  const stream = await resolveStreamUrlWithMeta(videoId, quality);
+  if (!stream || !stream.url || !isAllowedUpstreamUrl(stream.url)) {
+    return new Response("Stream not found or invalid upstream", { status: 404 });
+  }
 
-  // Use metadata from ytdl-core cache (contentLength, mimeType) when
-  // available — avoids an extra round-trip HEAD probe.  Fall back to a
-  // bounded probe only when the resolver didn't capture the size.
-  const streamUrl = stream.url;
-  let size: number | null = stream.contentLength;
-  let type = stream.mimeType || "audio/mp4";
+  const upstreamHeaders: Record<string, string> = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+    Referer: "https://www.youtube.com/",
+  };
+  const rangeHeader = request.headers.get("range");
+  if (rangeHeader) {
+    upstreamHeaders["Range"] = rangeHeader;
+  }
 
-  if (size === null) {
-    try {
-      const head = await fetch(streamUrl, {
-        headers: { Range: "bytes=0-0" },
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (head.ok || head.status === 206) {
-        const total = head.headers.get("content-range")?.match(/\/(\d+)$/)?.[1];
-        if (total) size = Number(total);
-        type = head.headers.get("content-type") ?? type;
-      }
-    } catch {
-      // fall through
+  const upstreamRes = await fetch(stream.url, {
+    headers: upstreamHeaders,
+  });
+
+  if (!upstreamRes.ok && upstreamRes.status !== 206) {
+    return new Response("Upstream stream fetch failed", { status: upstreamRes.status || 502 });
+  }
+
+  let mimeType = stream.mimeType || "audio/mp4";
+  const upstreamMime = upstreamRes.headers.get("content-type");
+  if (upstreamMime) {
+    if (upstreamMime.includes("webm")) {
+      mimeType = "audio/webm";
+    } else if (upstreamMime.includes("mp4") || upstreamMime.includes("m4a")) {
+      mimeType = "audio/mp4";
+    } else if (upstreamMime.startsWith("audio/")) {
+      mimeType = upstreamMime;
     }
   }
-  if (size === null) return new Response("Stream unavailable", { status: 502 });
 
-  // Reject streams that are capped by YouTube (usually indicated by a tiny query parameter or by failing our chunking test)
-  const isCapped = size > 2 * 1024 * 1024 && stream.url.match(/[?&]clen=(\d+)/) && Number(stream.url.match(/[?&]clen=(\d+)/)![1]) < size;
-  if (isCapped) {
-    console.error(`[stream-proxy] capped stream for ${videoId} (size ${size})`);
-    return new Response("Capped stream url", { status: 502 });
-  }
-  const headers = new Headers();
-  headers.set("content-type", type);
-  headers.set("accept-ranges", "bytes");
+  const responseHeaders = new Headers();
+  responseHeaders.set("access-control-allow-origin", "*");
+  responseHeaders.set("access-control-allow-headers", "Range, Accept-Ranges, Content-Type");
+  responseHeaders.set("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges");
+  responseHeaders.set("content-type", mimeType);
+  responseHeaders.set("accept-ranges", "bytes");
 
-  const parsed = /^bytes=(\d+)-(\d*)$/.exec(request.headers.get("range") ?? "");
-  let status: number;
+  const contentRange = upstreamRes.headers.get("content-range");
+  if (contentRange) responseHeaders.set("content-range", contentRange);
 
-  if (parsed) {
-    const start = Number(parsed[1]);
-    const end = parsed[2] === "" ? size - 1 : Math.min(Number(parsed[2]), size - 1);
-    if (start >= size || start > end) {
-      return new Response("", {
-        status: 416,
-        headers: { "content-range": `bytes */${size}` },
-      });
-    }
-    headers.set("content-range", `bytes ${start}-${end}/${size}`);
-    headers.set("content-length", String(end - start + 1));
-    status = 206;
-  } else {
-    headers.set("content-length", String(size));
-    status = 200;
-  }
+  const contentLength = upstreamRes.headers.get("content-length");
+  if (contentLength) responseHeaders.set("content-length", contentLength);
 
-  return new Response(chunkedBody(streamUrl, parsed ? Number(parsed[1]) : 0, size - 1, videoId), {
-    status,
-    headers,
+  return new Response(upstreamRes.body, {
+    status: upstreamRes.status,
+    headers: responseHeaders,
   });
 }
 

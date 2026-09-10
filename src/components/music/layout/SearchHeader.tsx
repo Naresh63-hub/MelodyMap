@@ -69,6 +69,7 @@ export function SearchHeader({
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
             <Input
+              id="main-search-input"
               value={query}
               onChange={(e) => {
                 onQueryChange(e.target.value);
@@ -76,7 +77,7 @@ export function SearchHeader({
               }}
               onFocus={() => onShowSuggestions(true)}
               onBlur={() => window.setTimeout(() => onShowSuggestions(false), 180)}
-              placeholder="Search songs, artists, albums, playlists..."
+              placeholder="Search songs, artists, albums, playlists... (/ to focus)"
               className="h-11 rounded-full border-white/10 bg-white/[0.04] pl-11 pr-11 text-sm text-white placeholder:text-white/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
               autoComplete="off"
             />

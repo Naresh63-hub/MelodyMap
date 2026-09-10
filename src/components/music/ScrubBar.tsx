@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { formatTime } from "@/lib/use-youtube-iframe";
+import { formatTime } from "@/lib/use-audio-player";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -10,44 +10,70 @@ type Props = {
   className?: string;
 };
 
-/** Scrub bar with a hover thumbnail + timestamp preview. Supports keyboard seeking. */
+/** Scrub bar with smooth dragging, pointer capture, hover thumbnail + timestamp preview. */
 export function ScrubBar({ position, duration, thumbnail, onSeek, className }: Props) {
   const barRef = useRef<HTMLDivElement | null>(null);
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [hoverTime, setHoverTime] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  /** Track if a RAF is already scheduled for throttling seek events. */
-  const rafRef = useRef<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPosition, setDragPosition] = useState(0);
+  const activePosition = isDragging ? dragPosition : position;
 
-  const pct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
+  const pct = duration > 0 ? Math.min(100, Math.max(0, (activePosition / duration) * 100)) : 0;
 
-  const ratioFrom = (clientX: number) => {
+  const getRatio = useCallback((clientX: number) => {
     const rect = barRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0) return 0;
     return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsDragging(true);
+    const ratio = getRatio(e.clientX);
+    const targetSeconds = ratio * duration;
+    setDragPosition(targetSeconds);
+    setHoverTime(targetSeconds);
   };
 
-  const handleMove = useCallback(
-    (clientX: number) => {
-      const rect = barRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const ratio = ratioFrom(clientX);
-      setHoverX(ratio * rect.width);
-      setHoverTime(ratio * duration);
-      if (dragging && rafRef.current === null) {
-        rafRef.current = requestAnimationFrame(() => {
-          rafRef.current = null;
-          onSeek(ratio * duration);
-        });
-      }
-    },
-    [dragging, duration, onSeek],
-  );
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = barRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const ratio = getRatio(e.clientX);
+    const targetSeconds = ratio * duration;
+    setHoverX(ratio * rect.width);
+    setHoverTime(targetSeconds);
+
+    if (isDragging) {
+      setDragPosition(targetSeconds);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+      setIsDragging(false);
+      const ratio = getRatio(e.clientX);
+      onSeek(ratio * duration);
+    }
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+      setIsDragging(false);
+    }
+    setHoverX(null);
+  };
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (duration <= 0) return;
-      const step = e.shiftKey ? 10 : 5; // Shift+Arrow = 10s, Arrow = 5s
+      const step = e.shiftKey ? 15 : 5;
       let next = position;
       switch (e.key) {
         case "ArrowRight":
@@ -75,27 +101,14 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
 
   return (
     <div
-      className={cn("relative w-full select-none", className)}
-      onPointerMove={(e) => handleMove(e.clientX)}
+      className={cn("relative w-full select-none touch-none", className)}
       onPointerLeave={() => {
-        setHoverX(null);
-        setDragging(false);
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
-      }}
-      onPointerUp={() => {
-        setDragging(false);
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
-        }
+        if (!isDragging) setHoverX(null);
       }}
     >
       {hoverX !== null && duration > 0 && (
         <div
-          className="pointer-events-none absolute bottom-5 z-10 -translate-x-1/2 rounded-lg border border-border bg-card p-1 shadow-lift"
+          className="pointer-events-none absolute bottom-6 z-30 -translate-x-1/2 rounded-lg border border-white/10 bg-[#121220]/95 p-1.5 shadow-2xl backdrop-blur-md"
           style={{ left: hoverX }}
         >
           {thumbnail && (
@@ -106,7 +119,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
               loading="lazy"
             />
           )}
-          <p className="mt-1 text-center text-[11px] tabular-nums text-muted-foreground">
+          <p className="mt-1 text-center text-[11px] tabular-nums font-semibold text-white/90">
             {formatTime(hoverTime)}
           </p>
         </div>
@@ -116,25 +129,30 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
         ref={barRef}
         role="slider"
         tabIndex={0}
-        aria-label="Seek through track"
+        aria-label="Seek through audio track"
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
-        aria-valuenow={Math.round(position)}
-        aria-valuetext={formatTime(position)}
-        className="group flex h-5 cursor-pointer items-center focus-ring-neon"
+        aria-valuenow={Math.round(activePosition)}
+        aria-valuetext={formatTime(activePosition)}
+        className="group flex h-6 cursor-pointer items-center py-2 focus:outline-none"
         onKeyDown={handleKeyDown}
-        onPointerDown={(e) => {
-          setDragging(true);
-          onSeek(ratioFrom(e.clientX) * duration);
-        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       >
-        <div className="relative h-1.5 w-full overflow-visible rounded-full bg-white/10 shadow-inner">
+        <div className="relative h-1.5 w-full overflow-visible rounded-full bg-white/15 transition-all group-hover:h-2">
+          {/* Progress bar fill */}
           <div
-            className="absolute inset-y-0 left-0 rounded-full progress-gradient shadow-[0_0_12px_rgba(168,85,247,0.4)] transition-all duration-100"
+            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]"
             style={{ width: `${pct}%` }}
           />
+          {/* Thumb handle */}
           <span
-            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg shadow-purple-500/50 opacity-0 transition-all duration-200 group-hover:opacity-100 group-hover:scale-125 animate-neon-glow"
+            className={cn(
+              "absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg shadow-purple-500/50 transition-transform duration-100",
+              isDragging ? "scale-125 opacity-100 ring-4 ring-purple-500/30" : "opacity-0 group-hover:opacity-100 group-hover:scale-110",
+            )}
             style={{ left: `${pct}%` }}
           />
         </div>

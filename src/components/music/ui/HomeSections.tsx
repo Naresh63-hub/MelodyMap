@@ -1,5 +1,6 @@
 import { Clock, Flame, Music2, Star, TrendingUp } from "lucide-react";
 import { MediaCard } from "./MediaCard";
+import { CardGrid } from "@/components/common/CardGrid";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 
@@ -11,7 +12,7 @@ type Props = {
   onPlayTrack: (track: Track, index: number) => void;
   onToggleLike: (track: Track) => void;
   likedIds: Set<string>;
-  currentId?: string | undefined;
+  currentId?: string | null;
   isPlaying: boolean;
   /** Show skeleton placeholders while data loads. */
   loading?: boolean;
@@ -86,8 +87,9 @@ export function HomeSections({
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1920px]:grid-cols-10 min-[2560px]:grid-cols-12 min-[3840px]:grid-cols-16 gap-4">
-          {tracks.slice(0, 12).map((track, index) => (
+        <CardGrid 
+          items={tracks.slice(0, 12)}
+          renderCard={(track, index) => (
             <MediaCard
               key={track.id}
               title={track.title}
@@ -102,8 +104,9 @@ export function HomeSections({
               className="animate-fade-in-up"
               style={{ animationDelay: `${index * 50}ms` }}
             />
-          ))}
-        </div>
+          )}
+          className="grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 min-[1920px]:grid-cols-10 min-[2560px]:grid-cols-12 min-[3840px]:grid-cols-16"
+        />
       </section>
     );
   };
@@ -129,7 +132,7 @@ export function HomeSections({
       
       {trending.length > 0 && (
         <Section
-          title="Trending now"
+          title="🔥 Trending & Fresh Hits"
           icon={TrendingUp}
           tracks={trending}
         />
@@ -137,7 +140,7 @@ export function HomeSections({
 
       {newReleases.length > 0 && (
         <Section
-          title="New releases"
+          title="⚡ Just Dropped / Fresh Releases"
           icon={Flame}
           tracks={newReleases}
         />
@@ -145,7 +148,7 @@ export function HomeSections({
 
       {recommended.length > 0 && (
         <Section
-          title="Recommended for you"
+          title="✨ New & Old Classics Blend"
           icon={Star}
           tracks={recommended}
         />

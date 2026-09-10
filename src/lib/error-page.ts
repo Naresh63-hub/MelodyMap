@@ -1,7 +1,18 @@
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function renderErrorPage(error?: unknown): string {
   const timestamp = new Date().toLocaleString();
-  const errorMessage =
+  const rawMessage =
     error instanceof Error ? error.message : error ? String(error) : "Unknown error";
+  const errorMessage = escapeHtml(rawMessage);
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -27,7 +38,7 @@ export function renderErrorPage(error?: unknown): string {
       <h1>Something went wrong</h1>
       <p>The page couldn't load. Your music library is safe — try reloading or go back home.</p>
       <div class="detail">
-        <strong>Error:</strong> ${errorMessage.replace(/</g, "&lt;")}<br/>
+        <strong>Error:</strong> ${errorMessage}<br/>
         <strong>Time:</strong> ${timestamp}
       </div>
       <div class="actions">

@@ -60,10 +60,13 @@ export function invalidateStreamCache(videoId: string) {
   streamCache.delete(videoId);
 }
 
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
 // ─── Circuit breaker ─────────────────────────────────────────────────
 
-const FAILURE_THRESHOLD = 5;
-const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+const FAILURE_THRESHOLD = 20;
+const COOLDOWN_MS = 15 * 1000; // 15 seconds
 
 let consecutiveFailures = 0;
 let cooldownUntil = 0;
@@ -96,8 +99,12 @@ function recordFailure() {
 async function probeStream(url: string): Promise<boolean> {
   try {
     const res = await fetch(url, {
-      headers: { Range: "bytes=0-65535" },
-      signal: AbortSignal.timeout(8_000),
+      headers: {
+        Range: "bytes=0-65535",
+        "User-Agent": BROWSER_UA,
+        Referer: "https://www.youtube.com/",
+      },
+      signal: AbortSignal.timeout(6_000),
     });
     return res.ok || res.status === 206;
   } catch {
@@ -106,13 +113,13 @@ async function probeStream(url: string): Promise<boolean> {
 }
 
 // ─── yt-dlp resolver ──────────────────────────────────────────────────
-//
-// The only resolver that currently works against YouTube: it handles the
-// player-client challenges, poToken generation and signature decryption
-// that have locked out the raw player API and ytdl-core forks. It spawns
-// the yt-dlp binary, so it needs the binary present on the host.
 
-async function resolveWithYtDlp(videoId: string): Promise<CacheEntry | null> {
+export type StreamQuality = "saver" | "standard" | "high";
+
+async function resolveWithYtDlp(
+  videoId: string,
+  quality: StreamQuality = "high",
+): Promise<CacheEntry | null> {
   try {
     const { default: youtubedl } = await import("youtube-dl-exec");
     const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
@@ -120,61 +127,67 @@ async function resolveWithYtDlp(videoId: string): Promise<CacheEntry | null> {
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
-      extractorArgs: "youtube:player_client=android",
-      addHeader: [
-        'referer:youtube.com',
-        'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      ]
+      extractorArgs: "youtube:player_client=android,tv_embedded",
     } as any);
 
     const fmts = (output as any).formats || [];
-    
-    // The android client DASH audio formats (140, 251) are capped at 1MB.
-    // However, the legacy mp4 format (18) is NOT capped.
-    // So we explicitly prefer format 18, or any format that has audio and video 
-    // because those are legacy non-DASH formats that bypass the 1MB cap.
-    const uncappedFormats = fmts.filter((f: any) => f.acodec !== 'none' && f.vcodec !== 'none');
-    
-    // Fallback to audio-only if no legacy format is found (though they will likely be capped)
-    const audioFormats = uncappedFormats.length > 0 
-      ? uncappedFormats 
-      : fmts.filter((f: any) => f.acodec !== 'none');
-      
-    // Sort by bitrate
-    audioFormats.sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0));
 
-    if (audioFormats.length === 0) {
-      console.warn(`[stream] yt-dlp: no audio format for ${videoId}`);
+    // Audio-only formats: has audio, no video.
+    const audioFormats = fmts.filter(
+      (f: any) =>
+        f.url &&
+        f.acodec &&
+        f.acodec !== "none" &&
+        (!f.vcodec || f.vcodec === "none"),
+    );
+
+    // Fallback: if no audio-only format, try any format with audio
+    const candidates =
+      audioFormats.length > 0
+        ? audioFormats
+        : fmts.filter((f: any) => f.url && f.acodec && f.acodec !== "none");
+
+    if (candidates.length === 0) {
+      console.warn(`[stream] yt-dlp: no usable audio stream found for ${videoId}`);
       return null;
     }
 
-    const format = audioFormats[0];
-
-    if (!format.url) {
-      console.warn(`[stream] yt-dlp: format itag=${format.format_id} has no URL for ${videoId}`);
-      return null;
+    // Quality-aware sorting:
+    if (quality === "saver") {
+      // Smallest bitrate (data saver: ~48-70kbps)
+      candidates.sort((a: any, b: any) => (a.abr || 0) - (b.abr || 0));
+    } else if (quality === "standard") {
+      // Target ~128kbps
+      candidates.sort(
+        (a: any, b: any) =>
+          Math.abs((a.abr || 128) - 128) - Math.abs((b.abr || 128) - 128),
+      );
+    } else {
+      // High quality (~160-256kbps)
+      candidates.sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0));
     }
 
-    // Verify the URL actually streams
-    if (!(await probeStream(format.url))) {
-      console.warn(`[stream] yt-dlp: probe failed for ${videoId} (itag=${format.format_id})`);
-      return null;
+    const bestFormat = candidates[0];
+    if (bestFormat && bestFormat.url) {
+      const contentLen = bestFormat.filesize || bestFormat.filesize_approx;
+      return {
+        url: bestFormat.url,
+        mimeType: bestFormat.ext === "webm" ? "audio/webm" : "audio/mp4",
+        contentLength: contentLen ? Number(contentLen) : null,
+        audioBitrate: bestFormat.abr ? Number(bestFormat.abr) * 1000 : null,
+        at: Date.now(),
+      };
     }
 
-    const contentLen = format.filesize || format.filesize_approx;
-
-    return {
-      url: format.url,
-      mimeType: format.ext === 'webm' ? 'audio/webm' : 'audio/mp4',
-      contentLength: contentLen ? Number(contentLen) : null,
-      audioBitrate: format.abr ? Number(format.abr) * 1000 : null,
-      at: Date.now(),
-    };
+    console.warn(`[stream] yt-dlp: no usable audio stream found for ${videoId}`);
+    return null;
   } catch (err) {
     console.warn(`[stream] yt-dlp resolve error for ${videoId}:`, err);
     return null;
   }
 }
+
+const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
 
 // ─── Main resolver ───────────────────────────────────────────────────
 
@@ -183,8 +196,13 @@ async function resolveWithYtDlp(videoId: string): Promise<CacheEntry | null> {
  */
 export async function resolveStreamUrl(
   videoId: string,
+  quality: StreamQuality = "high",
 ): Promise<string | null> {
-  const cached = cacheGet(videoId);
+  if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
+    return null;
+  }
+  const cacheKey = `${videoId}:${quality}`;
+  const cached = cacheGet(cacheKey);
   if (cached) return cached.url;
 
   if (!isCooledDown()) {
@@ -194,10 +212,10 @@ export async function resolveStreamUrl(
     return null;
   }
 
-  const entry = await resolveWithYtDlp(videoId);
+  const entry = await resolveWithYtDlp(videoId, quality);
 
   if (entry) {
-    cacheSet(videoId, entry);
+    cacheSet(cacheKey, entry);
     recordSuccess();
     return entry.url;
   }
@@ -215,13 +233,18 @@ export async function resolveStreamUrl(
  */
 export async function resolveStreamUrlWithMeta(
   videoId: string,
+  quality: StreamQuality = "high",
 ): Promise<{
   url: string;
   mimeType: string;
   contentLength: number | null;
   audioBitrate: number | null;
 } | null> {
-  const cached = cacheGet(videoId);
+  if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
+    return null;
+  }
+  const cacheKey = `${videoId}:${quality}`;
+  const cached = cacheGet(cacheKey);
   if (cached) {
     return {
       url: cached.url,
@@ -233,10 +256,10 @@ export async function resolveStreamUrlWithMeta(
 
   if (!isCooledDown()) return null;
 
-  const entry = await resolveWithYtDlp(videoId);
+  const entry = await resolveWithYtDlp(videoId, quality);
 
   if (entry) {
-    cacheSet(videoId, entry);
+    cacheSet(cacheKey, entry);
     recordSuccess();
     return {
       url: entry.url,
