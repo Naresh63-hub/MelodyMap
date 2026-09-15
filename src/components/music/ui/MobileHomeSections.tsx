@@ -261,7 +261,7 @@ export function MobileHomeSections({
         <section className="animate-fade-in">
           <SectionHeader title="🔥 Trending & Fresh Hits" icon={TrendingUp} />
           <VerticalSongList
-            tracks={trending.slice(0, 6)}
+            tracks={trending.slice(0, 8)}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
@@ -275,7 +275,7 @@ export function MobileHomeSections({
         <section className="animate-fade-in">
           <SectionHeader title="✨ New & Old Classics Blend" icon={Sparkles} />
           <VerticalSongList
-            tracks={recommended.slice(0, 6)}
+            tracks={recommended}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}

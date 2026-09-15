@@ -237,9 +237,10 @@ function looksLikePodcast(title: string, artist: string, seconds: number): boole
   const t = title.toLowerCase();
   const a = artist.toLowerCase();
   if (JUNK_MEDIA.some((word) => t.includes(word) || a.includes(word))) return false;
+  if (seconds > 0 && seconds < 30) return false;
   if (PODCAST_KEYWORDS.some((word) => t.includes(word) || a.includes(word))) return true;
-  if (seconds >= 300 && !looksLikeMusic(title, seconds)) return true;
-  return false;
+  // If not junk, accept any talk/episode content
+  return true;
 }
 
 function looksLikeMusic(title: string, seconds: number): boolean {

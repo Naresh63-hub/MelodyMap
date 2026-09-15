@@ -1126,8 +1126,8 @@ export const podcastPicks = createServerFn({ method: "POST" })
       .slice(0, 3);
     const hasLang = langs.length > 0;
     const topics = data.topics
-      .map((t) => TOPIC_SEARCH[t.trim()])
-      .filter((t): t is string => Boolean(t))
+      .map((t) => TOPIC_SEARCH[t.trim()] || t.trim())
+      .filter((t): t is string => Boolean(t) && t.toLowerCase() !== "all")
       .slice(0, 4);
     const hasTopics = topics.length > 0;
 
@@ -1137,12 +1137,15 @@ export const podcastPicks = createServerFn({ method: "POST" })
     /** Runs a set of queries and merges results (musicOnly=false → podcasts pass the filter). */
     const add = async (queries: string[], quota: number, upload?: "today" | "week") => {
       if (out.length >= count || quota <= 0) return;
-      const per = Math.max(1, Math.ceil(quota / queries.length));
+      const per = Math.max(1, Math.ceil(quota / Math.max(1, queries.length)));
       for (const query of queries) {
         if (out.length >= count) return;
         let tracks: Track[] = [];
         try {
           tracks = await searchYouTube(query, per + 6, false, upload);
+          if (tracks.length === 0 && upload) {
+            tracks = await searchYouTube(query, per + 6, false);
+          }
         } catch {
           continue;
         }
@@ -1158,20 +1161,20 @@ export const podcastPicks = createServerFn({ method: "POST" })
     // When topics are picked, they drive the mix; otherwise fall back to
     // language-focused and general trending shows.
     const freshQueries = hasTopics
-      ? topics.map((t) => `${t} podcast new episodes`)
+      ? topics.map((t) => `${t} podcast latest episodes`)
       : hasLang
         ? langs.map((l) => `new ${l} podcast episodes`)
-        : ["new podcast episodes this week"];
+        : ["new podcast episodes this week", "popular podcast"];
     const topQueries = hasTopics
-      ? topics.flatMap((t) => [`top ${t} podcasts`, `best ${t} podcasts`])
+      ? topics.flatMap((t) => [`top ${t} podcast`, `best ${t} podcast`])
       : hasLang
         ? langs.map((l) => `top ${l} podcasts`)
-        : ["trending podcasts"];
+        : ["trending podcasts", "best podcasts to listen to"];
     const topicQueries = hasTopics
-      ? topics.flatMap((t) => [`${t} podcast episodes`, `${t} podcast`])
+      ? topics.flatMap((t) => [`${t} podcast conversation`, `${t} show`])
       : hasLang
         ? langs.map((l) => `best ${l} podcasts`)
-        : ["best podcasts to listen to"];
+        : ["the ranveer show", "huberman lab", "joe rogan podcast"];
 
     // Fresh episodes, top shows in your topics/languages, then your artists' shows.
     await add(freshQueries, Math.floor(count * 0.4), "week");
@@ -1181,6 +1184,12 @@ export const podcastPicks = createServerFn({ method: "POST" })
     }
     // Top up with well-known shows.
     await add(topicQueries, count);
+
+    // Fallback if still low
+    if (out.length < 6) {
+      await add(["top podcasts", "best podcast episodes 2026", "the ranveer show podcast"], count - out.length);
+    }
+
     return { tracks: out.slice(0, count), error: null };
   });
 

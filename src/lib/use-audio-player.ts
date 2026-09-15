@@ -113,8 +113,19 @@ export function useAudioPlayer(options: {
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
   const prebufferGainRef = useRef<GainNode | null>(null);
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
 
-  // Initialize Web Audio API 10-band equalizer graph on user interaction
+  /** Calculate equal-power trigonometric curve for smooth crossfading without volume drop */
+  const createEqualPowerCurve = (type: "in" | "out", length = 32): Float32Array => {
+    const curve = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+      const t = i / (length - 1);
+      curve[i] = type === "in" ? Math.sin((t * Math.PI) / 2) : Math.cos((t * Math.PI) / 2);
+    }
+    return curve;
+  };
+
+  // Initialize Web Audio API 10-band equalizer + Dynamics Compressor graph on user interaction
   const initWebAudio = useCallback(() => {
     if (typeof window === "undefined") return;
     const audio = audioRef.current;
@@ -154,7 +165,16 @@ export function useAudioPlayer(options: {
 
         filterNodesRef.current = filters;
 
-        // Connect main gain -> filter[0] -> ... -> destination
+        // Broadcast standard Dynamic Range Compressor (-14 LUFS leveling)
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-24, ctx.currentTime);
+        compressor.knee.setValueAtTime(30, ctx.currentTime);
+        compressor.ratio.setValueAtTime(3, ctx.currentTime);
+        compressor.attack.setValueAtTime(0.003, ctx.currentTime);
+        compressor.release.setValueAtTime(0.25, ctx.currentTime);
+        compressorRef.current = compressor;
+
+        // Connect main gain -> filter[0] -> ... -> compressor -> destination
         if (filters.length > 0 && filters[0]) {
           mainGain.connect(filters[0]);
           let prevNode: AudioNode = filters[0];
@@ -165,9 +185,11 @@ export function useAudioPlayer(options: {
               prevNode = f;
             }
           }
-          prevNode.connect(ctx.destination);
+          prevNode.connect(compressor);
+          compressor.connect(ctx.destination);
         } else {
-          mainGain.connect(ctx.destination);
+          mainGain.connect(compressor);
+          compressor.connect(ctx.destination);
         }
       } catch (err) {
         console.warn("[WebAudio] Equalizer init notice:", err);
@@ -288,6 +310,17 @@ export function useAudioPlayer(options: {
       audio.load();
 
       if (wantPlayRef.current) {
+        const fadeDur = equalizerSettingsRef.current.crossfade || 0;
+        if (fadeDur > 0 && audioCtxRef.current && mainGainRef.current) {
+          const ctx = audioCtxRef.current;
+          const mainGain = mainGainRef.current;
+          const curve = createEqualPowerCurve("in", 32);
+          try {
+            mainGain.gain.cancelScheduledValues(ctx.currentTime);
+            mainGain.gain.setValueCurveAtTime(curve, ctx.currentTime, Math.min(fadeDur, 4));
+          } catch {}
+        }
+
         const playPromise = audio.play();
         if (playPromise !== undefined) {
           playPromise.catch((err) => {
