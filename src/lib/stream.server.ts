@@ -98,15 +98,23 @@ function recordFailure() {
  */
 async function probeStream(url: string): Promise<boolean> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8_000);
     const res = await fetch(url, {
+      method: "GET",
       headers: {
-        Range: "bytes=0-65535",
+        Range: "bytes=0-1024",
         "User-Agent": BROWSER_UA,
         Referer: "https://www.youtube.com/",
       },
-      signal: AbortSignal.timeout(6_000),
+      signal: controller.signal,
     });
-    return res.ok || res.status === 206;
+    clearTimeout(timeout);
+    if (res.ok || res.status === 206) {
+      await res.arrayBuffer().catch(() => null);
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -167,8 +175,15 @@ async function resolveWithYtDlp(
       candidates.sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0));
     }
 
-    const bestFormat = candidates[0];
-    if (bestFormat && bestFormat.url) {
+    for (const bestFormat of candidates.slice(0, 3)) {
+      if (!bestFormat || !bestFormat.url) continue;
+      
+      const isHealthy = await probeStream(bestFormat.url);
+      if (!isHealthy) {
+        console.warn(`[stream] Candidate format failed probe check for ${videoId}, trying next format...`);
+        continue;
+      }
+
       const contentLen = bestFormat.filesize || bestFormat.filesize_approx;
       return {
         url: bestFormat.url,
@@ -179,7 +194,7 @@ async function resolveWithYtDlp(
       };
     }
 
-    console.warn(`[stream] yt-dlp: no usable audio stream found for ${videoId}`);
+    console.warn(`[stream] yt-dlp: all stream candidates failed probe verification for ${videoId}`);
     return null;
   } catch (err) {
     console.warn(`[stream] yt-dlp resolve error for ${videoId}:`, err);

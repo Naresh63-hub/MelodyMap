@@ -58,9 +58,9 @@ export async function getRadioHybrid(
   // Try YouTube radio first
   try {
     const { getRadioTracks } = await import("./radio.server");
-    const ytTracks = await getRadioTracks(videoId, count);
-    if (ytTracks.length >= 3) {
-      return ytTracks;
+    const res = await getRadioTracks(videoId, count);
+    if (res.tracks.length >= 3) {
+      return res.tracks;
     }
   } catch (err) {
     console.warn("[MelodyMap] YouTube radio failed:", err);

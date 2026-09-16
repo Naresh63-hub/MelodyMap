@@ -243,14 +243,29 @@ function looksLikePodcast(title: string, artist: string, seconds: number): boole
   return true;
 }
 
-function looksLikeMusic(title: string, seconds: number): boolean {
+function looksLikeMusic(title: string, seconds: number, query = ""): boolean {
   const t = title.toLowerCase();
+  const q = query.toLowerCase();
   if (NON_MUSIC.some((word) => t.includes(word))) return false;
-  if (COMPILATION.some((word) => t.includes(word))) return false;
+  
+  // Allow compilations / jukeboxes if the user query explicitly searched for them
+  const isCompilationQuery =
+    COMPILATION.some((word) => q.includes(word)) ||
+    q.includes("album") ||
+    q.includes("collection") ||
+    q.includes("top") ||
+    q.includes("hits") ||
+    q.includes("all songs") ||
+    q.includes("jukebox");
+
+  if (!isCompilationQuery && COMPILATION.some((word) => t.includes(word))) {
+    return false;
+  }
   if (JUNK_MEDIA.some((word) => t.includes(word))) return false;
-  // Single songs are strictly standalone tracks (45s to 8.0 minutes / 480s max).
-  // Anything over 480s is a podcast, interview, or multi-song bundle.
-  if (seconds > 0 && (seconds < 45 || seconds > 480)) return false;
+
+  // Single songs: 30s to 15.0 minutes (900s max). If compilation query, allow up to 2 hours (7200s).
+  const maxSecs = isCompilationQuery ? 7200 : 900;
+  if (seconds > 0 && (seconds < 30 || seconds > maxSecs)) return false;
   return true;
 }
 
@@ -272,7 +287,36 @@ export async function suggestQueries(query: string): Promise<string[]> {
   }
 }
 
-/** Scrapes YouTube search results — no API key required. Cached for 30 minutes. */
+const WEB_CLIENT = { clientName: "WEB", clientVersion: "2.20240801.00.00", hl: "en", gl: "US" };
+
+/** InnerTube API search query */
+async function searchWithInnerTube(
+  searchQuery: string,
+  params?: string,
+): Promise<AnyRecord | null> {
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      },
+      body: JSON.stringify({
+        context: { client: WEB_CLIENT },
+        query: searchQuery,
+        ...(params ? { params } : {}),
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as AnyRecord;
+  } catch {
+    return null;
+  }
+}
+
+/** Scrapes/Queries YouTube search results — cached for 30 minutes. */
 export async function searchYouTube(
   query: string,
   limit = 20,
@@ -281,49 +325,62 @@ export async function searchYouTube(
 ): Promise<Track[]> {
   const cacheKey = `yt:${query}:${limit}:${musicOnly}:${upload ?? ""}`;
   const cached = getCached(cacheKey);
-  if (cached) return cached;
+  if (cached && cached.length >= Math.min(limit, 10)) return cached;
 
   const inFlight = inFlightSearches.get(cacheKey);
   if (inFlight) return inFlight;
 
   const searchPromise = (async (): Promise<Track[]> => {
     if (!checkSearchRateLimit()) {
-      // Return cached query variations if available rather than empty
       return getCached(cacheKey) ?? [];
     }
 
-    // For music, target songs specifically and exclude podcast channels
     const cleanQ = query.toLowerCase();
+    const isExplicitMusicOrAudio =
+      cleanQ.includes("song") ||
+      cleanQ.includes("audio") ||
+      cleanQ.includes("track") ||
+      cleanQ.includes("music") ||
+      cleanQ.includes("lyrics") ||
+      cleanQ.includes("jukebox");
+
     const searchQuery = musicOnly
-      ? cleanQ.includes("song") || cleanQ.includes("audio") || cleanQ.includes("track")
+      ? isExplicitMusicOrAudio
         ? query
         : `${query} song`
       : cleanQ.includes("podcast")
         ? query
         : `${query} podcast`;
+
     const sp = upload ? UPLOAD_FILTERS[upload] : musicOnly ? MUSIC_FILTER : VIDEO_FILTER;
-    const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}&sp=${sp}`;
 
     try {
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        signal: AbortSignal.timeout(8_000),
-      });
-      if (!res.ok) throw new Error(`Search failed (${res.status})`);
-      const html = await res.text();
-      const match = html.match(/ytInitialData\s*=\s*(\{.+?\});\s*<\/script>/s);
-      if (!match?.[1]) return [];
+      // 1. Try YouTube InnerTube API first
+      let data: AnyRecord | null = await searchWithInnerTube(searchQuery, sp);
 
-      let data: unknown;
-      try {
-        data = JSON.parse(match[1]);
-      } catch {
-        return [];
+      // 2. Fallback to HTML scraping if InnerTube fails
+      if (!data) {
+        const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}&sp=${sp}`;
+        const res = await fetch(url, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (res.ok) {
+          const html = await res.text();
+          const match = html.match(/ytInitialData\s*=\s*(\{.+?\});\s*<\/script>/s);
+          if (match?.[1]) {
+            try {
+              data = JSON.parse(match[1]) as AnyRecord;
+            } catch {}
+          }
+        }
       }
+
+      if (!data) return [];
 
       const renderers: AnyRecord[] = [];
       collectVideoRenderers(data, renderers);
@@ -339,7 +396,7 @@ export async function searchYouTube(
         const artist = text(r["ownerText"]) || text(r["longBylineText"]) || "Unknown artist";
         const secs = durationSeconds(duration);
         if (musicOnly) {
-          if (!looksLikeMusic(title, secs)) continue;
+          if (!looksLikeMusic(title, secs, query)) continue;
           const lowerArtist = artist.toLowerCase();
           if (NON_MUSIC.some((w) => lowerArtist.includes(w))) continue;
           if (JUNK_MEDIA.some((w) => lowerArtist.includes(w))) continue;
@@ -361,7 +418,7 @@ export async function searchYouTube(
         if (tracks.length >= limit) break;
       }
 
-      // If upload filter ("week") returned 0 tracks, retry once without the upload filter
+      // If upload filter returned 0 tracks, retry without it
       if (tracks.length === 0 && upload) {
         return await searchYouTube(query, limit, musicOnly, undefined);
       }

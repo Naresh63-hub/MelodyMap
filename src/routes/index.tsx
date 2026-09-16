@@ -227,6 +227,7 @@ function MusicApp() {
   // Undo support for playlist track removal
   const undoRef = useRef<{ timeout: ReturnType<typeof setTimeout>; restore: () => void } | null>(null);
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
+  const radioContinuationRef = useRef<string | undefined>(undefined);
 
   // Refresh downloads on mount
   useEffect(() => {
@@ -523,7 +524,7 @@ function MusicApp() {
           },
         });
         if (res.tracks) {
-          const pureMusic = (res.tracks as Track[]).filter(isMusicTrack);
+          const pureMusic = res.tracks as Track[];
           setMixTracks((prev) => ({ ...prev, [kind]: dedupeTracks(pureMusic) }));
         }
       } finally {
@@ -543,7 +544,7 @@ function MusicApp() {
         },
       });
       if (res.tracks) {
-        const pureMusic = (res.tracks as Track[]).filter(isMusicTrack);
+        const pureMusic = res.tracks as Track[];
         setTrendingList(dedupeTracks(pureMusic));
       }
     } catch {}
@@ -572,7 +573,7 @@ function MusicApp() {
               },
             });
             if (res.tracks) {
-              const pureMusic = (res.tracks as Track[]).filter(isMusicTrack);
+              const pureMusic = res.tracks as Track[];
               setRecs(dedupeTracks(pureMusic));
             }
           })(),
@@ -585,7 +586,7 @@ function MusicApp() {
               },
             });
             if (res.tracks) {
-              const pureMusic = (res.tracks as Track[]).filter(isMusicTrack);
+              const pureMusic = res.tracks as Track[];
               setTrendingList(dedupeTracks(pureMusic));
             }
           })(),
@@ -605,7 +606,7 @@ function MusicApp() {
               },
             });
             if (res.tracks) {
-              const pureMusic = (res.tracks as Track[]).filter(isMusicTrack);
+              const pureMusic = res.tracks as Track[];
               setMixTracks((prev) => ({ ...prev, newrelease: dedupeTracks(pureMusic) }));
             }
           })(),
@@ -638,7 +639,7 @@ function MusicApp() {
           },
         });
         if (res.tracks && res.tracks.length > 0) {
-          const pureMusic = (res.tracks as Track[]).filter(isMusicTrack);
+          const pureMusic = res.tracks as Track[];
           setRecs((prev) => dedupeTracks([...prev, ...pureMusic]));
         }
       } finally {
@@ -656,9 +657,18 @@ function MusicApp() {
       // 1. Try YouTube RD Song Radio for continuous similar tracks
       if (currentTrack?.id) {
         try {
-          const radioRes = await getSongRadio({ data: { videoId: currentTrack.id, limit: 12 } });
+          const radioRes = await getSongRadio({
+            data: {
+              videoId: currentTrack.id,
+              limit: 15,
+              continuation: radioContinuationRef.current,
+            },
+          });
+          if (radioRes.continuation) {
+            radioContinuationRef.current = radioRes.continuation;
+          }
           if (radioRes.tracks && radioRes.tracks.length > 0) {
-            const pureMusic = (radioRes.tracks as Track[]).filter(isMusicTrack);
+            const pureMusic = radioRes.tracks as Track[];
             let added: Track[] = [];
             setQueue((prev) => {
               added = pureMusic.filter((t) => !trackExistsIn(prev, t as TrackLike));
@@ -687,7 +697,7 @@ function MusicApp() {
         },
       });
       if (res.tracks && res.tracks.length > 0) {
-        const pureMusic = (res.tracks as Track[]).filter(isMusicTrack);
+        const pureMusic = res.tracks as Track[];
         let added: Track[] = [];
         setQueue((prev) => {
           added = pureMusic.filter((t) => !trackExistsIn(prev, t as TrackLike));
@@ -714,7 +724,7 @@ function MusicApp() {
         if (res.error) setMessage(res.error);
         if (res.tracks) {
           const raw = res.tracks as Track[];
-          const filtered = t === "songs" ? raw.filter(isMusicTrack) : raw.filter(isPodcastTrack);
+          const filtered = t === "songs" ? raw : raw.filter(isPodcastTrack);
           setResults(dedupeTracks(filtered));
         }
       } finally {

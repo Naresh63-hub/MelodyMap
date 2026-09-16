@@ -307,10 +307,9 @@ export function isMusicTrack(track: Track | undefined | null): boolean {
   const title = track.title.toLowerCase();
   const artist = (track.artist || "").toLowerCase();
   if (NON_MUSIC_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
-  if (COMPILATION_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
   if (JUNK_MEDIA_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
   const secs = parseDurationSecs(track.duration);
-  if (secs > 0 && (secs < 45 || secs > 480)) return false;
+  if (secs > 0 && (secs < 30 || secs > 900)) return false;
   return true;
 }
 

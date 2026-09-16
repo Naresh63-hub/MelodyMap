@@ -22,8 +22,22 @@ function rendererText(node: unknown): string {
   return "";
 }
 
-export async function getRadioTracks(videoId: string, limit = 15): Promise<Track[]> {
+export async function getRadioTracks(
+  videoId: string,
+  limit = 25,
+  continuation?: string,
+): Promise<{ tracks: Track[]; continuation?: string }> {
   let res: Response;
+  const bodyPayload: Record<string, unknown> = {
+    context: { client: WEB_CLIENT },
+  };
+  if (continuation) {
+    bodyPayload["continuation"] = continuation;
+  } else {
+    bodyPayload["videoId"] = videoId;
+    bodyPayload["playlistId"] = `RD${videoId}`;
+  }
+
   try {
     res = await fetch("https://www.youtube.com/youtubei/v1/next?prettyPrint=false", {
       method: "POST",
@@ -32,23 +46,19 @@ export async function getRadioTracks(videoId: string, limit = 15): Promise<Track
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       },
-      body: JSON.stringify({
-        context: { client: WEB_CLIENT },
-        videoId,
-        playlistId: `RD${videoId}`,
-      }),
+      body: JSON.stringify(bodyPayload),
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
-    return [];
+    return { tracks: [] };
   }
-  if (!res.ok) return [];
+  if (!res.ok) return { tracks: [] };
 
   let data: unknown;
   try {
     data = await res.json();
   } catch {
-    return [];
+    return { tracks: [] };
   }
 
   const contents = (data as UnknownRecord)?.["contents"] as UnknownRecord | undefined;
@@ -67,9 +77,24 @@ export async function getRadioTracks(videoId: string, limit = 15): Promise<Track
 
   const out: Track[] = [];
   const seen = new Set<string>([videoId]);
+  let nextContinuation: string | undefined;
+
   for (const entry of items) {
-    const r = ((entry as UnknownRecord)?.["playlistPanelVideoRenderer"] ??
-      (entry as UnknownRecord)?.["compactVideoRenderer"]) as UnknownRecord | undefined;
+    const entryObj = entry as UnknownRecord;
+    // Check for continuation token
+    const contRenderer = entryObj?.["continuationItemRenderer"] as UnknownRecord | undefined;
+    if (contRenderer) {
+      const command = (contRenderer["continuationEndpoint"] as UnknownRecord | undefined)?.[
+        "continuationCommand"
+      ] as UnknownRecord | undefined;
+      if (typeof command?.["token"] === "string") {
+        nextContinuation = command["token"];
+      }
+      continue;
+    }
+
+    const r = (entryObj?.["playlistPanelVideoRenderer"] ??
+      entryObj?.["compactVideoRenderer"]) as UnknownRecord | undefined;
     if (!r) continue;
     const id = r["videoId"];
     if (typeof id !== "string" || seen.has(id)) continue;
@@ -90,5 +115,7 @@ export async function getRadioTracks(videoId: string, limit = 15): Promise<Track
     });
     if (out.length >= limit) break;
   }
-  return out;
+  return nextContinuation !== undefined
+    ? { tracks: out, continuation: nextContinuation }
+    : { tracks: out };
 }

@@ -116,9 +116,18 @@ export async function streamProxyMiddleware(
       const nodeStream = Readable.fromWeb(
         upstreamRes.body as import("node:stream/web").ReadableStream
       );
+      nodeStream.on("error", () => {
+        if (!res.writableEnded) {
+          try {
+            res.end();
+          } catch {}
+        }
+      });
       nodeStream.pipe(res);
       req.on("close", () => {
-        nodeStream.destroy();
+        try {
+          nodeStream.destroy();
+        } catch {}
       });
     } else {
       res.end();

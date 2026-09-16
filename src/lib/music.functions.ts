@@ -39,9 +39,29 @@ export const searchTracks = createServerFn({ method: "POST" })
 
     try {
       const tracks = await searchYouTube(data.query, limit, isMusicOnly);
+      // Fallback: If YouTube returns few results, query Deezer to backfill
+      if (tracks.length < 5 && isMusicOnly) {
+        try {
+          const { searchDeezer } = await import("./deezer.server");
+          const deezerTracks = await searchDeezer(data.query, limit - tracks.length);
+          if (deezerTracks.length > 0) {
+            return { tracks: [...tracks, ...deezerTracks], error: null };
+          }
+        } catch {}
+      }
       return { tracks, error: null };
     } catch (error) {
       console.error("Search failed:", error);
+      // Try Deezer as complete fallback if YouTube throws
+      if (isMusicOnly) {
+        try {
+          const { searchDeezer } = await import("./deezer.server");
+          const deezerTracks = await searchDeezer(data.query, limit);
+          if (deezerTracks.length > 0) {
+            return { tracks: deezerTracks, error: null };
+          }
+        } catch {}
+      }
       return { tracks: [], error: "Could not reach the catalog. Try again." };
     }
   });
@@ -92,6 +112,7 @@ export const getTrackLyrics = createServerFn({ method: "POST" })
 const RadioInput = z.object({
   videoId: z.string().min(1),
   limit: z.number().optional(),
+  continuation: z.string().optional(),
 });
 
 /** Fetches YouTube native RD song radio */
@@ -100,8 +121,8 @@ export const getSongRadio = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { getRadioTracks } = await import("./radio.server");
     try {
-      const tracks = await getRadioTracks(data.videoId, data.limit ?? 15);
-      return { tracks, error: null };
+      const res = await getRadioTracks(data.videoId, data.limit ?? 20, data.continuation);
+      return { tracks: res.tracks, continuation: res.continuation, error: null };
     } catch {
       return { tracks: [], error: "Radio unavailable" };
     }
@@ -122,37 +143,8 @@ const RecommendInput = z.object({
   refreshNonce: z.union([z.string(), z.number()]).optional(),
 });
 
-/** Query pools for fresh new songs & trending releases */
-const NEW_SONGS_QUERIES = [
-  "latest trending songs 2026",
-  "new release songs 2025 2026",
-  "top new viral music hits",
-  "fresh hit music chart today",
-  "new popular songs this week",
-  "latest romantic songs 2026",
-  "top new indie music releases",
-  "fresh workout upbeat songs 2026",
-  "latest viral songs trending now",
-  "top billboard hot songs new",
-  "new dance party tracks 2026",
-  "latest melody songs new",
-];
-
-/** Query pools for golden classics, 90s, 2000s & nostalgic evergreen songs */
-const OLD_SONGS_QUERIES = [
-  "90s superhit classic songs",
-  "2000s nostalgic superhit songs",
-  "all time golden evergreen hit songs",
-  "timeless classic melody songs",
-  "retro nostalgic melody hits",
-  "iconic all time greatest songs",
-  "90s 2000s romantic evergreen songs",
-  "vintage superhit songs",
-  "legendary classic all time hits",
-  "golden oldies greatest hits",
-  "best retro hits all time",
-  "timeless 90s love songs",
-];
+const CURRENT_YEAR = new Date().getFullYear();
+const PREV_YEAR = CURRENT_YEAR - 1;
 
 const LANGUAGE_ARTISTS: Record<string, string[]> = {
   Telugu: [
@@ -198,16 +190,16 @@ const LANGUAGE_ARTISTS: Record<string, string[]> = {
 };
 
 const DIVERSE_THEMES = [
-  "latest romantic melody songs 2026",
+  `latest romantic melody songs ${CURRENT_YEAR}`,
   "mass high energy dance party hits",
   "soulful emotional love songs",
-  "viral reels trending songs 2026",
+  `viral reels trending songs ${CURRENT_YEAR}`,
   "acoustic lo-fi chill vibes",
   "all time golden evergreen hits",
   "90s classic superhit songs",
   "2000s nostalgic romantic hits",
   "unplugged live studio hits",
-  "top movie chartbuster songs 2025 2026",
+  `top movie chartbuster songs ${PREV_YEAR} ${CURRENT_YEAR}`,
   "folk fusion upbeat songs",
   "indie new artist discovery",
 ];
@@ -228,17 +220,28 @@ function getDynamicQueries(languages: string[], userArtists: string[]): { newQue
 
   const primaryLang = langs[0] || "";
   const langArtistPool = primaryLang && LANGUAGE_ARTISTS[primaryLang] ? LANGUAGE_ARTISTS[primaryLang] : Object.values(LANGUAGE_ARTISTS).flat();
-  const allArtists = [...new Set([...userArtists, ...langArtistPool])];
-  const shuffledArtists = shuffleArray(allArtists);
 
   const newQ: string[] = [];
   const oldQ: string[] = [];
 
-  // Distribute queries across the active languages
+  // 1. High-priority queries for user's explicitly favorited artists (70% focus)
+  if (userArtists.length > 0) {
+    for (const art of userArtists) {
+      newQ.push(`${art} latest songs ${CURRENT_YEAR}`);
+      newQ.push(`${art} top hit songs`);
+      newQ.push(`${art} popular tracks`);
+      oldQ.push(`${art} best melody hits`);
+      oldQ.push(`${art} all time classics`);
+      oldQ.push(`${art} evergreen songs`);
+    }
+  }
+
+  // 2. Supplementary queries across active languages
+  const otherArtists = shuffleArray(langArtistPool.filter((a) => !userArtists.includes(a)));
   for (const lang of langs.slice(0, 3)) {
     const langPrefix = `${lang} `;
-    for (const art of shuffledArtists.slice(0, 5)) {
-      newQ.push(`${art} ${langPrefix}latest new hit songs 2026`);
+    for (const art of otherArtists.slice(0, 4)) {
+      newQ.push(`${art} ${langPrefix}latest new hit songs ${CURRENT_YEAR}`);
       newQ.push(`${art} ${langPrefix}top songs`);
       newQ.push(`${art} ${langPrefix}viral hit tracks`);
       oldQ.push(`${art} ${langPrefix}all time classic evergreen hits`);
@@ -246,7 +249,7 @@ function getDynamicQueries(languages: string[], userArtists: string[]): { newQue
       oldQ.push(`${art} ${langPrefix}golden nostalgic superhits`);
     }
 
-    for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 5)) {
+    for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 4)) {
       if (theme.includes("classic") || theme.includes("90s") || theme.includes("2000s") || theme.includes("evergreen")) {
         oldQ.push(`${langPrefix}${theme}`);
       } else {
@@ -387,20 +390,20 @@ const CATEGORIZED_TRENDING_QUERIES = {
     "Top Streaming Hits Worldwide",
   ],
   viral: [
-    "Viral Global Hit Songs 2026",
-    "Top Viral Spotify Hits 2026",
+    `Viral Global Hit Songs ${CURRENT_YEAR}`,
+    `Top Viral Spotify Hits ${CURRENT_YEAR}`,
     "Shazam Top 50 Trending Songs",
-    "Viral Reels Trending Music 2026",
+    `Viral Reels Trending Music ${CURRENT_YEAR}`,
   ],
   party: [
     "Top 40 Music Chart Hits Worldwide",
-    "Global Dance Party Trending Tracks 2026",
-    "High Energy Hit Songs 2026",
+    `Global Dance Party Trending Tracks ${CURRENT_YEAR}`,
+    `High Energy Hit Songs ${CURRENT_YEAR}`,
   ],
   charts: [
     "YouTube Music Charts Top Trending Songs",
-    "Trending Hit Songs 2025 2026",
-    "Top 50 Most Streamed Songs 2026",
+    `Trending Hit Songs ${PREV_YEAR} ${CURRENT_YEAR}`,
+    `Top 50 Most Streamed Songs ${CURRENT_YEAR}`,
   ],
 };
 
@@ -419,11 +422,11 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
       for (const l of langs.slice(0, 3)) {
         selectedQueries.push(
           `Top 50 ${l} Songs Global Trending Chart`,
-          `Viral ${l} Reels Trending Audio 2026`,
-          `Most Streamed ${l} Songs 2026`,
-          `${l} Chartbuster Hit Songs 2026`,
-          `Top ${l} Party Dance Songs 2026`,
-          `Latest ${l} Movie Songs 2026`,
+          `Viral ${l} Reels Trending Audio ${CURRENT_YEAR}`,
+          `Most Streamed ${l} Songs ${CURRENT_YEAR}`,
+          `${l} Chartbuster Hit Songs ${CURRENT_YEAR}`,
+          `Top ${l} Party Dance Songs ${CURRENT_YEAR}`,
+          `Latest ${l} Movie Songs ${CURRENT_YEAR}`,
         );
       }
       selectedQueries = shuffleArray(selectedQueries).slice(0, 5);
@@ -522,7 +525,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         ? `CRITICAL LANGUAGE RESTRICTION: The user strictly wants songs in: ${sanitizedLangs.join(", ")}. EVERY single recommended track MUST be in one of these languages: ${sanitizedLangs.join(", ")}. Do NOT suggest tracks in any other language.`
         : "",
       "",
-      `Recommend ${count} songs with a dynamic 50/50 balance: exactly 50% brand new songs (released in 2024-2026 or current trending hits) and 50% classic evergreen songs (90s, 2000s, iconic timeless tracks). Respect tuning preferences above.`,
+      `Recommend ${count} songs with a dynamic 50/50 balance: exactly 50% brand new songs (released in ${PREV_YEAR}-${CURRENT_YEAR} or current trending hits) and 50% classic evergreen songs (90s, 2000s, iconic timeless tracks). Respect tuning preferences above.`,
       "CRITICAL: On every refresh, provide a completely fresh, diverse, and newly randomized selection with zero repetitive patterns.",
       'Reply with ONLY a JSON array like: [{"title":"Song name","artist":"Artist name","reason":"why, max 8 words"}]',
     ]
@@ -1187,7 +1190,7 @@ export const podcastPicks = createServerFn({ method: "POST" })
 
     // Fallback if still low
     if (out.length < 6) {
-      await add(["top podcasts", "best podcast episodes 2026", "the ranveer show podcast"], count - out.length);
+      await add(["top podcasts", `best podcast episodes ${CURRENT_YEAR}`, "the ranveer show podcast"], count - out.length);
     }
 
     return { tracks: out.slice(0, count), error: null };
@@ -1197,6 +1200,7 @@ export const podcastPicks = createServerFn({ method: "POST" })
 const RadioTracksInput = z.object({
   videoId: z.string().min(1).max(64),
   count: z.number().min(1).max(30).optional(),
+  continuation: z.string().optional(),
 });
 
 /**
@@ -1208,7 +1212,8 @@ export const radioTracks = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { getRadioTracks } = await import("./radio.server");
     try {
-      return { tracks: await getRadioTracks(data.videoId, data.count ?? 15), error: null };
+      const res = await getRadioTracks(data.videoId, data.count ?? 20, data.continuation);
+      return { tracks: res.tracks, continuation: res.continuation, error: null };
     } catch {
       return { tracks: [], error: null };
     }
