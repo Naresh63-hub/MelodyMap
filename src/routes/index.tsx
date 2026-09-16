@@ -12,6 +12,7 @@ import {
   Play,
   Repeat,
   Search,
+  Settings2,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -57,13 +58,15 @@ const EqualizerModal = lazy(() =>
 const KeyboardShortcutsModal = lazy(() =>
   import("@/components/music/ui/KeyboardShortcutsModal").then((m) => ({ default: m.KeyboardShortcutsModal }))
 );
+const SettingsModal = lazy(() =>
+  import("@/components/music/ui/SettingsModal").then((m) => ({ default: m.SettingsModal }))
+);
 const FloatingMiniPlayer = lazy(() =>
   import("@/components/music/ui/FloatingMiniPlayer").then((m) => ({ default: m.FloatingMiniPlayer }))
 );
 import { MixesPanel, type MixId } from "@/components/music/MixesPanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { QueuePanel } from "@/components/music/QueuePanel";
-import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
 import { ScrubBar } from "@/components/music/ScrubBar";
 import { SleepTimer } from "@/components/music/SleepTimer";
 import { TrackList } from "@/components/music/TrackList";
@@ -1165,6 +1168,14 @@ function MusicApp() {
                   </button>
                 )}
               </form>
+              <button
+                type="button"
+                onClick={() => setShowSettings(true)}
+                aria-label="Settings"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 text-white/50 active:scale-95 transition-all hover:text-white"
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
             </div>
             {/* Quick filter chips */}
             <div className="flex gap-1.5 overflow-x-auto px-4 pb-2.5 scrollbar-hide">
@@ -1232,14 +1243,6 @@ function MusicApp() {
                         {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                         Refresh picks
                       </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="rounded-full bg-white/[0.06] text-white/70 hover:bg-white/10 hover:text-white border-white/10"
-                        onClick={() => setShowSettings((v) => !v)}
-                      >
-                        Tune picks
-                      </Button>
                     </div>
                   </div>
 
@@ -1257,19 +1260,6 @@ function MusicApp() {
                       </button>
                     ))}
                   </div>
-
-                  {showSettings && (
-                    <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5 backdrop-blur-md">
-                      <RecSettingsPanel
-                        settings={settings}
-                        onChange={updateSettings}
-                        onReset={resetSettings}
-                        onApply={() => void loadRecommendations()}
-                        loading={recLoading}
-                        onOpenLanguages={() => setTab("languages")}
-                      />
-                    </div>
-                  )}
 
                   {/* Home Sections — mobile horizontal scroll */}
                   <MobileHomeSections
@@ -1818,6 +1808,30 @@ function MusicApp() {
           onToggleEnabled={player.toggleEqualizer}
           onCrossfadeChange={player.setCrossfadeDuration}
           onQualityChange={player.setAudioQuality}
+        />
+
+        {/* SETTINGS & AI RECOMMENDATION TUNING MODAL */}
+        <SettingsModal
+          open={showSettings}
+          onOpenChange={setShowSettings}
+          settings={settings}
+          onUpdateSettings={updateSettings}
+          onResetSettings={resetSettings}
+          onApplyRecs={() => void loadRecommendations()}
+          recLoading={recLoading}
+          onOpenLanguages={() => setTab("languages")}
+          continuous={continuous}
+          onContinuousChange={(v) => {
+            setContinuous(v);
+            localStorage.setItem("melodymap.continuous.v1", String(v));
+          }}
+          onOpenEqualizer={() => setShowEqualizer(true)}
+          onOpenSleepTimer={() => setShowSleepTimer(true)}
+          onOpenShortcuts={() => setShowShortcuts(true)}
+          userId={auth.userId}
+          userEmail={auth.email}
+          userProfile={auth.profile}
+          onSignOut={auth.signOut}
         />
 
         {/* KEYBOARD SHORTCUTS MODAL */}

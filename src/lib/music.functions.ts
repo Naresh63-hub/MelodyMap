@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Track } from "./types";
-import { norm } from "./track-dedup";
+import { norm } from "./track-dedup.ts";
 
 /** Sanitizes user-provided strings to prevent AI prompt injection while preserving real song/artist names */
 function sanitizePromptInput(str: string | undefined): string {
