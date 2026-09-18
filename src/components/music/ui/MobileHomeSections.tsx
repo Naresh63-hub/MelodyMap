@@ -247,20 +247,7 @@ export function MobileHomeSections({
 
   return (
     <div className="space-y-7">
-      {/* 1. Recently Played (Horizontal Carousel) */}
-      {recentlyPlayed.length > 0 && (
-        <section className="animate-fade-in">
-          <SectionHeader title="Recently Played" icon={Clock} />
-          <HorizontalScrollRow
-            tracks={recentlyPlayed}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-          />
-        </section>
-      )}
-
-      {/* 2. Daily Mix (Seeded Daily Recommendations) */}
+      {/* 1. Daily Mix (Seeded Daily Recommendations) */}
       {dailyMix && dailyMix.length > 0 && (
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-3 px-1">
@@ -281,7 +268,7 @@ export function MobileHomeSections({
         </section>
       )}
 
-      {/* 3. Trending Now (Vertical List) */}
+      {/* 2. Trending Now (Vertical List) */}
       {trending.length > 0 && (
         <section className="animate-fade-in">
           <SectionHeader title="🔥 Trending & Fresh Hits" icon={TrendingUp} />
@@ -316,6 +303,19 @@ export function MobileHomeSections({
           <SectionHeader title="⚡ Just Dropped" icon={Flame} />
           <HorizontalScrollRow
             tracks={newReleases}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+          />
+        </section>
+      )}
+
+      {/* 5. Recently Played (Horizontal Carousel) */}
+      {recentlyPlayed.length > 0 && (
+        <section className="animate-fade-in">
+          <SectionHeader title="Recently Played" icon={Clock} />
+          <HorizontalScrollRow
+            tracks={recentlyPlayed}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}

@@ -1149,14 +1149,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
-    const saved = readPlayback();
-    if (!saved) {
-      setResumed(true);
-      return;
-    }
-    resumeRef.current = saved.position;
-    setQueue(saved.queue);
-    setIndex(Math.min(saved.index, Math.max(0, saved.queue.length - 1)));
+    setResumed(true);
   }, []);
 
   const restored = useRef(false);

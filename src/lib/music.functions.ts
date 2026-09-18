@@ -125,15 +125,15 @@ export const getSongRadio = createServerFn({ method: "POST" })
 
 
 const RecommendInput = z.object({
-  liked: z.array(z.string()).max(40),
-  recent: z.array(z.string()).max(40),
-  disliked: z.array(z.string()).max(40).optional(),
-  sequence: z.array(z.string()).max(20).optional(),
-  skipped: z.array(z.string()).max(20).optional(),
+  liked: z.array(z.string()).max(40).default([]),
+  recent: z.array(z.string()).max(40).default([]),
+  disliked: z.array(z.string()).max(40).default([]),
+  sequence: z.array(z.string()).max(20).default([]),
+  skipped: z.array(z.string()).max(20).default([]),
   mood: z.string().max(120).optional(),
   brief: z.string().max(800).optional(),
-  count: z.number().min(1).max(40).optional(),
-  artists: z.array(z.string()).max(20).optional(),
+  count: z.number().min(1).max(50).optional(),
+  artists: z.array(z.string()).max(20).default([]),
   languages: z.array(z.string()).max(10).default([]),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
 });
@@ -317,11 +317,13 @@ async function getLocalPicks(data: {
   count?: number | undefined;
   languages?: string[] | undefined;
   refreshNonce?: string | number | undefined;
+  exclude?: string[] | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
   const bypassCache = !!data.refreshNonce;
   const artists = data.artists.map((a) => a.trim()).filter(Boolean);
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
+  const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
   const { newQueries, oldQueries } = getDynamicQueries(languages, artists);
 
   // Sample queries concurrently
@@ -336,13 +338,25 @@ async function getLocalPicks(data: {
   const newQuota = Math.ceil(count / 2);
   const oldQuota = count - newQuota;
 
+  // Filter out any excluded / recently played tracks
+  const filteredNew = newCandidates.filter((t) => {
+    const key = norm(`${t.artist} - ${t.title}`);
+    const titleKey = norm(t.title);
+    return !excludeSet.has(key) && !excludeSet.has(titleKey);
+  });
+  const filteredOld = oldCandidates.filter((t) => {
+    const key = norm(`${t.artist} - ${t.title}`);
+    const titleKey = norm(t.title);
+    return !excludeSet.has(key) && !excludeSet.has(titleKey);
+  });
+
   // Draw 50% new releases
-  const selectedNew = shuffleArray(newCandidates).slice(0, newQuota);
+  const selectedNew = shuffleArray(filteredNew.length >= newQuota ? filteredNew : newCandidates).slice(0, newQuota);
   const chosenKeys = new Set<string>(selectedNew.map((t) => getTrackDedupeKey(t.title, t.artist)));
   const chosenIds = new Set<string>(selectedNew.map((t) => t.id));
 
   // Draw 50% golden classics, avoiding cross-bucket duplicates
-  const distinctOldCandidates = shuffleArray(oldCandidates).filter(
+  const distinctOldCandidates = shuffleArray(filteredOld.length >= oldQuota ? filteredOld : oldCandidates).filter(
     (t) => !chosenIds.has(t.id) && !chosenKeys.has(getTrackDedupeKey(t.title, t.artist)),
   );
   const selectedOld = distinctOldCandidates.slice(0, oldQuota);
@@ -398,34 +412,31 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const count = data.count ?? 20;
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
+    const bypassCache = !!data.refreshNonce;
 
-    let selectedQueries: string[] = [];
-    if (langs.length > 0) {
-      for (const l of langs.slice(0, 3)) {
-        selectedQueries.push(
-          `Top 50 ${l} Songs Global Trending Chart`,
-          `Viral ${l} Reels Trending Audio ${CURRENT_YEAR}`,
-          `Most Streamed ${l} Songs ${CURRENT_YEAR}`,
-          `${l} Chartbuster Hit Songs ${CURRENT_YEAR}`,
-          `Top ${l} Party Dance Songs ${CURRENT_YEAR}`,
-          `Latest ${l} Movie Songs ${CURRENT_YEAR}`,
-        );
-      }
-      selectedQueries = shuffleArray(selectedQueries).slice(0, 5);
-    } else {
-      // Sample 1 distinct query from each musical category for maximum breadth
-      selectedQueries = [
-        shuffleArray(CATEGORIZED_TRENDING_QUERIES.billboard)[0]!,
-        shuffleArray(CATEGORIZED_TRENDING_QUERIES.viral)[0]!,
-        shuffleArray(CATEGORIZED_TRENDING_QUERIES.party)[0]!,
-        shuffleArray(CATEGORIZED_TRENDING_QUERIES.charts)[0]!,
-      ];
+    const userLangs = langs.length > 0 ? langs : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
+    const queries: string[] = [];
+
+    // 1. Add language-specific trending chart queries
+    for (const lang of userLangs.slice(0, 3)) {
+      queries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
+      queries.push(`${lang} Official Music Hits Chart`);
+      queries.push(`${lang} Most Popular Viral Songs`);
     }
 
-    const candidates = await runQueryBatch(selectedQueries, 10, true, !!data.refreshNonce);
-    return { tracks: shuffleArray(candidates).slice(0, count), error: null };
+    // 2. Add global categorized queries
+    const categories = Object.values(CATEGORIZED_TRENDING_QUERIES);
+    for (const cat of categories) {
+      queries.push(...shuffleArray(cat).slice(0, 2));
+    }
+
+    const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache);
+    return { tracks: shuffleArray(tracks).slice(0, count), error: null };
   });
 
+/**
+ * Intelligent AI Recommendation Engine powered by DeepMind / Gemini AI Gateway
+ */
 export const recommendTracks = createServerFn({ method: "POST" })
   .validator((input: unknown) => RecommendInput.parse(input))
   .handler(async ({ data }) => {
@@ -445,6 +456,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         count: data.count ?? 24,
         languages: data.languages,
         refreshNonce: data.refreshNonce,
+        exclude: data.recent,
       });
       return { tracks, error: null };
     }
@@ -485,6 +497,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         : "",
       "",
       `Recommend ${count} songs with a dynamic 50/50 balance: exactly 50% brand new songs (released in ${PREV_YEAR}-${CURRENT_YEAR} or current trending hits) and 50% classic evergreen songs (90s, 2000s, iconic timeless tracks). Respect tuning preferences above.`,
+      "CRITICAL: Do NOT suggest songs that are already in recently played list above. Every suggestion MUST be a different, unplayed song that the listener has not heard recently.",
       "CRITICAL: On every refresh, provide a completely fresh, diverse, and newly randomized selection with zero repetitive patterns.",
       'Reply with ONLY a JSON array like: [{"title":"Song name","artist":"Artist name","reason":"why, max 8 words"}]',
     ]
@@ -517,7 +530,16 @@ export const recommendTracks = createServerFn({ method: "POST" })
       return { tracks: [], error: "Could not read the recommendations." };
     }
 
-    const valid = picks.filter((p) => p.title && p.artist).slice(0, count);
+    const recentSet = new Set(data.recent.map((s) => norm(s)));
+    const valid = picks
+      .filter((p) => {
+        if (!p.title || !p.artist) return false;
+        const fullKey = norm(`${p.artist} - ${p.title}`);
+        const titleKey = norm(p.title);
+        return !recentSet.has(fullKey) && !recentSet.has(titleKey);
+      })
+      .slice(0, count);
+
     const resolved: Track[] = [];
     const CHUNK_SIZE = 4;
     for (let i = 0; i < valid.length; i += CHUNK_SIZE) {
