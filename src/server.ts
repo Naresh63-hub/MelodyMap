@@ -2,6 +2,12 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import {
+  VIDEO_ID_REGEX,
+  isAllowedUpstreamUrl,
+  isAllowedOrigin,
+  resolveAudioMimeType,
+} from "./lib/stream-proxy-core";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -46,99 +52,18 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 /**
- * Same-origin audio proxy. YouTube's stream URLs don't send CORS headers, so
- * the browser can't fetch the bytes directly — this pipes them through our
- * own origin. It also works around YouTube's throttled URLs, which answer
- * 403 to open-ended ranges ("bytes=0-") and to any single request larger
- * than ~1 MiB, so the file is streamed in small bounded chunks.
- *
- * Range requests are honored, so the <audio> element can seek, and plain
- * requests (offline downloads) get the full file with a real content-length
- * for progress bars.
+ * Same-origin audio stream proxy with SSRF & Origin protection and range handling.
  */
-
-const CHUNK = 1024 * 1024; // 1 MiB — throttled URLs 403 beyond this per request
-
-/** Yields the requested byte range in 1 MiB pieces, retrying each once. */
-async function* upstreamChunks(
-  url: string,
-  start: number,
-  end: number,
-  videoId: string,
-) {
-  let pos = start;
-  while (pos <= end) {
-    const to = Math.min(pos + CHUNK - 1, end);
-    let buf: ArrayBuffer | null = null;
-    for (let attempt = 0; attempt < 2 && buf === null; attempt++) {
-      const r = await fetch(url, { headers: { Range: `bytes=${pos}-${to}` } });
-      if (r.ok || r.status === 206) {
-        buf = await r.arrayBuffer();
-      } else if (r.status === 403 && attempt === 1) {
-        // Throttled / expired URL — invalidate the cache entry so the next
-        // request gets a fresh URL instead of reusing this dead one.
-        console.warn(`[stream-proxy] chunk ${pos}-${to} -> 403 (expired/throttled)`);
-        const { invalidateStreamCache } = await import("./lib/stream.server");
-        invalidateStreamCache(videoId);
-        throw new Error("upstream chunk 403 (expired/throttled)");
-      } else if (attempt === 1) {
-        console.error(`[stream-proxy] chunk ${pos}-${to} -> ${r.status}`);
-        throw new Error(`upstream chunk ${r.status}`);
-      }
-    }
-    if (buf === null) throw new Error("upstream chunk failed");
-    if (buf.byteLength === 0) return;
-    yield new Uint8Array(buf);
-    pos += buf.byteLength;
-  }
-}
-
-function chunkedBody(
-  url: string,
-  start: number,
-  end: number,
-  videoId: string,
-): ReadableStream<Uint8Array> {
-  const iterator = upstreamChunks(url, start, end, videoId);
-  return new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      try {
-        const { value, done } = await iterator.next();
-        if (done) controller.close();
-        else controller.enqueue(value);
-      } catch (err) {
-        controller.error(err);
-      }
-    },
-    cancel() {
-      void iterator.return?.();
-    },
-  });
-}
-
-const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
-
-function isAllowedUpstreamUrl(urlStr: string): boolean {
-  try {
-    const parsed = new URL(urlStr);
-    if (parsed.protocol !== "https:") return false;
-    const host = parsed.hostname.toLowerCase();
-    return (
-      host.endsWith(".googlevideo.com") ||
-      host.endsWith(".youtube.com") ||
-      host.endsWith(".ytimg.com") ||
-      host === "googlevideo.com" ||
-      host === "youtube.com"
-    );
-  } catch {
-    return false;
-  }
-}
-
 async function handleStreamProxy(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
   const PREFIX = "/api/stream/";
   if (!url.pathname.startsWith(PREFIX)) return null;
+
+  const originHeader = request.headers.get("origin");
+  const hostHeader = request.headers.get("host");
+  if (!isAllowedOrigin(originHeader, hostHeader)) {
+    return new Response("Forbidden origin", { status: 403 });
+  }
 
   const rawId = url.pathname.slice(PREFIX.length).split("?")[0];
   const videoId = decodeURIComponent(rawId ?? "").trim();
@@ -148,8 +73,8 @@ async function handleStreamProxy(request: Request): Promise<Response | null> {
     return new Response("Invalid or missing video id", { status: 400 });
   }
 
-  const { resolveStreamUrlWithMeta } = await import("./lib/stream.server");
-  const stream = await resolveStreamUrlWithMeta(videoId, quality);
+  const { resolveStreamUrlWithMeta, invalidateStreamCache } = await import("./lib/stream.server");
+  let stream = await resolveStreamUrlWithMeta(videoId, quality);
   if (!stream || !stream.url || !isAllowedUpstreamUrl(stream.url)) {
     return new Response("Stream not found or invalid upstream", { status: 404 });
   }
@@ -164,28 +89,48 @@ async function handleStreamProxy(request: Request): Promise<Response | null> {
     upstreamHeaders["Range"] = rangeHeader;
   }
 
-  const upstreamRes = await fetch(stream.url, {
-    headers: upstreamHeaders,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
 
-  if (!upstreamRes.ok && upstreamRes.status !== 206) {
-    return new Response("Upstream stream fetch failed", { status: upstreamRes.status || 502 });
-  }
+  let upstreamRes: Response | null = null;
+  try {
+    upstreamRes = await fetch(stream.url, {
+      headers: upstreamHeaders,
+      signal: controller.signal,
+    });
 
-  let mimeType = stream.mimeType || "audio/mp4";
-  const upstreamMime = upstreamRes.headers.get("content-type");
-  if (upstreamMime) {
-    if (upstreamMime.includes("webm")) {
-      mimeType = "audio/webm";
-    } else if (upstreamMime.includes("mp4") || upstreamMime.includes("m4a")) {
-      mimeType = "audio/mp4";
-    } else if (upstreamMime.startsWith("audio/")) {
-      mimeType = upstreamMime;
+    // If upstream returns 403 Forbidden (e.g. expired or throttled stream URL), invalidate cache and retry once
+    if (upstreamRes.status === 403) {
+      console.warn(`[stream-proxy] Upstream 403 for ${videoId}, invalidating cache and retrying fresh stream...`);
+      invalidateStreamCache(videoId);
+      stream = await resolveStreamUrlWithMeta(videoId, quality);
+      if (stream && stream.url && isAllowedUpstreamUrl(stream.url)) {
+        upstreamRes = await fetch(stream.url, {
+          headers: upstreamHeaders,
+          signal: controller.signal,
+        });
+      }
     }
+  } catch (err: unknown) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === "AbortError") {
+      return new Response("Upstream stream request timed out", { status: 504 });
+    }
+    invalidateStreamCache(videoId);
+    return new Response("Upstream stream fetch error", { status: 502 });
+  } finally {
+    clearTimeout(timeoutId);
   }
+
+  if (!upstreamRes || (!upstreamRes.ok && upstreamRes.status !== 206)) {
+    invalidateStreamCache(videoId);
+    return new Response("Upstream stream fetch failed", { status: upstreamRes?.status || 502 });
+  }
+
+  const mimeType = resolveAudioMimeType(stream?.mimeType, upstreamRes.headers.get("content-type"));
 
   const responseHeaders = new Headers();
-  responseHeaders.set("access-control-allow-origin", "*");
+  responseHeaders.set("access-control-allow-origin", originHeader || "*");
   responseHeaders.set("access-control-allow-headers", "Range, Accept-Ranges, Content-Type");
   responseHeaders.set("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges");
   responseHeaders.set("content-type", mimeType);

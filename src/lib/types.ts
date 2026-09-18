@@ -7,4 +7,7 @@ export interface Track {
   previewUrl?: string | undefined;
   source?: "youtube" | "deezer" | undefined;
   reason?: string | undefined;
+  album?: string | undefined;
+  year?: string | undefined;
 }
+

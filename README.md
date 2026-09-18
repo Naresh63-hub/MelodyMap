@@ -25,7 +25,7 @@ A full-featured music streaming application built with React 19 and TanStack Sta
 - **Streaming**: YouTube audio extraction + Deezer fallback
 - **AI Recommendations**: OpenAI-compatible gateway (works with any provider)
 - **Build Tool**: Vite 8 + TypeScript 5
-- **Deployment**: Cloudflare Workers (via Wrangler)
+- **Deployment**: Node.js / Docker / VPS Self-Hosted (via Nitro `node-server`)
 
 ## 🚀 Getting Started
 

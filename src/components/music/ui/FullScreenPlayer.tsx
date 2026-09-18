@@ -172,7 +172,13 @@ export function FullScreenPlayer({
               <p className="text-sm font-medium text-purple-300/60 truncate mt-0.5">
                 {track.artist}
               </p>
+              {(track.album || track.year) && (
+                <p className="text-xs text-white/40 truncate mt-0.5">
+                  {[track.album, track.year].filter(Boolean).join(" • ")}
+                </p>
+              )}
             </div>
+
             <div className="flex items-center gap-2">
               <button
                 type="button"

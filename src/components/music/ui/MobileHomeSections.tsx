@@ -9,6 +9,7 @@ type Props = {
   trending: Track[];
   newReleases: Track[];
   recommended: Track[];
+  dailyMix?: Track[] | undefined;
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
   onToggleLike: (track: Track) => void;
   onOpenOptions?: ((track: Track) => void) | undefined;
@@ -17,6 +18,7 @@ type Props = {
   isPlaying: boolean;
   loading?: boolean | undefined;
 };
+
 
 /** Horizontal scrollable row of track cards */
 function HorizontalScrollRow({
@@ -191,6 +193,7 @@ function SectionHeader({
 
 export function MobileHomeSections({
   recentlyPlayed,
+  dailyMix,
   trending,
   newReleases,
   recommended,
@@ -202,6 +205,7 @@ export function MobileHomeSections({
   isPlaying,
   loading = false,
 }: Props) {
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -256,10 +260,32 @@ export function MobileHomeSections({
         </section>
       )}
 
-      {/* 2. Trending Now (Vertical List) */}
+      {/* 2. Daily Mix (Seeded Daily Recommendations) */}
+      {dailyMix && dailyMix.length > 0 && (
+        <section className="animate-fade-in">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-purple-400" />
+              <h2 className="text-sm font-bold text-white/95">Daily Mix</h2>
+            </div>
+            <span className="rounded-full bg-purple-500/15 border border-purple-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-300">
+              Updated Today
+            </span>
+          </div>
+          <HorizontalScrollRow
+            tracks={dailyMix}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+          />
+        </section>
+      )}
+
+      {/* 3. Trending Now (Vertical List) */}
       {trending.length > 0 && (
         <section className="animate-fade-in">
           <SectionHeader title="🔥 Trending & Fresh Hits" icon={TrendingUp} />
+
           <VerticalSongList
             tracks={trending.slice(0, 8)}
             currentId={currentId}

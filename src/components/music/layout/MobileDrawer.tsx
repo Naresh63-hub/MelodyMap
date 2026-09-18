@@ -5,6 +5,8 @@ import {
   Heart,
   Layers,
   ListMusic,
+  LogIn,
+  LogOut,
   Mic,
   Search,
   Settings2,
@@ -25,6 +27,8 @@ type Props = {
   userName?: string;
   userInitial?: string;
   userAvatar?: string | null;
+  onSignIn?: () => void;
+  onSignOut?: () => Promise<void> | void;
 };
 
 export function MobileDrawer({
@@ -37,6 +41,8 @@ export function MobileDrawer({
   userName = "Listener",
   userInitial = "L",
   userAvatar,
+  onSignIn,
+  onSignOut,
 }: Props) {
   if (!open) return null;
 
@@ -99,24 +105,39 @@ export function MobileDrawer({
         </div>
 
         {/* User profile section */}
-        <div className="flex items-center gap-3 px-5 py-3.5 bg-white/[0.02] border-b border-white/[0.06]">
-          {userAvatar ? (
-            <img
-              src={userAvatar}
-              alt=""
-              className="h-10 w-10 rounded-full object-cover border border-white/15"
-            />
-          ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-white font-semibold text-sm">
-              {userInitial}
+        <div className="flex items-center justify-between gap-3 px-5 py-3.5 bg-white/[0.02] border-b border-white/[0.06]">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {userAvatar ? (
+              <img
+                src={userAvatar}
+                alt=""
+                className="h-10 w-10 rounded-full object-cover border border-white/15"
+              />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-white font-semibold text-sm">
+                {userInitial}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-white">{userName}</p>
+              <p className="text-[11px] text-white/40">
+                {isSynced ? "Account synced" : "Local guest mode"}
+              </p>
             </div>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-white">{userName}</p>
-            <p className="text-[11px] text-white/40">
-              {isSynced ? "Account synced" : "Local guest session"}
-            </p>
           </div>
+
+          {!isSynced && onSignIn && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onSignIn();
+              }}
+              className="shrink-0 rounded-full bg-purple-600/30 border border-purple-500/40 px-3 py-1 text-xs font-semibold text-purple-200 hover:bg-purple-600/50 transition-colors"
+            >
+              Sign In
+            </button>
+          )}
         </div>
 
         {/* Nav Links */}
@@ -170,6 +191,34 @@ export function MobileDrawer({
             <Settings2 className="h-4 w-4 text-white/40" />
             <span>Settings & Preferences</span>
           </button>
+
+          {isSynced && onSignOut ? (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                void onSignOut();
+              }}
+              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-medium text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 text-left transition-colors"
+            >
+              <LogOut className="h-4 w-4 text-rose-400" />
+              <span>Sign Out</span>
+            </button>
+          ) : (
+            !isSynced && onSignIn && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onSignIn();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 text-left transition-colors"
+              >
+                <LogIn className="h-4 w-4 text-purple-400" />
+                <span>Sign In to Sync</span>
+              </button>
+            )
+          )}
         </div>
       </div>
     </div>

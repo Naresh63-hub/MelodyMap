@@ -8,6 +8,12 @@ import {
   type EqualizerPreset,
   type EqualizerSettings,
 } from "@/lib/equalizer";
+import {
+  fetchSponsorBlockSegments,
+  findSkipTarget,
+  getSponsorBlockEnabled,
+  type SponsorBlockSegment,
+} from "@/lib/sponsorblock";
 
 export type NextTrackInfo = {
   id: string;
@@ -23,14 +29,18 @@ export function useAudioPlayer(options: {
   onEnded: () => void;
   onError?: (message: string) => void;
   getNextTrack?: () => NextTrackInfo | undefined;
+  onSponsorBlockSkipped?: (category: string) => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const prebufferAudioRef = useRef<HTMLAudioElement | null>(null);
   const prebufferedTrackIdRef = useRef<string | null>(null);
+  const sponsorSegmentsRef = useRef<SponsorBlockSegment[]>([]);
+  const qualityFallbackStepRef = useRef<number>(0); // 0 = original, 1 = standard, 2 = saver
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const filterNodesRef = useRef<BiquadFilterNode[]>([]);
+
 
   // Equalizer & sound profile state
   const [equalizerSettings, setEqualizerSettingsState] = useState<EqualizerSettings>(loadEqualizerSettings);
@@ -97,18 +107,26 @@ export function useAudioPlayer(options: {
   onErrorRef.current = options.onError;
   const getNextTrackRef = useRef(options.getNextTrack);
   getNextTrackRef.current = options.getNextTrack;
+  const onSponsorBlockSkippedRef = useRef(options.onSponsorBlockSkipped);
+  onSponsorBlockSkippedRef.current = options.onSponsorBlockSkipped;
 
   /** True when playback should auto-start as soon as a stream is ready. */
   const wantPlayRef = useRef(false);
   /** Object URLs created for offline blobs. */
   const objectUrlRef = useRef<string | null>(null);
+  /** Pending seek target queued while audio metadata is loading */
+  const pendingSeekRef = useRef<number | null>(null);
 
   const [ready] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
+    if (typeof window === "undefined") return 1;
+    const saved = localStorage.getItem("melodymap.playback_speed.v1");
+    return saved ? Math.min(3, Math.max(0.25, Number(saved) || 1)) : 1;
+  });
 
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
@@ -293,11 +311,10 @@ export function useAudioPlayer(options: {
       setIsLoading(true);
 
       if (startAt > 0) {
-        const seekToStart = () => {
-          audio.currentTime = startAt;
-          audio.removeEventListener("loadedmetadata", seekToStart);
-        };
-        audio.addEventListener("loadedmetadata", seekToStart);
+        pendingSeekRef.current = startAt;
+        setPosition(startAt);
+      } else {
+        pendingSeekRef.current = null;
       }
 
       try {
@@ -364,21 +381,39 @@ export function useAudioPlayer(options: {
     const audio = audioRef.current;
     if (!audio) return;
 
+    const applyPendingSeek = () => {
+      if (pendingSeekRef.current !== null) {
+        const target = pendingSeekRef.current;
+        pendingSeekRef.current = null;
+        const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : target;
+        const clamped = Math.max(0, Math.min(target, dur));
+        audio.currentTime = clamped;
+        setPosition(clamped);
+      }
+    };
+
     const onPlay = () => {
       audio.muted = false;
       initWebAudio();
       setIsPlaying(true);
       setIsLoading(false);
+      applyPendingSeek();
     };
     const onPlaying = () => {
       setIsPlaying(true);
       setIsLoading(false);
+      applyPendingSeek();
     };
     const onWaiting = () => {
       if (wantPlayRef.current) setIsLoading(true);
     };
     const onCanPlay = () => {
       setIsLoading(false);
+      applyPendingSeek();
+    };
+    const onLoadedMetadata = () => {
+      applyPendingSeek();
+      onTime();
     };
     const onPause = () => {
       setIsPlaying(false);
@@ -390,6 +425,15 @@ export function useAudioPlayer(options: {
       setPosition(cur);
       setDuration(dur);
       if (cur > 0) setIsLoading(false);
+
+      // SponsorBlock Auto-Skip: Check if currentTime falls within an intro/sponsor/outro range
+      if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
+        const skip = findSkipTarget(cur, sponsorSegmentsRef.current);
+        if (skip) {
+          audio.currentTime = skip.target;
+          onSponsorBlockSkippedRef.current?.(skip.category);
+        }
+      }
 
       // Gapless Pre-buffering: when current song has <= 25s left, pre-buffer upcoming track
       if (dur > 0 && dur - cur <= 25 && prebufferAudioRef.current) {
@@ -441,10 +485,29 @@ export function useAudioPlayer(options: {
         !audio.src.endsWith("/api/stream/")
       ) {
         console.warn("[MelodyMap] Audio element error:", audio.error.code, audio.error.message);
+
+        // Quality Auto-Fallback: Try lower qualities if the stream failed
+        const activeId = currentTrackIdRef.current;
+        if (
+          activeId &&
+          audio.src &&
+          audio.src.includes("/api/stream/") &&
+          qualityFallbackStepRef.current < 2
+        ) {
+          qualityFallbackStepRef.current += 1;
+          const fallbackQuality = qualityFallbackStepRef.current === 1 ? "standard" : "saver";
+          console.info(`[MelodyMap] Retrying track ${activeId} with fallback quality: ${fallbackQuality}`);
+          const retryUrl = streamUrl(activeId, fallbackQuality);
+          const resumePos = audio.currentTime || 0;
+          setStream(retryUrl, resumePos);
+          return;
+        }
+
         const message = "Could not load audio stream. Tap play to retry.";
         onErrorRef.current?.(message);
       }
     };
+
 
     audio.addEventListener("play", onPlay);
     audio.addEventListener("playing", onPlaying);
@@ -453,7 +516,7 @@ export function useAudioPlayer(options: {
     audio.addEventListener("pause", onPause);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("durationchange", onTime);
-    audio.addEventListener("loadedmetadata", onTime);
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
 
@@ -465,7 +528,7 @@ export function useAudioPlayer(options: {
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("durationchange", onTime);
-      audio.removeEventListener("loadedmetadata", onTime);
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
@@ -514,6 +577,17 @@ export function useAudioPlayer(options: {
     async (id: string, directUrl?: string) => {
       wantPlayRef.current = true;
       currentTrackIdRef.current = id;
+      qualityFallbackStepRef.current = 0;
+      sponsorSegmentsRef.current = [];
+
+      if (!directUrl && id) {
+        void fetchSponsorBlockSegments(id).then((segs) => {
+          if (currentTrackIdRef.current === id) {
+            sponsorSegmentsRef.current = segs;
+          }
+        });
+      }
+
       if (await playOffline(id)) return;
       if (directUrl) {
         setStream(directUrl);
@@ -529,6 +603,17 @@ export function useAudioPlayer(options: {
     async (id: string, startSeconds = 0, directUrl?: string) => {
       wantPlayRef.current = false;
       currentTrackIdRef.current = id;
+      qualityFallbackStepRef.current = 0;
+      sponsorSegmentsRef.current = [];
+
+      if (!directUrl && id) {
+        void fetchSponsorBlockSegments(id).then((segs) => {
+          if (currentTrackIdRef.current === id) {
+            sponsorSegmentsRef.current = segs;
+          }
+        });
+      }
+
       if (await playOffline(id, startSeconds)) return;
       if (directUrl) {
         setStream(directUrl, startSeconds);
@@ -538,6 +623,7 @@ export function useAudioPlayer(options: {
     },
     [setStream, playOffline, streamUrl],
   );
+
 
   const play = useCallback(() => {
     wantPlayRef.current = true;
@@ -564,34 +650,41 @@ export function useAudioPlayer(options: {
   const seek = useCallback((seconds: number) => {
     const audio = audioRef.current;
     if (!audio) return;
-    const max = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : seconds;
-    const target = Math.max(0, Math.min(seconds, max));
-    audio.currentTime = target;
-    setPosition(target);
+    const target = Math.max(0, seconds);
+    if (audio.readyState < 1 || !Number.isFinite(audio.duration) || audio.duration === 0) {
+      pendingSeekRef.current = target;
+      setPosition(target);
+      return;
+    }
+    const max = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : target;
+    const clamped = Math.max(0, Math.min(target, max));
+    audio.currentTime = clamped;
+    setPosition(clamped);
   }, []);
 
   const skipForward = useCallback((seconds = 30) => {
     const audio = audioRef.current;
     if (!audio) return;
-    const max = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : audio.currentTime + seconds;
-    const target = Math.min(audio.currentTime + seconds, max);
-    audio.currentTime = target;
-    setPosition(target);
-  }, []);
+    const current = audio.currentTime || position;
+    seek(current + seconds);
+  }, [position, seek]);
 
   const skipBackward = useCallback((seconds = 15) => {
     const audio = audioRef.current;
     if (!audio) return;
-    const target = Math.max(0, audio.currentTime - seconds);
-    audio.currentTime = target;
-    setPosition(target);
-  }, []);
+    const current = audio.currentTime || position;
+    seek(Math.max(0, current - seconds));
+  }, [position, seek]);
 
   const setSpeed = useCallback((speed: number) => {
-    setPlaybackSpeed(speed);
+    const clamped = Math.min(3, Math.max(0.25, speed));
+    setPlaybackSpeed(clamped);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("melodymap.playback_speed.v1", String(clamped));
+    }
     const audio = audioRef.current;
     if (audio) {
-      audio.playbackRate = speed;
+      audio.playbackRate = clamped;
     }
   }, []);
 

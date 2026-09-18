@@ -1,28 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
-
-const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
-const RANGE_REGEX = /^bytes=\d*-\d*$/;
-
-function isAllowedUpstreamUrl(urlStr: string): boolean {
-  try {
-    const parsed = new URL(urlStr);
-    if (parsed.protocol !== "https:") return false;
-    const host = parsed.hostname.toLowerCase();
-    return (
-      host.endsWith(".googlevideo.com") ||
-      host.endsWith(".youtube.com") ||
-      host.endsWith(".ytimg.com") ||
-      host === "googlevideo.com" ||
-      host === "youtube.com"
-    );
-  } catch {
-    return false;
-  }
-}
+import {
+  VIDEO_ID_REGEX,
+  isAllowedUpstreamUrl,
+  isAllowedOrigin,
+  resolveAudioMimeType,
+} from "./stream-proxy-core";
 
 /**
- * High-performance, secure streaming proxy for YouTube audio streams.
+ * High-performance, secure streaming proxy for YouTube audio streams (Node / Vite Dev).
  * Handles Range requests (HTTP 206 Partial Content), audio format negotiation,
  * SSRF protection, and graceful resource cleanup on client disconnect.
  */
@@ -35,6 +21,15 @@ export async function streamProxyMiddleware(
   const PREFIX = "/api/stream/";
   if (!url.startsWith(PREFIX)) {
     if (next) next();
+    return;
+  }
+
+  const originHeader = req.headers.origin as string | undefined;
+  const hostHeader = req.headers.host as string | undefined;
+  if (!isAllowedOrigin(originHeader, hostHeader)) {
+    res.statusCode = 403;
+    res.setHeader("content-type", "text/plain");
+    res.end("Forbidden origin");
     return;
   }
 
@@ -51,8 +46,8 @@ export async function streamProxyMiddleware(
   }
 
   try {
-    const { resolveStreamUrlWithMeta } = await import("./stream.server.ts");
-    const stream = await resolveStreamUrlWithMeta(videoId, quality);
+    const { resolveStreamUrlWithMeta, invalidateStreamCache } = await import("./stream.server");
+    let stream = await resolveStreamUrlWithMeta(videoId, quality);
 
     if (!stream || !stream.url || !isAllowedUpstreamUrl(stream.url)) {
       res.statusCode = 404;
@@ -75,32 +70,36 @@ export async function streamProxyMiddleware(
       controller.abort();
     });
 
-    const upstreamRes = await fetch(stream.url, {
+    let upstreamRes = await fetch(stream.url, {
       headers: upstreamHeaders,
       signal: controller.signal,
     });
 
+    // If 403, invalidate cache and retry once with a freshly resolved stream
+    if (upstreamRes.status === 403) {
+      console.warn(`[stream-proxy] 403 for ${videoId} in dev proxy, invalidating cache and retrying...`);
+      invalidateStreamCache(videoId);
+      stream = await resolveStreamUrlWithMeta(videoId, quality);
+      if (stream && stream.url && isAllowedUpstreamUrl(stream.url)) {
+        upstreamRes = await fetch(stream.url, {
+          headers: upstreamHeaders,
+          signal: controller.signal,
+        });
+      }
+    }
+
     if (!upstreamRes.ok && upstreamRes.status !== 206) {
+      invalidateStreamCache(videoId);
       res.statusCode = upstreamRes.status || 502;
       res.setHeader("content-type", "text/plain");
       res.end("Upstream stream fetch failed");
       return;
     }
 
-    let mimeType = stream.mimeType || "audio/mp4";
-    const upstreamMime = upstreamRes.headers.get("content-type");
-    if (upstreamMime) {
-      if (upstreamMime.includes("webm")) {
-        mimeType = "audio/webm";
-      } else if (upstreamMime.includes("mp4") || upstreamMime.includes("m4a")) {
-        mimeType = "audio/mp4";
-      } else if (upstreamMime.startsWith("audio/")) {
-        mimeType = upstreamMime;
-      }
-    }
+    const mimeType = resolveAudioMimeType(stream?.mimeType, upstreamRes.headers.get("content-type"));
 
     res.statusCode = upstreamRes.status;
-    res.setHeader("access-control-allow-origin", "*");
+    res.setHeader("access-control-allow-origin", originHeader || "*");
     res.setHeader("access-control-allow-headers", "Range, Accept-Ranges, Content-Type");
     res.setHeader("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges");
     res.setHeader("content-type", mimeType);
@@ -114,7 +113,7 @@ export async function streamProxyMiddleware(
 
     if (upstreamRes.body) {
       const nodeStream = Readable.fromWeb(
-        upstreamRes.body as import("node:stream/web").ReadableStream
+        upstreamRes.body as import("node:stream/web").ReadableStream,
       );
       nodeStream.on("error", () => {
         if (!res.writableEnded) {

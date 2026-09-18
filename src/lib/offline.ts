@@ -56,6 +56,14 @@ function txDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
+function getDownloadKey(trackOrId: Track | string, source?: string): string {
+  if (typeof trackOrId === "string") {
+    return trackOrId;
+  }
+  const s = trackOrId.source || source || "yt";
+  return `${s}:${trackOrId.id}`;
+}
+
 export async function saveDownload(track: Track, blob: Blob, imageBlob?: Blob): Promise<void> {
   let finalImageBlob = imageBlob;
   if (!finalImageBlob && track.thumbnail && track.thumbnail.startsWith("http")) {
@@ -82,8 +90,9 @@ export async function saveDownload(track: Track, blob: Blob, imageBlob?: Blob): 
   }
   const db = await openDb();
   const tx = db.transaction(STORE, "readwrite");
+  const key = getDownloadKey(track);
   tx.objectStore(STORE).put({
-    id: track.id,
+    id: key,
     track,
     blob,
     imageBlob: finalImageBlob,
@@ -97,7 +106,13 @@ export async function getBlob(id: string): Promise<Blob | null> {
   try {
     const db = await openDb();
     const tx = db.transaction(STORE, "readonly");
-    const rec = await request<DownloadRecord | undefined>(tx.objectStore(STORE).get(id));
+    const store = tx.objectStore(STORE);
+    // Try exact id, then source prefixed keys
+    let rec = await request<DownloadRecord | undefined>(store.get(id));
+    if (!rec && !id.includes(":")) {
+      rec = (await request<DownloadRecord | undefined>(store.get(`yt:${id}`))) ||
+            (await request<DownloadRecord | undefined>(store.get(`deezer:${id}`)));
+    }
     return rec?.blob ?? null;
   } catch (err) {
     console.warn("[MelodyMap] getBlob failed for", id, err);
@@ -111,26 +126,43 @@ export type DownloadInfo = {
   savedAt: number;
 };
 
+/**
+ * List downloads using a lightweight cursor to avoid deserializing
+ * all audio blobs into RAM at once.
+ */
 export async function listDownloads(): Promise<DownloadInfo[]> {
   try {
     const db = await openDb();
     const tx = db.transaction(STORE, "readonly");
-    const all = await request<DownloadRecord[]>(tx.objectStore(STORE).getAll());
-    return (all ?? [])
-      .map(({ track, blob, imageBlob, size, savedAt }) => {
-        let localThumb = track.thumbnail;
-        if (imageBlob) {
-          try {
-            localThumb = URL.createObjectURL(imageBlob);
-          } catch {}
+    const store = tx.objectStore(STORE);
+    const results: DownloadInfo[] = [];
+
+    await new Promise<void>((resolve, reject) => {
+      const req = store.openCursor();
+      req.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          const val = cursor.value as DownloadRecord;
+          let localThumb = val.track.thumbnail;
+          if (val.imageBlob) {
+            try {
+              localThumb = URL.createObjectURL(val.imageBlob);
+            } catch {}
+          }
+          results.push({
+            track: { ...val.track, thumbnail: localThumb },
+            size: val.size,
+            savedAt: val.savedAt,
+          });
+          cursor.continue();
+        } else {
+          resolve();
         }
-        return {
-          track: { ...track, thumbnail: localThumb },
-          size,
-          savedAt,
-        };
-      })
-      .sort((a, b) => b.savedAt - a.savedAt);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    return results.sort((a, b) => b.savedAt - a.savedAt);
   } catch {
     return [];
   }
@@ -140,7 +172,12 @@ export async function removeDownload(id: string): Promise<void> {
   try {
     const db = await openDb();
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).delete(id);
+    const store = tx.objectStore(STORE);
+    store.delete(id);
+    if (!id.includes(":")) {
+      store.delete(`yt:${id}`);
+      store.delete(`deezer:${id}`);
+    }
     await txDone(tx);
   } catch (err) {
     console.warn("[MelodyMap] removeDownload failed for", id, err);

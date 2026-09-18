@@ -9,8 +9,11 @@
  * a minimal compatible Track interface rather than importing from library.ts.
  */
 
+import { parseDurationSeconds } from "./track-filters";
+
 /** Minimal track shape used for identity and comparison. */
 export interface TrackLike {
+
   id: string;
   title: string;
   artist: string;
@@ -32,7 +35,7 @@ export function norm(s: string): string {
     .replace(/[()[\]{}]/g, " ")
     .replace(/\s+/g, " ")
     .replace(
-      /\b(official|music|video|audio|lyric|lyrics|lyrical|hd|4k|8k|mv|vevo|topic|full song|full video|full audio|remastered|remaster|live version|live|acoustic version|acoustic)\b/gi,
+      /\b(official|music|video|audio|lyric|lyrics|lyrical|hd|4k|8k|mv|vevo|topic|full song|full video|full audio|song|songs|track|tracks|remastered|remaster|live version|live|acoustic version|acoustic)\b/gi,
       "",
     )
     .replace(/[^\p{L}\p{N}' ]/gu, "")
@@ -90,17 +93,14 @@ export function stringSimilarity(s1: string, s2: string): number {
 }
 
 /** Duration tolerance: two tracks are "the same length" if within ±8 seconds. */
+
 const DURATION_TOLERANCE = 8;
 
 function durationSec(d: string | number | undefined): number {
   if (typeof d === "number") return d;
-  if (!d) return 0;
-  const parts = String(d)
-    .split(":")
-    .map(Number);
-  if (parts.some(isNaN)) return 0;
-  return parts.reduce((acc, n) => acc * 60 + n, 0);
+  return parseDurationSeconds(d);
 }
+
 
 // ─── Identity & Multi-Factor Similarity ──────────────────────────
 
@@ -126,6 +126,13 @@ export function calculateTrackSimilarity(a: TrackLike, b: TrackLike): number {
 
   const durA = durationSec(a.duration);
   const durB = durationSec(b.duration);
+
+  // Same song re-uploaded by a different label channel (e.g. Sony Music India vs Aditya Music):
+  // near-identical title AND duration => same song regardless of channel name
+  if (titleScore >= 0.92 && durA > 0 && durB > 0 && Math.abs(durA - durB) <= 3) {
+    return 0.95; // >= 0.88 threshold => duplicate
+  }
+
   let durationScore = 0.85; // neutral when duration is unknown
 
   if (durA > 0 && durB > 0) {

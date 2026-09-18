@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Track } from "./types";
-import { norm } from "./track-dedup.ts";
+import { norm } from "./track-dedup";
 
 /** Sanitizes user-provided strings to prevent AI prompt injection while preserving real song/artist names */
 function sanitizePromptInput(str: string | undefined): string {
@@ -33,38 +33,30 @@ const SearchInput = z.object({
 export const searchTracks = createServerFn({ method: "POST" })
   .validator((input: unknown) => SearchInput.parse(input))
   .handler(async ({ data }) => {
-    const { searchYouTube } = await import("./music.server");
     const limit = data.limit ?? 20;
     const isMusicOnly = data.type !== "podcasts";
 
-    try {
-      const tracks = await searchYouTube(data.query, limit, isMusicOnly);
-      // Fallback: If YouTube returns few results, query Deezer to backfill
-      if (tracks.length < 5 && isMusicOnly) {
-        try {
-          const { searchDeezer } = await import("./deezer.server");
-          const deezerTracks = await searchDeezer(data.query, limit - tracks.length);
-          if (deezerTracks.length > 0) {
-            return { tracks: [...tracks, ...deezerTracks], error: null };
-          }
-        } catch {}
+    if (isMusicOnly) {
+      try {
+        const { searchHybrid } = await import("./music-hybrid.server");
+        const tracks = await searchHybrid(data.query, limit);
+        return { tracks, error: null };
+      } catch (error) {
+        console.error("Search failed:", error);
+        return { tracks: [], error: "Could not reach the catalog. Try again." };
       }
+    }
+
+    try {
+      const { searchYouTube } = await import("./music.server");
+      const tracks = await searchYouTube(data.query, limit, false);
       return { tracks, error: null };
     } catch (error) {
       console.error("Search failed:", error);
-      // Try Deezer as complete fallback if YouTube throws
-      if (isMusicOnly) {
-        try {
-          const { searchDeezer } = await import("./deezer.server");
-          const deezerTracks = await searchDeezer(data.query, limit);
-          if (deezerTracks.length > 0) {
-            return { tracks: deezerTracks, error: null };
-          }
-        } catch {}
-      }
       return { tracks: [], error: "Could not reach the catalog. Try again." };
     }
   });
+
 
 export const suggestSearch = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({ query: z.string().min(1).max(120) }).parse(input))
@@ -221,18 +213,20 @@ function getDynamicQueries(languages: string[], userArtists: string[]): { newQue
   const primaryLang = langs[0] || "";
   const langArtistPool = primaryLang && LANGUAGE_ARTISTS[primaryLang] ? LANGUAGE_ARTISTS[primaryLang] : Object.values(LANGUAGE_ARTISTS).flat();
 
-  const newQ: string[] = [];
-  const oldQ: string[] = [];
+  const userNewQ: string[] = [];
+  const userOldQ: string[] = [];
+  const generalNewQ: string[] = [];
+  const generalOldQ: string[] = [];
 
-  // 1. High-priority queries for user's explicitly favorited artists (70% focus)
+  // 1. High-priority queries for user's explicitly favorited artists (guarantee top 3 included)
   if (userArtists.length > 0) {
     for (const art of userArtists) {
-      newQ.push(`${art} latest songs ${CURRENT_YEAR}`);
-      newQ.push(`${art} top hit songs`);
-      newQ.push(`${art} popular tracks`);
-      oldQ.push(`${art} best melody hits`);
-      oldQ.push(`${art} all time classics`);
-      oldQ.push(`${art} evergreen songs`);
+      userNewQ.push(`${art} latest songs ${CURRENT_YEAR}`);
+      userNewQ.push(`${art} top hit songs`);
+      userNewQ.push(`${art} popular tracks`);
+      userOldQ.push(`${art} best melody hits`);
+      userOldQ.push(`${art} all time classics`);
+      userOldQ.push(`${art} evergreen songs`);
     }
   }
 
@@ -241,26 +235,26 @@ function getDynamicQueries(languages: string[], userArtists: string[]): { newQue
   for (const lang of langs.slice(0, 3)) {
     const langPrefix = `${lang} `;
     for (const art of otherArtists.slice(0, 4)) {
-      newQ.push(`${art} ${langPrefix}latest new hit songs ${CURRENT_YEAR}`);
-      newQ.push(`${art} ${langPrefix}top songs`);
-      newQ.push(`${art} ${langPrefix}viral hit tracks`);
-      oldQ.push(`${art} ${langPrefix}all time classic evergreen hits`);
-      oldQ.push(`${art} ${langPrefix}best melody songs`);
-      oldQ.push(`${art} ${langPrefix}golden nostalgic superhits`);
+      generalNewQ.push(`${art} ${langPrefix}latest new hit songs ${CURRENT_YEAR}`);
+      generalNewQ.push(`${art} ${langPrefix}top songs`);
+      generalNewQ.push(`${art} ${langPrefix}viral hit tracks`);
+      generalOldQ.push(`${art} ${langPrefix}all time classic evergreen hits`);
+      generalOldQ.push(`${art} ${langPrefix}best melody songs`);
+      generalOldQ.push(`${art} ${langPrefix}golden nostalgic superhits`);
     }
 
     for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 4)) {
       if (theme.includes("classic") || theme.includes("90s") || theme.includes("2000s") || theme.includes("evergreen")) {
-        oldQ.push(`${langPrefix}${theme}`);
+        generalOldQ.push(`${langPrefix}${theme}`);
       } else {
-        newQ.push(`${langPrefix}${theme}`);
+        generalNewQ.push(`${langPrefix}${theme}`);
       }
     }
   }
 
   return {
-    newQueries: shuffleArray(newQ),
-    oldQueries: shuffleArray(oldQ),
+    newQueries: [...userNewQ, ...shuffleArray(generalNewQ)],
+    oldQueries: [...userOldQ, ...shuffleArray(generalOldQ)],
   };
 }
 
@@ -276,6 +270,43 @@ function shuffleArray<T>(array: T[]): T[] {
   return arr;
 }
 
+/** Helper to execute and deduplicate multi-query search batches */
+export async function runQueryBatch(
+  queries: string[],
+  perQueryLimit = 10,
+  musicOnly = true,
+  bypassCache = false,
+): Promise<Track[]> {
+  const { searchYouTube } = await import("./music.server");
+  const seenIds = new Set<string>();
+  const seenKeys = new Set<string>();
+  const results: Track[] = [];
+
+  const batchResults = await Promise.allSettled(
+    queries.map(async (q) => {
+      try {
+        return await searchYouTube(q, perQueryLimit, musicOnly, undefined, bypassCache);
+      } catch {
+        return [];
+      }
+    }),
+  );
+
+  for (const r of batchResults) {
+    if (r.status === "fulfilled" && Array.isArray(r.value)) {
+      for (const t of r.value) {
+        if (!t || !t.id || seenIds.has(t.id)) continue;
+        const key = getTrackDedupeKey(t.title, t.artist);
+        if (key && seenKeys.has(key)) continue;
+        if (key) seenKeys.add(key);
+        seenIds.add(t.id);
+        results.push(t);
+      }
+    }
+  }
+  return results;
+}
+
 async function getLocalPicks(data: {
   artists: string[];
   currentArtist?: string | undefined;
@@ -284,69 +315,20 @@ async function getLocalPicks(data: {
   languages?: string[] | undefined;
   refreshNonce?: string | number | undefined;
 }): Promise<Track[]> {
-  const { searchYouTube } = await import("./music.server");
   const count = data.count ?? 28;
+  const bypassCache = !!data.refreshNonce;
   const artists = data.artists.map((a) => a.trim()).filter(Boolean);
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
   const { newQueries, oldQueries } = getDynamicQueries(languages, artists);
 
-  const seenNewIds = new Set<string>();
-  const seenNewKeys = new Set<string>();
-  const seenOldIds = new Set<string>();
-  const seenOldKeys = new Set<string>();
+  // Sample queries concurrently
+  const pickedNew = newQueries.slice(0, 4);
+  const pickedOld = oldQueries.slice(0, 4);
 
-  // Sample 4 distinct new queries and 4 distinct old queries concurrently
-  const pickedNew = shuffleArray(newQueries).slice(0, 4);
-  const pickedOld = shuffleArray(oldQueries).slice(0, 4);
-
-  const [newResults, oldResults] = await Promise.all([
-    Promise.allSettled(
-      pickedNew.map(async (q) => {
-        try {
-          return await searchYouTube(q, 10);
-        } catch {
-          return [];
-        }
-      }),
-    ),
-    Promise.allSettled(
-      pickedOld.map(async (q) => {
-        try {
-          return await searchYouTube(q, 10);
-        } catch {
-          return [];
-        }
-      }),
-    ),
+  const [newCandidates, oldCandidates] = await Promise.all([
+    runQueryBatch(pickedNew, 10, true, bypassCache),
+    runQueryBatch(pickedOld, 10, true, bypassCache),
   ]);
-
-  const newCandidates: Track[] = [];
-  for (const r of newResults) {
-    if (r.status === "fulfilled") {
-      for (const t of shuffleArray(r.value)) {
-        if (seenNewIds.has(t.id)) continue;
-        const key = getTrackDedupeKey(t.title, t.artist);
-        if (key && seenNewKeys.has(key)) continue;
-        if (key) seenNewKeys.add(key);
-        seenNewIds.add(t.id);
-        newCandidates.push(t);
-      }
-    }
-  }
-
-  const oldCandidates: Track[] = [];
-  for (const r of oldResults) {
-    if (r.status === "fulfilled") {
-      for (const t of shuffleArray(r.value)) {
-        if (seenOldIds.has(t.id)) continue;
-        const key = getTrackDedupeKey(t.title, t.artist);
-        if (key && seenOldKeys.has(key)) continue;
-        if (key) seenOldKeys.add(key);
-        seenOldIds.add(t.id);
-        oldCandidates.push(t);
-      }
-    }
-  }
 
   const newQuota = Math.ceil(count / 2);
   const oldQuota = count - newQuota;
@@ -374,6 +356,7 @@ async function getLocalPicks(data: {
 
   return interleaved.slice(0, count);
 }
+
 
 const TrendingInput = z.object({
   languages: z.array(z.string()).max(10).default([]),
@@ -410,11 +393,7 @@ const CATEGORIZED_TRENDING_QUERIES = {
 export const getRealTrendingTracks = createServerFn({ method: "POST" })
   .validator((input: unknown) => TrendingInput.parse(input))
   .handler(async ({ data }) => {
-    const { searchYouTube } = await import("./music.server");
     const count = data.count ?? 20;
-    const seenIds = new Set<string>();
-    const seenKeys = new Set<string>();
-
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
 
     let selectedQueries: string[] = [];
@@ -440,30 +419,7 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
       ];
     }
 
-    const batchResults = await Promise.allSettled(
-      selectedQueries.map(async (q) => {
-        try {
-          return await searchYouTube(q, 10);
-        } catch {
-          return [];
-        }
-      }),
-    );
-
-    const candidates: Track[] = [];
-    for (const r of batchResults) {
-      if (r.status === "fulfilled") {
-        for (const t of r.value) {
-          if (seenIds.has(t.id)) continue;
-          const key = getTrackDedupeKey(t.title, t.artist);
-          if (key && seenKeys.has(key)) continue;
-          if (key) seenKeys.add(key);
-          seenIds.add(t.id);
-          candidates.push(t);
-        }
-      }
-    }
-
+    const candidates = await runQueryBatch(selectedQueries, 10, true, !!data.refreshNonce);
     return { tracks: shuffleArray(candidates).slice(0, count), error: null };
   });
 
@@ -661,30 +617,7 @@ export const buildMix = createServerFn({ method: "POST" })
       }
 
       const pickedQueries = shuffleArray(freshReleaseQueries).slice(0, 5);
-      const batchResults = await Promise.allSettled(
-        pickedQueries.map(async (q) => {
-          try {
-            return await searchYouTube(q, 10);
-          } catch {
-            return [];
-          }
-        }),
-      );
-
-      const candidates: Track[] = [];
-      const seenKeys = new Set<string>();
-      for (const r of batchResults) {
-        if (r.status === "fulfilled") {
-          for (const t of r.value) {
-            if (seenIds.has(t.id)) continue;
-            const key = getTrackDedupeKey(t.title, t.artist);
-            if (key && seenKeys.has(key)) continue;
-            if (key) seenKeys.add(key);
-            seenIds.add(t.id);
-            candidates.push(t);
-          }
-        }
-      }
+      const candidates = await runQueryBatch(pickedQueries, 10, true, !!data.refreshNonce);
 
       return { tracks: shuffleArray(candidates).slice(0, count), error: null };
     }
@@ -887,11 +820,67 @@ export const localPicks = createServerFn({ method: "POST" })
     return { tracks, error: null };
   });
 
+function seededRandom(seed: number) {
+  let t = (seed += 0x6d2b79f5);
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+function seededShuffleArray<T>(array: T[], seedStr: string): T[] {
+  let hash = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    hash = (hash << 5) - hash + seedStr.charCodeAt(i);
+    hash |= 0;
+  }
+  const arr = [...array];
+  let currentSeed = Math.abs(hash) || 1;
+  for (let i = arr.length - 1; i > 0; i--) {
+    const rand = seededRandom(currentSeed++);
+    const j = Math.floor(rand * (i + 1));
+    const temp = arr[i]!;
+    arr[i] = arr[j]!;
+    arr[j] = temp;
+  }
+  return arr;
+}
+
+const DailyMixInput = z.object({
+  languages: z.array(z.string()).max(10).default([]),
+  artists: z.array(z.string()).max(20).default([]),
+  liked: z.array(z.string()).max(30).default([]),
+  dateSeed: z.string().optional(),
+  count: z.number().min(1).max(40).optional(),
+});
+
+/**
+ * Daily Mix: Generates a stable, high-affinity mix that remains consistent
+ * throughout the day (seeded by YYYY-MM-DD) and automatically rotates at midnight.
+ */
+export const getDailyMix = createServerFn({ method: "POST" })
+  .validator((input: unknown) => DailyMixInput.parse(input))
+  .handler(async ({ data }) => {
+    const count = data.count ?? 25;
+    const dateSeed = data.dateSeed || new Date().toISOString().slice(0, 10);
+    const artists = data.artists.map((a) => a.trim()).filter(Boolean);
+    const languages = data.languages.map((l) => l.trim()).filter(Boolean);
+    const { newQueries, oldQueries } = getDynamicQueries(languages, artists);
+
+    // Pick 4 stable new queries and 4 stable old queries using the daily seed
+    const pickedNew = seededShuffleArray(newQueries, `${dateSeed}-new`).slice(0, 4);
+    const pickedOld = seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
+
+    const candidates = await runQueryBatch([...pickedNew, ...pickedOld], 10, true, false);
+    const dailyTracks = seededShuffleArray(candidates, `${dateSeed}-final`).slice(0, count);
+    return { tracks: dailyTracks, dateSeed, error: null };
+  });
+
+
 
 const NewSongsInput = z.object({
-  artists: z.array(z.string()).max(10).default([]),
+  artists: z.array(z.string()).max(50).default([]),
   count: z.number().min(1).max(30).optional(),
-  languages: z.array(z.string()).max(10).default([]),
+  languages: z.array(z.string()).max(30).default([]),
 });
 
 /** Language names from Tune picks → search terms for YouTube queries. */
@@ -978,8 +967,8 @@ export const newSongs = createServerFn({ method: "POST" })
 
 
 const LanguagePicksInput = z.object({
-  languages: z.array(z.string()).max(10).default([]),
-  artists: z.array(z.string()).max(10).default([]),
+  languages: z.array(z.string()).max(30).default([]),
+  artists: z.array(z.string()).max(50).default([]),
   count: z.number().min(1).max(40).optional(),
 });
 
@@ -1044,7 +1033,7 @@ export const languagePicks = createServerFn({ method: "POST" })
 
 
 const LanguageChartsInput = z.object({
-  languages: z.array(z.string()).max(10).default([]),
+  languages: z.array(z.string()).max(30).default([]),
   count: z.number().min(1).max(40).optional(),
 });
 
@@ -1088,10 +1077,10 @@ export const languageCharts = createServerFn({ method: "POST" })
 
 
 const PodcastInput = z.object({
-  artists: z.array(z.string()).max(10).default([]),
+  artists: z.array(z.string()).max(50).default([]),
   count: z.number().min(1).max(30).optional(),
-  languages: z.array(z.string()).max(10).default([]),
-  topics: z.array(z.string()).max(10).default([]),
+  languages: z.array(z.string()).max(30).default([]),
+  topics: z.array(z.string()).max(30).default([]),
 });
 
 /** Podcast topic names from Tune picks → search terms for YouTube queries. */

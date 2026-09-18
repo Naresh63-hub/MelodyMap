@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -61,6 +61,9 @@ const KeyboardShortcutsModal = lazy(() =>
 const SettingsModal = lazy(() =>
   import("@/components/music/ui/SettingsModal").then((m) => ({ default: m.SettingsModal }))
 );
+const OnboardingModal = lazy(() =>
+  import("@/components/music/ui/OnboardingModal").then((m) => ({ default: m.OnboardingModal }))
+);
 const FloatingMiniPlayer = lazy(() =>
   import("@/components/music/ui/FloatingMiniPlayer").then((m) => ({ default: m.FloatingMiniPlayer }))
 );
@@ -87,6 +90,7 @@ import {
   sequenceBrief,
   isMusicTrack,
   isPodcastTrack,
+  parseDurationSeconds,
   MOODS,
   type Track,
 } from "@/lib/library";
@@ -100,6 +104,7 @@ import {
   recommendTracks,
   searchTracks,
   suggestSearch,
+  getDailyMix,
 } from "@/lib/music.functions";
 import { formatTime, useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
@@ -107,6 +112,7 @@ import { getBlob, listDownloads, removeDownload, saveDownload, type DownloadInfo
 import { cn } from "@/lib/utils";
 import { areSameTrack, trackExistsIn, dedupeTracks } from "@/lib/track-dedup";
 import type { TrackLike } from "@/lib/track-dedup";
+import { contextEngine } from "@/lib/context-engine";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import {
   Dialog,
@@ -131,6 +137,7 @@ export const Route = createFileRoute("/")({
 });
 
 function MusicApp() {
+  const navigate = useNavigate();
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
   const runTrending = useServerFn(getRealTrendingTracks);
@@ -139,6 +146,8 @@ function MusicApp() {
   const runPodcastPicks = useServerFn(podcastPicks);
   const runSuggest = useServerFn(suggestSearch);
   const runPrewarm = useServerFn(prewarmStreams);
+  const runDailyMix = useServerFn(getDailyMix);
+
 
   const auth = useAuth();
   const {
@@ -191,6 +200,7 @@ function MusicApp() {
     return saved ? Math.min(100, Math.max(0, Number(saved) || 80)) : 80;
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [continuous, setContinuous] = useState(() => {
     if (typeof window === "undefined") return true;
@@ -204,7 +214,10 @@ function MusicApp() {
     Record<"discover" | "newrelease" | "explore", Track[]>
   >({ discover: [], newrelease: [], explore: [] });
   const [mixLoading, setMixLoading] = useState(false);
+  const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>([]);
+  const [dailyMixLoading, setDailyMixLoading] = useState(false);
   const [podcastTracks, setPodcastTracks] = useState<Track[]>([]);
+
   const [podcastLoading, setPodcastLoading] = useState(false);
   const [selectedPodcastTopic, setSelectedPodcastTopic] = useState<string>("All");
   const [loadingMoreRecs, setLoadingMoreRecs] = useState(false);
@@ -229,14 +242,102 @@ function MusicApp() {
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
   const radioContinuationRef = useRef<string | undefined>(undefined);
 
-  // Refresh downloads on mount
+  // Refresh downloads on mount & hydrate context engine
   useEffect(() => {
+    contextEngine.loadFromStorage();
     void listDownloads().then((items: DownloadInfo[]) => {
       setDownloadedIds(new Set(items.map((t: DownloadInfo) => t.track.id)));
     });
   }, []);
 
+  // Show language & artist onboarding for new users / accounts without song language preferences
+  useEffect(() => {
+    if (!hydrated) return;
+    const onboarded = typeof window !== "undefined" ? localStorage.getItem("melodymap.onboarded.v1") : null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (!onboarded && settings.languages.length === 0) {
+      timer = setTimeout(() => {
+        setShowOnboarding(true);
+      }, 600);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [hydrated, settings.languages.length]);
+
+function getPodcastResumePosition(trackId: string): number {
+  if (typeof window === "undefined" || !trackId) return 0;
+  try {
+    const raw = localStorage.getItem("melodymap.podcast_positions.v1");
+    if (!raw) return 0;
+    const map = JSON.parse(raw);
+    return typeof map[trackId] === "number" ? map[trackId] : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function savePodcastResumePosition(trackId: string, pos: number) {
+  if (typeof window === "undefined" || !trackId || pos < 5) return;
+  try {
+    const raw = localStorage.getItem("melodymap.podcast_positions.v1");
+    const map = raw ? JSON.parse(raw) : {};
+    map[trackId] = Math.floor(pos);
+    localStorage.setItem("melodymap.podcast_positions.v1", JSON.stringify(map));
+  } catch {}
+}
+
   const handleDownload = async (track: Track) => {
+    const dur = parseDurationSeconds(track.duration);
+
+    // 1. Refuse tracks > 2 hours
+    if (dur > 7200) {
+      setMessage("Files over 2 hours cannot be downloaded for offline use");
+      setTimeout(() => setMessage(null), 3500);
+      return;
+    }
+
+    // 2. For episodes between 20 min and 2 hours, stream directly to disk if supported
+    if (dur > 1200) {
+      if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
+        try {
+          setDownloadingIds((prev) => new Set([...prev, track.id]));
+          setMessage(`Saving "${track.title}" to disk...`);
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: `${track.title.replace(/[/\\?%*:|"<>]/g, "_")}.m4a`,
+            types: [
+              {
+                description: "Audio File",
+                accept: { "audio/mp4": [".m4a", ".mp4", ".aac"] },
+              },
+            ],
+          });
+          const writable = await handle.createWritable();
+          const res = await fetch(`/api/stream/${encodeURIComponent(track.id)}`);
+          if (!res.ok || !res.body) throw new Error("Download stream failed");
+          await res.body.pipeTo(writable);
+          setMessage(`Saved "${track.title}" to disk`);
+        } catch (err: any) {
+          if (err?.name !== "AbortError") {
+            setMessage("Failed to save audio file to disk");
+          }
+        } finally {
+          setDownloadingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(track.id);
+            return next;
+          });
+          setTimeout(() => setMessage(null), 3500);
+        }
+        return;
+      } else {
+        setMessage("Episodes over 20 minutes cannot be saved to browser storage");
+        setTimeout(() => setMessage(null), 3500);
+        return;
+      }
+    }
+
+    // Standard download (< 20 min) -> saved to IndexedDB
     setDownloadingIds((prev) => new Set([...prev, track.id]));
     try {
       const res = await fetch(`/api/stream/${encodeURIComponent(track.id)}`);
@@ -286,6 +387,7 @@ function MusicApp() {
   const current = queue[index];
   const currentRef = useRef<Track | undefined>(undefined);
   currentRef.current = current;
+  const previousTrackRef = useRef<Track | null>(null);
   const queueRef = useRef<Track[]>([]);
   queueRef.current = queue;
   const recsRef = useRef<Track[]>([]);
@@ -369,9 +471,18 @@ function MusicApp() {
     [],
   );
 
+  const consecutiveErrorsRef = useRef<number>(0);
+  const lastErrorTimeRef = useRef<number>(0);
+
   // --- Player ---
   const player = useAudioPlayer({
+    onSponsorBlockSkipped: (category) => {
+      const label = category === "sponsor" ? "Sponsor pitch" : category === "intro" ? "Intro" : category === "outro" ? "Outro" : category;
+      setMessage(`SponsorBlock: Skipped ${label}`);
+      setTimeout(() => setMessage(null), 3000);
+    },
     getNextTrack: () => {
+
       if (repeatModeRef.current === "one") {
         const cur = currentRef.current;
         if (cur) return { id: cur.id, previewUrl: cur.previewUrl };
@@ -390,7 +501,11 @@ function MusicApp() {
     },
     onEnded: () => {
       const track = currentRef.current;
-      if (track) logComplete(track);
+      if (track) {
+        logComplete(track);
+        contextEngine.recordCompletion(track, previousTrackRef.current);
+        previousTrackRef.current = track;
+      }
 
       // Repeat One Mode: replay current song
       if (repeatModeRef.current === "one" && track) {
@@ -432,6 +547,22 @@ function MusicApp() {
     },
     onError: (msg) => {
       console.warn("[Player] Stream notice:", msg);
+      const now = Date.now();
+      if (now - lastErrorTimeRef.current < 60_000) {
+        consecutiveErrorsRef.current += 1;
+      } else {
+        consecutiveErrorsRef.current = 1;
+      }
+      lastErrorTimeRef.current = now;
+
+      // Protection for screen-off error loops: stop if 4 consecutive tracks fail
+      if (consecutiveErrorsRef.current >= 4) {
+        player.pause();
+        setMessage("Playback stopped — several tracks failed to load");
+        setTimeout(() => setMessage(null), 5000);
+        return;
+      }
+
       setMessage("Audio stream unavailable, skipping to next track...");
       setTimeout(() => setMessage(null), 3000);
       setTimeout(() => {
@@ -467,8 +598,11 @@ function MusicApp() {
   const startQueue = useCallback(
     (tracks: Track[], startIndex = 0) => {
       if (tracks.length === 0) return;
-      setQueue(tracks);
-      setIndex(startIndex);
+      const dq = dedupeTracks(tracks);
+      setQueue(dq);
+      const targetId = tracks[startIndex]?.id;
+      const newIdx = targetId ? dq.findIndex((t) => t.id === targetId) : 0;
+      setIndex(newIdx !== -1 ? newIdx : 0);
     },
     [],
   );
@@ -492,7 +626,8 @@ function MusicApp() {
 
   const enqueue = useCallback((tracks: Track[]) => {
     setQueue((prev) => {
-      const newTracks = tracks.filter((t) => !trackExistsIn(prev, t as TrackLike));
+      const batch = dedupeTracks(tracks);
+      const newTracks = batch.filter((t) => !trackExistsIn(prev, t as TrackLike));
       if (newTracks.length === 0 && tracks.length > 0) {
         setMessage("Already in queue");
         setTimeout(() => setMessage(null), 2000);
@@ -525,7 +660,8 @@ function MusicApp() {
         });
         if (res.tracks) {
           const pureMusic = res.tracks as Track[];
-          setMixTracks((prev) => ({ ...prev, [kind]: dedupeTracks(pureMusic) }));
+          const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+          setMixTracks((prev) => ({ ...prev, [kind]: ranked }));
         }
       } finally {
         setMixLoading(false);
@@ -545,10 +681,33 @@ function MusicApp() {
       });
       if (res.tracks) {
         const pureMusic = res.tracks as Track[];
-        setTrendingList(dedupeTracks(pureMusic));
+        const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+        setTrendingList(ranked);
       }
     } catch {}
   }, [runTrending, settings.languages]);
+
+  const loadDailyMix = useCallback(async () => {
+    setDailyMixLoading(true);
+    try {
+      const res = await runDailyMix({
+        data: {
+          languages: settings.languages,
+          artists: topArtists(stats, likes),
+          liked: likes.slice(0, 15).map(trackLabel),
+          count: 24,
+        },
+      });
+      if (res.tracks) {
+        const pureMusic = res.tracks as Track[];
+        const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+        setDailyMixTracks(ranked);
+      }
+    } catch {}
+    finally {
+      setDailyMixLoading(false);
+    }
+  }, [runDailyMix, settings.languages, stats, likes]);
 
   const loadRecommendations = useCallback(
     async (mood?: string) => {
@@ -574,7 +733,8 @@ function MusicApp() {
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
-              setRecs(dedupeTracks(pureMusic));
+              const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+              setRecs(ranked);
             }
           })(),
           (async () => {
@@ -587,7 +747,8 @@ function MusicApp() {
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
-              setTrendingList(dedupeTracks(pureMusic));
+              const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+              setTrendingList(ranked);
             }
           })(),
           (async () => {
@@ -607,15 +768,19 @@ function MusicApp() {
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
-              setMixTracks((prev) => ({ ...prev, newrelease: dedupeTracks(pureMusic) }));
+              const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+              setMixTracks((prev) => ({ ...prev, newrelease: ranked }));
             }
+          })(),
+          (async () => {
+            await loadDailyMix();
           })(),
         ]);
       } finally {
         setRecLoading(false);
       }
     },
-    [runRecommend, runTrending, runMix, likes, history, dislikes, stats, settings],
+    [runRecommend, runTrending, runMix, loadDailyMix, likes, history, dislikes, stats, settings],
   );
 
   const loadMoreRecommendations = useCallback(
@@ -640,7 +805,8 @@ function MusicApp() {
         });
         if (res.tracks && res.tracks.length > 0) {
           const pureMusic = res.tracks as Track[];
-          setRecs((prev) => dedupeTracks([...prev, ...pureMusic]));
+          const ranked = contextEngine.rankTracks(pureMusic, currentRef.current);
+          setRecs((prev) => dedupeTracks([...prev, ...ranked]));
         }
       } finally {
         setLoadingMoreRecs(false);
@@ -669,9 +835,10 @@ function MusicApp() {
           }
           if (radioRes.tracks && radioRes.tracks.length > 0) {
             const pureMusic = radioRes.tracks as Track[];
+            const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
             let added: Track[] = [];
             setQueue((prev) => {
-              added = pureMusic.filter((t) => !trackExistsIn(prev, t as TrackLike));
+              added = ranked.filter((t) => !trackExistsIn(prev, t as TrackLike));
               return added.length > 0 ? [...prev, ...added] : prev;
             });
             if (added.length > 0) return added;
@@ -698,9 +865,10 @@ function MusicApp() {
       });
       if (res.tracks && res.tracks.length > 0) {
         const pureMusic = res.tracks as Track[];
+        const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
         let added: Track[] = [];
         setQueue((prev) => {
-          added = pureMusic.filter((t) => !trackExistsIn(prev, t as TrackLike));
+          added = ranked.filter((t) => !trackExistsIn(prev, t as TrackLike));
           return added.length > 0 ? [...prev, ...added] : prev;
         });
         return added;
@@ -743,6 +911,15 @@ function MusicApp() {
   );
 
   const goNext = useCallback(() => {
+    const currentTrack = currentRef.current;
+    if (currentTrack) {
+      if (player.position > 0 && player.position < 25) {
+        logSkip(currentTrack);
+        contextEngine.recordSkip(currentTrack);
+      }
+      previousTrackRef.current = currentTrack;
+    }
+
     const q = queueRef.current;
     const i = indexRef.current;
     const nextIdx = findNextValidTrackIndex(q, i, false);
@@ -758,14 +935,15 @@ function MusicApp() {
     }
 
     // 2. Queue reached the end: find unplayed tracks from recs, trending, or mixTracks
-    const existingIds = new Set(q.map((t) => t.id));
-    const pool = [
+    const pool = dedupeTracks([
       ...recsRef.current,
       ...trendingRef.current,
       ...(mixTracksRef.current?.discover || []),
       ...(mixTracksRef.current?.newrelease || []),
-    ];
-    const candidateTracks = pool.filter((t) => !existingIds.has(t.id) && !dislikedIdsRef.current.has(t.id));
+    ]);
+    const candidateTracks = pool.filter(
+      (t) => !trackExistsIn(q, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
+    );
 
     if (candidateTracks.length > 0) {
       const added = candidateTracks.slice(0, 10);
@@ -786,7 +964,7 @@ function MusicApp() {
         setIndex(fallbackIdx);
       }
     });
-  }, [extendQueue, findNextValidTrackIndex]);
+  }, [extendQueue, findNextValidTrackIndex, logSkip, player.position]);
 
   const goPrev = useCallback(() => {
     const q = queueRef.current;
@@ -801,10 +979,12 @@ function MusicApp() {
   const dislikeCurrent = useCallback(() => {
     const track = currentRef.current;
     if (!track) return;
+    logSkip(track);
+    contextEngine.recordSkip(track);
     toggleDislike(track);
     setRecs((prev) => prev.filter((t) => t.id !== track.id));
     goNext();
-  }, [toggleDislike, goNext]);
+  }, [toggleDislike, logSkip, goNext]);
 
   // --- Global Keyboard Shortcuts ---
   useKeyboardShortcuts({
@@ -953,7 +1133,10 @@ function MusicApp() {
     if (loadedTrackIdRef.current === track.id) return;
     loadedTrackIdRef.current = track.id;
 
-    const resumeAt = resumeRef.current;
+    const isPodcast = isPodcastTrack(track) || parseDurationSeconds(track.duration) > 900;
+    const podcastSavedPos = isPodcast ? getPodcastResumePosition(track.id) : 0;
+    const resumeAt = resumeRef.current !== null ? resumeRef.current : (podcastSavedPos > 0 ? podcastSavedPos : null);
+
     if (resumeAt !== null) {
       resumeRef.current = null;
       cue(track.id, resumeAt, track.previewUrl);
@@ -977,38 +1160,65 @@ function MusicApp() {
     void load(track.id, track.previewUrl);
   }, [current?.id, player.ready, load, cue]);
 
-  // Track play count after 5 continuous seconds of playback without re-triggering audio loading
-  const logPlayRef = useRef(logPlay);
-  logPlayRef.current = logPlay;
   const isPlayingRef = useRef(player.isPlaying);
   isPlayingRef.current = player.isPlaying;
+  const playerPositionRef = useRef(player.position);
+  playerPositionRef.current = player.position;
+
+  // Track play count after 5 cumulative seconds of active playback without misfiring on pause or seeks
+  const logPlayRef = useRef(logPlay);
+  logPlayRef.current = logPlay;
+  const loggedPlayTrackIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const track = current;
     if (!track) return;
-    const playTimer = window.setTimeout(() => {
-      if (isPlayingRef.current) {
-        logPlayRef.current(track);
+    let listened = 0;
+    let last = playerPositionRef.current;
+    const iv = window.setInterval(() => {
+      const pos = playerPositionRef.current;
+      if (isPlayingRef.current && typeof pos === "number" && typeof last === "number") {
+        const delta = pos - last;
+        if (delta > 0 && delta <= 2) listened += delta; // cap 2s/tick => seeks don't count
       }
-    }, 5000);
-    return () => window.clearTimeout(playTimer);
+      last = pos;
+      if (listened >= 5 && loggedPlayTrackIdRef.current !== track.id) {
+        loggedPlayTrackIdRef.current = track.id;
+        logPlayRef.current(track);
+        window.clearInterval(iv);
+      }
+    }, 1000);
+
+    return () => window.clearInterval(iv);
   }, [current?.id]);
 
-  // Pre-warm the next upcoming track's audio stream in background for zero-gap playback
+  // Reset consecutive playback errors once audio successfully plays
   useEffect(() => {
-    const nextTrack = queue[index + 1];
-    if (nextTrack && !nextTrack.previewUrl) {
-      void runPrewarm({ data: { ids: [nextTrack.id] } });
+    if (player.isPlaying) {
+      consecutiveErrorsRef.current = 0;
+    }
+  }, [player.isPlaying]);
+
+  // Pre-warm the next upcoming 3 tracks' audio streams in background for zero-gap screen-off playback
+  useEffect(() => {
+    const upcoming = queue
+      .slice(index + 1, index + 4)
+      .filter((t) => !t.previewUrl)
+      .map((t) => t.id);
+    if (upcoming.length > 0) {
+      void runPrewarm({ data: { ids: upcoming } });
     }
   }, [index, queue, runPrewarm]);
-
-  const playerPositionRef = useRef(player.position);
-  playerPositionRef.current = player.position;
 
   useEffect(() => {
     if (!resumed || queue.length === 0) return;
     const timer = window.setInterval(() => {
-      writePlayback({ queue, index, position: playerPositionRef.current });
+      const pos = playerPositionRef.current;
+      writePlayback({ queue, index, position: pos });
+      const cur = currentRef.current;
+      if (cur && (isPodcastTrack(cur) || parseDurationSeconds(cur.duration) > 900)) {
+        savePodcastResumePosition(cur.id, pos);
+      }
     }, 5000);
     return () => window.clearInterval(timer);
   }, [resumed, queue, index]);
@@ -1127,6 +1337,15 @@ function MusicApp() {
         userName={auth.profile?.display_name ?? auth.email?.split("@")[0] ?? "Listener"}
         userInitial={auth.email?.[0]?.toUpperCase() ?? "L"}
         userAvatar={auth.profile?.avatar_url ?? null}
+        onSignIn={() => {
+          setDrawerOpen(false);
+          void navigate({ to: "/auth" });
+        }}
+        onSignOut={async () => {
+          await auth.signOut();
+          setMessage("Signed out successfully");
+          setTimeout(() => setMessage(null), 3000);
+        }}
       />
 
       {/* Main column */}
@@ -1274,6 +1493,7 @@ function MusicApp() {
                   {/* Home Sections — mobile horizontal scroll */}
                   <MobileHomeSections
                     recentlyPlayed={history.filter(isMusicTrack).slice(0, 12)}
+                    dailyMix={dailyMixTracks}
                     trending={trendingList.length > 0 ? trendingList : recs.slice(0, 12)}
                     newReleases={mixTracks.newrelease.slice(0, 12)}
                     recommended={recs}
@@ -1291,6 +1511,7 @@ function MusicApp() {
                     isPlaying={player.isPlaying}
                     loading={recLoading && recs.length === 0}
                   />
+
 
                 {/* Explore More Songs for low-bandwidth incremental discovery */}
                 {recs.length > 0 && (
@@ -1842,6 +2063,30 @@ function MusicApp() {
           userEmail={auth.email}
           userProfile={auth.profile}
           onSignOut={auth.signOut}
+          onLibraryRestored={() => window.location.reload()}
+        />
+
+
+        {/* NEW USER ONBOARDING MODAL (SONG LANGUAGES & FAVOURITE ARTISTS) */}
+        <OnboardingModal
+          open={showOnboarding}
+          onOpenChange={setShowOnboarding}
+          currentLanguages={settings.languages}
+          currentArtists={settings.artists}
+          onSave={(data) => {
+            updateSettings({ languages: data.languages, artists: data.artists });
+            if (typeof window !== "undefined") {
+              localStorage.setItem("melodymap.onboarded.v1", "true");
+            }
+            setShowOnboarding(false);
+            setMessage("Preferences saved! Loading your personalized music...");
+            setTimeout(() => setMessage(null), 3500);
+            void loadRecommendations();
+          }}
+          onOpenSettings={() => {
+            setShowOnboarding(false);
+            setShowSettings(true);
+          }}
         />
 
         {/* KEYBOARD SHORTCUTS MODAL */}

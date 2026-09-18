@@ -11,6 +11,8 @@ export type Track = {
   previewUrl?: string;
   /** Source provider: "youtube" (default) or "deezer". */
   source?: "youtube" | "deezer";
+  album?: string;
+  year?: string;
 };
 
 export type Playlist = {
@@ -171,171 +173,31 @@ const PLAYLISTS_KEY = "melodymap.playlists.v1";
 export const SETTINGS_KEY = "melodymap.recsettings.v1";
 const STATS_KEY = "melodymap.stats.v1";
 
-const NON_MUSIC_KEYWORDS = [
-  "podcast",
-  "podcasts",
-  "episode",
-  "ep.",
-  "ep ",
-  "#ep",
-  "interview",
-  "reaction",
-  "review",
-  "vlog",
-  "talk show",
-  "talkshow",
-  "audiobook",
-  "documentary",
-  "news",
-  "discussion",
-  "debate",
-  "speech",
-  "lecture",
-  "commentary",
-  "chapter",
-  "session",
-  "full movie",
-  "trailer",
-  "teaser",
-  "making of",
-  "standup",
-  "comedy show",
-  "livestream",
-  "live stream",
-  "raj shamani",
-  "ranveer allahbadia",
-  "beerbiceps",
-  "prakhar",
-  "samay raina",
-  "huberman",
-  "rogan",
-  "lex fridman",
-];
+import {
+  isMusicTrack,
+  isPodcastTrack,
+  parseDurationSeconds,
+  parseDurationSeconds as parseDurationSecs,
+  NON_MUSIC_KEYWORDS,
+  COMPILATION_KEYWORDS,
+  JUNK_MEDIA_KEYWORDS,
+  PODCAST_POSITIVE_KEYWORDS,
+} from "./track-filters";
 
-const COMPILATION_KEYWORDS = [
-  "jukebox",
-  "audio playlist",
-  "compilation",
-  "non-stop",
-  "nonstop",
-  "mega mix",
-  "megamix",
-  "best of",
-  "greatest hits",
-  "top 10",
-  "top 20",
-  "top 30",
-  "top 40",
-  "top 50",
-  "top 100",
-  "superhit",
-  "full album",
-  "hits collection",
-  "audio jukebox",
-  "collection",
-  "bundle",
-  "all songs",
-  "discography",
-  "medley",
-  "soundtrack collection",
-  "all hit songs",
-  "continuous mix",
-];
-
-const PODCAST_POSITIVE_KEYWORDS = [
-  "podcast",
-  "episode",
-  "ep.",
-  "ep ",
-  "#ep",
-  "interview",
-  "discussion",
-  "conversation",
-  "audiobook",
-  "talk show",
-  "talkshow",
-  "series",
-  "huberman",
-  "rogan",
-  "lex fridman",
-  "beerbiceps",
-  "raj shamani",
-  "ranveer allahbadia",
-  "prakhar",
-  "samay raina",
-  "audio show",
-  "storytelling",
-  "stories",
-  "lecture",
-  "documentary",
-  "masterclass",
-  "deep dive",
-];
-
-const JUNK_MEDIA_KEYWORDS = [
-  "trailer",
-  "teaser",
-  "gameplay",
-  "reaction",
-  "review",
-  "vlog",
-  "shorts",
-  "tiktok",
-  "unboxing",
-  "prank",
-  "making of",
-  "behind the scenes",
-  "tutorial",
-  "comedy scene",
-  "funny clips",
-  "status video",
-  "whatsapp status",
-];
-
-export function parseDurationSecs(dur: string | undefined): number {
-  if (!dur) return 0;
-  const parts = dur.split(":").map((p) => Number(p));
-  if (parts.some((n) => Number.isNaN(n))) return 0;
-  return parts.reduce((acc, n) => acc * 60 + n, 0);
-}
-
-/**
- * Strict validator to guarantee a track is a single, pure musical song.
- */
-export function isMusicTrack(track: Track | undefined | null): boolean {
-  if (!track || !track.title) return false;
-  const title = track.title.toLowerCase();
-  const artist = (track.artist || "").toLowerCase();
-  if (NON_MUSIC_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
-  if (JUNK_MEDIA_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
-  const secs = parseDurationSecs(track.duration);
-  if (secs > 0 && (secs < 30 || secs > 900)) return false;
-  return true;
-}
-
-/**
- * Strict validator to guarantee a track is a genuine podcast episode.
- */
-export function isPodcastTrack(track: Track | undefined | null): boolean {
-  if (!track || !track.title) return false;
-  const title = track.title.toLowerCase();
-  const artist = (track.artist || "").toLowerCase();
-
-  // Reject junk non-audio media
-  if (JUNK_MEDIA_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
-
-  const secs = parseDurationSecs(track.duration);
-  const hasPodcastSignal = PODCAST_POSITIVE_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw));
-
-  if (hasPodcastSignal) return true;
-  // If no explicit keyword, must be long-form audio (>= 5 mins) and NOT a standard music song
-  if (secs >= 300 && !isMusicTrack(track)) return true;
-
-  return false;
-}
+export {
+  isMusicTrack,
+  isPodcastTrack,
+  parseDurationSeconds,
+  parseDurationSecs,
+  NON_MUSIC_KEYWORDS,
+  COMPILATION_KEYWORDS,
+  JUNK_MEDIA_KEYWORDS,
+  PODCAST_POSITIVE_KEYWORDS,
+};
 
 /** Behavioural signal per song: how often it's replayed vs skipped, and when. */
 export type PlayStat = {
+
   track: Track;
   plays: number;
   skips: number;
@@ -432,6 +294,7 @@ type LibraryDoc = {
   likes: Track[];
   dislikes: Track[];
   history: Track[];
+  podcastHistory?: Track[];
   playlists: Playlist[];
   settings: RecSettings;
   stats?: Stats;
@@ -482,6 +345,8 @@ export function useLibrary(userId?: string | null) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [settings, setSettings] = useState<RecSettings>(DEFAULT_SETTINGS);
   const [stats, setStats] = useState<Stats>({});
+  const [syncedUser, setSyncedUser] = useState<string | null>(null);
+  const pullingRef = useRef(false);
 
   useEffect(() => {
     // 1. Sanitize likes: keep only pure music tracks
@@ -516,67 +381,89 @@ export function useLibrary(userId?: string | null) {
 
 
   /** Pull the account copy once per sign-in and merge it with what's on device. */
-  const pulled = useRef<string | null>(null);
   useEffect(() => {
-    if (!hydrated || !userId || pulled.current === userId) return;
-    pulled.current = userId;
+    if (!hydrated || !userId || syncedUser === userId || pullingRef.current) return;
+    pullingRef.current = true;
     let cancelled = false;
-    void import("@/integrations/supabase/client").then(async ({ supabase }) => {
-      const { data } = await supabase
-        .from("user_library")
-        .select("data")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (cancelled || !data?.data) return;
-      const doc = data.data as Partial<LibraryDoc>;
-      setLikes((prev) => {
-        const next = mergeById((doc.likes ?? []).filter(isMusicTrack), prev, 200);
-        write(LIKES_KEY, next);
-        return next;
-      });
-      setDislikes((prev) => {
-        const next = mergeById(doc.dislikes ?? [], prev, 200);
-        write(DISLIKES_KEY, next);
-        return next;
-      });
-      setHistory((prev) => {
-        const next = mergeById(prev, (doc.history ?? []).filter(isMusicTrack), 200);
-        write(HISTORY_KEY, next);
-        return next;
-      });
-      setPlaylists((prev) => {
-        const next = mergeById(doc.playlists ?? [], prev, 200);
-        write(PLAYLISTS_KEY, next);
-        return next;
-      });
-      if (doc.stats) {
-        setStats((prev) => {
-          const next = mergeStats(prev, doc.stats ?? {});
-          write(STATS_KEY, next);
-          return next;
-        });
+
+    void (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data } = await supabase
+          .from("user_library")
+          .select("data")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (data?.data) {
+          const doc = data.data as Partial<LibraryDoc>;
+          setLikes((prev) => {
+            const next = mergeById((doc.likes ?? []).filter(isMusicTrack), prev, 200);
+            write(LIKES_KEY, next);
+            return next;
+          });
+          setDislikes((prev) => {
+            const next = mergeById(doc.dislikes ?? [], prev, 200);
+            write(DISLIKES_KEY, next);
+            return next;
+          });
+          setHistory((prev) => {
+            const next = mergeById(prev, (doc.history ?? []).filter(isMusicTrack), 200);
+            write(HISTORY_KEY, next);
+            return next;
+          });
+          if (doc.podcastHistory) {
+            setPodcastHistory((prev) => {
+              const next = mergeById(prev, doc.podcastHistory ?? [], 200);
+              write(PODCAST_HISTORY_KEY, next);
+              return next;
+            });
+          }
+          setPlaylists((prev) => {
+            const next = mergeById(doc.playlists ?? [], prev, 200);
+            write(PLAYLISTS_KEY, next);
+            return next;
+          });
+          if (doc.stats) {
+            setStats((prev) => {
+              const next = mergeStats(prev, doc.stats ?? {});
+              write(STATS_KEY, next);
+              return next;
+            });
+          }
+          if (doc.settings) {
+            const next = { ...DEFAULT_SETTINGS, ...doc.settings };
+            setSettings(next);
+            write(SETTINGS_KEY, next);
+          }
+        }
+        // Mark synced only AFTER pull finishes and merges so push won't overwrite cloud data
+        setSyncedUser(userId);
+      } catch (err) {
+        console.warn("[MelodyMap] Initial cloud pull error:", err);
+        // Allow push on failure after attempt
+        setSyncedUser(userId);
+      } finally {
+        pullingRef.current = false;
       }
-      if (doc.settings) {
-        const next = { ...DEFAULT_SETTINGS, ...doc.settings };
-        setSettings(next);
-        write(SETTINGS_KEY, next);
-      }
-    });
+    })();
 
     return () => {
       cancelled = true;
     };
-  }, [hydrated, userId]);
+  }, [hydrated, userId, syncedUser]);
 
   useEffect(() => {
     if (!userId) {
-      pulled.current = null;
+      setSyncedUser(null);
     }
   }, [userId]);
 
   /** Push changes back to the account, debounced so typing/likes don't spam it. */
   useEffect(() => {
-    if (!hydrated || !userId || pulled.current !== userId) return;
+    if (!hydrated || !userId || syncedUser !== userId) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
@@ -588,6 +475,7 @@ export function useLibrary(userId?: string | null) {
             likes,
             dislikes,
             history: history.slice(0, 100),
+            podcastHistory: podcastHistory.slice(0, 100),
             playlists,
             settings,
             stats,
@@ -602,7 +490,7 @@ export function useLibrary(userId?: string | null) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [hydrated, userId, likes, dislikes, history, playlists, settings, stats]);
+  }, [hydrated, userId, syncedUser, likes, dislikes, history, podcastHistory, playlists, settings, stats]);
 
 
 
@@ -926,3 +814,60 @@ export function sequenceBrief(history: Track[], stats: Stats, limit = 15): strin
     return `${trackLabel(t)} — ${action}`;
   });
 }
+
+export type LibraryBackup = {
+  version: 1;
+  exportedAt: number;
+  likes: Track[];
+  dislikes: Track[];
+  history: Track[];
+  podcastHistory: Track[];
+  playlists: Playlist[];
+  settings: RecSettings;
+  stats: Stats;
+};
+
+/**
+ * 1-Click Library Export: Serializes all user library data into a clean JSON backup.
+ */
+export function exportLibraryData(): string {
+  if (typeof window === "undefined") return "{}";
+  const data: LibraryBackup = {
+    version: 1,
+    exportedAt: Date.now(),
+    likes: read<Track[]>(LIKES_KEY, []),
+    dislikes: read<Track[]>(DISLIKES_KEY, []),
+    history: read<Track[]>(HISTORY_KEY, []),
+    podcastHistory: read<Track[]>(PODCAST_HISTORY_KEY, []),
+    playlists: read<Playlist[]>(PLAYLISTS_KEY, []),
+    settings: read<RecSettings>(SETTINGS_KEY, DEFAULT_SETTINGS),
+    stats: read<Stats>(STATS_KEY, {}),
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+/**
+ * 1-Click Library Import: Restores user library data from a JSON backup.
+ */
+export function importLibraryData(jsonString: string): { success: boolean; error?: string } {
+  if (typeof window === "undefined") return { success: false, error: "No window context" };
+  try {
+    const data = JSON.parse(jsonString) as Partial<LibraryBackup>;
+    if (!data || typeof data !== "object") {
+      return { success: false, error: "Invalid backup format" };
+    }
+
+    if (Array.isArray(data.likes)) write(LIKES_KEY, data.likes);
+    if (Array.isArray(data.dislikes)) write(DISLIKES_KEY, data.dislikes);
+    if (Array.isArray(data.history)) write(HISTORY_KEY, data.history);
+    if (Array.isArray(data.podcastHistory)) write(PODCAST_HISTORY_KEY, data.podcastHistory);
+    if (Array.isArray(data.playlists)) write(PLAYLISTS_KEY, data.playlists);
+    if (data.settings && typeof data.settings === "object") write(SETTINGS_KEY, data.settings);
+    if (data.stats && typeof data.stats === "object") write(STATS_KEY, data.stats);
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Invalid JSON syntax" };
+  }
+}
+

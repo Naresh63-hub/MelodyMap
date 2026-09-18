@@ -1,63 +1,32 @@
 /**
  * Resolves a direct, ad-free audio stream URL for a YouTube video.
  *
- * Primary strategy: @distube/ytdl-core — the same engine that powers
- * yt-dlp, SimpMusic, Nuclear, and most open-source YouTube Music clients.
- * It handles signature decryption, player-client rotation, and format
- * selection automatically.
+ * Primary strategy: @distube/ytdl-core / yt-dlp.
+ * Fallback: direct YouTube InnerTube player API (Android client emulation).
  *
- * Fallback: manual YouTube player API calls (the previous approach) for
- * resilience if ytdl-core is ever rate-limited or blocked.
- *
- * Resolved URLs are cached for 25 minutes (YouTube stream URLs typically
- * expire after ~6 hours, so this is well within the safe window).
- *
- * A lightweight circuit breaker prevents hammering YouTube when it's
- * rate-limiting or blocking — after N consecutive failures we back off
- * for a cooldown period instead of burning CPU on doomed requests.
+ * Resolved URLs are verified with byte-range probe checks and cached in LRU.
  */
 
-// ─── Stream URL cache (LRU, 25-min TTL) ──────────────────────────────
+import { createLruCache } from "./lru-cache";
 
-const CACHE_TTL = 25 * 60 * 1000; // 25 minutes
-const CACHE_MAX = 200;
+export type StreamQuality = "saver" | "standard" | "high";
 
-type CacheEntry = {
+export type StreamMeta = {
   url: string;
   mimeType: string;
   contentLength: number | null;
   audioBitrate: number | null;
-  at: number;
 };
 
-const streamCache = new Map<string, CacheEntry>();
+// ─── Stream URL cache (LRU, 25-min TTL) ──────────────────────────────
 
-function cacheGet(videoId: string): CacheEntry | null {
-  const entry = streamCache.get(videoId);
-  if (!entry) return null;
-  if (Date.now() - entry.at > CACHE_TTL) {
-    streamCache.delete(videoId);
-    return null;
-  }
-  // Refresh LRU position
-  streamCache.delete(videoId);
-  streamCache.set(videoId, entry);
-  return entry;
-}
-
-function cacheSet(videoId: string, entry: CacheEntry) {
-  // Evict oldest entries when full
-  while (streamCache.size >= CACHE_MAX) {
-    const oldest = streamCache.keys().next().value;
-    if (oldest) streamCache.delete(oldest);
-    else break;
-  }
-  streamCache.set(videoId, entry);
-}
+const streamCache = createLruCache<StreamMeta>(200, 25 * 60 * 1000);
 
 /** Invalidate a cached stream URL (e.g. when playback fails mid-stream). */
 export function invalidateStreamCache(videoId: string) {
-  streamCache.delete(videoId);
+  streamCache.delete(`${videoId}:high`);
+  streamCache.delete(`${videoId}:standard`);
+  streamCache.delete(`${videoId}:saver`);
 }
 
 const BROWSER_UA =
@@ -96,7 +65,7 @@ function recordFailure() {
  * Some resolved URLs are throttled and answer 403 — check that the bytes
  * actually flow before handing the URL to the player.
  */
-async function probeStream(url: string): Promise<boolean> {
+export async function probeStream(url: string): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8_000);
@@ -122,169 +91,228 @@ async function probeStream(url: string): Promise<boolean> {
 
 // ─── yt-dlp resolver ──────────────────────────────────────────────────
 
-export type StreamQuality = "saver" | "standard" | "high";
+const EXTRACTOR_CLIENT_PRESETS = [
+  "youtube:player_client=android,tv_embedded",
+  "youtube:player_client=web_safari,ios,mweb",
+  "youtube:player_client=web,mweb",
+];
 
 async function resolveWithYtDlp(
   videoId: string,
   quality: StreamQuality = "high",
-): Promise<CacheEntry | null> {
+): Promise<StreamMeta | null> {
+  const { default: youtubedl } = await import("youtube-dl-exec");
+
+  for (const extractorArgs of EXTRACTOR_CLIENT_PRESETS) {
+    try {
+      const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+        dumpJson: true,
+        noCheckCertificates: true,
+        noWarnings: true,
+        preferFreeFormats: true,
+        extractorArgs,
+      } as any);
+
+      const fmts = (output as any).formats || [];
+
+      // Priority 1: Pure audio-only formats (no video tracks)
+      const audioFormats = fmts.filter(
+        (f: any) =>
+          f.url &&
+          f.acodec &&
+          f.acodec !== "none" &&
+          (!f.vcodec || f.vcodec === "none"),
+      );
+
+      // If audio-only formats exist for this client preset, probe and sort them
+      if (audioFormats.length > 0) {
+        if (quality === "saver") {
+          audioFormats.sort((a: any, b: any) => (a.abr || 0) - (b.abr || 0));
+        } else if (quality === "standard") {
+          audioFormats.sort(
+            (a: any, b: any) =>
+              Math.abs((a.abr || 128) - 128) - Math.abs((b.abr || 128) - 128),
+          );
+        } else {
+          audioFormats.sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0));
+        }
+
+        for (const bestFormat of audioFormats.slice(0, 3)) {
+          if (!bestFormat || !bestFormat.url) continue;
+
+          const isHealthy = await probeStream(bestFormat.url);
+          if (!isHealthy) continue;
+
+          const contentLen = bestFormat.filesize || bestFormat.filesize_approx;
+          return {
+            url: bestFormat.url,
+            mimeType: bestFormat.ext === "webm" ? "audio/webm" : "audio/mp4",
+            contentLength: contentLen ? Number(contentLen) : null,
+            audioBitrate: bestFormat.abr ? Number(bestFormat.abr) * 1000 : null,
+          };
+        }
+      }
+
+      // If this preset returned no audio-only formats, continue loop to try next client preset
+    } catch (presetErr) {
+      console.warn(`[stream] yt-dlp preset (${extractorArgs}) failed for ${videoId}:`, presetErr);
+    }
+  }
+
+  // Last resort fallback across all formats (muxed with audio) if no audio-only client succeeded
   try {
-    const { default: youtubedl } = await import("youtube-dl-exec");
     const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
       dumpJson: true,
       noCheckCertificates: true,
       noWarnings: true,
       preferFreeFormats: true,
-      extractorArgs: "youtube:player_client=android,tv_embedded",
+      extractorArgs: "youtube:player_client=web_safari,ios,mweb",
     } as any);
 
     const fmts = (output as any).formats || [];
+    const muxedAudio = fmts.filter((f: any) => f.url && f.acodec && f.acodec !== "none");
+    for (const format of muxedAudio.slice(0, 2)) {
+      if (await probeStream(format.url)) {
+        const contentLen = format.filesize || format.filesize_approx;
+        return {
+          url: format.url,
+          mimeType: format.ext === "webm" ? "audio/webm" : "audio/mp4",
+          contentLength: contentLen ? Number(contentLen) : null,
+          audioBitrate: format.abr ? Number(format.abr) * 1000 : null,
+        };
+      }
+    }
+  } catch (lastErr) {
+    console.warn(`[stream] yt-dlp final fallback failed for ${videoId}:`, lastErr);
+  }
 
-    // Audio-only formats: has audio, no video.
-    const audioFormats = fmts.filter(
-      (f: any) =>
-        f.url &&
-        f.acodec &&
-        f.acodec !== "none" &&
-        (!f.vcodec || f.vcodec === "none"),
+  return null;
+}
+
+// ─── InnerTube Player Fallback (Direct YouTube API) ───────────────────
+
+async function resolveWithInnerTubePlayer(
+  videoId: string,
+  quality: StreamQuality = "high",
+): Promise<StreamMeta | null> {
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11; Pixel 5) gzip",
+        "X-YouTube-Client-Name": "3",
+        "X-YouTube-Client-Version": "19.09.37",
+      },
+      body: JSON.stringify({
+        videoId,
+        context: {
+          client: {
+            clientName: "ANDROID",
+            clientVersion: "19.09.37",
+            androidSdkVersion: 30,
+            hl: "en",
+            gl: "US",
+          },
+        },
+      }),
+    });
+
+    if (!res.ok) return null;
+
+    const data = (await res.json()) as any;
+    const adaptiveFormats = data?.streamingData?.adaptiveFormats;
+    if (!Array.isArray(adaptiveFormats)) return null;
+
+    // Filter audio formats with direct playable URLs
+    const audioFormats = adaptiveFormats.filter(
+      (f: any) => f && f.url && typeof f.mimeType === "string" && f.mimeType.startsWith("audio/"),
     );
 
-    // Fallback: if no audio-only format, try any format with audio
-    const candidates =
-      audioFormats.length > 0
-        ? audioFormats
-        : fmts.filter((f: any) => f.url && f.acodec && f.acodec !== "none");
+    if (audioFormats.length === 0) return null;
 
-    if (candidates.length === 0) {
-      console.warn(`[stream] yt-dlp: no usable audio stream found for ${videoId}`);
-      return null;
-    }
-
-    // Quality-aware sorting:
     if (quality === "saver") {
-      // Smallest bitrate (data saver: ~48-70kbps)
-      candidates.sort((a: any, b: any) => (a.abr || 0) - (b.abr || 0));
+      audioFormats.sort((a: any, b: any) => (a.bitrate || 0) - (b.bitrate || 0));
     } else if (quality === "standard") {
-      // Target ~128kbps
-      candidates.sort(
+      audioFormats.sort(
         (a: any, b: any) =>
-          Math.abs((a.abr || 128) - 128) - Math.abs((b.abr || 128) - 128),
+          Math.abs((a.bitrate || 128000) - 128000) - Math.abs((b.bitrate || 128000) - 128000),
       );
     } else {
-      // High quality (~160-256kbps)
-      candidates.sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0));
+      audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
     }
 
-    for (const bestFormat of candidates.slice(0, 3)) {
-      if (!bestFormat || !bestFormat.url) continue;
-      
-      const isHealthy = await probeStream(bestFormat.url);
-      if (!isHealthy) {
-        console.warn(`[stream] Candidate format failed probe check for ${videoId}, trying next format...`);
-        continue;
-      }
+    for (const fmt of audioFormats.slice(0, 3)) {
+      if (!fmt || !fmt.url) continue;
+      const isHealthy = await probeStream(fmt.url);
+      if (!isHealthy) continue;
 
-      const contentLen = bestFormat.filesize || bestFormat.filesize_approx;
+      const mime = fmt.mimeType.split(";")[0] || "audio/mp4";
+      const contentLen = fmt.contentLength ? Number(fmt.contentLength) : null;
+      const bitrate = fmt.bitrate ? Number(fmt.bitrate) : null;
+
       return {
-        url: bestFormat.url,
-        mimeType: bestFormat.ext === "webm" ? "audio/webm" : "audio/mp4",
-        contentLength: contentLen ? Number(contentLen) : null,
-        audioBitrate: bestFormat.abr ? Number(bestFormat.abr) * 1000 : null,
-        at: Date.now(),
+        url: fmt.url,
+        mimeType: mime,
+        contentLength: contentLen,
+        audioBitrate: bitrate,
       };
     }
 
-    console.warn(`[stream] yt-dlp: all stream candidates failed probe verification for ${videoId}`);
     return null;
   } catch (err) {
-    console.warn(`[stream] yt-dlp resolve error for ${videoId}:`, err);
+    console.warn(`[stream] InnerTube player fallback error for ${videoId}:`, err);
     return null;
   }
 }
 
 const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
 
-// ─── Main resolver ───────────────────────────────────────────────────
+// ─── Main resolvers ───────────────────────────────────────────────────
 
 /**
- * Resolve a direct audio stream URL for a YouTube video ID.
+ * Resolve a stream URL *and* return metadata (content length, MIME type,
+ * bitrate).
+ */
+export async function resolveStreamUrlWithMeta(
+  videoId: string,
+  quality: StreamQuality = "high",
+): Promise<StreamMeta | null> {
+  if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
+    return null;
+  }
+  const cacheKey = `${videoId}:${quality}`;
+  const cached = streamCache.get(cacheKey);
+  if (cached) return cached;
+
+  if (!isCooledDown()) return null;
+
+  // Strategy 1: yt-dlp
+  let entry = await resolveWithYtDlp(videoId, quality);
+
+  // Strategy 2: InnerTube Player direct API fallback
+  if (!entry) {
+    console.info(`[stream] yt-dlp unavailable or failed for ${videoId}, attempting InnerTube fallback...`);
+    entry = await resolveWithInnerTubePlayer(videoId, quality);
+  }
+
+  if (entry) {
+    streamCache.set(cacheKey, entry);
+    recordSuccess();
+    return entry;
+  }
+
+  recordFailure();
+  return null;
+}
+
+/**
+ * Resolve direct audio stream URL for a YouTube video ID.
  */
 export async function resolveStreamUrl(
   videoId: string,
   quality: StreamQuality = "high",
 ): Promise<string | null> {
-  if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
-    return null;
-  }
-  const cacheKey = `${videoId}:${quality}`;
-  const cached = cacheGet(cacheKey);
-  if (cached) return cached.url;
-
-  if (!isCooledDown()) {
-    console.warn(
-      `[stream] Circuit breaker open — skipping resolve for ${videoId}`,
-    );
-    return null;
-  }
-
-  const entry = await resolveWithYtDlp(videoId, quality);
-
-  if (entry) {
-    cacheSet(cacheKey, entry);
-    recordSuccess();
-    return entry.url;
-  }
-
-  recordFailure();
-  console.error(
-    `[stream] All resolve strategies failed for ${videoId}`,
-  );
-  return null;
+  const meta = await resolveStreamUrlWithMeta(videoId, quality);
+  return meta?.url ?? null;
 }
-
-/**
- * Resolve a stream URL *and* return metadata (content length, MIME type,
- * bitrate). Useful for the proxy server to skip the HEAD probe.
- */
-export async function resolveStreamUrlWithMeta(
-  videoId: string,
-  quality: StreamQuality = "high",
-): Promise<{
-  url: string;
-  mimeType: string;
-  contentLength: number | null;
-  audioBitrate: number | null;
-} | null> {
-  if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
-    return null;
-  }
-  const cacheKey = `${videoId}:${quality}`;
-  const cached = cacheGet(cacheKey);
-  if (cached) {
-    return {
-      url: cached.url,
-      mimeType: cached.mimeType,
-      contentLength: cached.contentLength,
-      audioBitrate: cached.audioBitrate,
-    };
-  }
-
-  if (!isCooledDown()) return null;
-
-  const entry = await resolveWithYtDlp(videoId, quality);
-
-  if (entry) {
-    cacheSet(cacheKey, entry);
-    recordSuccess();
-    return {
-      url: entry.url,
-      mimeType: entry.mimeType,
-      contentLength: entry.contentLength,
-      audioBitrate: entry.audioBitrate,
-    };
-  }
-
-  recordFailure();
-  return null;
-}
-

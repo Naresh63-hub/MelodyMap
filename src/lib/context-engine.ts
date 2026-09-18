@@ -66,10 +66,59 @@ interface CompletionRecord {
   timestamp: number;
 }
 
-class ContextEngineSession {
+const STORAGE_KEY = "melodymap.context_engine.v1";
+
+export class ContextEngineSession {
   private skips: SkipRecord[] = [];
   private completions: CompletionRecord[] = [];
   private transitionMatrix = new Map<string, Map<string, number>>();
+
+  constructor() {
+    this.loadFromStorage();
+  }
+
+  /** Load learned state from localStorage */
+  loadFromStorage(): void {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.skips)) this.skips = data.skips.slice(-50);
+      if (Array.isArray(data.completions)) this.completions = data.completions.slice(-50);
+      if (data.transitions && typeof data.transitions === "object") {
+        this.transitionMatrix.clear();
+        for (const [fromArtist, toMap] of Object.entries(data.transitions)) {
+          if (toMap && typeof toMap === "object") {
+            const row = new Map<string, number>();
+            for (const [toArtist, count] of Object.entries(toMap as Record<string, number>)) {
+              row.set(toArtist, Number(count) || 1);
+            }
+            this.transitionMatrix.set(fromArtist, row);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[contextEngine] Failed to restore state:", err);
+    }
+  }
+
+  /** Save learned state to localStorage */
+  saveToStorage(): void {
+    if (typeof window === "undefined") return;
+    try {
+      const transitionsObj: Record<string, Record<string, number>> = {};
+      for (const [fromArtist, toMap] of this.transitionMatrix.entries()) {
+        transitionsObj[fromArtist] = Object.fromEntries(toMap.entries());
+      }
+      const data = {
+        skips: this.skips.slice(-50),
+        completions: this.completions.slice(-50),
+        transitions: transitionsObj,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {}
+  }
 
   /** Record when a user skips a track early (< 25s) */
   recordSkip(track: TrackLike) {
@@ -79,8 +128,8 @@ class ContextEngineSession {
       title: track.title.toLowerCase().trim(),
       timestamp: Date.now(),
     });
-    // Keep last 50 skips
     if (this.skips.length > 50) this.skips.shift();
+    this.saveToStorage();
   }
 
   /** Record when a user completes a track (> 85% played) */
@@ -105,35 +154,40 @@ class ContextEngineSession {
       const count = row.get(normArtist) || 0;
       row.set(normArtist, count + 1);
     }
+    this.saveToStorage();
   }
 
   /**
    * Calculate dynamic affinity score for a track (higher is better).
-   * - Recent skips within 30 min penalize score by up to -0.6.
-   * - Recent completions boost score by +0.3.
-   * - Transition flow affinity from the previous track adds up to +0.5.
+   * - Recent skips within 30 min penalize score by up to -0.7.
+   * - Hard skip filter: 2+ recent skips drops score to 0.05 (near zero).
+   * - Recent completions boost score by +0.35.
+   * - Transition flow affinity from the previous track adds up to +0.45.
    */
   calculateAffinityScore(track: TrackLike, currentTrack?: TrackLike | null): number {
     let score = 1.0;
     const normArtist = (track.artist || "").toLowerCase().trim();
+    const normTitle = (track.title || "").toLowerCase().trim();
     const now = Date.now();
     const HALF_HOUR_MS = 30 * 60 * 1000;
 
-    // 1. Skip penalty with temporal decay
+    // 1. Skip penalty with temporal decay & hard negative threshold
     const recentSkips = this.skips.filter(
-      (s) => s.artist === normArtist && now - s.timestamp < HALF_HOUR_MS
+      (s) => (s.artist === normArtist || s.title === normTitle) && now - s.timestamp < HALF_HOUR_MS,
     );
+    if (recentSkips.length >= 2) {
+      return 0.05; // Hard drop for repeatedly skipped songs/artists
+    }
     if (recentSkips.length > 0) {
-      const penalty = Math.min(0.7, recentSkips.length * 0.25);
-      score -= penalty;
+      score -= Math.min(0.7, recentSkips.length * 0.35);
     }
 
     // 2. Completion reward
     const recentCompletions = this.completions.filter(
-      (c) => c.artist === normArtist && now - c.timestamp < HALF_HOUR_MS
+      (c) => c.artist === normArtist && now - c.timestamp < HALF_HOUR_MS,
     );
     if (recentCompletions.length > 0) {
-      score += Math.min(0.5, recentCompletions.length * 0.15);
+      score += Math.min(0.45, recentCompletions.length * 0.15);
     }
 
     // 3. Sequence transition probability from current playing track
@@ -143,12 +197,12 @@ class ContextEngineSession {
       if (row) {
         const transCount = row.get(normArtist) || 0;
         if (transCount > 0) {
-          score += Math.min(0.4, transCount * 0.1);
+          score += Math.min(0.45, transCount * 0.12);
         }
       }
     }
 
-    return Math.max(0.1, score);
+    return Math.max(0.05, score);
   }
 
   /**
@@ -157,7 +211,7 @@ class ContextEngineSession {
   rankTracks<T extends TrackLike>(
     tracks: T[],
     currentTrack?: TrackLike | null,
-    temporalCtx?: TemporalContext
+    temporalCtx?: TemporalContext,
   ): T[] {
     if (tracks.length <= 1) return tracks;
     const ctx = temporalCtx || getTemporalContext();

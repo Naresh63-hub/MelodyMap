@@ -67,7 +67,8 @@ export function LanguageArtistPicker({
   const removeArtist = (name: string) =>
     onChange({ artists: artists.filter((a) => a !== name) });
 
-  const suggested = SUGGESTED_ARTISTS.filter(
+  const uniqueSuggested = Array.from(new Set(SUGGESTED_ARTISTS));
+  const suggested = uniqueSuggested.filter(
     (a) => !artists.some((x) => x.toLowerCase() === a.toLowerCase()),
   );
 
