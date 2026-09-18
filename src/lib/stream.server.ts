@@ -159,8 +159,9 @@ export async function probeStream(url: string): Promise<boolean> {
 
 // ─── yt-dlp resolver ──────────────────────────────────────────────────
 
-const EXTRACTOR_CLIENT_PRESETS = [
-  "youtube:player_client=android,tv_embedded",
+const EXTRACTOR_CLIENT_PRESETS: Array<string | undefined> = [
+  undefined, // Standard default yt-dlp extraction
+  "youtube:player_client=android,web",
   "youtube:player_client=web_safari,ios,mweb",
   "youtube:player_client=web,mweb",
 ];
@@ -177,8 +178,7 @@ async function resolveWithYtDlp(
         dumpJson: true,
         noCheckCertificates: true,
         noWarnings: true,
-        preferFreeFormats: true,
-        extractorArgs,
+        ...(extractorArgs ? { extractorArgs } : {}),
       } as any);
 
       const fmts = (output as any).formats || [];
@@ -220,21 +220,17 @@ async function resolveWithYtDlp(
           };
         }
       }
-
-      // If this preset returned no audio-only formats, continue loop to try next client preset
     } catch (presetErr) {
-      console.warn(`[stream] yt-dlp preset (${extractorArgs}) failed for ${videoId}:`, presetErr);
+      console.warn(`[stream] yt-dlp preset (${extractorArgs ?? "default"}) failed for ${videoId}:`, presetErr);
     }
   }
 
-  // Last resort fallback across all formats (muxed with audio) if no audio-only client succeeded
+  // Last resort fallback across all formats (muxed with audio) if no audio-only format succeeded
   try {
     const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
       dumpJson: true,
       noCheckCertificates: true,
       noWarnings: true,
-      preferFreeFormats: true,
-      extractorArgs: "youtube:player_client=web_safari,ios,mweb",
     } as any);
 
     const fmts = (output as any).formats || [];
