@@ -7,6 +7,9 @@
  * Resolved URLs are verified with byte-range probe checks and cached in LRU.
  */
 
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { createLruCache } from "./lru-cache";
 
 export type StreamQuality = "saver" | "standard" | "high";
@@ -31,6 +34,71 @@ export function invalidateStreamCache(videoId: string) {
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+
+// ─── Serverless Binary Auto-Resolution (Vercel / Linux) ──────────────
+
+let resolvedYtDlpInstance: any = null;
+let downloadPromise: Promise<void> | null = null;
+
+async function getYtDlpInstance() {
+  const ytdlModule = (await import("youtube-dl-exec")) as any;
+  const create = ytdlModule.create || ytdlModule.default?.create || ytdlModule.default;
+  const constants = ytdlModule.constants || {};
+
+  // 1. Check if the default binary exists on disk
+  if (constants.YOUTUBE_DL_PATH && fs.existsSync(constants.YOUTUBE_DL_PATH)) {
+    resolvedYtDlpInstance = create(constants.YOUTUBE_DL_PATH);
+    return resolvedYtDlpInstance;
+  }
+
+  // 2. Check if cached binary in /tmp already exists
+  const isWindows = process.platform === "win32";
+  const binaryName = isWindows ? "yt-dlp.exe" : "yt-dlp";
+  const tmpPath = path.join(os.tmpdir(), binaryName);
+
+  if (fs.existsSync(tmpPath)) {
+    try {
+      if (!isWindows) {
+        fs.chmodSync(tmpPath, 0o755);
+      }
+      resolvedYtDlpInstance = create(tmpPath);
+      return resolvedYtDlpInstance;
+    } catch {}
+  }
+
+  // 3. Download standalone binary to /tmp if running on serverless Linux (e.g. Vercel)
+  if (!downloadPromise) {
+    downloadPromise = (async () => {
+      try {
+        console.info(`[stream] yt-dlp binary missing from bundle, downloading to ${tmpPath}...`);
+        const downloadUrl = isWindows
+          ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+          : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+        const res = await fetch(downloadUrl);
+        if (res.ok) {
+          const buffer = Buffer.from(await res.arrayBuffer());
+          fs.writeFileSync(tmpPath, buffer);
+          if (!isWindows) {
+            fs.chmodSync(tmpPath, 0o755);
+          }
+          console.info(`[stream] Successfully installed yt-dlp to ${tmpPath}`);
+        }
+      } catch (err) {
+        console.warn(`[stream] Failed to download yt-dlp binary to /tmp:`, err);
+      }
+    })();
+  }
+
+  await downloadPromise;
+
+  if (fs.existsSync(tmpPath)) {
+    resolvedYtDlpInstance = create(tmpPath);
+    return resolvedYtDlpInstance;
+  }
+
+  resolvedYtDlpInstance = create(constants.YOUTUBE_DL_PATH);
+  return resolvedYtDlpInstance;
+}
 
 // ─── Circuit breaker ─────────────────────────────────────────────────
 
@@ -101,7 +169,7 @@ async function resolveWithYtDlp(
   videoId: string,
   quality: StreamQuality = "high",
 ): Promise<StreamMeta | null> {
-  const { default: youtubedl } = await import("youtube-dl-exec");
+  const youtubedl = await getYtDlpInstance();
 
   for (const extractorArgs of EXTRACTOR_CLIENT_PRESETS) {
     try {
