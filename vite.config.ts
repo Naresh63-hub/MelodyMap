@@ -70,7 +70,11 @@ export default defineConfig({
     react(),
     tailwindcss(),
     tsconfigPaths(),
-    nitro(),
+    nitro(
+      process.env["VERCEL"]
+        ? { preset: "vercel" }
+        : undefined,
+    ),
   ],
 });
 
