@@ -11,7 +11,7 @@
  * 4. Deezer tracks get a special `_deezerPreview` field for the stream proxy
  */
 
-import type { Track } from "./music.server";
+import type { Track, SearchFilter } from "./music.server";
 
 export type HybridTrack = Track & { _deezerPreview?: string };
 
@@ -22,18 +22,19 @@ export type HybridSearchResult = {
 
 /**
  * Search with YouTube primary, Deezer fallback.
- * Always returns something playable and supports InnerTube pagination.
+ * Always returns something playable and supports InnerTube pagination and category filters.
  */
 export async function searchHybrid(
   query: string,
   limit = 20,
   continuation?: string,
+  filter: SearchFilter = "all",
 ): Promise<HybridSearchResult> {
   // If continuation token provided, paginate YouTube directly
   if (continuation) {
     try {
-      const { searchYouTubePage } = await import("./music.server");
-      const res = await searchYouTubePage(continuation, true);
+      const { searchYouTubePaginated } = await import("./music.server");
+      const res = await searchYouTubePaginated(query, filter, continuation, limit);
       return res;
     } catch (err) {
       console.warn("[MelodyMap] YouTube continuation search failed:", err);
@@ -43,8 +44,8 @@ export async function searchHybrid(
 
   // Try YouTube first
   try {
-    const { searchYouTubeWithPage } = await import("./music.server");
-    const ytRes = await searchYouTubeWithPage(query, limit, true);
+    const { searchYouTubePaginated } = await import("./music.server");
+    const ytRes = await searchYouTubePaginated(query, filter, undefined, limit);
     if (ytRes.tracks.length >= Math.min(limit, 5)) {
       return ytRes;
     }
@@ -52,15 +53,17 @@ export async function searchHybrid(
     console.warn("[MelodyMap] YouTube search failed, falling back to Deezer:", err);
   }
 
-  // Fallback to Deezer
-  try {
-    const { searchDeezer } = await import("./deezer.server");
-    const dzTracks = await searchDeezer(query, limit);
-    if (dzTracks.length > 0) {
-      return { tracks: dzTracks };
+  // Fallback to Deezer (only when applicable)
+  if (filter === "all" || filter === "songs" || filter === "albums") {
+    try {
+      const { searchDeezer } = await import("./deezer.server");
+      const dzTracks = await searchDeezer(query, limit);
+      if (dzTracks.length > 0) {
+        return { tracks: dzTracks };
+      }
+    } catch (err) {
+      console.warn("[MelodyMap] Deezer search also failed:", err);
     }
-  } catch (err) {
-    console.warn("[MelodyMap] Deezer search also failed:", err);
   }
 
   return { tracks: [] };

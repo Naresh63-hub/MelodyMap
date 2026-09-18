@@ -12,16 +12,38 @@ export type { Track };
 
 type AnyRecord = Record<string, unknown>;
 
-function collectVideoRenderers(node: unknown, out: AnyRecord[]): void {
+export type SearchFilter = "all" | "songs" | "artists" | "albums" | "playlists";
+
+export const SEARCH_FILTER_PARAMS: Record<SearchFilter, string | undefined> = {
+  all: undefined,
+  songs: "EgIQAQ%253D%253D",
+  artists: "EgIQBA%253D%253D",
+  playlists: "EgIQAw%253D%253D",
+  albums: "EgIQAw%253D%253D",
+};
+
+function collectSearchRenderers(node: unknown, out: AnyRecord[]): void {
   if (Array.isArray(node)) {
-    for (const item of node) collectVideoRenderers(item, out);
+    for (const item of node) collectSearchRenderers(item, out);
     return;
   }
   if (node && typeof node === "object") {
     const obj = node as AnyRecord;
-    if (obj["videoRenderer"]) out.push(obj["videoRenderer"] as AnyRecord);
-    for (const value of Object.values(obj)) collectVideoRenderers(value, out);
+    if (obj["videoRenderer"]) {
+      out.push({ _rendererType: "video", ...(obj["videoRenderer"] as AnyRecord) });
+    } else if (obj["compactVideoRenderer"]) {
+      out.push({ _rendererType: "video", ...(obj["compactVideoRenderer"] as AnyRecord) });
+    } else if (obj["playlistRenderer"]) {
+      out.push({ _rendererType: "playlist", ...(obj["playlistRenderer"] as AnyRecord) });
+    } else if (obj["channelRenderer"]) {
+      out.push({ _rendererType: "channel", ...(obj["channelRenderer"] as AnyRecord) });
+    }
+    for (const value of Object.values(obj)) collectSearchRenderers(value, out);
   }
+}
+
+function collectVideoRenderers(node: unknown, out: AnyRecord[]): void {
+  collectSearchRenderers(node, out);
 }
 
 function text(node: unknown): string {
@@ -150,16 +172,65 @@ function extractContinuation(node: unknown): string | undefined {
   return undefined;
 }
 
-/** Shared conversion loop from raw videoRenderers to validated Track items */
+/** Shared conversion loop from raw video/channel/playlist renderers to validated Track items */
 function renderersToTracks(
   renderers: AnyRecord[],
-  options: { musicOnly: boolean; allowLong: boolean },
+  options: { musicOnly: boolean; allowLong: boolean; filter?: SearchFilter },
   seen: Set<string>,
   tracks: Track[],
   cap?: number,
 ): void {
   for (const r of renderers) {
     if (cap && tracks.length >= cap) break;
+    const rendererType = (r["_rendererType"] as string) || "video";
+
+    if (rendererType === "channel") {
+      const id = (r["channelId"] as string) || "";
+      if (!id || seen.has(id)) continue;
+      const title = text(r["title"]).trim();
+      if (!title) continue;
+      const subs = text(r["subscriberCountText"]).trim() || text(r["videoCountText"]).trim() || "Artist";
+      const thumbs = ((r["thumbnail"] as AnyRecord | undefined)?.["thumbnails"] ?? []) as AnyRecord[];
+      seen.add(id);
+      tracks.push({
+        id,
+        title,
+        artist: subs,
+        duration: "Artist",
+        thumbnail:
+          (thumbs[thumbs.length - 1]?.["url"] as string | undefined) ??
+          `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      });
+      continue;
+    }
+
+    if (rendererType === "playlist") {
+      const id = (r["playlistId"] as string) || "";
+      if (!id || seen.has(id)) continue;
+      const title = text(r["title"]).trim();
+      if (!title) continue;
+      const byline =
+        text(r["shortBylineText"]).trim() ||
+        text(r["longBylineText"]).trim() ||
+        "Playlist";
+      const videoCount = text(r["videoCount"]).trim() || text(r["videoCountShortText"]).trim() || "Playlist";
+      const thumbs = ((r["thumbnails"] ?? (r["thumbnail"] as AnyRecord | undefined)?.["thumbnails"]) ?? []) as AnyRecord[];
+      seen.add(id);
+      tracks.push({
+        id,
+        title,
+        artist: byline,
+        duration:
+          videoCount.includes("track") || videoCount.includes("song") || videoCount.includes("video")
+            ? videoCount
+            : `${videoCount} songs`,
+        thumbnail:
+          (thumbs[thumbs.length - 1]?.["url"] as string | undefined) ??
+          `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      });
+      continue;
+    }
+
     const id = r["videoId"] as string | undefined;
     if (!id || seen.has(id)) continue;
 
@@ -174,12 +245,17 @@ function renderersToTracks(
 
     const candidateTrack = { title, artist, duration };
 
-    if (options.musicOnly) {
+    if (
+      options.musicOnly &&
+      options.filter !== "artists" &&
+      options.filter !== "playlists" &&
+      options.filter !== "albums"
+    ) {
       if (!isMusicTrack(candidateTrack, options.allowLong)) continue;
       const lowerArtist = artist.toLowerCase();
       if (NON_MUSIC_KEYWORDS.some((w) => lowerArtist.includes(w))) continue;
       if (JUNK_MEDIA_KEYWORDS.some((w) => lowerArtist.includes(w))) continue;
-    } else {
+    } else if (!options.musicOnly) {
       if (!isPodcastTrack(candidateTrack)) continue;
     }
 
@@ -203,28 +279,139 @@ export type SearchPageResult = {
   continuation?: string | undefined;
 };
 
-/** Fetches a single page of YouTube search results via continuation token */
-export async function searchYouTubePage(
-  continuation: string,
-  musicOnly = true,
-  allowLong = false,
+/**
+ * Queries YouTube with filter support and pagination continuation.
+ */
+export async function searchYouTubePaginated(
+  query: string,
+  filter: SearchFilter = "all",
+  continuation?: string,
+  limit = 20,
 ): Promise<SearchPageResult> {
+  if (continuation) {
+    try {
+      const data = await searchWithInnerTube("", undefined, continuation);
+      if (!data) return { tracks: [] };
+
+      const renderers: AnyRecord[] = [];
+      collectSearchRenderers(data, renderers);
+
+      const seen = new Set<string>();
+      const tracks: Track[] = [];
+      renderersToTracks(
+        renderers,
+        { musicOnly: filter === "all" || filter === "songs", allowLong: false, filter },
+        seen,
+        tracks,
+        limit,
+      );
+
+      const nextToken = extractContinuation(data);
+      return { tracks, continuation: nextToken };
+    } catch {
+      return { tracks: [] };
+    }
+  }
+
+  const cleanQ = query.toLowerCase();
+  let filterParam = SEARCH_FILTER_PARAMS[filter];
+  if (!filterParam && filter === "all") {
+    filterParam = !cleanQ.includes("podcast") ? MUSIC_FILTER : VIDEO_FILTER;
+  }
+
+  const isExplicitMusicOrAudio =
+    cleanQ.includes("song") ||
+    cleanQ.includes("audio") ||
+    cleanQ.includes("track") ||
+    cleanQ.includes("music") ||
+    cleanQ.includes("lyrics") ||
+    cleanQ.includes("jukebox");
+
+  const searchQuery =
+    (filter === "all" || filter === "songs") && !isExplicitMusicOrAudio
+      ? `${query} song`
+      : filter === "albums"
+        ? `${query} album`
+        : query;
+
+  const allowLong =
+    cleanQ.includes("jukebox") ||
+    cleanQ.includes("album") ||
+    cleanQ.includes("collection") ||
+    cleanQ.includes("top 50") ||
+    cleanQ.includes("hits");
+
   try {
-    const data = await searchWithInnerTube("", undefined, continuation);
+    let data: AnyRecord | null = await searchWithInnerTube(searchQuery, filterParam);
+    if (!data && filterParam) {
+      data = await searchWithInnerTube(searchQuery);
+    }
     if (!data) return { tracks: [] };
 
     const renderers: AnyRecord[] = [];
-    collectVideoRenderers(data, renderers);
+    collectSearchRenderers(data, renderers);
 
     const seen = new Set<string>();
     const tracks: Track[] = [];
-    renderersToTracks(renderers, { musicOnly, allowLong }, seen, tracks);
+    renderersToTracks(
+      renderers,
+      { musicOnly: filter === "all" || filter === "songs", allowLong, filter },
+      seen,
+      tracks,
+      limit,
+    );
 
     const nextToken = extractContinuation(data);
     return { tracks, continuation: nextToken };
   } catch {
     return { tracks: [] };
   }
+}
+
+/**
+ * Automatically fetches up to targetCount items across multiple continuation pages.
+ */
+export async function searchYouTubeDeep(
+  query: string,
+  targetCount = 50,
+  filter: SearchFilter = "songs",
+): Promise<Track[]> {
+  const seen = new Set<string>();
+  const tracks: Track[] = [];
+
+  let res = await searchYouTubePaginated(query, filter, undefined, targetCount);
+  for (const t of res.tracks) {
+    if (!seen.has(t.id)) {
+      seen.add(t.id);
+      tracks.push(t);
+    }
+  }
+
+  let page = 0;
+  let continuation = res.continuation;
+  while (tracks.length < targetCount && continuation && page < 5) {
+    page++;
+    res = await searchYouTubePaginated(query, filter, continuation, targetCount);
+    for (const t of res.tracks) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        tracks.push(t);
+        if (tracks.length >= targetCount) break;
+      }
+    }
+    continuation = res.continuation;
+  }
+
+  return tracks;
+}
+
+/** Fetches a single page of YouTube search results via continuation token */
+export async function searchYouTubePage(
+  continuation: string,
+  musicOnly = true,
+  allowLong = false,
+): Promise<SearchPageResult> {
+  return searchYouTubePaginated("", musicOnly ? "songs" : "all", continuation);
 }
 
 /** Queries YouTube search with automatic multi-page expansion and returns continuation token */

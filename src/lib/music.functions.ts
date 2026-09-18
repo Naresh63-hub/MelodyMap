@@ -28,6 +28,7 @@ const SearchInput = z.object({
   query: z.string().min(1),
   limit: z.number().optional(),
   type: z.enum(["songs", "podcasts"]).optional(),
+  filter: z.enum(["all", "songs", "artists", "albums", "playlists"]).optional(),
   continuation: z.string().optional(),
 });
 
@@ -36,11 +37,12 @@ export const searchTracks = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const limit = data.limit ?? 20;
     const isMusicOnly = data.type !== "podcasts";
+    const filter = data.filter ?? "all";
 
     if (isMusicOnly) {
       try {
         const { searchHybrid } = await import("./music-hybrid.server");
-        const res = await searchHybrid(data.query, limit, data.continuation);
+        const res = await searchHybrid(data.query, limit, data.continuation, filter);
         return { tracks: res.tracks, continuation: res.continuation, error: null };
       } catch (error) {
         console.error("Search failed:", error);
@@ -49,13 +51,8 @@ export const searchTracks = createServerFn({ method: "POST" })
     }
 
     try {
-      if (data.continuation) {
-        const { searchYouTubePage } = await import("./music.server");
-        const res = await searchYouTubePage(data.continuation, false);
-        return { tracks: res.tracks, continuation: res.continuation, error: null };
-      }
-      const { searchYouTubeWithPage } = await import("./music.server");
-      const res = await searchYouTubeWithPage(data.query, limit, false);
+      const { searchYouTubePaginated } = await import("./music.server");
+      const res = await searchYouTubePaginated(data.query, "songs", data.continuation, limit);
       return { tracks: res.tracks, continuation: res.continuation, error: null };
     } catch (error) {
       console.error("Search failed:", error);

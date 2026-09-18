@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 
-type SearchFilter = "all" | "songs" | "artists" | "albums" | "playlists";
+export type SearchFilter = "all" | "songs" | "artists" | "albums" | "playlists";
 
 type Props = {
   results: Track[];
@@ -30,6 +30,8 @@ type Props = {
   isPlaying: boolean;
   onClear?: () => void;
   onSearch?: (query: string, type?: "songs" | "podcasts") => void;
+  selectedFilter?: SearchFilter;
+  onFilterChange?: (filter: SearchFilter) => void;
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
@@ -58,11 +60,14 @@ export function SearchResults({
   isPlaying,
   onClear,
   onSearch,
+  selectedFilter,
+  onFilterChange,
   hasMore,
   loadingMore,
   onLoadMore,
 }: Props) {
-  const [filter, setFilter] = useState<SearchFilter>("all");
+  const [internalFilter, setInternalFilter] = useState<SearchFilter>("all");
+  const filter = selectedFilter ?? internalFilter;
 
   const filterOptions: Array<{ value: SearchFilter; label: string }> = [
     { value: "all", label: "Top" },
@@ -192,7 +197,10 @@ export function SearchResults({
             <button
               key={opt.value}
               type="button"
-              onClick={() => setFilter(opt.value)}
+              onClick={() => {
+                setInternalFilter(opt.value);
+                onFilterChange?.(opt.value);
+              }}
               className={cn(
                 "rounded-full border px-3.5 py-1 text-xs font-medium transition-all",
                 active

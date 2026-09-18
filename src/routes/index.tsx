@@ -32,7 +32,7 @@ import { MobileHomeSections } from "@/components/music/ui/MobileHomeSections";
 import { MobileLibrary } from "@/components/music/ui/MobileLibrary";
 import { MobileQueue } from "@/components/music/ui/MobileQueue";
 import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
-import { SearchResults } from "@/components/music/ui/SearchResults";
+import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchResults";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 
@@ -190,6 +190,7 @@ function MusicApp() {
   const [searching, setSearching] = useState(false);
   const [searchContinuation, setSearchContinuation] = useState<string | undefined>(undefined);
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
+  const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [recs, setRecs] = useState<Track[]>([]);
   const [trendingList, setTrendingList] = useState<Track[]>([]);
   const [recLoading, setRecLoading] = useState(false);
@@ -882,16 +883,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, [extending, runRecommend, likes, history, dislikes, stats, settings]);
 
   const searchFor = useCallback(
-    async (term: string, searchType?: "songs" | "podcasts") => {
+    async (term: string, searchType?: "songs" | "podcasts", filter?: SearchFilter) => {
       if (!term.trim()) return;
       const t = searchType ?? "songs";
+      const f = filter ?? "all";
       setTab("search");
       setShowSuggestions(false);
       setSearching(true);
       setSearchContinuation(undefined);
       setMessage(null);
       try {
-        const res = await runSearch({ data: { query: term.trim(), limit: 50, type: t } });
+        const res = await runSearch({
+          data: {
+            query: term.trim(),
+            limit: 50,
+            type: t,
+            filter: f,
+          },
+        });
         if (res.error) setMessage(res.error);
         if (res.tracks) {
           const raw = res.tracks as Track[];
@@ -913,6 +922,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const res = await runSearch({
         data: {
           query: query.trim(),
+          filter: searchFilter,
           continuation: searchContinuation,
         },
       });
@@ -927,7 +937,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } finally {
       setLoadingMoreSearch(false);
     }
-  }, [searchContinuation, loadingMoreSearch, query, runSearch]);
+  }, [searchContinuation, loadingMoreSearch, query, searchFilter, runSearch]);
 
   const openArtist = useCallback(
     (artist: string) => {
@@ -1564,6 +1574,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 results={results}
                 loading={searching}
                 query={query}
+                selectedFilter={searchFilter}
+                onFilterChange={(newFilter) => {
+                  setSearchFilter(newFilter);
+                  if (query.trim()) {
+                    void searchFor(query, "songs", newFilter);
+                  }
+                }}
                 onPlayTrack={(track, i) => {
                   if (current?.id === track.id) {
                     player.isPlaying ? pause() : play();
@@ -1580,10 +1597,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   setQuery("");
                   setResults([]);
                   setSuggestions([]);
+                  setSearchContinuation(undefined);
                 }}
                 onSearch={(q, type) => {
                   setQuery(q);
-                  void searchFor(q, type);
+                  setSearchFilter("all");
+                  void searchFor(q, type, "all");
                 }}
                 hasMore={Boolean(searchContinuation)}
                 loadingMore={loadingMoreSearch}
