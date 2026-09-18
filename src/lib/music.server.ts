@@ -91,6 +91,7 @@ const WEB_CLIENT = { clientName: "WEB", clientVersion: "2.20240801.00.00", hl: "
 async function searchWithInnerTube(
   searchQuery: string,
   params?: string,
+  continuation?: string,
 ): Promise<AnyRecord | null> {
   try {
     const res = await fetch("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", {
@@ -100,11 +101,18 @@ async function searchWithInnerTube(
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       },
-      body: JSON.stringify({
-        context: { client: WEB_CLIENT },
-        query: searchQuery,
-        ...(params ? { params } : {}),
-      }),
+      body: JSON.stringify(
+        continuation
+          ? {
+              context: { client: WEB_CLIENT },
+              continuation,
+            }
+          : {
+              context: { client: WEB_CLIENT },
+              query: searchQuery,
+              ...(params ? { params } : {}),
+            },
+      ),
       signal: AbortSignal.timeout(8_000),
     });
     if (!res.ok) return null;
@@ -114,26 +122,136 @@ async function searchWithInnerTube(
   }
 }
 
-/** Scrapes/Queries YouTube search results — cached for 30 minutes. */
-export async function searchYouTube(
+/** Recursively extracts the InnerTube continuation token if present */
+function extractContinuation(node: unknown): string | undefined {
+  if (!node) return undefined;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const token = extractContinuation(item);
+      if (token) return token;
+    }
+    return undefined;
+  }
+  if (typeof node === "object") {
+    const obj = node as AnyRecord;
+    const contRenderer = obj["continuationItemRenderer"] as AnyRecord | undefined;
+    if (contRenderer) {
+      const endpoint = contRenderer["continuationEndpoint"] as AnyRecord | undefined;
+      const command = endpoint?.["continuationCommand"] as AnyRecord | undefined;
+      if (typeof command?.["token"] === "string") {
+        return command["token"];
+      }
+    }
+    for (const val of Object.values(obj)) {
+      const token = extractContinuation(val);
+      if (token) return token;
+    }
+  }
+  return undefined;
+}
+
+/** Shared conversion loop from raw videoRenderers to validated Track items */
+function renderersToTracks(
+  renderers: AnyRecord[],
+  options: { musicOnly: boolean; allowLong: boolean },
+  seen: Set<string>,
+  tracks: Track[],
+  cap?: number,
+): void {
+  for (const r of renderers) {
+    if (cap && tracks.length >= cap) break;
+    const id = r["videoId"] as string | undefined;
+    if (!id || seen.has(id)) continue;
+
+    const title = text(r["title"]).trim();
+    const artist =
+      text(r["ownerText"]).trim() ||
+      text(r["shortBylineText"]).trim() ||
+      text(r["longBylineText"]).trim() ||
+      "";
+    const duration = text(r["lengthText"]).trim();
+    if (!title) continue;
+
+    const candidateTrack = { title, artist, duration };
+
+    if (options.musicOnly) {
+      if (!isMusicTrack(candidateTrack, options.allowLong)) continue;
+      const lowerArtist = artist.toLowerCase();
+      if (NON_MUSIC_KEYWORDS.some((w) => lowerArtist.includes(w))) continue;
+      if (JUNK_MEDIA_KEYWORDS.some((w) => lowerArtist.includes(w))) continue;
+    } else {
+      if (!isPodcastTrack(candidateTrack)) continue;
+    }
+
+    const thumbs = ((r["thumbnail"] as AnyRecord | undefined)?.["thumbnails"] ?? []) as AnyRecord[];
+    seen.add(id);
+
+    tracks.push({
+      id,
+      title,
+      artist,
+      duration,
+      thumbnail:
+        (thumbs[thumbs.length - 1]?.["url"] as string | undefined) ??
+        `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    });
+  }
+}
+
+export type SearchPageResult = {
+  tracks: Track[];
+  continuation?: string | undefined;
+};
+
+/** Fetches a single page of YouTube search results via continuation token */
+export async function searchYouTubePage(
+  continuation: string,
+  musicOnly = true,
+  allowLong = false,
+): Promise<SearchPageResult> {
+  try {
+    const data = await searchWithInnerTube("", undefined, continuation);
+    if (!data) return { tracks: [] };
+
+    const renderers: AnyRecord[] = [];
+    collectVideoRenderers(data, renderers);
+
+    const seen = new Set<string>();
+    const tracks: Track[] = [];
+    renderersToTracks(renderers, { musicOnly, allowLong }, seen, tracks);
+
+    const nextToken = extractContinuation(data);
+    return { tracks, continuation: nextToken };
+  } catch {
+    return { tracks: [] };
+  }
+}
+
+/** Queries YouTube search with automatic multi-page expansion and returns continuation token */
+export async function searchYouTubeWithPage(
   query: string,
   limit = 20,
   musicOnly = true,
   upload?: UploadRange,
   bypassCache = false,
-): Promise<Track[]> {
+): Promise<SearchPageResult> {
   const cacheKey = `yt:${query}:${limit}:${musicOnly}:${upload ?? ""}`;
   if (!bypassCache) {
     const cached = searchCache.get(cacheKey);
-    if (cached && cached.length >= Math.min(limit, 10)) return cached;
+    if (cached && cached.length >= Math.min(limit, 10)) {
+      return { tracks: cached };
+    }
   }
 
   const inFlight = inFlightSearches.get(cacheKey);
-  if (inFlight && !bypassCache) return inFlight;
+  if (inFlight && !bypassCache) {
+    const cachedTracks = await inFlight;
+    return { tracks: cachedTracks };
+  }
 
-  const searchPromise = (async (): Promise<Track[]> => {
+  const searchPromise = (async (): Promise<SearchPageResult> => {
     if (!checkSearchRateLimit()) {
-      return searchCache.get(cacheKey) ?? [];
+      return { tracks: searchCache.get(cacheKey) ?? [] };
     }
 
     const cleanQ = query.toLowerCase();
@@ -156,6 +274,13 @@ export async function searchYouTube(
       filterParam = musicOnly && !cleanQ.includes("podcast") ? MUSIC_FILTER : VIDEO_FILTER;
     }
 
+    const allowLong =
+      cleanQ.includes("jukebox") ||
+      cleanQ.includes("album") ||
+      cleanQ.includes("collection") ||
+      cleanQ.includes("top 50") ||
+      cleanQ.includes("hits");
+
     try {
       let data: AnyRecord | null = await searchWithInnerTube(searchQuery, filterParam);
 
@@ -176,11 +301,11 @@ export async function searchYouTube(
           },
           signal: AbortSignal.timeout(8_000),
         });
-        if (!res.ok) return [];
+        if (!res.ok) return { tracks: [] };
 
         const html = await res.text();
         const jsonMatch = html.match(/ytInitialData\s*=\s*({.+?});\s*<\/script>/s);
-        if (!jsonMatch?.[1]) return [];
+        if (!jsonMatch?.[1]) return { tracks: [] };
         data = JSON.parse(jsonMatch[1]) as AnyRecord;
       }
 
@@ -189,73 +314,60 @@ export async function searchYouTube(
 
       const seen = new Set<string>();
       const tracks: Track[] = [];
+      renderersToTracks(renderers, { musicOnly, allowLong }, seen, tracks, limit);
 
-      const allowLong =
-        cleanQ.includes("jukebox") ||
-        cleanQ.includes("album") ||
-        cleanQ.includes("collection") ||
-        cleanQ.includes("top 50") ||
-        cleanQ.includes("hits");
+      let nextContinuation = extractContinuation(data);
 
-      for (const r of renderers) {
-        const id = r["videoId"] as string | undefined;
-        if (!id || seen.has(id)) continue;
-
-        const title = text(r["title"]).trim();
-        const artist =
-          text(r["ownerText"]).trim() ||
-          text(r["shortBylineText"]).trim() ||
-          text(r["longBylineText"]).trim() ||
-          "";
-        const duration = text(r["lengthText"]).trim();
-        if (!title) continue;
-
-        const candidateTrack = { title, artist, duration };
-
-        if (musicOnly) {
-          if (!isMusicTrack(candidateTrack, allowLong)) continue;
-          const lowerArtist = artist.toLowerCase();
-          if (NON_MUSIC_KEYWORDS.some((w) => lowerArtist.includes(w))) continue;
-          if (JUNK_MEDIA_KEYWORDS.some((w) => lowerArtist.includes(w))) continue;
-        } else {
-          if (!isPodcastTrack(candidateTrack)) continue;
+      // Follow continuation tokens if more results are requested and available
+      let page = 0;
+      while (tracks.length < limit && nextContinuation && page < 4) {
+        page++;
+        const nextPage = await searchYouTubePage(nextContinuation, musicOnly, allowLong);
+        for (const t of nextPage.tracks) {
+          if (!seen.has(t.id)) {
+            seen.add(t.id);
+            tracks.push(t);
+            if (tracks.length >= limit) break;
+          }
         }
-
-        const thumbs = ((r["thumbnail"] as AnyRecord | undefined)?.["thumbnails"] ?? []) as AnyRecord[];
-        seen.add(id);
-
-        tracks.push({
-          id,
-          title,
-          artist,
-          duration,
-          thumbnail:
-            (thumbs[thumbs.length - 1]?.["url"] as string | undefined) ??
-            `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-        });
-        if (tracks.length >= limit) break;
+        nextContinuation = nextPage.continuation;
       }
 
       // If upload filter returned 0 tracks, retry without it
       if (tracks.length === 0 && upload) {
-        return await searchYouTube(query, limit, musicOnly, undefined, bypassCache);
+        return await searchYouTubeWithPage(query, limit, musicOnly, undefined, bypassCache);
       }
 
       if (tracks.length > 0) {
         searchCache.set(cacheKey, tracks);
       }
-      return tracks;
+      return { tracks, continuation: nextContinuation };
     } catch {
-      return [];
+      return { tracks: [] };
     }
   })();
 
-  inFlightSearches.set(cacheKey, searchPromise);
+  inFlightSearches.set(
+    cacheKey,
+    searchPromise.then((r) => r.tracks),
+  );
   try {
     return await searchPromise;
   } finally {
     inFlightSearches.delete(cacheKey);
   }
+}
+
+/** Scrapes/Queries YouTube search results — cached for 30 minutes. Backward-compatible wrapper. */
+export async function searchYouTube(
+  query: string,
+  limit = 20,
+  musicOnly = true,
+  upload?: UploadRange,
+  bypassCache = false,
+): Promise<Track[]> {
+  const res = await searchYouTubeWithPage(query, limit, musicOnly, upload, bypassCache);
+  return res.tracks;
 }
 
 // ─── Track metadata enrichment (ytdl-core) ───────────────────────────

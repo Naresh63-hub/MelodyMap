@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Track } from "./types";
-import { norm } from "./track-dedup";
+import { norm, areSameTrack } from "./track-dedup";
 
 /** Sanitizes user-provided strings to prevent AI prompt injection while preserving real song/artist names */
 function sanitizePromptInput(str: string | undefined): string {
@@ -28,6 +28,7 @@ const SearchInput = z.object({
   query: z.string().min(1),
   limit: z.number().optional(),
   type: z.enum(["songs", "podcasts"]).optional(),
+  continuation: z.string().optional(),
 });
 
 export const searchTracks = createServerFn({ method: "POST" })
@@ -39,21 +40,26 @@ export const searchTracks = createServerFn({ method: "POST" })
     if (isMusicOnly) {
       try {
         const { searchHybrid } = await import("./music-hybrid.server");
-        const tracks = await searchHybrid(data.query, limit);
-        return { tracks, error: null };
+        const res = await searchHybrid(data.query, limit, data.continuation);
+        return { tracks: res.tracks, continuation: res.continuation, error: null };
       } catch (error) {
         console.error("Search failed:", error);
-        return { tracks: [], error: "Could not reach the catalog. Try again." };
+        return { tracks: [], continuation: undefined, error: "Could not reach the catalog. Try again." };
       }
     }
 
     try {
-      const { searchYouTube } = await import("./music.server");
-      const tracks = await searchYouTube(data.query, limit, false);
-      return { tracks, error: null };
+      if (data.continuation) {
+        const { searchYouTubePage } = await import("./music.server");
+        const res = await searchYouTubePage(data.continuation, false);
+        return { tracks: res.tracks, continuation: res.continuation, error: null };
+      }
+      const { searchYouTubeWithPage } = await import("./music.server");
+      const res = await searchYouTubeWithPage(data.query, limit, false);
+      return { tracks: res.tracks, continuation: res.continuation, error: null };
     } catch (error) {
       console.error("Search failed:", error);
-      return { tracks: [], error: "Could not reach the catalog. Try again." };
+      return { tracks: [], continuation: undefined, error: "Could not reach the catalog. Try again." };
     }
   });
 
@@ -522,8 +528,10 @@ export const recommendTracks = createServerFn({ method: "POST" })
       const batch = await Promise.all(
         chunk.map(async (p) => {
           try {
-            const found = await searchYouTube(`${p.artist} ${p.title} audio`, 1);
-            const track = found[0];
+            const found = await searchYouTube(`${p.artist} ${p.title} audio`, 3);
+            if (found.length === 0) return null;
+            const target = { id: "", title: p.title ?? "", artist: p.artist ?? "", duration: 0 };
+            const track = found.find((candidate) => areSameTrack(candidate, target)) ?? found[0];
             return track ? { ...track, reason: p.reason ?? "" } : null;
           } catch {
             return null;
@@ -721,8 +729,10 @@ export const buildMix = createServerFn({ method: "POST" })
       const batch = await Promise.all(
         chunk.map(async (p) => {
           try {
-            const found = await searchYouTube(`${p.artist} ${p.title} audio`, 1);
-            const track = found[0];
+            const found = await searchYouTube(`${p.artist} ${p.title} audio`, 3);
+            if (found.length === 0) return null;
+            const target = { id: "", title: p.title ?? "", artist: p.artist ?? "", duration: 0 };
+            const track = found.find((candidate) => areSameTrack(candidate, target)) ?? found[0];
             return track ? { ...track, reason: p.reason ?? "" } : null;
           } catch {
             return null;

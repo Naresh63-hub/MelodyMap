@@ -13,16 +13,14 @@ import { parseDurationSeconds } from "./track-filters";
 
 /** Minimal track shape used for identity and comparison. */
 export interface TrackLike {
-
   id: string;
   title: string;
   artist: string;
-  duration?: string | number;
-  thumbnail?: string;
-  reason?: string;
-  previewUrl?: string;
-  source?: string;
-  [key: string]: unknown;
+  duration?: string | number | undefined;
+  thumbnail?: string | undefined;
+  reason?: string | undefined;
+  previewUrl?: string | undefined;
+  source?: string | undefined;
 }
 
 // ─── Normalization & Fuzzy Distance ─────────────────────────────────

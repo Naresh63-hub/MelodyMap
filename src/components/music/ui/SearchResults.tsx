@@ -10,6 +10,7 @@ import {
   Globe2,
   Mic,
   ListMusic,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
@@ -29,6 +30,9 @@ type Props = {
   isPlaying: boolean;
   onClear?: () => void;
   onSearch?: (query: string, type?: "songs" | "podcasts") => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 const TRENDING_SEARCH_SEEDS = [
@@ -54,6 +58,9 @@ export function SearchResults({
   isPlaying,
   onClear,
   onSearch,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: Props) {
   const [filter, setFilter] = useState<SearchFilter>("all");
 
@@ -265,6 +272,21 @@ export function SearchResults({
           );
         })}
       </div>
+
+      {/* Load More Button */}
+      {hasMore && results.length > 0 && (
+        <div className="flex justify-center pt-2 pb-6">
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-600/20 px-6 py-2.5 text-xs font-semibold text-purple-200 hover:bg-purple-600/30 hover:text-white active:scale-95 transition-all shadow-md disabled:opacity-50"
+          >
+            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin text-purple-400" /> : null}
+            {loadingMore ? "Loading more..." : "Load more results"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

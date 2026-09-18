@@ -13,22 +13,40 @@
 
 import type { Track } from "./music.server";
 
-type HybridTrack = Track & { _deezerPreview?: string };
+export type HybridTrack = Track & { _deezerPreview?: string };
+
+export type HybridSearchResult = {
+  tracks: HybridTrack[];
+  continuation?: string | undefined;
+};
 
 /**
  * Search with YouTube primary, Deezer fallback.
- * Always returns something playable.
+ * Always returns something playable and supports InnerTube pagination.
  */
 export async function searchHybrid(
   query: string,
   limit = 20,
-): Promise<HybridTrack[]> {
+  continuation?: string,
+): Promise<HybridSearchResult> {
+  // If continuation token provided, paginate YouTube directly
+  if (continuation) {
+    try {
+      const { searchYouTubePage } = await import("./music.server");
+      const res = await searchYouTubePage(continuation, true);
+      return res;
+    } catch (err) {
+      console.warn("[MelodyMap] YouTube continuation search failed:", err);
+      return { tracks: [] };
+    }
+  }
+
   // Try YouTube first
   try {
-    const { searchYouTube } = await import("./music.server");
-    const ytTracks = await searchYouTube(query, limit, true);
-    if (ytTracks.length >= Math.min(limit, 5)) {
-      return ytTracks;
+    const { searchYouTubeWithPage } = await import("./music.server");
+    const ytRes = await searchYouTubeWithPage(query, limit, true);
+    if (ytRes.tracks.length >= Math.min(limit, 5)) {
+      return ytRes;
     }
   } catch (err) {
     console.warn("[MelodyMap] YouTube search failed, falling back to Deezer:", err);
@@ -39,13 +57,13 @@ export async function searchHybrid(
     const { searchDeezer } = await import("./deezer.server");
     const dzTracks = await searchDeezer(query, limit);
     if (dzTracks.length > 0) {
-      return dzTracks;
+      return { tracks: dzTracks };
     }
   } catch (err) {
     console.warn("[MelodyMap] Deezer search also failed:", err);
   }
 
-  return [];
+  return { tracks: [] };
 }
 
 /**

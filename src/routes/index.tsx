@@ -188,6 +188,8 @@ function MusicApp() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchContinuation, setSearchContinuation] = useState<string | undefined>(undefined);
+  const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [recs, setRecs] = useState<Track[]>([]);
   const [trendingList, setTrendingList] = useState<Track[]>([]);
   const [recLoading, setRecLoading] = useState(false);
@@ -886,6 +888,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setTab("search");
       setShowSuggestions(false);
       setSearching(true);
+      setSearchContinuation(undefined);
       setMessage(null);
       try {
         const res = await runSearch({ data: { query: term.trim(), limit: 50, type: t } });
@@ -894,6 +897,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           const raw = res.tracks as Track[];
           const filtered = t === "songs" ? raw : raw.filter(isPodcastTrack);
           setResults(dedupeTracks(filtered));
+          setSearchContinuation(res.continuation);
         }
       } finally {
         setSearching(false);
@@ -901,6 +905,29 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     },
     [runSearch],
   );
+
+  const loadMoreResults = useCallback(async () => {
+    if (!searchContinuation || loadingMoreSearch || !query.trim()) return;
+    setLoadingMoreSearch(true);
+    try {
+      const res = await runSearch({
+        data: {
+          query: query.trim(),
+          continuation: searchContinuation,
+        },
+      });
+      if (res.tracks && res.tracks.length > 0) {
+        const raw = res.tracks as Track[];
+        setResults((prev) => dedupeTracks([...prev, ...raw]));
+      }
+      setSearchContinuation(res.continuation);
+    } catch {
+      setMessage("Could not load more results");
+      setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setLoadingMoreSearch(false);
+    }
+  }, [searchContinuation, loadingMoreSearch, query, runSearch]);
 
   const openArtist = useCallback(
     (artist: string) => {
@@ -1558,6 +1585,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   setQuery(q);
                   void searchFor(q, type);
                 }}
+                hasMore={Boolean(searchContinuation)}
+                loadingMore={loadingMoreSearch}
+                onLoadMore={() => void loadMoreResults()}
               />
             )}
 
