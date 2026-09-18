@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseEnv, supabase } from "@/integrations/supabase/client";
 
 function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -70,18 +70,28 @@ function AuthPage() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [errorNote, setErrorNote] = useState<string | null>(null);
   const [successNote, setSuccessNote] = useState<string | null>(null);
+  const { isConfigured } = getSupabaseEnv();
 
   useEffect(() => {
+    if (!isConfigured) return;
     void supabase.auth.getSession().then(({ data }) => {
       if (data.session) void navigate({ to: "/", replace: true });
     });
-  }, [navigate]);
+  }, [navigate, isConfigured]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setErrorNote(null);
     setSuccessNote(null);
+
+    if (!isConfigured) {
+      setBusy(false);
+      setErrorNote(
+        "Supabase is not configured on this deployment. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your Vercel Project Settings > Environment Variables.",
+      );
+      return;
+    }
 
     if (mode === "forgot") {
       try {
@@ -150,6 +160,14 @@ function AuthPage() {
   const google = async () => {
     setErrorNote(null);
     setSuccessNote(null);
+
+    if (!isConfigured) {
+      setErrorNote(
+        "Google Sign-In requires Supabase credentials. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your Vercel Project Settings > Environment Variables.",
+      );
+      return;
+    }
+
     setGoogleBusy(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -158,11 +176,11 @@ function AuthPage() {
       });
       if (error) {
         setGoogleBusy(false);
-        setErrorNote("Google sign-in failed. Please try again.");
+        setErrorNote(error.message || "Google sign-in failed. Please try again.");
       }
-    } catch {
+    } catch (err: any) {
       setGoogleBusy(false);
-      setErrorNote("Could not initiate Google authentication.");
+      setErrorNote(err?.message || "Could not initiate Google authentication.");
     }
   };
 
@@ -227,6 +245,16 @@ function AuthPage() {
                 <ArrowLeft className="h-3.5 w-3.5" /> Back to Sign In
               </button>
               <span className="text-xs font-semibold text-white/70">Reset Password</span>
+            </div>
+          )}
+
+          {/* Unconfigured notice */}
+          {!isConfigured && (
+            <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-200/90 leading-relaxed">
+              <p className="font-semibold text-amber-300 mb-1">⚡ Setup Supabase for Cloud Sync</p>
+              <p className="text-amber-200/70">
+                To sign in or use Google login across devices, configure <code className="bg-white/10 px-1 py-0.5 rounded text-[11px] text-white">VITE_SUPABASE_URL</code> and <code className="bg-white/10 px-1 py-0.5 rounded text-[11px] text-white">VITE_SUPABASE_ANON_KEY</code> in your Vercel Project Settings.
+              </p>
             </div>
           )}
 
