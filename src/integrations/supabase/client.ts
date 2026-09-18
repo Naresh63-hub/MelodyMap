@@ -27,15 +27,13 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 
-function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL =
+export function getSupabaseEnv() {
+  const url =
     import.meta.env['VITE_SUPABASE_URL'] ||
     process.env['SUPABASE_URL'] ||
     process.env['VITE_SUPABASE_URL'];
 
-  const SUPABASE_PUBLISHABLE_KEY =
+  const key =
     import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
     import.meta.env['VITE_SUPABASE_ANON_KEY'] ||
     process.env['SUPABASE_PUBLISHABLE_KEY'] ||
@@ -43,25 +41,34 @@ function createSupabaseClient() {
     process.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
     process.env['VITE_SUPABASE_ANON_KEY'];
 
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ['VITE_SUPABASE_URL'] : []),
-      ...(!SUPABASE_PUBLISHABLE_KEY ? ['VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY)'] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Please add them to your .env file.`;
-    console.error(`[Supabase] ${message}`);
-    throw new Error(message);
+  return {
+    url: url || '',
+    key: key || '',
+    isConfigured: Boolean(url && key),
+  };
+}
+
+function createSupabaseClient() {
+  const { url, key, isConfigured } = getSupabaseEnv();
+
+  if (!isConfigured) {
+    console.warn(
+      '[Supabase] Environment variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not configured. Running in local-first guest mode.',
+    );
   }
 
-  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  const effectiveUrl = isConfigured ? url : 'https://placeholder-project.supabase.co';
+  const effectiveKey = isConfigured ? key : 'placeholder-anon-key';
+
+  return createClient<Database>(effectiveUrl, effectiveKey, {
     global: {
-      fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
+      fetch: createSupabaseFetch(effectiveKey),
     },
     auth: {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
-    }
+    },
   });
 }
 
