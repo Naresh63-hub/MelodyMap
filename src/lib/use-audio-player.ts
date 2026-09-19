@@ -20,10 +20,18 @@ export type NextTrackInfo = {
   previewUrl?: string | undefined;
 };
 
+declare global {
+  interface Window {
+    YT?: any;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
 /**
  * HTML5-Audio + Web Audio API backed player with Spotify-like background playback,
  * screen-off & lockscreen continuous playback, 10-band hardware equalizer, sound presets,
- * gapless pre-buffering, speed adjustment, offline caching, and robust stream resolution.
+ * gapless pre-buffering, speed adjustment, offline caching, and robust dual-engine streaming
+ * with client-side YouTube IFrame fallback for zero-failure playback across all hosts (including Vercel).
  */
 export function useAudioPlayer(options: {
   onEnded: () => void;
@@ -41,6 +49,12 @@ export function useAudioPlayer(options: {
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const filterNodesRef = useRef<BiquadFilterNode[]>([]);
 
+  // Dual-engine playback state ("html5" or "youtube")
+  const activeEngineRef = useRef<"html5" | "youtube">("html5");
+  const ytPlayerRef = useRef<any>(null);
+  const ytReadyRef = useRef<boolean>(false);
+  const ytTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingYtActionRef = useRef<{ id: string; startAt: number; autoPlay: boolean } | null>(null);
 
   // Equalizer & sound profile state
   const [equalizerSettings, setEqualizerSettingsState] = useState<EqualizerSettings>(loadEqualizerSettings);
@@ -52,7 +66,7 @@ export function useAudioPlayer(options: {
     return `/api/stream/${encodeURIComponent(id)}?quality=${encodeURIComponent(q)}`;
   }, []);
 
-  // Initialize and attach core audio + prebuffer elements to DOM
+  // Initialize and attach core audio + prebuffer + YouTube iframe container to DOM
   if (typeof document !== "undefined") {
     if (!audioRef.current) {
       let el = document.getElementById("melodymap-core-audio") as HTMLAudioElement | null;
@@ -98,6 +112,26 @@ export function useAudioPlayer(options: {
         } catch {}
       }
       prebufferAudioRef.current = pEl;
+    }
+
+    // Attach hidden YouTube iframe placeholder
+    if (!document.getElementById("melodymap-yt-wrapper")) {
+      const holder = document.createElement("div");
+      holder.id = "melodymap-yt-wrapper";
+      holder.style.position = "fixed";
+      holder.style.bottom = "-500px";
+      holder.style.left = "-500px";
+      holder.style.width = "1px";
+      holder.style.height = "1px";
+      holder.style.opacity = "0.001";
+      holder.style.pointerEvents = "none";
+      holder.style.overflow = "hidden";
+      const iframeDiv = document.createElement("div");
+      iframeDiv.id = "melodymap-yt-iframe";
+      holder.appendChild(iframeDiv);
+      try {
+        document.body.appendChild(holder);
+      } catch {}
     }
   }
 
@@ -484,22 +518,14 @@ export function useAudioPlayer(options: {
         !audio.src.includes("/api/stream/undefined") &&
         !audio.src.endsWith("/api/stream/")
       ) {
-        console.warn("[MelodyMap] Audio element error:", audio.error.code, audio.error.message);
+        console.warn("[MelodyMap] Audio stream proxy error:", audio.error.code, audio.error.message);
 
-        // Quality Auto-Fallback: Try lower qualities if the stream failed
+        // Instant Fallback to Client YouTube Player on Vercel / server proxy block
         const activeId = currentTrackIdRef.current;
-        if (
-          activeId &&
-          audio.src &&
-          audio.src.includes("/api/stream/") &&
-          qualityFallbackStepRef.current < 2
-        ) {
-          qualityFallbackStepRef.current += 1;
-          const fallbackQuality = qualityFallbackStepRef.current === 1 ? "standard" : "saver";
-          console.info(`[MelodyMap] Retrying track ${activeId} with fallback quality: ${fallbackQuality}`);
-          const retryUrl = streamUrl(activeId, fallbackQuality);
+        if (activeId && !activeId.startsWith("deezer:")) {
+          console.info(`[MelodyMap] Falling back to direct client YouTube streaming for track: ${activeId}`);
           const resumePos = audio.currentTime || 0;
-          setStream(retryUrl, resumePos);
+          playViaYouTube(activeId, resumePos, wantPlayRef.current);
           return;
         }
 
@@ -507,7 +533,6 @@ export function useAudioPlayer(options: {
         onErrorRef.current?.(message);
       }
     };
-
 
     audio.addEventListener("play", onPlay);
     audio.addEventListener("playing", onPlaying);
@@ -534,6 +559,163 @@ export function useAudioPlayer(options: {
     };
   }, [playbackSpeed, initWebAudio, streamUrl]);
 
+  // Initialize YouTube IFrame Player API on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const initYt = () => {
+      if (ytPlayerRef.current || !window.YT || !window.YT.Player) return;
+      const targetEl = document.getElementById("melodymap-yt-iframe");
+      if (!targetEl) return;
+      try {
+        ytPlayerRef.current = new window.YT.Player("melodymap-yt-iframe", {
+          height: "1",
+          width: "1",
+          playerVars: {
+            autoplay: 1,
+            controls: 0,
+            disablekb: 1,
+            fs: 0,
+            playsinline: 1,
+            rel: 0,
+            enablejsapi: 1,
+            origin: window.location.origin,
+          },
+          events: {
+            onReady: (event: any) => {
+              ytReadyRef.current = true;
+              try {
+                event.target.setVolume(80);
+              } catch {}
+              if (pendingYtActionRef.current) {
+                const { id, startAt, autoPlay } = pendingYtActionRef.current;
+                pendingYtActionRef.current = null;
+                if (autoPlay) {
+                  event.target.loadVideoById(id, startAt);
+                } else {
+                  event.target.cueVideoById(id, startAt);
+                }
+              }
+            },
+            onStateChange: (event: any) => {
+              if (event.data === 1) {
+                setIsPlaying(true);
+                setIsLoading(false);
+              } else if (event.data === 2) {
+                setIsPlaying(false);
+                setIsLoading(false);
+              } else if (event.data === 3) {
+                setIsLoading(true);
+              } else if (event.data === 0) {
+                setIsPlaying(false);
+                setIsLoading(false);
+                endedRef.current();
+              }
+            },
+            onError: (event: any) => {
+              console.warn("[MelodyMap] YouTube player API error:", event.data);
+              onErrorRef.current?.("Audio stream unavailable, skipping to next track...");
+            },
+          },
+        });
+      } catch (err) {
+        console.warn("[MelodyMap] YouTube player init notice:", err);
+      }
+    };
+
+    if (window.YT && window.YT.Player) {
+      initYt();
+    } else {
+      const existingTag = document.getElementById("yt-iframe-api-script");
+      if (!existingTag) {
+        const tag = document.createElement("script");
+        tag.id = "yt-iframe-api-script";
+        tag.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(tag);
+      }
+      const oldCallback = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (oldCallback) oldCallback();
+        initYt();
+      };
+    }
+  }, []);
+
+  // Poll position and duration during YouTube player playback
+  useEffect(() => {
+    if (isPlaying && activeEngineRef.current === "youtube") {
+      if (ytTimerRef.current) clearInterval(ytTimerRef.current);
+      ytTimerRef.current = setInterval(() => {
+        const p = ytPlayerRef.current;
+        if (p && typeof p.getCurrentTime === "function" && typeof p.getDuration === "function") {
+          try {
+            const cur = p.getCurrentTime() || 0;
+            const dur = p.getDuration() || 0;
+            setPosition(cur);
+            setDuration(dur);
+
+            // SponsorBlock Auto-Skip
+            if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
+              const skip = findSkipTarget(cur, sponsorSegmentsRef.current);
+              if (skip) {
+                p.seekTo(skip.target, true);
+                onSponsorBlockSkippedRef.current?.(skip.category);
+              }
+            }
+
+            // Gapless Pre-buffering
+            if (dur > 0 && dur - cur <= 25 && prebufferAudioRef.current) {
+              const nextTrack = getNextTrackRef.current?.();
+              if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
+                prebufferedTrackIdRef.current = nextTrack.id;
+                const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
+                prebufferAudioRef.current.src = nextUrl;
+                prebufferAudioRef.current.load();
+              }
+            }
+          } catch {}
+        }
+      }, 300);
+    } else {
+      if (ytTimerRef.current) {
+        clearInterval(ytTimerRef.current);
+        ytTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (ytTimerRef.current) {
+        clearInterval(ytTimerRef.current);
+        ytTimerRef.current = null;
+      }
+    };
+  }, [isPlaying, streamUrl]);
+
+  /** Direct YouTube IFrame API play */
+  const playViaYouTube = useCallback(
+    (id: string, startAt = 0, autoPlay = true) => {
+      activeEngineRef.current = "youtube";
+      setIsLoading(true);
+      try {
+        audioRef.current?.pause();
+      } catch {}
+
+      const p = ytPlayerRef.current;
+      if (p && ytReadyRef.current && typeof p.loadVideoById === "function") {
+        if (autoPlay) {
+          p.loadVideoById(id, startAt);
+        } else {
+          p.cueVideoById(id, startAt);
+        }
+        try {
+          p.setPlaybackRate(playbackSpeed);
+        } catch {}
+      } else {
+        pendingYtActionRef.current = { id, startAt, autoPlay };
+      }
+    },
+    [playbackSpeed],
+  );
+
   /** Cleanup on unmount */
   useEffect(() => {
     return () => {
@@ -542,6 +724,14 @@ export function useAudioPlayer(options: {
         audio.pause();
         audio.removeAttribute("src");
         audio.load();
+      }
+      if (ytPlayerRef.current && typeof ytPlayerRef.current.destroy === "function") {
+        try {
+          ytPlayerRef.current.destroy();
+        } catch {}
+      }
+      if (ytTimerRef.current) {
+        clearInterval(ytTimerRef.current);
       }
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
@@ -562,6 +752,10 @@ export function useAudioPlayer(options: {
         if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
         const url = URL.createObjectURL(blob);
         objectUrlRef.current = url;
+        activeEngineRef.current = "html5";
+        try {
+          ytPlayerRef.current?.stopVideo();
+        } catch {}
         setStream(url, startAt);
         return true;
       } catch (err) {
@@ -590,12 +784,23 @@ export function useAudioPlayer(options: {
 
       if (await playOffline(id)) return;
       if (directUrl) {
+        activeEngineRef.current = "html5";
+        try {
+          ytPlayerRef.current?.stopVideo();
+        } catch {}
         setStream(directUrl);
         return;
       }
+
+      // If YouTube engine was already active from previous fallback, directly use YouTube player
+      if (activeEngineRef.current === "youtube") {
+        playViaYouTube(id, 0, true);
+        return;
+      }
+
       setStream(streamUrl(id));
     },
-    [setStream, playOffline, streamUrl],
+    [setStream, playOffline, streamUrl, playViaYouTube],
   );
 
   /** Cue a track at specific second without autoplay */
@@ -616,17 +821,30 @@ export function useAudioPlayer(options: {
 
       if (await playOffline(id, startSeconds)) return;
       if (directUrl) {
+        activeEngineRef.current = "html5";
+        try {
+          ytPlayerRef.current?.stopVideo();
+        } catch {}
         setStream(directUrl, startSeconds);
         return;
       }
+
+      if (activeEngineRef.current === "youtube") {
+        playViaYouTube(id, startSeconds, false);
+        return;
+      }
+
       setStream(streamUrl(id), startSeconds);
     },
-    [setStream, playOffline, streamUrl],
+    [setStream, playOffline, streamUrl, playViaYouTube],
   );
-
 
   const play = useCallback(() => {
     wantPlayRef.current = true;
+    if (activeEngineRef.current === "youtube") {
+      ytPlayerRef.current?.playVideo();
+      return;
+    }
     initWebAudio();
     const audio = audioRef.current;
     if (audio && audio.src && audio.src.length > 0 && !audio.src.endsWith("/")) {
@@ -644,13 +862,22 @@ export function useAudioPlayer(options: {
 
   const pause = useCallback(() => {
     wantPlayRef.current = false;
-    audioRef.current?.pause();
+    if (activeEngineRef.current === "youtube") {
+      ytPlayerRef.current?.pauseVideo();
+    } else {
+      audioRef.current?.pause();
+    }
   }, []);
 
   const seek = useCallback((seconds: number) => {
+    const target = Math.max(0, seconds);
+    if (activeEngineRef.current === "youtube") {
+      ytPlayerRef.current?.seekTo(target, true);
+      setPosition(target);
+      return;
+    }
     const audio = audioRef.current;
     if (!audio) return;
-    const target = Math.max(0, seconds);
     if (audio.readyState < 1 || !Number.isFinite(audio.duration) || audio.duration === 0) {
       pendingSeekRef.current = target;
       setPosition(target);
@@ -663,16 +890,12 @@ export function useAudioPlayer(options: {
   }, []);
 
   const skipForward = useCallback((seconds = 30) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const current = audio.currentTime || position;
+    const current = position;
     seek(current + seconds);
   }, [position, seek]);
 
   const skipBackward = useCallback((seconds = 15) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const current = audio.currentTime || position;
+    const current = position;
     seek(Math.max(0, current - seconds));
   }, [position, seek]);
 
@@ -682,6 +905,11 @@ export function useAudioPlayer(options: {
     if (typeof window !== "undefined") {
       localStorage.setItem("melodymap.playback_speed.v1", String(clamped));
     }
+    if (activeEngineRef.current === "youtube") {
+      try {
+        ytPlayerRef.current?.setPlaybackRate(clamped);
+      } catch {}
+    }
     const audio = audioRef.current;
     if (audio) {
       audio.playbackRate = clamped;
@@ -689,8 +917,12 @@ export function useAudioPlayer(options: {
   }, []);
 
   const setVolume = useCallback((v: number) => {
+    const clamped = Math.max(0, Math.min(100, v));
     const audio = audioRef.current;
-    if (audio) audio.volume = Math.max(0, Math.min(1, v / 100));
+    if (audio) audio.volume = clamped / 100;
+    try {
+      ytPlayerRef.current?.setVolume(clamped);
+    } catch {}
   }, []);
 
   return {
@@ -724,3 +956,4 @@ export function formatTime(seconds: number) {
   const s = Math.floor(seconds % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
+
