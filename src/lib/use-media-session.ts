@@ -83,7 +83,19 @@ export function useMediaSession(
     const ms = typeof navigator !== "undefined" ? navigator.mediaSession : undefined;
     if (!ms || !track) return;
 
-    const thumb = track.thumbnail || "/icons/icon-512.png";
+    const toAbsolute = (url: string) => {
+      if (!url) return "";
+      if (url.startsWith("http://") || url.startsWith("https://")) return url;
+      if (typeof window !== "undefined") {
+        return `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
+      }
+      return url;
+    };
+
+    const rawThumb = track.thumbnail || "/icons/icon-512.png";
+    const thumb = toAbsolute(rawThumb);
+    const fallbackIcon = toAbsolute("/icons/icon-512.png");
+
     const artworkList: MediaImage[] = [
       { src: thumb, sizes: "96x96", type: "image/jpeg" },
       { src: thumb, sizes: "128x128", type: "image/jpeg" },
@@ -91,7 +103,7 @@ export function useMediaSession(
       { src: thumb, sizes: "256x256", type: "image/jpeg" },
       { src: thumb, sizes: "384x384", type: "image/jpeg" },
       { src: thumb, sizes: "512x512", type: "image/jpeg" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: fallbackIcon, sizes: "512x512", type: "image/png" },
     ];
 
     try {

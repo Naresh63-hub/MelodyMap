@@ -27,6 +27,10 @@ declare global {
   }
 }
 
+/** 1-second silent WAV data URI to maintain OS audio focus for Spotify-like lockscreen & background playback */
+const SILENT_AUDIO_URI =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+
 /**
  * HTML5-Audio + Web Audio API backed player with Spotify-like background playback,
  * screen-off & lockscreen continuous playback, 10-band hardware equalizer, sound presets,
@@ -362,6 +366,8 @@ export function useAudioPlayer(options: {
         audio.pause();
       } catch {}
 
+      audio.loop = false;
+      audio.volume = 1;
       audio.muted = false;
       audio.src = url;
       audio.playbackRate = playbackSpeed;
@@ -606,16 +612,30 @@ export function useAudioPlayer(options: {
             },
             onStateChange: (event: any) => {
               if (event.data === 1) {
+                // Playing
                 setIsPlaying(true);
                 setIsLoading(false);
+                const audio = audioRef.current;
+                if (audio) {
+                  if (audio.src !== SILENT_AUDIO_URI) {
+                    audio.src = SILENT_AUDIO_URI;
+                    audio.loop = true;
+                    audio.volume = 0.0001;
+                  }
+                  audio.play().catch(() => {});
+                }
               } else if (event.data === 2) {
+                // Paused
                 setIsPlaying(false);
                 setIsLoading(false);
+                audioRef.current?.pause();
               } else if (event.data === 3) {
                 setIsLoading(true);
               } else if (event.data === 0) {
+                // Ended
                 setIsPlaying(false);
                 setIsLoading(false);
+                audioRef.current?.pause();
                 endedRef.current();
               }
             },
@@ -850,6 +870,15 @@ export function useAudioPlayer(options: {
     wantPlayRef.current = true;
     if (activeEngineRef.current === "youtube") {
       ytPlayerRef.current?.playVideo();
+      const audio = audioRef.current;
+      if (audio) {
+        if (audio.src !== SILENT_AUDIO_URI) {
+          audio.src = SILENT_AUDIO_URI;
+          audio.loop = true;
+          audio.volume = 0.0001;
+        }
+        audio.play().catch(() => {});
+      }
       return;
     }
     initWebAudio();
@@ -871,6 +900,7 @@ export function useAudioPlayer(options: {
     wantPlayRef.current = false;
     if (activeEngineRef.current === "youtube") {
       ytPlayerRef.current?.pauseVideo();
+      audioRef.current?.pause();
     } else {
       audioRef.current?.pause();
     }
