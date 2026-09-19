@@ -1,150 +1,115 @@
-# 🎵 MelodyMap — Music Player
+<div align="center">
+  <img src="public/brand/app-icon.png" alt="MelodyMap Logo" width="96" height="96" style="border-radius: 22px; box-shadow: 0 10px 30px rgba(124, 58, 237, 0.4);" />
+  <h1>MelodyMap</h1>
+  <p><strong>Your Music. Your Mood. Your Map.</strong></p>
+  <p>A full-featured, local-first music streaming application with AI recommendations, 10-band equalizer, Spotify-style background playback, and seamless lock screen controls.</p>
 
-A full-featured music streaming application built with React 19 and TanStack Start. Stream any song for free with AI-powered recommendations that learn your taste. No account needed for basic usage, with optional cloud sync via Supabase.
+  <p>
+    <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square&logo=react" alt="React 19" />
+    <img src="https://img.shields.io/badge/TanStack-Start-ff4154?style=flat-square" alt="TanStack Start" />
+    <img src="https://img.shields.io/badge/TailwindCSS-v4-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind CSS 4" />
+    <img src="https://img.shields.io/badge/TypeScript-5.8-3178c6?style=flat-square&logo=typescript" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/PWA-Ready-7c3aed?style=flat-square" alt="PWA Ready" />
+    <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
+  </p>
+</div>
 
-## ✨ Features
+---
 
-- **🎧 Unlimited Streaming**: Play any song from YouTube with ad-free audio extraction
-- **🤖 AI-Powered Recommendations**: Smart playlists and music discovery that adapts to your preferences
-- **📱 Responsive Design**: Beautiful dark neon theme that works on all devices
-- **🎨 Premium UI**: Glass morphism effects, smooth animations, and intuitive navigation
-- **📚 Local-First Library**: Manage your likes, playlists, and listening history locally
-- **☁️ Cloud Sync**: Optional Supabase integration for cross-device synchronization
-- **🔍 Smart Search**: Real-time search with suggestions and multi-source aggregation
-- **🎵 Multiple Sources**: YouTube, Deezer fallback, and more streaming options
-- **⚡ Offline Support**: Service worker for PWA functionality and offline access
-- **🎛️ Advanced Controls**: Queue management, sleep timer, and playback customization
+## 🎧 Features
+
+- **⚡ Dual-Engine Audio Streaming**: Seamlessly routes between HTML5 audio proxy and direct client-side playback for zero-failure streaming across localhost and serverless clouds (Vercel).
+- **📱 Spotify-Like Lock Screen Controls**: Full native Media Session integration showing high-res album art, song title, artist, live seek scrubber, play/pause, and track advance directly on Android, iOS, Windows, and macOS lock screens.
+- **🎵 Continuous Background Playback**: Screen-off background audio focus keeps music streaming seamlessly even when your phone is locked in your pocket or when multitasking between apps.
+- **🎛️ 10-Band Hardware Equalizer & FX**: Studio-grade Web Audio API parametric filters, bass booster, vocal enhancer, and LUFS Dynamic Range Compressor leveling.
+- **❤️ 1-Click Fast Favourites**: Tap the heart button on the playing bar or mini player to immediately save songs and tune personalized recommendations.
+- **🤖 AI-Powered Recommendation Engine**: Generates Daily Mixes, Mood Radios, and personalized song suggestions learning from your play history and likes.
+- **⚡ Offline Caching**: Download songs directly to local browser IndexedDB storage for full offline listening without an internet connection.
+- **⏩ SponsorBlock Auto-Skip**: Automatically detects and skips sponsored segments, non-music intros, and outros for uninterrupted listening.
+- **📝 Real-Time Synced Lyrics**: Synchronized word-for-word scrolling lyrics powered by LRCLIB.
+- **☁️ Cloud Sync (Optional)**: Connect Supabase to sync your library, playlists, and history across all your devices, or use local guest mode with zero setup.
+
+---
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 19 + TanStack Start (SSR via Nitro)
-- **Styling**: Tailwind CSS 4 + custom dark neon theme + Radix UI primitives
-- **State Management**: TanStack Query + React hooks
-- **Routing**: TanStack Router with file-based routing
-- **Database**: Supabase (PostgreSQL + Auth + RLS) for cloud sync
-- **Streaming**: YouTube audio extraction + Deezer fallback
-- **AI Recommendations**: OpenAI-compatible gateway (works with any provider)
-- **Build Tool**: Vite 8 + TypeScript 5
-- **Deployment**: Node.js / Docker / VPS Self-Hosted (via Nitro `node-server`)
+| Layer | Technologies |
+| :--- | :--- |
+| **Framework** | [React 19](https://react.dev/), [TanStack Start](https://tanstack.com/start) (SSR & Server Functions via Nitro) |
+| **Styling** | [Tailwind CSS 4](https://tailwindcss.com/), Radix UI Primitives, Lucide Icons |
+| **Audio Pipeline** | Web Audio API (10-Band Biquad Filters), Media Session API, HTML5 Audio |
+| **Catalog & Search** | Multi-source hybrid search aggregation with YouTube Music & Deezer |
+| **PWA & Mobile** | Progressive Web App manifest, Service Worker caching, Capacitor ready |
+| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + Row-Level Security) |
+| **Build & Tooling** | Vite 8, TypeScript 5, ESLint, Prettier |
 
-## 🚀 Getting Started
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-
-- Node.js 18+ 
-- npm or bun
-- (Optional) Supabase account for cloud sync
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- `npm`
 
 ### Installation
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/Naresh63-hub/Musicplayer.git
 cd Musicplayer
 
-# Install dependencies
+# 2. Install dependencies
 npm install
-```
 
-### Development
-
-```bash
-# Start development server
+# 3. Start local development server
 npm run dev
-
-# The app will be available at http://localhost:3000
 ```
 
-### Build for Production
+The application will be running at **`http://localhost:3000`**.
+
+---
+
+## 📦 Building for Production
 
 ```bash
-# Create production build
+# Build client and server bundles
 npm run build
 
 # Preview production build locally
 npm run preview
 ```
 
-## 📖 Usage
+---
 
-### Basic Usage
-1. Open the app and start browsing recommended music
-2. Use the search bar to find specific songs, artists, or albums
-3. Click on any track to start playing
-4. Use keyboard shortcuts for quick control (Space for play/pause, etc.)
+## ☁️ Cloud Sync & Deployment (Optional)
 
-### Features Navigation
-- **For You**: AI-curated recommendations based on your listening history
-- **Mixes**: Pre-built playlists for different moods and genres
-- **Search**: Find any song, artist, or album
-- **Playlists**: Create and manage your own playlists
-- **History**: View your recently played tracks
-- **Favourites**: Quick access to your liked songs
+MelodyMap runs completely local-first out of the box with **no configuration required**. 
 
-### Cloud Sync (Optional)
-To enable cross-device synchronization:
-1. Create a Supabase project
-2. Add your Supabase URL and anon key to `.env`
-3. Sign up/in through the app's authentication
-4. Your library will sync across devices
+If you want cross-device cloud sync and Google OAuth:
+1. Create a free project at [Supabase](https://supabase.com/).
+2. In your deployment platform (e.g. Vercel), add these Environment Variables:
+   - `VITE_SUPABASE_URL`: `https://your-project.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY`: `your-supabase-anon-key`
+3. Deploy!
 
-## 🎯 Scripts
+---
 
-| Command          | Description                           |
-| ---------------- | ------------------------------------- |
-| `npm run dev`    | Start dev server with HMR             |
-| `npm run build`  | Production build (client + server)    |
-| `npm run preview`| Preview the production build locally  |
-| `npm run lint`   | Run ESLint                            |
-| `npm run format` | Format with Prettier                  |
+## ⌨️ Keyboard Shortcuts
 
-## ⚙️ Environment Variables (Optional)
+| Shortcut | Action |
+| :--- | :--- |
+| <kbd>Space</kbd> | Play / Pause |
+| <kbd>J</kbd> / <kbd>L</kbd> | Skip Backward (15s) / Forward (30s) |
+| <kbd>K</kbd> | Play / Pause |
+| <kbd>N</kbd> / <kbd>P</kbd> | Next Track / Previous Track |
+| <kbd>M</kbd> | Mute / Unmute Volume |
+| <kbd>F</kbd> | Toggle Full-Screen Player |
+| <kbd>E</kbd> | Open 10-Band Equalizer |
+| <kbd>L</kbd> | Toggle Synced Lyrics |
+| <kbd>/</kbd> | Focus Search Bar |
 
-MelodyMap runs completely local-first out of the box with zero configuration required. For cross-device sync and Google login, add these to your deployment:
-
-```env
-# Supabase (optional - for cloud sync)
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-
-# AI Gateway (optional - for enhanced recommendations)
-VITE_AI_GATEWAY_URL=your_ai_gateway_url
-VITE_AI_GATEWAY_KEY=your_ai_gateway_key
-```
-
-## 🏗️ Project Structure
-
-```
-src/
-├── components/
-│   ├── music/           # Main music player components
-│   │   ├── layout/     # Sidebar, SearchHeader
-│   │   └── ui/         # Custom UI components
-│   └── ui/             # shadcn/ui components
-├── hooks/              # Custom React hooks
-├── lib/                # Utilities and server functions
-├── routes/             # TanStack Router file-based routes
-└── styles.css          # Global styles and Tailwind config
-```
-
-## 🎨 Design System
-
-The app uses a custom dark neon theme with:
-- **Primary Colors**: Neon pink/magenta (#ec4899) and purple (#8b5cf6)
-- **Accent Colors**: Cyan (#06b6d4) and electric blue (#2979ff)
-- **Background**: Deep navy/black (#0a0a18)
-- **Effects**: Glass morphism, neon glows, and smooth animations
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+---
 
 ## 📄 License
 
-This project is open source and available under the MIT License.
-
-## 🙏 Acknowledgments
-
-- Music streaming powered by YouTube and Deezer APIs
-- UI components from shadcn/ui and Radix UI
-- Build tooling by Vite and TanStack
+This project is open source and available under the [MIT License](LICENSE).
