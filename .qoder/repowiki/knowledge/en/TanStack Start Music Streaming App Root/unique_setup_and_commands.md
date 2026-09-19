@@ -1,1 +1,0 @@
-`bun run dev` starts the Vite dev server with TanStack Start hot reload; `bun run build` produces a Nitro/Cloudflare bundle; `bun run lint` and `bun run format` apply ESLint and Prettier across the whole workspace.

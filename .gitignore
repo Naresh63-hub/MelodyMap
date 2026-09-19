@@ -24,7 +24,8 @@ dist-ssr
 # Environment variables — never commit secrets
 .env
 .env.*
-!.env.example
+.qoder/
+.freebuff/
 
 # Editor directories and files
 .vscode/*

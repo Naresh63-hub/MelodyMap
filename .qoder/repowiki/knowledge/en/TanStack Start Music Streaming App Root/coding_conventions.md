@@ -1,4 +1,0 @@
-- All source files use the `@/*` path alias pointing to `./src/*` instead of relative imports.
-- Runtime shape validation is done with Zod schemas co-located with API or data-fetching code.
-- UI components are composed from Radix UI primitives styled with Tailwind CSS v4 utilities.
-- Environment variables are consumed via `import.meta.env` and prefixed with `VITE_` so Vite injects them at build time.

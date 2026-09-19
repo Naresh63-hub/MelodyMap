@@ -1,1 +1,0 @@
-TanStack Start (React + Router), React Query for data fetching, Supabase client with custom auth-attacher middleware, shadcn/ui primitives, and native Media Session API for system-level playback controls.

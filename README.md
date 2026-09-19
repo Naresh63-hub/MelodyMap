@@ -44,11 +44,6 @@ cd Musicplayer
 
 # Install dependencies
 npm install
-
-# Copy environment variables
-cp .env.example .env
-
-# Edit .env with your API keys (optional for local-only usage)
 ```
 
 ### Development
@@ -103,9 +98,9 @@ To enable cross-device synchronization:
 | `npm run lint`   | Run ESLint                            |
 | `npm run format` | Format with Prettier                  |
 
-## ⚙️ Environment Variables
+## ⚙️ Environment Variables (Optional)
 
-Create a `.env` file based on `.env.example`:
+MelodyMap runs completely local-first out of the box with zero configuration required. For cross-device sync and Google login, add these to your deployment:
 
 ```env
 # Supabase (optional - for cloud sync)

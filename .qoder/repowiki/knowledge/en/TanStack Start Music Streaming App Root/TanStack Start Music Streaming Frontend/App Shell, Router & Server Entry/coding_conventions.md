@@ -1,4 +1,0 @@
-- Server-side error rendering is centralized in `renderErrorPage` and returned as `text/html` 500 responses from both the start middleware and the Node fetch adapter.
-- Expensive or optional modules are loaded lazily via dynamic `import()` inside request handlers (e.g., the TanStack server entry and `./lib/stream.server`) to avoid cold-start overhead.
-- Streaming responses are built with `ReadableStream` generators that yield typed `Uint8Array` chunks and propagate cancellation via an async iterator's `return`.
-- Range-based byte serving is handled uniformly: parse the `Range` header, compute `content-range` and `content-length`, and return either 206 Partial Content or 416 Range Not Satisfiable.

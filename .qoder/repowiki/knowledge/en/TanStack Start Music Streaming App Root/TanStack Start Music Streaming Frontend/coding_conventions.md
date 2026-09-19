@@ -1,3 +1,0 @@
-- Server-side music operations are isolated in `lib/*.server.ts` files and called from routes or functions rather than inline.
-- Cross-cutting state (audio player, media session, sleep timer) is exposed as custom hooks under `hooks/` and `lib/use-*` for reuse across music components.
-- Supabase client usage goes through the typed wrapper in `integrations/supabase/client.ts` plus the auth-attacher middleware instead of direct SDK calls.

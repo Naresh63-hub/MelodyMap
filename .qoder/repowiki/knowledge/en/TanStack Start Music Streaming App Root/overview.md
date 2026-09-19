@@ -1,1 +1,0 @@
-Top-level monorepo root that bootstraps a TanStack Start + Vite + Nitro music streaming frontend and wires it to the Supabase schema child via environment-driven client configuration.

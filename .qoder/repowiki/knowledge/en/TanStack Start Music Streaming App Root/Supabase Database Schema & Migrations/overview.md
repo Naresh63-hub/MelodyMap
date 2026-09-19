@@ -1,1 +1,0 @@
-Defines the Supabase project's PostgreSQL schema, including user profiles, per-user JSONB libraries, RLS policies, triggers, and migration history.
