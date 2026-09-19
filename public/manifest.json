@@ -7,7 +7,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0f",
-  "theme_color": "#7c3aed",
+  "theme_color": "#0b0716",
   "categories": ["music", "podcasts", "entertainment"],
   "prefer_related_applications": false,
   "icons": [
