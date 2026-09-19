@@ -191,11 +191,13 @@ function AuthPage() {
         <div className="flex flex-col items-center gap-3 text-center">
           <Link
             to="/"
-            className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-cyan-400 p-0.5 shadow-xl shadow-purple-500/20 hover:scale-105 transition-transform"
+            className="flex h-16 w-16 items-center justify-center rounded-2xl p-0.5 shadow-2xl shadow-purple-500/30 hover:scale-105 transition-transform"
           >
-            <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-[#0d0a1a]">
-              <Disc3 className="h-7 w-7 text-pink-400 animate-spin-slow" />
-            </div>
+            <img
+              src="/brand/app-icon.png"
+              alt="MelodyMap"
+              className="h-full w-full rounded-2xl object-cover"
+            />
           </Link>
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">

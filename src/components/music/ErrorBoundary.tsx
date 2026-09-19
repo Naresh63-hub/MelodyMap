@@ -37,7 +37,11 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="flex min-h-screen items-center justify-center bg-background px-4">
           <div className="max-w-md text-center">
-            <p className="text-6xl mb-4">🎵</p>
+            <img
+              src="/brand/app-icon.png"
+              alt="MelodyMap"
+              className="h-16 w-16 mx-auto mb-4 rounded-2xl object-cover shadow-xl shadow-purple-500/20"
+            />
             <h1 className="text-xl font-bold text-foreground">
               Something went wrong
             </h1>

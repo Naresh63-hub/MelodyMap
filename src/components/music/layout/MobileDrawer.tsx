@@ -85,9 +85,11 @@ export function MobileDrawer({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-400 shadow-md">
-              <Disc3 className="h-4 w-4 text-white animate-spin-slow" />
-            </div>
+            <img
+              src="/brand/app-icon.png"
+              alt="MelodyMap"
+              className="h-8 w-8 rounded-lg object-cover shadow-md"
+            />
             <span className="font-display text-base font-bold">
               <span className="text-white">Melody</span>
               <span className="bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent">

@@ -57,7 +57,7 @@ export function SearchHeader({
       <div className="mx-auto flex w-full items-center gap-2 sm:gap-3">
         {/* Mobile brand */}
         <div className="flex shrink-0 items-center gap-2 lg:hidden">
-          <img src="/brand/icon.svg" alt="" className="h-8 w-8" />
+          <img src="/brand/app-icon.png" alt="MelodyMap" className="h-8 w-8 rounded-lg object-cover shadow-sm" />
           <span className="font-display text-base font-bold">
             <span className="text-white">Melody</span>
             <span className="bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 bg-clip-text text-transparent">Map</span>

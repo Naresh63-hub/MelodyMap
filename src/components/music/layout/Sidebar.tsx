@@ -108,10 +108,11 @@ export function Sidebar({
         )}
       >
         <div className="relative shrink-0">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-purple-500 to-cyan-400 shadow-lg shadow-purple-500/20">
-            <Disc3 className="h-5 w-5 text-white animate-spin-slow" />
-          </div>
-          <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-pink-500/20 via-purple-500/20 to-cyan-500/20 blur-lg animate-pulse" />
+          <img
+            src="/brand/app-icon.png"
+            alt="MelodyMap"
+            className="h-10 w-10 rounded-xl object-cover shadow-lg shadow-purple-500/25"
+          />
         </div>
         {!collapsed && (
           <div className="min-w-0 animate-fade-in-up">
