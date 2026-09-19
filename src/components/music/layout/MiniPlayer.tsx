@@ -1,4 +1,4 @@
-import { Loader2, Pause, Play, SkipForward, Sliders } from "lucide-react";
+import { Heart, Loader2, Pause, Play, SkipForward, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import type { Track } from "@/lib/library";
@@ -7,9 +7,11 @@ type Props = {
   track: Track | undefined;
   isPlaying: boolean;
   isLoading?: boolean;
+  liked?: boolean;
   position: number;
   duration: number;
   onTogglePlay: () => void;
+  onToggleLike?: () => void;
   onNext: () => void;
   onOpenPlayer: () => void;
   onOpenEqualizer?: () => void;
@@ -23,9 +25,11 @@ export function MiniPlayer({
   track,
   isPlaying,
   isLoading = false,
+  liked = false,
   position,
   duration,
   onTogglePlay,
+  onToggleLike,
   onNext,
   onOpenPlayer,
   onOpenEqualizer,
@@ -93,6 +97,31 @@ export function MiniPlayer({
 
         {/* Transport controls */}
         <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+          {onToggleLike && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLike();
+              }}
+              className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-full active:scale-90 transition-all",
+                liked
+                  ? "text-pink-400 hover:text-pink-300 hover:bg-pink-500/10 shadow-[0_0_12px_rgba(244,114,182,0.35)]"
+                  : "text-purple-300/70 hover:text-white hover:bg-white/5"
+              )}
+              aria-label={liked ? "Remove from favourites" : "Add to favourites (trains AI recommendations)"}
+              title={liked ? "In your favourites" : "Save to favourites (tunes your recommendations)"}
+            >
+              <Heart
+                className={cn(
+                  "h-4 w-4 transition-all duration-200",
+                  liked ? "fill-pink-500 text-pink-500 scale-110 drop-shadow-[0_0_8px_rgba(236,72,153,0.6)]" : "hover:scale-110"
+                )}
+              />
+            </button>
+          )}
+
           {onOpenEqualizer && (
             <button
               type="button"

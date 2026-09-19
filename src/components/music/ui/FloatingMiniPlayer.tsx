@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ExternalLink,
+  Heart,
   Maximize2,
   Minimize2,
   Move,
@@ -21,10 +22,12 @@ type Props = {
   track: Track | null;
   isPlaying: boolean;
   isLoading?: boolean;
+  liked?: boolean;
   position: number;
   duration: number;
   volume: number;
   onTogglePlay: () => void;
+  onToggleLike?: () => void;
   onNext: () => void;
   onPrevious: () => void;
   onSeek: (seconds: number) => void;
@@ -37,10 +40,12 @@ export function FloatingMiniPlayer({
   track,
   isPlaying,
   isLoading = false,
+  liked = false,
   position,
   duration,
   volume,
   onTogglePlay,
+  onToggleLike,
   onNext,
   onPrevious,
   onSeek,
@@ -192,6 +197,28 @@ export function FloatingMiniPlayer({
         {/* Transport Controls */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-1.5 flex-1 justify-center">
+            {onToggleLike && (
+              <button
+                type="button"
+                onClick={onToggleLike}
+                className={cn(
+                  "p-1.5 rounded-full active:scale-90 transition-all",
+                  liked
+                    ? "text-pink-400 hover:text-pink-300 hover:bg-pink-500/10 shadow-[0_0_10px_rgba(244,114,182,0.3)]"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
+                )}
+                aria-label={liked ? "Remove from favourites" : "Add to favourites (trains recommendations)"}
+                title={liked ? "In your favourites" : "Save to favourites (tunes your recommendations)"}
+              >
+                <Heart
+                  className={cn(
+                    "h-4 w-4 transition-transform duration-200",
+                    liked ? "fill-pink-500 text-pink-500 scale-110 drop-shadow-[0_0_6px_rgba(236,72,153,0.5)]" : "hover:scale-110"
+                  )}
+                />
+              </button>
+            )}
+
             <button
               type="button"
               onClick={onPrevious}

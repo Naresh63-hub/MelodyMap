@@ -1909,9 +1909,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           track={current}
           isPlaying={player.isPlaying}
           isLoading={player.isLoading}
+          liked={likedIds.has(current?.id ?? "")}
           position={player.position}
           duration={player.duration}
           onTogglePlay={togglePlay}
+          onToggleLike={() => current && toggleLike(current)}
           onNext={goNext}
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
@@ -1924,10 +1926,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           track={current}
           isPlaying={player.isPlaying}
           isLoading={player.isLoading}
+          liked={likedIds.has(current?.id ?? "")}
           position={player.position}
           duration={player.duration}
           volume={volume}
           onTogglePlay={togglePlay}
+          onToggleLike={() => current && toggleLike(current)}
           onNext={goNext}
           onPrevious={goPrev}
           onSeek={(s) => player.seek(s)}
