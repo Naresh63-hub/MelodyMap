@@ -50,7 +50,14 @@ export function useAudioPlayer(options: {
   const filterNodesRef = useRef<BiquadFilterNode[]>([]);
 
   // Dual-engine playback state ("html5" or "youtube")
-  const activeEngineRef = useRef<"html5" | "youtube">("html5");
+  // In deployed production environments (e.g. Vercel), default directly to client-side YouTube engine
+  const activeEngineRef = useRef<"html5" | "youtube">(
+    typeof window !== "undefined" &&
+      window.location.hostname !== "localhost" &&
+      window.location.hostname !== "127.0.0.1"
+      ? "youtube"
+      : "html5",
+  );
   const ytPlayerRef = useRef<any>(null);
   const ytReadyRef = useRef<boolean>(false);
   const ytTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
