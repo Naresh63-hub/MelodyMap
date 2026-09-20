@@ -2126,6 +2126,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           userId={auth.userId}
           userEmail={auth.email}
           userProfile={auth.profile}
+          onUpdateProfile={auth.updateProfile}
+          onUpdatePassword={auth.updatePassword}
           onSignOut={auth.signOut}
           onLibraryRestored={() => window.location.reload()}
         />

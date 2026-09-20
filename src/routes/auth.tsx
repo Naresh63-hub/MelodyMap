@@ -59,17 +59,33 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+function isRecoveryUrl(): boolean {
+  if (typeof window === "undefined") return false;
+  const hash = window.location.hash;
+  const search = window.location.search;
+  return (
+    hash.includes("type=recovery") ||
+    search.includes("type=recovery") ||
+    search.includes("reset=true")
+  );
+}
+
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "reset_password">(() => {
+    return isRecoveryUrl() ? "reset_password" : "signin";
+  });
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(() => {
     if (typeof window !== "undefined") {
+      if (isRecoveryUrl()) return false;
       const h = window.location.hash;
       const s = window.location.search;
       return h.includes("access_token") || s.includes("code=");
@@ -77,15 +93,30 @@ function AuthPage() {
     return false;
   });
   const [errorNote, setErrorNote] = useState<string | null>(null);
-  const [successNote, setSuccessNote] = useState<string | null>(null);
+  const [successNote, setSuccessNote] = useState<string | null>(() => {
+    return isRecoveryUrl() ? "Password recovery link verified. Enter your new password below." : null;
+  });
   const { isConfigured } = getSupabaseEnv();
 
   useEffect(() => {
     if (!isConfigured) return;
 
-    // Listen for auth state change (Google OAuth exchange, email confirmation, etc.)
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+    if (isRecoveryUrl()) {
+      setOauthLoading(false);
+      setMode("reset_password");
+      setSuccessNote("Password recovery link verified. Enter your new password below.");
+    }
+
+    // Listen for auth state change (Google OAuth exchange, email confirmation, recovery, etc.)
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || isRecoveryUrl()) {
+        setOauthLoading(false);
+        setMode("reset_password");
+        setSuccessNote("Password recovery link verified. Enter your new password below.");
+        return;
+      }
+
+      if (session && mode !== "reset_password" && !isRecoveryUrl()) {
         if (typeof window !== "undefined") {
           localStorage.removeItem("melodymap.guest_mode");
         }
@@ -94,7 +125,14 @@ function AuthPage() {
     });
 
     void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+      if (isRecoveryUrl()) {
+        setOauthLoading(false);
+        setMode("reset_password");
+        setSuccessNote("Password recovery link verified. Enter your new password below.");
+        return;
+      }
+
+      if (data.session && mode !== "reset_password") {
         if (typeof window !== "undefined") {
           localStorage.removeItem("melodymap.guest_mode");
         }
@@ -105,7 +143,7 @@ function AuthPage() {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [navigate, isConfigured]);
+  }, [navigate, isConfigured, mode]);
 
   const handleContinueAsGuest = () => {
     if (typeof window !== "undefined") {
@@ -128,6 +166,57 @@ function AuthPage() {
       return;
     }
 
+    if (mode === "reset_password") {
+      if (!password || password.length < 6) {
+        setBusy(false);
+        setErrorNote("New password must be at least 6 characters long.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setBusy(false);
+        setErrorNote("Passwords do not match. Please re-type your new password.");
+        return;
+      }
+
+      try {
+        // If an OTP code was entered manually, verify it first
+        if (otpCode.trim() && email.trim()) {
+          const { error: otpErr } = await supabase.auth.verifyOtp({
+            email: email.trim(),
+            token: otpCode.trim(),
+            type: "recovery",
+          });
+          if (otpErr) {
+            setBusy(false);
+            setErrorNote(formatAuthError(otpErr.message));
+            return;
+          }
+        }
+
+        const { error } = await supabase.auth.updateUser({
+          password: password,
+        });
+
+        setBusy(false);
+        if (error) {
+          setErrorNote(formatAuthError(error.message));
+          return;
+        }
+
+        setSuccessNote("Password updated successfully! Welcome back to MelodyMap.");
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("melodymap.guest_mode");
+        }
+        setTimeout(() => {
+          void navigate({ to: "/", replace: true });
+        }, 1200);
+      } catch (err: any) {
+        setBusy(false);
+        setErrorNote(err?.message || "Failed to update password.");
+      }
+      return;
+    }
+
     if (mode === "forgot") {
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
@@ -138,7 +227,11 @@ function AuthPage() {
           setErrorNote(formatAuthError(error.message));
           return;
         }
-        setSuccessNote("Password reset link has been sent to your email.");
+        setSuccessNote(
+          "Password reset link sent! Check your inbox (or spam) to open the reset link, or enter your 6-digit code below.",
+        );
+        // Switch to allow entering OTP / new password
+        setMode("reset_password");
       } catch (err: any) {
         setBusy(false);
         setErrorNote(err?.message || "Failed to send reset link.");
@@ -273,7 +366,7 @@ function AuthPage() {
         {/* Auth Card */}
         <div className="rounded-3xl border border-white/10 bg-[#100d1d]/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl">
           {/* Mode Switcher */}
-          {mode !== "forgot" ? (
+          {mode === "signin" || mode === "signup" ? (
             <div className="mb-6 flex rounded-full bg-white/[0.04] p-1 border border-white/5 text-xs font-semibold">
               {(["signin", "signup"] as const).map((m) => (
                 <button
@@ -303,11 +396,13 @@ function AuthPage() {
                   setErrorNote(null);
                   setSuccessNote(null);
                 }}
-                className="inline-flex items-center gap-1.5 text-xs text-purple-300 hover:text-white transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-purple-300 hover:text-white transition-colors cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Back to Sign In
               </button>
-              <span className="text-xs font-semibold text-white/70">Reset Password</span>
+              <span className="text-xs font-semibold text-white/70">
+                {mode === "reset_password" ? "Set New Password" : "Reset Password"}
+              </span>
             </div>
           )}
 
@@ -355,24 +450,48 @@ function AuthPage() {
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs text-white/80 font-medium">Email Address</Label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+            {/* Email Address */}
+            {(mode === "signin" || mode === "signup" || mode === "forgot" || (mode === "reset_password" && !isRecoveryUrl())) && (
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs text-white/80 font-medium">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <Input
+                    id="email"
+                    type="email"
+                    required
+                    maxLength={255}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Optional 6-digit OTP code for reset_password mode */}
+            {mode === "reset_password" && !isRecoveryUrl() && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="otpCode" className="text-xs text-white/80 font-medium">
+                    Reset Code / Token <span className="text-white/40 font-normal">(if received in email)</span>
+                  </Label>
+                </div>
                 <Input
-                  id="email"
-                  type="email"
-                  required
-                  maxLength={255}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                  id="otpCode"
+                  type="text"
+                  maxLength={32}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="e.g. 123456 or token"
+                  className="h-10 rounded-xl border-white/10 bg-white/[0.04] px-3.5 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50 font-mono"
                 />
               </div>
-            </div>
+            )}
 
-            {mode !== "forgot" && (
+            {/* Password input for Sign In / Sign Up */}
+            {(mode === "signin" || mode === "signup") && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password" className="text-xs text-white/80 font-medium">Password</Label>
@@ -384,7 +503,7 @@ function AuthPage() {
                         setErrorNote(null);
                         setSuccessNote(null);
                       }}
-                      className="text-[11px] text-purple-300 hover:text-purple-200 transition-colors"
+                      className="text-[11px] text-purple-300 hover:text-purple-200 transition-colors cursor-pointer"
                     >
                       Forgot password?
                     </button>
@@ -415,9 +534,58 @@ function AuthPage() {
               </div>
             )}
 
+            {/* Password input & confirmation for reset_password mode */}
+            {mode === "reset_password" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-password" className="text-xs text-white/80 font-medium">New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                    <Input
+                      id="new-password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      maxLength={72}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter at least 6 characters"
+                      className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 pr-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm-password" className="text-xs text-white/80 font-medium">Confirm New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                    <Input
+                      id="confirm-password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      maxLength={72}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter your new password"
+                      className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
             <Button
               type="submit"
-              className="w-full h-10 rounded-xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 font-semibold text-white shadow-lg shadow-purple-500/20 hover:brightness-110 active:scale-[0.99] transition-all"
+              className="w-full h-10 rounded-xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 font-semibold text-white shadow-lg shadow-purple-500/20 hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer"
               disabled={busy}
             >
               {busy ? (
@@ -426,13 +594,31 @@ function AuthPage() {
                 "Sign In to MelodyMap"
               ) : mode === "signup" ? (
                 "Create Account"
-              ) : (
+              ) : mode === "forgot" ? (
                 "Send Password Reset Link"
+              ) : (
+                "Save New Password & Continue"
               )}
             </Button>
+
+            {mode === "forgot" && (
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("reset_password");
+                    setErrorNote(null);
+                    setSuccessNote(null);
+                  }}
+                  className="text-xs text-purple-300 hover:text-white underline underline-offset-4 transition-colors cursor-pointer"
+                >
+                  Already have a reset code or clicked email link? Enter new password
+                </button>
+              </div>
+            )}
           </form>
 
-          {mode !== "forgot" && (
+          {mode !== "forgot" && mode !== "reset_password" && (
             <>
               <div className="my-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-white/30">
                 <span className="h-px flex-1 bg-white/10" />
