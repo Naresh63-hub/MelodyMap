@@ -150,6 +150,23 @@ function MusicApp() {
 
 
   const auth = useAuth();
+
+  // Require login first: redirect to /auth if not signed in and not explicitly in guest mode
+  useEffect(() => {
+    if (!auth.ready) return;
+    if (typeof window !== "undefined") {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      if (hash.includes("access_token") || search.includes("code=")) {
+        // OAuth tokens present in URL, let Supabase auth listener process them
+        return;
+      }
+      const isGuest = localStorage.getItem("melodymap.guest_mode") === "true";
+      if (!auth.userId && !isGuest) {
+        void navigate({ to: "/auth", replace: true });
+      }
+    }
+  }, [auth.ready, auth.userId, navigate]);
   const {
     hydrated,
     likes,

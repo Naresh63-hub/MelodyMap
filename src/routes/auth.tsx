@@ -68,16 +68,51 @@ function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(() => {
+    if (typeof window !== "undefined") {
+      const h = window.location.hash;
+      const s = window.location.search;
+      return h.includes("access_token") || s.includes("code=");
+    }
+    return false;
+  });
   const [errorNote, setErrorNote] = useState<string | null>(null);
   const [successNote, setSuccessNote] = useState<string | null>(null);
   const { isConfigured } = getSupabaseEnv();
 
   useEffect(() => {
     if (!isConfigured) return;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) void navigate({ to: "/", replace: true });
+
+    // Listen for auth state change (Google OAuth exchange, email confirmation, etc.)
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("melodymap.guest_mode");
+        }
+        void navigate({ to: "/", replace: true });
+      }
     });
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("melodymap.guest_mode");
+        }
+        void navigate({ to: "/", replace: true });
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, [navigate, isConfigured]);
+
+  const handleContinueAsGuest = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("melodymap.guest_mode", "true");
+    }
+    void navigate({ to: "/", replace: true });
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -172,7 +207,13 @@ function AuthPage() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin },
+        options: {
+          redirectTo: `${window.location.origin}/auth`,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
       });
       if (error) {
         setGoogleBusy(false);
@@ -183,6 +224,26 @@ function AuthPage() {
       setErrorNote(err?.message || "Could not initiate Google authentication.");
     }
   };
+
+  if (oauthLoading) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-[#07060d] px-4 py-8 text-foreground">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl p-0.5 shadow-2xl shadow-purple-500/30 animate-pulse">
+            <img
+              src="/brand/app-icon.png"
+              alt="MelodyMap"
+              className="h-full w-full rounded-2xl object-cover"
+            />
+          </div>
+          <div className="flex items-center gap-2 text-purple-300">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="text-sm font-semibold">Completing secure sign-in...</span>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#07060d] px-4 py-8 text-foreground selection:bg-purple-500/30">
@@ -416,12 +477,13 @@ function AuthPage() {
 
         {/* Guest Mode Back Link */}
         <p className="text-center text-xs text-white/40">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 hover:text-purple-300 underline underline-offset-4 transition-colors"
+          <button
+            type="button"
+            onClick={handleContinueAsGuest}
+            className="inline-flex items-center gap-1.5 hover:text-purple-300 underline underline-offset-4 transition-colors cursor-pointer"
           >
             <span>Continue listening as guest (local only)</span>
-          </Link>
+          </button>
         </p>
       </div>
     </main>

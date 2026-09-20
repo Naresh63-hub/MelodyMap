@@ -67,6 +67,9 @@ export function useAuth() {
     } catch (err) {
       console.warn("[Auth] signOut error:", err);
     } finally {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("melodymap.guest_mode");
+      }
       setUserId(null);
       setEmail(null);
       setProfile(null);
