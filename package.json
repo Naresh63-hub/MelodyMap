@@ -12,10 +12,15 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "android:build": "cap sync android && cd android && gradlew.bat assembleDebug",
+    "android:open": "cap open android"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.20",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-dialog": "^1.1.15",

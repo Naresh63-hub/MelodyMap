@@ -47,5 +47,8 @@ maglev-tour/
 probe*
 resp.json
 test-ytdlp.cjs
+# Android / Mobile
+android/local.properties
+android/.gradle
+*.apk
 test.m4a
-

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MelodyMap</string>
+    <string name="title_activity_main">MelodyMap</string>
+    <string name="package_name">com.melodymap.music</string>
+    <string name="custom_url_scheme">com.melodymap.music</string>
+</resources>
