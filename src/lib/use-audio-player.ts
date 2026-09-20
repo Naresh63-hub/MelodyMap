@@ -64,6 +64,7 @@ export function useAudioPlayer(options: {
   const pendingYtActionRef = useRef<{ id: string; startAt: number; autoPlay: boolean } | null>(null);
   const isSeekingRef = useRef<boolean>(false);
   const seekCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skippedSegmentsRef = useRef<Set<string>>(new Set());
 
   // Equalizer & sound profile state
   const [equalizerSettings, setEqualizerSettingsState] = useState<EqualizerSettings>(loadEqualizerSettings);
@@ -480,10 +481,17 @@ export function useAudioPlayer(options: {
 
       // SponsorBlock Auto-Skip: Check if currentTime falls within an intro/sponsor/outro range
       if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
-        const skip = findSkipTarget(cur, sponsorSegmentsRef.current);
-        if (skip) {
-          audio.currentTime = skip.target;
-          onSponsorBlockSkippedRef.current?.(skip.category);
+        for (const seg of sponsorSegmentsRef.current) {
+          const segKey = `${seg.start.toFixed(1)}-${seg.end.toFixed(1)}`;
+          if (skippedSegmentsRef.current.has(segKey)) continue;
+
+          if (cur >= seg.start - 0.05 && cur < seg.end - 0.2) {
+            skippedSegmentsRef.current.add(segKey);
+            const target = seg.end + 0.2;
+            audio.currentTime = target;
+            onSponsorBlockSkippedRef.current?.(seg.category);
+            break;
+          }
         }
       }
 
@@ -643,7 +651,13 @@ export function useAudioPlayer(options: {
             },
             onError: (event: any) => {
               console.warn("[MelodyMap] YouTube player API error:", event.data);
-              onErrorRef.current?.("Audio stream unavailable, skipping to next track...");
+              // Only fatal unplayable errors should skip to next track
+              // 101/150 = embed blocked by video owner, 100 = video removed, 2 = invalid ID
+              if (event.data === 101 || event.data === 150 || event.data === 100 || event.data === 2) {
+                onErrorRef.current?.("Audio stream unavailable, skipping to next track...");
+              } else {
+                console.warn("[MelodyMap] Non-fatal YouTube player error, ignoring transient code:", event.data);
+              }
             },
           },
         });
@@ -686,12 +700,19 @@ export function useAudioPlayer(options: {
             setPosition(cur);
             if (dur > 0) setDuration(dur);
 
-            // SponsorBlock Auto-Skip
+            // SponsorBlock Auto-Skip: skip each matching segment exactly once
             if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
-              const skip = findSkipTarget(cur, sponsorSegmentsRef.current);
-              if (skip) {
-                p.seekTo(skip.target, true);
-                onSponsorBlockSkippedRef.current?.(skip.category);
+              for (const seg of sponsorSegmentsRef.current) {
+                const segKey = `${seg.start.toFixed(1)}-${seg.end.toFixed(1)}`;
+                if (skippedSegmentsRef.current.has(segKey)) continue;
+
+                if (cur >= seg.start - 0.05 && cur < seg.end - 0.2) {
+                  skippedSegmentsRef.current.add(segKey);
+                  const target = seg.end + 0.2;
+                  seek(target);
+                  onSponsorBlockSkippedRef.current?.(seg.category);
+                  break;
+                }
               }
             }
 
@@ -805,6 +826,7 @@ export function useAudioPlayer(options: {
       currentTrackIdRef.current = id;
       qualityFallbackStepRef.current = 0;
       sponsorSegmentsRef.current = [];
+      skippedSegmentsRef.current.clear();
 
       if (!directUrl && id) {
         void fetchSponsorBlockSegments(id).then((segs) => {
@@ -842,6 +864,7 @@ export function useAudioPlayer(options: {
       currentTrackIdRef.current = id;
       qualityFallbackStepRef.current = 0;
       sponsorSegmentsRef.current = [];
+      skippedSegmentsRef.current.clear();
 
       if (!directUrl && id) {
         void fetchSponsorBlockSegments(id).then((segs) => {
