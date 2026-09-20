@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getSupabaseEnv, supabase } from "@/integrations/supabase/client";
+import { getSupabaseEnv, setLocalSupabaseCredentials, supabase } from "@/integrations/supabase/client";
 
 function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -96,7 +96,11 @@ function AuthPage() {
   const [successNote, setSuccessNote] = useState<string | null>(() => {
     return isRecoveryUrl() ? "Password recovery link verified. Enter your new password below." : null;
   });
-  const { isConfigured } = getSupabaseEnv();
+  const [customUrl, setCustomUrl] = useState("");
+  const [customKey, setCustomKey] = useState("");
+  const [showConfigBox, setShowConfigBox] = useState(false);
+  const supabaseEnv = getSupabaseEnv();
+  const isConfigured = supabaseEnv.isConfigured;
 
   useEffect(() => {
     if (!isConfigured) return;
@@ -254,6 +258,23 @@ function AuthPage() {
           setErrorNote(formatAuthError(error.message));
           return;
         }
+
+        if (data?.user) {
+          try {
+            await supabase.from("profiles").upsert(
+              {
+                id: data.user.id,
+                display_name: name.trim() || email.split("@")[0],
+                avatar_url: null,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "id" }
+            );
+          } catch (e) {
+            console.warn("[Auth] Profile upsert notice:", e);
+          }
+        }
+
         if (!data.session) {
           setSuccessNote("Account created! Check your inbox to confirm your email, then sign in.");
           setMode("signin");
@@ -269,7 +290,7 @@ function AuthPage() {
 
     // Sign in mode
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
@@ -278,6 +299,24 @@ function AuthPage() {
         setErrorNote(formatAuthError(error.message));
         return;
       }
+
+      if (data?.user) {
+        try {
+          const meta = data.user.user_metadata || {};
+          await supabase.from("profiles").upsert(
+            {
+              id: data.user.id,
+              display_name: meta.display_name || meta.full_name || meta.name || email.split("@")[0],
+              avatar_url: meta.avatar_url || null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" }
+          );
+        } catch (e) {
+          console.warn("[Auth] Sign-in profile sync notice:", e);
+        }
+      }
+
       void navigate({ to: "/", replace: true });
     } catch (err: any) {
       setBusy(false);
@@ -406,13 +445,88 @@ function AuthPage() {
             </div>
           )}
 
-          {/* Unconfigured notice */}
-          {!isConfigured && (
-            <div className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-xs text-amber-200/90 leading-relaxed">
-              <p className="font-semibold text-amber-300 mb-1">⚡ Setup Supabase for Cloud Sync</p>
-              <p className="text-amber-200/70">
-                To sign in or use Google login across devices, configure <code className="bg-white/10 px-1 py-0.5 rounded text-[11px] text-white">VITE_SUPABASE_URL</code> and <code className="bg-white/10 px-1 py-0.5 rounded text-[11px] text-white">VITE_SUPABASE_ANON_KEY</code> in your Vercel Project Settings.
-              </p>
+          {/* Supabase Connection Status / Quick Connect */}
+          {isConfigured && !showConfigBox ? (
+            <div className="mb-4 flex items-center justify-between rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-2 text-[11px] text-emerald-300">
+              <div className="flex items-center gap-2 truncate">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="truncate font-mono">
+                  Connected: {supabaseEnv.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "")}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowConfigBox(true)}
+                className="text-[10px] text-emerald-400/80 hover:text-emerald-200 underline shrink-0 cursor-pointer ml-2"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 leading-relaxed space-y-3">
+              <div>
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-amber-300 text-xs flex items-center gap-1.5">
+                    <span>⚡ Connect Supabase for Cloud Login</span>
+                  </p>
+                  {isConfigured && (
+                    <button
+                      type="button"
+                      onClick={() => setShowConfigBox(false)}
+                      className="text-[11px] text-white/50 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+                <p className="text-amber-200/70 text-[11px] mt-1">
+                  Enter your Supabase Project URL and Anon Key to record logins and sync your playlists, or set them in Vercel Project Settings.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <Input
+                  placeholder="https://your-project.supabase.co"
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value)}
+                  className="h-8 rounded-lg border-amber-500/30 bg-black/40 text-xs text-white placeholder:text-white/30 font-mono"
+                />
+                <Input
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (anon key)"
+                  type="password"
+                  value={customKey}
+                  onChange={(e) => setCustomKey(e.target.value)}
+                  className="h-8 rounded-lg border-amber-500/30 bg-black/40 text-xs text-white placeholder:text-white/30 font-mono"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      if (!customUrl.trim() || !customKey.trim()) return;
+                      setLocalSupabaseCredentials(customUrl.trim(), customKey.trim());
+                      window.location.reload();
+                    }}
+                    className="flex-1 h-8 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs cursor-pointer shadow-md"
+                  >
+                    Save &amp; Connect Project
+                  </Button>
+                  {isConfigured && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setLocalSupabaseCredentials("", "");
+                        window.location.reload();
+                      }}
+                      className="h-8 rounded-lg border-white/10 text-xs text-white/70 hover:text-white cursor-pointer"
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

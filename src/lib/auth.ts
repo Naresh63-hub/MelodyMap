@@ -24,9 +24,28 @@ export function useAuth() {
 
       if (u) {
         const meta = u.user_metadata || {};
-        const fallbackName = meta.display_name || meta.full_name || meta.name || u.email?.split("@")[0] || null;
+        const fallbackName = meta.display_name || meta.full_name || meta.name || u.email?.split("@")[0] || "Listener";
         const fallbackAvatar = meta.avatar_url || null;
         setProfile((prev) => prev || { id: u.id, display_name: fallbackName, avatar_url: fallbackAvatar });
+
+        // Guarantee user entry is recorded in Supabase public.profiles table
+        void supabase
+          .from("profiles")
+          .upsert(
+            {
+              id: u.id,
+              display_name: fallbackName,
+              avatar_url: fallbackAvatar,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" }
+          )
+          .then(({ data, error }) => {
+            if (!error && data) {
+              setProfile(data as any);
+            }
+          })
+          .catch(() => {});
       } else {
         setProfile(null);
       }
