@@ -6,13 +6,13 @@ export type Track = {
   artist: string;
   duration: string;
   thumbnail: string;
-  reason?: string;
+  reason?: string | undefined;
   /** Direct audio URL (e.g. Deezer preview or direct podcast audio stream) — bypasses the YouTube stream proxy. */
-  previewUrl?: string;
+  previewUrl?: string | undefined;
   /** Source provider: "youtube" (default), "deezer", or "podcast". */
-  source?: "youtube" | "deezer" | "podcast";
-  album?: string;
-  year?: string;
+  source?: "youtube" | "deezer" | "podcast" | undefined;
+  album?: string | undefined;
+  year?: string | undefined;
 };
 
 export type Playlist = {
