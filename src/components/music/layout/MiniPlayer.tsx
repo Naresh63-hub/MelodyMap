@@ -1,7 +1,9 @@
+import { useCallback, useRef, useState } from "react";
 import { Heart, Loader2, Pause, Play, SkipForward, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import type { Track } from "@/lib/library";
+import { formatTime } from "@/lib/use-audio-player";
 
 type Props = {
   track: Track | undefined;
@@ -15,11 +17,13 @@ type Props = {
   onNext: () => void;
   onOpenPlayer: () => void;
   onOpenEqualizer?: () => void;
+  onSeek?: (seconds: number) => void;
 };
 
 /**
  * Compact mini player docked above the mobile bottom navigation.
  * Styled with Deep Royal Violet glass and ambient glow.
+ * Features an interactive, draggable scrub bar at the top with touch-friendly controls.
  */
 export function MiniPlayer({
   track,
@@ -33,20 +37,106 @@ export function MiniPlayer({
   onNext,
   onOpenPlayer,
   onOpenEqualizer,
+  onSeek,
 }: Props) {
-  const progressPct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
+  const barRef = useRef<HTMLDivElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragPosition, setDragPosition] = useState(0);
+
+  const activePosition = isDragging ? dragPosition : position;
+  const progressPct = duration > 0 ? Math.min(100, Math.max(0, (activePosition / duration) * 100)) : 0;
+
+  const getRatio = useCallback((clientX: number) => {
+    const rect = barRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return 0;
+    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  }, []);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!onSeek || duration <= 0) return;
+    e.stopPropagation();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(true);
+    const ratio = getRatio(e.clientX);
+    const target = ratio * duration;
+    setDragPosition(target);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging || duration <= 0) return;
+    e.stopPropagation();
+    const ratio = getRatio(e.clientX);
+    setDragPosition(ratio * duration);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    e.stopPropagation();
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(false);
+    if (onSeek && duration > 0) {
+      const ratio = getRatio(e.clientX);
+      onSeek(ratio * duration);
+    }
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsDragging(false);
+  };
 
   return (
     <div
       className="fixed z-40 border-t border-purple-500/20 bg-[#120d22]/95 backdrop-blur-2xl shadow-2xl max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
-      {/* Violet Progress bar at top of mini player */}
-      <div className="h-0.5 w-full bg-purple-950/40">
-        <div
-          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
-          style={{ width: `${progressPct}%` }}
-        />
+      {/* Interactive Draggable Scrub Bar at Top of MiniPlayer */}
+      <div
+        ref={barRef}
+        role="slider"
+        tabIndex={0}
+        aria-label="Seek track"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(activePosition)}
+        className="group relative -mt-2 h-4 w-full cursor-pointer touch-none select-none flex items-center py-1.5"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+      >
+        {/* Floating timestamp tooltip while dragging */}
+        {isDragging && duration > 0 && (
+          <div
+            className="pointer-events-none absolute -top-8 -translate-x-1/2 rounded-md bg-purple-900/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm border border-purple-400/30"
+            style={{ left: `${progressPct}%` }}
+          >
+            {formatTime(dragPosition)} / {formatTime(duration)}
+          </div>
+        )}
+
+        {/* Track groove */}
+        <div className="relative h-1 w-full bg-purple-950/60 rounded-full transition-all group-hover:h-1.5 overflow-visible">
+          <div
+            className="h-full bg-gradient-to-r from-purple-500 via-indigo-400 to-pink-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.5)] transition-all duration-75"
+            style={{ width: `${progressPct}%` }}
+          />
+          {/* Thumb handle */}
+          <span
+            className={cn(
+              "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md shadow-purple-600/50 transition-transform duration-75",
+              isDragging ? "scale-125 opacity-100 ring-2 ring-purple-400" : "opacity-0 group-hover:opacity-100 scale-100",
+            )}
+            style={{ left: `${progressPct}%` }}
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-3 px-3.5 py-2.5">

@@ -1917,6 +1917,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onNext={goNext}
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
+          onSeek={(s) => player.seek(s)}
         />
       )}
 

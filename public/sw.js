@@ -1,5 +1,5 @@
-const CACHE_VERSION = "melodymap-v2";
-const SHELL_CACHE = "melodymap-shell-v2";
+const CACHE_VERSION = "melodymap-v4";
+const SHELL_CACHE = "melodymap-shell-v4";
 
 // App shell: the HTML, JS, CSS that make up the UI.
 const SHELL_ASSETS = ["/", "/manifest.json"];
@@ -46,9 +46,9 @@ self.addEventListener("fetch", (event) => {
   }
 
   // API calls & Page Navigation (HTML) — Network-first, fall back to cache when offline
-  if (url.pathname.startsWith("/api/") || request.mode === "navigate" || request.destination === "document") {
+  if (url.pathname === "/" || url.pathname.startsWith("/api/") || request.mode === "navigate" || request.destination === "document") {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: "no-cache" })
         .then((res) => {
           if (res.ok && request.method === "GET") {
             const clone = res.clone();

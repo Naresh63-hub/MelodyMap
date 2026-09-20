@@ -141,15 +141,38 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
-  // Register the service worker for PWA / offline support and check updates.
+  // Register the service worker for PWA / offline support, purge stale caches, and auto-update
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      // Purge any lingering legacy caches from previous versions
+      if ("caches" in window) {
+        window.caches.keys().then((keys) => {
+          keys.forEach((key) => {
+            if (key.includes("v1") || key.includes("v2") || key.includes("v3")) {
+              window.caches.delete(key);
+            }
+          });
+        }).catch(() => {});
+      }
+
       navigator.serviceWorker
         .register("/sw.js")
         .then((reg) => {
-          reg.update().catch((err) => {
-            if (import.meta.env.DEV) {
-              console.debug("[MelodyMap] SW update check skipped:", err);
+          reg.update().catch(() => {});
+
+          // If a new worker is waiting, activate immediately
+          if (reg.waiting) {
+            reg.waiting.postMessage("skipWaiting");
+          }
+
+          reg.addEventListener("updatefound", () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener("statechange", () => {
+                if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                  newWorker.postMessage("skipWaiting");
+                }
+              });
             }
           });
         })
@@ -158,6 +181,14 @@ function RootComponent() {
             console.debug("[MelodyMap] SW registration failed:", err);
           }
         });
+
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     }
   }, []);
 

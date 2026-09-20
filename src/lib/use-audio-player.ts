@@ -27,10 +27,6 @@ declare global {
   }
 }
 
-/** 1-second silent WAV data URI to maintain OS audio focus for Spotify-like lockscreen & background playback */
-const SILENT_AUDIO_URI =
-  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
-
 /**
  * HTML5-Audio + Web Audio API backed player with Spotify-like background playback,
  * screen-off & lockscreen continuous playback, 10-band hardware equalizer, sound presets,
@@ -66,6 +62,8 @@ export function useAudioPlayer(options: {
   const ytReadyRef = useRef<boolean>(false);
   const ytTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pendingYtActionRef = useRef<{ id: string; startAt: number; autoPlay: boolean } | null>(null);
+  const isSeekingRef = useRef<boolean>(false);
+  const seekCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Equalizer & sound profile state
   const [equalizerSettings, setEqualizerSettingsState] = useState<EqualizerSettings>(loadEqualizerSettings);
@@ -440,6 +438,7 @@ export function useAudioPlayer(options: {
     };
 
     const onPlay = () => {
+      if (activeEngineRef.current !== "html5") return;
       audio.muted = false;
       initWebAudio();
       setIsPlaying(true);
@@ -447,26 +446,32 @@ export function useAudioPlayer(options: {
       applyPendingSeek();
     };
     const onPlaying = () => {
+      if (activeEngineRef.current !== "html5") return;
       setIsPlaying(true);
       setIsLoading(false);
       applyPendingSeek();
     };
     const onWaiting = () => {
+      if (activeEngineRef.current !== "html5") return;
       if (wantPlayRef.current) setIsLoading(true);
     };
     const onCanPlay = () => {
+      if (activeEngineRef.current !== "html5") return;
       setIsLoading(false);
       applyPendingSeek();
     };
     const onLoadedMetadata = () => {
+      if (activeEngineRef.current !== "html5") return;
       applyPendingSeek();
       onTime();
     };
     const onPause = () => {
+      if (activeEngineRef.current !== "html5") return;
       setIsPlaying(false);
       setIsLoading(false);
     };
     const onTime = () => {
+      if (activeEngineRef.current !== "html5") return;
       const cur = audio.currentTime || 0;
       const dur = Number.isFinite(audio.duration) ? audio.duration : 0;
       setPosition(cur);
@@ -498,6 +503,7 @@ export function useAudioPlayer(options: {
     // When song ends with screen locked, synchronously switch .src & call .play()
     // inside the same event loop frame so mobile OS grants immediate autoplay permission!
     const onEnded = () => {
+      if (activeEngineRef.current !== "html5") return;
       setIsPlaying(false);
       setIsLoading(false);
 
@@ -521,6 +527,7 @@ export function useAudioPlayer(options: {
     };
 
     const onError = () => {
+      if (activeEngineRef.current !== "html5") return;
       setIsPlaying(false);
       setIsLoading(false);
       if (
@@ -612,30 +619,25 @@ export function useAudioPlayer(options: {
             },
             onStateChange: (event: any) => {
               if (event.data === 1) {
-                // Playing
+                // 1 = Playing
+                isSeekingRef.current = false;
                 setIsPlaying(true);
                 setIsLoading(false);
-                const audio = audioRef.current;
-                if (audio) {
-                  if (audio.src !== SILENT_AUDIO_URI) {
-                    audio.src = SILENT_AUDIO_URI;
-                    audio.loop = true;
-                    audio.volume = 0.0001;
-                  }
-                  audio.play().catch(() => {});
-                }
               } else if (event.data === 2) {
-                // Paused
-                setIsPlaying(false);
-                setIsLoading(false);
-                audioRef.current?.pause();
+                // 2 = Paused
+                // If user is seeking or wants to play, don't flip isPlaying to false (avoid pause/play bounce)
+                if (!isSeekingRef.current && !wantPlayRef.current) {
+                  setIsPlaying(false);
+                  setIsLoading(false);
+                }
               } else if (event.data === 3) {
+                // 3 = Buffering
                 setIsLoading(true);
               } else if (event.data === 0) {
-                // Ended
+                // 0 = Ended
+                isSeekingRef.current = false;
                 setIsPlaying(false);
                 setIsLoading(false);
-                audioRef.current?.pause();
                 endedRef.current();
               }
             },
@@ -673,13 +675,16 @@ export function useAudioPlayer(options: {
     if (isPlaying && activeEngineRef.current === "youtube") {
       if (ytTimerRef.current) clearInterval(ytTimerRef.current);
       ytTimerRef.current = setInterval(() => {
+        // Do not stomp local seek position with stale YouTube API time while seeking
+        if (isSeekingRef.current) return;
+
         const p = ytPlayerRef.current;
         if (p && typeof p.getCurrentTime === "function" && typeof p.getDuration === "function") {
           try {
             const cur = p.getCurrentTime() || 0;
             const dur = p.getDuration() || 0;
             setPosition(cur);
-            setDuration(dur);
+            if (dur > 0) setDuration(dur);
 
             // SponsorBlock Auto-Skip
             if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
@@ -870,15 +875,6 @@ export function useAudioPlayer(options: {
     wantPlayRef.current = true;
     if (activeEngineRef.current === "youtube") {
       ytPlayerRef.current?.playVideo();
-      const audio = audioRef.current;
-      if (audio) {
-        if (audio.src !== SILENT_AUDIO_URI) {
-          audio.src = SILENT_AUDIO_URI;
-          audio.loop = true;
-          audio.volume = 0.0001;
-        }
-        audio.play().catch(() => {});
-      }
       return;
     }
     initWebAudio();
@@ -898,9 +894,13 @@ export function useAudioPlayer(options: {
 
   const pause = useCallback(() => {
     wantPlayRef.current = false;
+    isSeekingRef.current = false;
+    if (seekCooldownTimerRef.current) {
+      clearTimeout(seekCooldownTimerRef.current);
+      seekCooldownTimerRef.current = null;
+    }
     if (activeEngineRef.current === "youtube") {
       ytPlayerRef.current?.pauseVideo();
-      audioRef.current?.pause();
     } else {
       audioRef.current?.pause();
     }
@@ -908,22 +908,40 @@ export function useAudioPlayer(options: {
 
   const seek = useCallback((seconds: number) => {
     const target = Math.max(0, seconds);
+    setPosition(target);
+
     if (activeEngineRef.current === "youtube") {
-      ytPlayerRef.current?.seekTo(target, true);
-      setPosition(target);
+      const p = ytPlayerRef.current;
+      if (p && typeof p.seekTo === "function") {
+        isSeekingRef.current = true;
+        if (seekCooldownTimerRef.current) clearTimeout(seekCooldownTimerRef.current);
+        // Protect position from stale polling ticks while YouTube buffers at target
+        seekCooldownTimerRef.current = setTimeout(() => {
+          isSeekingRef.current = false;
+        }, 1200);
+
+        p.seekTo(target, true);
+        if (wantPlayRef.current) {
+          try {
+            p.playVideo();
+          } catch {}
+        }
+      }
       return;
     }
+
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.readyState < 1 || !Number.isFinite(audio.duration) || audio.duration === 0) {
       pendingSeekRef.current = target;
-      setPosition(target);
       return;
     }
     const max = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : target;
     const clamped = Math.max(0, Math.min(target, max));
     audio.currentTime = clamped;
-    setPosition(clamped);
+    if (wantPlayRef.current && audio.paused) {
+      audio.play().catch(() => {});
+    }
   }, []);
 
   const skipForward = useCallback((seconds = 30) => {

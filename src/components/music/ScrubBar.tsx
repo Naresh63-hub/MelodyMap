@@ -17,7 +17,10 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
   const [hoverTime, setHoverTime] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragPosition, setDragPosition] = useState(0);
-  const activePosition = isDragging ? dragPosition : position;
+  const [seekHold, setSeekHold] = useState<number | null>(null);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const activePosition = isDragging ? dragPosition : seekHold !== null ? seekHold : position;
 
   const pct = duration > 0 ? Math.min(100, Math.max(0, (activePosition / duration) * 100)) : 0;
 
@@ -28,7 +31,10 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
   }, []);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
     setIsDragging(true);
     const ratio = getRatio(e.clientX);
     const targetSeconds = ratio * duration;
@@ -51,12 +57,19 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (isDragging) {
+      e.stopPropagation();
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {}
       setIsDragging(false);
       const ratio = getRatio(e.clientX);
-      onSeek(ratio * duration);
+      const targetSeconds = ratio * duration;
+      setSeekHold(targetSeconds);
+      if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = setTimeout(() => {
+        setSeekHold(null);
+      }, 1000);
+      onSeek(targetSeconds);
     }
   };
 

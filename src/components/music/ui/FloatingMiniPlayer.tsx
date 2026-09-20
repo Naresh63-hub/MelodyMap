@@ -59,10 +59,15 @@ export function FloatingMiniPlayer({
 
   if (!track) return null;
 
-  const progressPct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubPosition, setScrubPosition] = useState(0);
+  const scrubberRef = useRef<HTMLDivElement | null>(null);
+
+  const activePosition = isScrubbing ? scrubPosition : position;
+  const progressPct = duration > 0 ? Math.min(100, Math.max(0, (activePosition / duration) * 100)) : 0;
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest("button, input, a")) return;
+    if ((e.target as HTMLElement).closest("button, input, a, .scrubber-bar")) return;
     setIsDragging(true);
     dragRef.current = {
       startX: e.clientX,
@@ -70,6 +75,50 @@ export function FloatingMiniPlayer({
       posX: positionCoords?.x ?? 0,
       posY: positionCoords?.y ?? 0,
     };
+  };
+
+  const getScrubRatio = (clientX: number) => {
+    const rect = scrubberRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return 0;
+    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  };
+
+  const handleScrubPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+    setIsScrubbing(true);
+    const ratio = getScrubRatio(e.clientX);
+    setScrubPosition(ratio * duration);
+  };
+
+  const handleScrubPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing || duration <= 0) return;
+    e.stopPropagation();
+    const ratio = getScrubRatio(e.clientX);
+    setScrubPosition(ratio * duration);
+  };
+
+  const handleScrubPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing) return;
+    e.stopPropagation();
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsScrubbing(false);
+    if (duration > 0) {
+      const ratio = getScrubRatio(e.clientX);
+      onSeek(ratio * duration);
+    }
+  };
+
+  const handleScrubPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    setIsScrubbing(false);
   };
 
   useEffect(() => {
@@ -121,16 +170,29 @@ export function FloatingMiniPlayer({
 
       {/* Scrubber at top */}
       <div
-        className="relative h-1.5 w-full bg-white/10 cursor-pointer group"
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const clickPos = (e.clientX - rect.left) / rect.width;
-          onSeek(clickPos * duration);
-        }}
+        ref={scrubberRef}
+        role="slider"
+        tabIndex={0}
+        aria-label="Seek track"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(activePosition)}
+        className="scrubber-bar group relative h-2.5 w-full bg-white/10 cursor-pointer touch-none select-none flex items-center py-0.5"
+        onPointerDown={handleScrubPointerDown}
+        onPointerMove={handleScrubPointerMove}
+        onPointerUp={handleScrubPointerUp}
+        onPointerCancel={handleScrubPointerCancel}
       >
         <div
-          className="h-full bg-gradient-to-r from-purple-500 via-indigo-400 to-pink-500 transition-all"
+          className="h-1.5 w-full bg-gradient-to-r from-purple-500 via-indigo-400 to-pink-500 transition-all rounded-full"
           style={{ width: `${progressPct}%` }}
+        />
+        <span
+          className={cn(
+            "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md shadow-purple-600/50 transition-transform duration-75",
+            isScrubbing ? "scale-125 opacity-100 ring-2 ring-purple-400" : "opacity-0 group-hover:opacity-100 scale-100",
+          )}
+          style={{ left: `${progressPct}%` }}
         />
       </div>
 
