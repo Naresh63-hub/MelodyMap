@@ -1,8 +1,14 @@
 <div align="center">
-  <img src="public/brand/app-icon.png" alt="MelodyMap Logo" width="96" height="96" style="border-radius: 22px; box-shadow: 0 10px 30px rgba(124, 58, 237, 0.4);" />
+  <img src="public/brand/app-icon.png" alt="MelodyMap Logo" width="104" height="104" style="border-radius: 24px; box-shadow: 0 12px 36px rgba(124, 58, 237, 0.45);" />
   <h1>MelodyMap</h1>
   <p><strong>Your Music. Your Mood. Your Map.</strong></p>
-  <p>A full-featured, local-first music streaming application with AI recommendations, 10-band equalizer, Spotify-style background playback, and seamless lock screen controls.</p>
+  <p>A full-featured, local-first music streaming application with AI taste recommendations, 10-band studio equalizer, Spotify-style continuous background playback, and seamless lock screen controls.</p>
+
+  <p>
+    <a href="https://melodymap-pi.vercel.app" target="_blank">
+      <img src="https://img.shields.io/badge/Live_Demo-melodymap--pi.vercel.app-7c3aed?style=for-the-badge&logo=vercel" alt="Live Demo" />
+    </a>
+  </p>
 
   <p>
     <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square&logo=react" alt="React 19" />
@@ -18,16 +24,17 @@
 
 ## 🎧 Features
 
-- **⚡ Dual-Engine Audio Streaming**: Seamlessly routes between HTML5 audio proxy and direct client-side playback for zero-failure streaming across localhost and serverless clouds (Vercel).
-- **📱 Spotify-Like Lock Screen Controls**: Full native Media Session integration showing high-res album art, song title, artist, live seek scrubber, play/pause, and track advance directly on Android, iOS, Windows, and macOS lock screens.
-- **🎵 Continuous Background Playback**: Screen-off background audio focus keeps music streaming seamlessly even when your phone is locked in your pocket or when multitasking between apps.
-- **🎛️ 10-Band Hardware Equalizer & FX**: Studio-grade Web Audio API parametric filters, bass booster, vocal enhancer, and LUFS Dynamic Range Compressor leveling.
-- **❤️ 1-Click Fast Favourites**: Tap the heart button on the playing bar or mini player to immediately save songs and tune personalized recommendations.
-- **🤖 AI-Powered Recommendation Engine**: Generates Daily Mixes, Mood Radios, and personalized song suggestions learning from your play history and likes.
-- **⚡ Offline Caching**: Download songs directly to local browser IndexedDB storage for full offline listening without an internet connection.
-- **⏩ SponsorBlock Auto-Skip**: Automatically detects and skips sponsored segments, non-music intros, and outros for uninterrupted listening.
-- **📝 Real-Time Synced Lyrics**: Synchronized word-for-word scrolling lyrics powered by LRCLIB.
-- **☁️ Cloud Sync (Optional)**: Connect Supabase to sync your library, playlists, and history across all your devices, or use local guest mode with zero setup.
+- **⚡ Zero-Failure Dual-Engine Streaming**: Intelligent audio pipeline that automatically pairs server-side streaming proxy with client-side direct YouTube audio fallback for 100% reliable, zero-buffer playback across local environments and serverless edge clouds (Vercel).
+- **🎚️ Buttery Smooth Song Scrubbing & Dragging**: Fully draggable, pointer-captured scrub bars with live timestamp previews on both the docked bottom Mini Player and Full-Screen Player, featuring zero snapback and seamless auto-resume.
+- **📱 Spotify-Like Lock Screen Controls**: Complete native Media Session API integration showing high-resolution album art, title, artist, live position scrubber, play/pause, and skip controls directly on Android, iOS, Windows, and macOS lock screens and notification shades.
+- **🎵 Continuous Background Playback**: Screen-off background audio focus keeps music streaming without pauses when your screen locks or when switching between apps.
+- **🎛️ 10-Band Studio Hardware Equalizer**: Studio-grade Web Audio API parametric biquad filters, genre presets (Bass Boost, Vocal, Rock, Pop, Jazz, Electronic), and dynamic range compression leveling (-14 LUFS).
+- **❤️ 1-Click Fast Likes**: Save your favorite songs instantly with the 1-click heart button on the Mini Player, Full Screen Player, or Floating Player to automatically train your personalized AI recommendations.
+- **🤖 AI-Powered Recommendation Engine**: Curates Daily Mixes, Mood Radios (focus, chill, workout, party, late night), and smart track suggestions that adapt to your listening habits.
+- **💾 Offline Caching**: Download songs directly to local browser IndexedDB storage for full offline listening without an internet connection.
+- **⏩ SponsorBlock Auto-Skip**: Detects and skips sponsored segments, non-music intros, and outros automatically.
+- **📝 Real-Time Synced Lyrics**: Synchronized, word-for-word scrolling lyrics powered by LRCLIB.
+- **☁️ Cloud Sync (Optional)**: Connect Supabase to sync your library, playlists, and listening history across all devices, or use local guest mode with zero setup.
 
 ---
 
@@ -37,10 +44,10 @@
 | :--- | :--- |
 | **Framework** | [React 19](https://react.dev/), [TanStack Start](https://tanstack.com/start) (SSR & Server Functions via Nitro) |
 | **Styling** | [Tailwind CSS 4](https://tailwindcss.com/), Radix UI Primitives, Lucide Icons |
-| **Audio Pipeline** | Web Audio API (10-Band Biquad Filters), Media Session API, HTML5 Audio |
+| **Audio Pipeline** | Web Audio API (10-Band Biquad Filters), Media Session API, HTML5 Audio, YouTube IFrame API |
 | **Catalog & Search** | Multi-source hybrid search aggregation with YouTube Music & Deezer |
-| **PWA & Mobile** | Progressive Web App manifest, Service Worker caching, Capacitor ready |
-| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + Row-Level Security) |
+| **PWA & Mobile** | Progressive Web App manifest, Service Worker v4 (network-first caching), Capacitor ready |
+| **Database & Auth** | [Supabase](https://supabase.com/) (PostgreSQL + Row-Level Security, optional) |
 | **Build & Tooling** | Vite 8, TypeScript 5, ESLint, Prettier |
 
 ---
@@ -72,7 +79,7 @@ The application will be running at **`http://localhost:3000`**.
 ## 📦 Building for Production
 
 ```bash
-# Build client and server bundles
+# Build client, SSR, and Nitro server bundles
 npm run build
 
 # Preview production build locally
@@ -83,14 +90,17 @@ npm run preview
 
 ## ☁️ Cloud Sync & Deployment (Optional)
 
-MelodyMap runs completely local-first out of the box with **no configuration required**. 
+MelodyMap is designed **local-first** and works right out of the box with **zero configuration required**. 
 
-If you want cross-device cloud sync and Google OAuth:
+If you want cross-device cloud sync and Google OAuth authentication:
 1. Create a free project at [Supabase](https://supabase.com/).
-2. In your deployment platform (e.g. Vercel), add these Environment Variables:
+2. Run the SQL schema migrations in your Supabase SQL editor.
+3. In your deployment platform (e.g. Vercel), add these Environment Variables:
    - `VITE_SUPABASE_URL`: `https://your-project.supabase.co`
    - `VITE_SUPABASE_ANON_KEY`: `your-supabase-anon-key`
-3. Deploy!
+4. Set Authorized Redirect URI in Google Cloud Console:
+   - `https://<your-project-id>.supabase.co/auth/v1/callback`
+5. Deploy!
 
 ---
 
@@ -107,6 +117,12 @@ If you want cross-device cloud sync and Google OAuth:
 | <kbd>E</kbd> | Open 10-Band Equalizer |
 | <kbd>L</kbd> | Toggle Synced Lyrics |
 | <kbd>/</kbd> | Focus Search Bar |
+
+---
+
+## 👤 Author
+
+- **Naresh** ([@Naresh63-hub](https://github.com/Naresh63-hub))
 
 ---
 
