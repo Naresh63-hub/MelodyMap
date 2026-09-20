@@ -56,12 +56,39 @@ export function FloatingMiniPlayer({
   const [isDragging, setIsDragging] = useState(false);
   const [positionCoords, setPositionCoords] = useState<{ x: number; y: number } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; posX: number; posY: number } | null>(null);
-
-  if (!track) return null;
-
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPosition, setScrubPosition] = useState(0);
   const scrubberRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !dragRef.current) return;
+      const dx = e.clientX - dragRef.current.startX;
+      const dy = e.clientY - dragRef.current.startY;
+      setPositionCoords({
+        x: dragRef.current.posX + dx,
+        y: dragRef.current.posY + dy,
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      dragRef.current = null;
+    };
+
+    if (isDragging) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging]);
+
+  // Early returns must come AFTER every hook call so hook order is stable
+  // across renders (track appearing/disappearing used to reorder hooks).
+  if (!track) return null;
 
   const activePosition = isScrubbing ? scrubPosition : position;
   const progressPct = duration > 0 ? Math.min(100, Math.max(0, (activePosition / duration) * 100)) : 0;
@@ -120,32 +147,6 @@ export function FloatingMiniPlayer({
     } catch {}
     setIsScrubbing(false);
   };
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !dragRef.current) return;
-      const dx = e.clientX - dragRef.current.startX;
-      const dy = e.clientY - dragRef.current.startY;
-      setPositionCoords({
-        x: dragRef.current.posX + dx,
-        y: dragRef.current.posY + dy,
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      dragRef.current = null;
-    };
-
-    if (isDragging) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    }
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging]);
 
   return (
     <div

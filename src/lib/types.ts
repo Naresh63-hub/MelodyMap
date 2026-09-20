@@ -5,7 +5,7 @@ export interface Track {
   duration: string;
   thumbnail: string;
   previewUrl?: string | undefined;
-  source?: "youtube" | "deezer" | undefined;
+  source?: "youtube" | "deezer" | "podcast" | undefined;
   reason?: string | undefined;
   album?: string | undefined;
   year?: string | undefined;

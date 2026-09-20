@@ -7,10 +7,10 @@ export type Track = {
   duration: string;
   thumbnail: string;
   reason?: string;
-  /** Direct audio URL (e.g. Deezer preview) — bypasses the YouTube stream proxy. */
+  /** Direct audio URL (e.g. Deezer preview or direct podcast audio stream) — bypasses the YouTube stream proxy. */
   previewUrl?: string;
-  /** Source provider: "youtube" (default) or "deezer". */
-  source?: "youtube" | "deezer";
+  /** Source provider: "youtube" (default), "deezer", or "podcast". */
+  source?: "youtube" | "deezer" | "podcast";
   album?: string;
   year?: string;
 };

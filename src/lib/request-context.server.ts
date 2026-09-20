@@ -12,7 +12,7 @@ type RequestContext = { clientIp: string };
 const requestStorage = new AsyncLocalStorage<RequestContext>();
 
 /** Run `fn` with request-scoped context (called from the request middleware). */
-export function runWithRequestContext<T>(ctx: RequestContext, fn: () => Promise<T>): Promise<T> {
+export function runWithRequestContext<T>(ctx: RequestContext, fn: () => T): T {
   return requestStorage.run(ctx, fn);
 }
 

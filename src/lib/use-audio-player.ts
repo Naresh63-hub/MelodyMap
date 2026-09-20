@@ -134,12 +134,13 @@ export function useAudioPlayer(options: {
       const holder = document.createElement("div");
       holder.id = "melodymap-yt-wrapper";
       holder.style.position = "fixed";
-      holder.style.bottom = "-500px";
-      holder.style.left = "-500px";
-      holder.style.width = "1px";
-      holder.style.height = "1px";
+      holder.style.bottom = "0";
+      holder.style.right = "0";
+      holder.style.width = "320px";
+      holder.style.height = "180px";
       holder.style.opacity = "0.001";
       holder.style.pointerEvents = "none";
+      holder.style.zIndex = "-999";
       holder.style.overflow = "hidden";
       const iframeDiv = document.createElement("div");
       iframeDiv.id = "melodymap-yt-iframe";
@@ -602,8 +603,8 @@ export function useAudioPlayer(options: {
       if (!targetEl) return;
       try {
         ytPlayerRef.current = new window.YT.Player("melodymap-yt-iframe", {
-          height: "1",
-          width: "1",
+          height: "180",
+          width: "320",
           playerVars: {
             autoplay: 1,
             controls: 0,
@@ -613,6 +614,7 @@ export function useAudioPlayer(options: {
             rel: 0,
             enablejsapi: 1,
             origin: window.location.origin,
+            widget_referrer: window.location.href,
           },
           events: {
             onReady: (event: any) => {

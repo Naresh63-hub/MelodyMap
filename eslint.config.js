@@ -35,6 +35,15 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Empty catch blocks are the codebase's intentional pattern for
+      // best-effort operations (feature detection, pointer capture, etc.)
+      "no-empty": ["error", { allowEmptyCatch: true }],
+      // `cond && doThing()` short-circuit guards are used throughout
+      "no-unused-expressions": ["error", { allowShortCircuit: true, allowTernary: true }],
+      // The YouTube/InnerTube/yt-dlp integration layers parse untyped third-
+      // party JSON; `any` there is deliberate JS-interop typing. Surfaced as
+      // warnings so new usage stays visible without blocking the build.
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
 );

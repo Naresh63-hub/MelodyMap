@@ -9,6 +9,7 @@ import { resolveAiModelId } from "./ai-gateway.server";
 function sanitizePromptInput(str: string | undefined): string {
   if (!str) return "";
   return str
+    // eslint-disable-next-line no-control-regex -- stripping control characters is the purpose
     .replace(/[\x00-\x1F\x7F]/g, "") // control characters
     .replace(/```[\s\S]*?```/g, "") // markdown code blocks
     .replace(/<!--[\s\S]*?-->/g, "") // html comments
@@ -44,6 +45,27 @@ export const searchTracks = createServerFn({ method: "POST" })
       try {
         const { searchHybrid } = await import("./music-hybrid.server");
         const res = await searchHybrid(data.query, limit, data.continuation, filter);
+        return { tracks: res.tracks, continuation: res.continuation, error: null };
+      } catch (error) {
+        console.error("Search failed:", error);
+        return { tracks: [], continuation: undefined, error: "Could not reach the catalog. Try again." };
+      }
+    }
+
+    if (data.type === "podcasts") {
+      try {
+        const { searchPodcastEpisodes } = await import("./podcast.server");
+        const podcastTracks = await searchPodcastEpisodes(data.query, limit);
+        if (podcastTracks.length > 0) {
+          return { tracks: podcastTracks, continuation: undefined, error: null };
+        }
+      } catch (err) {
+        console.warn("[search] Direct podcast episode search notice:", err);
+      }
+
+      try {
+        const { searchYouTubePaginated } = await import("./music.server");
+        const res = await searchYouTubePaginated(data.query, "all", data.continuation, limit);
         return { tracks: res.tracks, continuation: res.continuation, error: null };
       } catch (error) {
         console.error("Search failed:", error);
@@ -1150,22 +1172,50 @@ const TOPIC_SEARCH: Record<string, string> = {
 export const podcastPicks = createServerFn({ method: "POST" })
   .validator((input: unknown) => PodcastInput.parse(input))
   .handler(async ({ data }) => {
-    const { searchYouTube } = await import("./music.server");
     const count = data.count ?? 20;
-    const artists = data.artists.map((a) => a.trim()).filter(Boolean).slice(0, 4);
-    const langs = data.languages
-      .map((l) => LANG_SEARCH[l.trim()])
-      .filter((t): t is string => Boolean(t))
-      .slice(0, 3);
-    const hasLang = langs.length > 0;
+    const langs = data.languages.map((l) => l.trim()).filter(Boolean);
     const topics = data.topics
       .map((t) => TOPIC_SEARCH[t.trim()] || t.trim())
       .filter((t): t is string => Boolean(t) && t.toLowerCase() !== "all")
       .slice(0, 4);
     const hasTopics = topics.length > 0;
+    const hasLang = langs.length > 0;
 
     const out: Track[] = [];
     const seen = new Set<string>();
+
+    // 1. Primary Strategy: Direct podcast episodes with official MP3 CDN streams
+    try {
+      const { searchPodcastEpisodes } = await import("./podcast.server");
+      const podcastSearchQueries: string[] = hasTopics
+        ? topics.map((t) => `${t} podcast`)
+        : hasLang
+          ? langs.map((l) => `${l} podcast`)
+          : ["top podcasts", "tech podcast", "science podcast", "motivation podcast", "comedy podcast"];
+
+      for (const query of podcastSearchQueries) {
+        if (out.length >= count) break;
+        const episodes = await searchPodcastEpisodes(query, 8);
+        for (const ep of episodes) {
+          if (out.length >= count) break;
+          const key = ep.title.toLowerCase();
+          if (seen.has(ep.id) || seen.has(key)) continue;
+          seen.add(ep.id);
+          seen.add(key);
+          out.push(ep);
+        }
+      }
+    } catch (err) {
+      console.warn("[podcast] Direct episode stream search notice:", err);
+    }
+
+    if (out.length >= Math.min(count, 8)) {
+      return { tracks: out.slice(0, count), error: null };
+    }
+
+    // 2. Supplementary Strategy: YouTube podcasts
+    const { searchYouTube } = await import("./music.server");
+    const artists = data.artists.map((a) => a.trim()).filter(Boolean).slice(0, 4);
 
     /** Runs a set of queries and merges results (musicOnly=false → podcasts pass the filter). */
     const add = async (queries: string[], quota: number, upload?: "today" | "week") => {
@@ -1191,8 +1241,6 @@ export const podcastPicks = createServerFn({ method: "POST" })
       }
     };
 
-    // When topics are picked, they drive the mix; otherwise fall back to
-    // language-focused and general trending shows.
     const freshQueries = hasTopics
       ? topics.map((t) => `${t} podcast latest episodes`)
       : hasLang
@@ -1209,16 +1257,13 @@ export const podcastPicks = createServerFn({ method: "POST" })
         ? langs.map((l) => `best ${l} podcasts`)
         : ["the ranveer show", "huberman lab", "joe rogan podcast"];
 
-    // Fresh episodes, top shows in your topics/languages, then your artists' shows.
     await add(freshQueries, Math.floor(count * 0.4), "week");
     await add(topQueries, Math.floor(count * 0.35));
     for (const artist of artists) {
       await add([`${artist} podcast`], Math.ceil(count / 8));
     }
-    // Top up with well-known shows.
     await add(topicQueries, count);
 
-    // Fallback if still low
     if (out.length < 6) {
       await add(["top podcasts", `best podcast episodes ${CURRENT_YEAR}`, "the ranveer show podcast"], count - out.length);
     }

@@ -586,11 +586,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         return;
       }
 
-      setMessage("Audio stream unavailable, skipping to next track...");
-      setTimeout(() => setMessage(null), 3000);
+      setMessage(msg || "Audio stream unavailable, skipping to next track...");
+      setTimeout(() => setMessage(null), 3500);
       setTimeout(() => {
         goNext();
-      }, 1200);
+      }, 1500);
     },
   });
 
@@ -1589,7 +1589,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     recommended={recs}
                     onPlayTrack={(track, sectionTracks, i) => {
                       if (current?.id === track.id) {
-                        player.isPlaying ? pause() : play();
+                        if (player.isPlaying) {
+                          pause();
+                        } else {
+                          play();
+                        }
                         return;
                       }
                       startQueue(sectionTracks, i);
@@ -1636,7 +1640,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 }}
                 onPlayTrack={(track, i) => {
                   if (current?.id === track.id) {
-                    player.isPlaying ? pause() : play();
+                    if (player.isPlaying) {
+                      pause();
+                    } else {
+                      play();
+                    }
                     return;
                   }
                   startQueue(results, i);
@@ -1684,7 +1692,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onPlayAll={() => startQueue(visibleMix, 0)}
                 onPlay={(track, i) => {
                   if (current?.id === track.id) {
-                    player.isPlaying ? pause() : play();
+                    if (player.isPlaying) {
+                      pause();
+                    } else {
+                      play();
+                    }
                     return;
                   }
                   startQueue(visibleMix, i);
@@ -1790,7 +1802,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         dislikedIds={dislikedIds}
                         onPlay={(track, i) => {
                           if (current?.id === track.id) {
-                            player.isPlaying ? pause() : play();
+                            if (player.isPlaying) {
+                              pause();
+                            } else {
+                              play();
+                            }
                             return;
                           }
                           startQueue(podcastSearchResults, i);
@@ -1857,7 +1873,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                               type="button"
                               onClick={() => {
                                 if (current?.id === ep.id) {
-                                  player.isPlaying ? pause() : play();
+                                  if (player.isPlaying) {
+                                    pause();
+                                  } else {
+                                    play();
+                                  }
                                   return;
                                 }
                                 startQueue(podcastHistory, i);
@@ -1915,7 +1935,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         dislikedIds={dislikedIds}
                         onPlay={(track, i) => {
                           if (current?.id === track.id) {
-                            player.isPlaying ? pause() : play();
+                            if (player.isPlaying) {
+                              pause();
+                            } else {
+                              play();
+                            }
                             return;
                           }
                           startQueue(podcastTracks, i);
@@ -1995,7 +2019,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onOpenOptions={(t) => setOptionsTrack(t)}
                 onPlayTrack={(tracks, i) => {
                   if (current?.id === tracks[i]?.id) {
-                    player.isPlaying ? pause() : play();
+                    if (player.isPlaying) {
+                      pause();
+                    } else {
+                      play();
+                    }
                     return;
                   }
                   startQueue(tracks, i);
@@ -2029,7 +2057,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   onRemoveDownload={(track) => void handleRemoveDownload(track)}
                   onPlay={(track, i) => {
                     if (current?.id === track.id) {
-                      player.isPlaying ? pause() : play();
+                      if (player.isPlaying) {
+                        pause();
+                      } else {
+                        play();
+                      }
                       return;
                     }
                     startQueue(visible, i);
