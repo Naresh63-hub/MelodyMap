@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import type { Track } from "./types";
 import { norm, areSameTrack } from "./track-dedup";
+import { resolveAiModelId } from "./ai-gateway.server";
 
 /** Sanitizes user-provided strings to prevent AI prompt injection while preserving real song/artist names */
 function sanitizePromptInput(str: string | undefined): string {
@@ -326,9 +327,9 @@ async function getLocalPicks(data: {
   const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
   const { newQueries, oldQueries } = getDynamicQueries(languages, artists);
 
-  // Sample queries concurrently
-  const pickedNew = newQueries.slice(0, 4);
-  const pickedOld = oldQueries.slice(0, 4);
+  // Sample queries concurrently with randomized selection
+  const pickedNew = shuffleArray(newQueries).slice(0, 5);
+  const pickedOld = shuffleArray(oldQueries).slice(0, 5);
 
   const [newCandidates, oldCandidates] = await Promise.all([
     runQueryBatch(pickedNew, 10, true, bypassCache),
@@ -508,7 +509,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
     try {
       const gateway = createAiGatewayProvider(key);
       const result = await generateText({
-        model: gateway("google/gemini-3.6-flash"),
+        model: gateway(resolveAiModelId()),
         prompt,
       });
       raw = result.text;
@@ -717,7 +718,7 @@ export const buildMix = createServerFn({ method: "POST" })
     let raw = "";
     try {
       const gateway = createAiGatewayProvider(key);
-      const result = await generateText({ model: gateway("google/gemini-3.6-flash"), prompt });
+      const result = await generateText({ model: gateway(resolveAiModelId()), prompt });
       raw = result.text;
     } catch (err) {
       const message = String(err);
@@ -879,28 +880,39 @@ const DailyMixInput = z.object({
   artists: z.array(z.string()).max(20).default([]),
   liked: z.array(z.string()).max(30).default([]),
   dateSeed: z.string().optional(),
+  refreshNonce: z.union([z.string(), z.number()]).optional(),
   count: z.number().min(1).max(40).optional(),
 });
 
 /**
  * Daily Mix: Generates a stable, high-affinity mix that remains consistent
- * throughout the day (seeded by YYYY-MM-DD) and automatically rotates at midnight.
+ * throughout the day (seeded by YYYY-MM-DD), automatically rotates at midnight,
+ * and refreshes with fresh picks whenever a refreshNonce is supplied.
  */
 export const getDailyMix = createServerFn({ method: "POST" })
   .validator((input: unknown) => DailyMixInput.parse(input))
   .handler(async ({ data }) => {
     const count = data.count ?? 25;
-    const dateSeed = data.dateSeed || new Date().toISOString().slice(0, 10);
+    const bypassCache = !!data.refreshNonce;
+    const dateSeed = data.refreshNonce
+      ? `${data.dateSeed || new Date().toISOString().slice(0, 10)}-${data.refreshNonce}`
+      : (data.dateSeed || new Date().toISOString().slice(0, 10));
     const artists = data.artists.map((a) => a.trim()).filter(Boolean);
     const languages = data.languages.map((l) => l.trim()).filter(Boolean);
     const { newQueries, oldQueries } = getDynamicQueries(languages, artists);
 
-    // Pick 4 stable new queries and 4 stable old queries using the daily seed
-    const pickedNew = seededShuffleArray(newQueries, `${dateSeed}-new`).slice(0, 4);
-    const pickedOld = seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
+    // Pick 4 dynamic new queries and 4 dynamic old queries (randomized on refresh, seeded on daily view)
+    const pickedNew = data.refreshNonce
+      ? shuffleArray(newQueries).slice(0, 4)
+      : seededShuffleArray(newQueries, `${dateSeed}-new`).slice(0, 4);
+    const pickedOld = data.refreshNonce
+      ? shuffleArray(oldQueries).slice(0, 4)
+      : seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
 
-    const candidates = await runQueryBatch([...pickedNew, ...pickedOld], 10, true, false);
-    const dailyTracks = seededShuffleArray(candidates, `${dateSeed}-final`).slice(0, count);
+    const candidates = await runQueryBatch([...pickedNew, ...pickedOld], 10, true, bypassCache);
+    const dailyTracks = data.refreshNonce
+      ? shuffleArray(candidates).slice(0, count)
+      : seededShuffleArray(candidates, `${dateSeed}-final`).slice(0, count);
     return { tracks: dailyTracks, dateSeed, error: null };
   });
 

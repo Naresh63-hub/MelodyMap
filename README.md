@@ -108,17 +108,26 @@ If you want cross-device cloud sync and Google OAuth authentication:
 
 | Shortcut | Action |
 | :--- | :--- |
-| <kbd>Space</kbd> | Play / Pause |
-| <kbd>J</kbd> / <kbd>L</kbd> | Skip Backward (15s) / Forward (30s) |
-| <kbd>K</kbd> | Play / Pause |
+| <kbd>Space</kbd> / <kbd>K</kbd> | Play / Pause |
+| <kbd>→</kbd> / <kbd>←</kbd> | Seek Forward / Backward |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Volume Up / Down |
 | <kbd>N</kbd> / <kbd>P</kbd> | Next Track / Previous Track |
 | <kbd>M</kbd> | Mute / Unmute Volume |
 | <kbd>F</kbd> | Toggle Full-Screen Player |
 | <kbd>E</kbd> | Open 10-Band Equalizer |
-| <kbd>L</kbd> | Toggle Synced Lyrics |
+| <kbd>S</kbd> | Toggle Shuffle |
+| <kbd>R</kbd> | Toggle Repeat |
 | <kbd>/</kbd> | Focus Search Bar |
+| <kbd>?</kbd> | Keyboard Shortcuts |
 
 ---
+
+## ⚖️ Legal Note
+
+MelodyMap streams audio by resolving publicly available stream URLs from third-party
+platforms (YouTube, Deezer). It does not host, cache, or redistribute any media.
+Using it may be subject to those platforms' Terms of Service — this project is for
+personal, educational use and is not affiliated with or endorsed by YouTube or Deezer.
 
 ## 👤 Author
 

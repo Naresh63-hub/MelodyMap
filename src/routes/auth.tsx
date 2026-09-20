@@ -264,7 +264,7 @@ function AuthPage() {
             await supabase.from("profiles").upsert(
               {
                 id: data.user.id,
-                display_name: name.trim() || email.split("@")[0],
+                display_name: name.trim() || email.split("@")[0] || null,
                 avatar_url: null,
                 updated_at: new Date().toISOString(),
               },
@@ -306,8 +306,8 @@ function AuthPage() {
           await supabase.from("profiles").upsert(
             {
               id: data.user.id,
-              display_name: meta.display_name || meta.full_name || meta.name || email.split("@")[0],
-              avatar_url: meta.avatar_url || null,
+              display_name: meta["display_name"] || meta["full_name"] || meta["name"] || email.split("@")[0] || null,
+              avatar_url: meta["avatar_url"] || null,
               updated_at: new Date().toISOString(),
             },
             { onConflict: "id" }

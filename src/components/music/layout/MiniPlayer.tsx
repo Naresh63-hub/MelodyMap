@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { Heart, Loader2, Pause, Play, SkipForward, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Equalizer } from "@/components/music/NowPlayingViz";
 import type { Track } from "@/lib/library";
 import { formatTime } from "@/lib/use-audio-player";
 
@@ -147,23 +146,31 @@ export function MiniPlayer({
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
           aria-label={`Open player for ${track?.title ?? "no track"}`}
         >
-          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl shadow-md shadow-purple-950/50">
+          <div
+            className={cn(
+              "relative h-11 w-11 shrink-0 overflow-hidden rounded-xl shadow-md shadow-purple-950/50 transition-all duration-300",
+              isPlaying && "ring-2 ring-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.35)]"
+            )}
+          >
             {track?.thumbnail ? (
               <img
                 src={track.thumbnail}
                 alt=""
-                className="h-full w-full object-cover"
+                className={cn(
+                  "h-full w-full object-cover transition-transform duration-500",
+                  isPlaying && "scale-105"
+                )}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-purple-900/30" />
             )}
             {isPlaying && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[0.5px]">
                 <div className="flex items-end gap-[2px] h-4">
                   {[0, 1, 2].map((i) => (
                     <div
                       key={i}
-                      className="w-[2.5px] rounded-full bg-white animate-bar"
+                      className="w-[2.5px] rounded-full bg-white animate-bar shadow-[0_0_6px_rgba(255,255,255,0.8)]"
                       style={{ animationDelay: `${i * 0.15}s`, height: "100%" }}
                     />
                   ))}
@@ -173,10 +180,7 @@ export function MiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5 truncate text-[13px] font-bold text-white leading-tight">
-              {isPlaying && (
-                <Equalizer active className="h-3 w-3 shrink-0 text-purple-400" />
-              )}
+            <p className="truncate text-[13px] font-bold text-white leading-tight">
               <span className="truncate">{track?.title ?? "Pick a song"}</span>
             </p>
             <p className="truncate text-[11px] text-purple-300/60 leading-tight mt-0.5 font-medium">

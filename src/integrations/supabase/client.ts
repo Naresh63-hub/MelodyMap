@@ -30,12 +30,13 @@ export function getSupabaseEnv() {
   const localUrl = typeof window !== 'undefined' ? localStorage.getItem('melodymap.supabase_url') || '' : '';
   const localKey = typeof window !== 'undefined' ? localStorage.getItem('melodymap.supabase_key') || '' : '';
 
-  // Use static dot property access so Vite compiles and replaces them at build time
-  const metaUrl = import.meta.env.VITE_SUPABASE_URL;
-  const metaKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+  // Vite exposes import.meta.env as a real object, so bracket access compiles
+  // (and satisfies noPropertyAccessFromIndexSignature) while still being replaced at build time.
+  const metaUrl = import.meta.env["VITE_SUPABASE_URL"];
+  const metaKey = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || import.meta.env["VITE_SUPABASE_ANON_KEY"];
 
-  const nodeUrl = typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL || process.env?.SUPABASE_URL : '';
-  const nodeKey = typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_PUBLISHABLE_KEY || process.env?.VITE_SUPABASE_ANON_KEY || process.env?.SUPABASE_PUBLISHABLE_KEY || process.env?.SUPABASE_ANON_KEY : '';
+  const nodeUrl = typeof process !== 'undefined' ? process.env?.["VITE_SUPABASE_URL"] || process.env?.["SUPABASE_URL"] : '';
+  const nodeKey = typeof process !== 'undefined' ? process.env?.["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env?.["VITE_SUPABASE_ANON_KEY"] || process.env?.["SUPABASE_PUBLISHABLE_KEY"] || process.env?.["SUPABASE_ANON_KEY"] : '';
 
   const rawUrl = (metaUrl || localUrl || nodeUrl || '').trim();
   const rawKey = (metaKey || localKey || nodeKey || '').trim();
@@ -75,7 +76,7 @@ function createSupabaseClient() {
       '[Supabase] Environment variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not configured. Running in local-first guest mode.',
     );
   } else {
-    console.info(`[Supabase] Initialized client for ${url}`);
+    console.info("[Supabase] Client initialized");
   }
 
   const effectiveUrl = isConfigured ? url : 'https://placeholder-project.supabase.co';

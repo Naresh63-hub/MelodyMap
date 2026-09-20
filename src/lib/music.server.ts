@@ -1,5 +1,6 @@
 import type { Track } from "./types";
 import { createLruCache } from "./lru-cache";
+import { getRequestClientIp } from "./request-context.server";
 import {
   isMusicTrack,
   isPodcastTrack,
@@ -73,19 +74,33 @@ export type UploadRange = keyof typeof UPLOAD_FILTERS;
 const searchCache = createLruCache<Track[]>(500, 30 * 60 * 1000);
 const inFlightSearches = new Map<string, Promise<Track[]>>();
 
-/** Rate limiter: allows up to 180 requests per minute with sliding window */
-const searchTimestamps: number[] = [];
-const MAX_SEARCH_PER_MINUTE = 180;
+/**
+ * Rate limiter: sliding-window counters per key. Two keys are checked per
+ * search — a per-IP bucket (fed from request context) and a global cap that
+ * protects the upstream catalog regardless of source.
+ */
+const searchTimestamps = new Map<string, number[]>();
+const MAX_SEARCH_PER_MINUTE_GLOBAL = 180;
+const MAX_SEARCH_PER_MINUTE_PER_IP = 60;
+let rateLimitSweepAt = 0;
 
-function checkSearchRateLimit(): boolean {
+function checkSearchRateLimit(key: string, max: number): boolean {
   const now = Date.now();
-  while (searchTimestamps.length > 0 && now - searchTimestamps[0]! > 60_000) {
-    searchTimestamps.shift();
+  if (now - rateLimitSweepAt > 60_000) {
+    rateLimitSweepAt = now;
+    for (const [k, hits] of searchTimestamps) {
+      const alive = hits.filter((t) => now - t < 60_000);
+      if (alive.length === 0) searchTimestamps.delete(k);
+      else searchTimestamps.set(k, alive);
+    }
   }
-  if (searchTimestamps.length >= MAX_SEARCH_PER_MINUTE) {
+  const hits = (searchTimestamps.get(key) ?? []).filter((t) => now - t < 60_000);
+  if (hits.length >= max) {
+    searchTimestamps.set(key, hits);
     return false;
   }
-  searchTimestamps.push(now);
+  hits.push(now);
+  searchTimestamps.set(key, hits);
   return true;
 }
 
@@ -437,7 +452,11 @@ export async function searchYouTubeWithPage(
   }
 
   const searchPromise = (async (): Promise<SearchPageResult> => {
-    if (!checkSearchRateLimit()) {
+    const clientIp = getRequestClientIp();
+    const rateLimited =
+      !checkSearchRateLimit(`ip:${clientIp}`, MAX_SEARCH_PER_MINUTE_PER_IP) ||
+      !checkSearchRateLimit("global", MAX_SEARCH_PER_MINUTE_GLOBAL);
+    if (rateLimited) {
       return { tracks: searchCache.get(cacheKey) ?? [] };
     }
 

@@ -56,6 +56,67 @@ function txDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
+/**
+ * When free storage can't fit `neededBytes`, delete the oldest downloads
+ * (never the one being saved) until there is enough headroom. Best-effort.
+ */
+async function evictOldestDownloadsIfNeeded(
+  db: IDBDatabase,
+  neededBytes: number,
+  keepKey: string,
+): Promise<void> {
+  if (
+    typeof navigator === "undefined" ||
+    !("storage" in navigator) ||
+    !("estimate" in navigator.storage)
+  ) {
+    return;
+  }
+  try {
+    const est = await navigator.storage.estimate();
+    const quota = est.quota ?? 0;
+    const usage = est.usage ?? 0;
+    const free = quota - usage;
+    if (quota <= 0 || free >= neededBytes) return;
+
+    // Gather download metadata only (skip deserializing audio blobs)
+    const readTx = db.transaction(STORE, "readonly");
+    const readStore = readTx.objectStore(STORE);
+    const metas: Array<{ id: string; size: number; savedAt: number }> = [];
+    await new Promise<void>((resolve, reject) => {
+      const req = readStore.openCursor();
+      req.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          const val = cursor.value as DownloadRecord;
+          metas.push({ id: val.id, size: val.size, savedAt: val.savedAt });
+          cursor.continue();
+        } else {
+          resolve();
+        }
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    metas.sort((a, b) => a.savedAt - b.savedAt);
+    let toFree = neededBytes - free;
+    const deleteTx = db.transaction(STORE, "readwrite");
+    const deleteStore = deleteTx.objectStore(STORE);
+    for (const meta of metas) {
+      if (toFree <= 0) break;
+      if (meta.id === keepKey) continue;
+      deleteStore.delete(meta.id);
+      toFree -= meta.size;
+    }
+    await txDone(deleteTx);
+    console.warn(
+      "[MelodyMap] Storage low — evicted oldest offline downloads to make room for the new one",
+    );
+  } catch {
+    // Eviction is best-effort; the save is still attempted afterwards
+  }
+}
+
 function getDownloadKey(trackOrId: Track | string, source?: string): string {
   if (typeof trackOrId === "string") {
     return trackOrId;
@@ -75,20 +136,13 @@ export async function saveDownload(track: Track, blob: Blob, imageBlob?: Blob): 
     }
   }
 
-  // Check storage quota before saving
-  if (typeof navigator !== "undefined" && "storage" in navigator && "estimate" in navigator.storage) {
-    try {
-      const est = await navigator.storage.estimate();
-      const quota = est.quota ?? 0;
-      const usage = est.usage ?? 0;
-      if (quota > 0 && quota - usage < blob.size + 100 * 1024 * 1024) {
-        console.warn("[MelodyMap] Storage running low:", formatBytes(quota - usage), "remaining");
-      }
-    } catch {
-      // Quota check is best-effort
-    }
-  }
   const db = await openDb();
+
+  // Keep storage headroom: if the free quota can't fit this download (plus
+  // headroom), evict the oldest downloads first instead of failing mid-save.
+  const needed = blob.size + (finalImageBlob?.size ?? 0) + 50 * 1024 * 1024;
+  await evictOldestDownloadsIfNeeded(db, needed, getDownloadKey(track));
+
   const tx = db.transaction(STORE, "readwrite");
   const key = getDownloadKey(track);
   tx.objectStore(STORE).put({

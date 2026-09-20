@@ -8,6 +8,19 @@ export type Profile = {
   avatar_url: string | null;
 };
 
+/**
+ * Remove OAuth tokens from the address bar once Supabase has consumed them,
+ * so session tokens don't linger in browser history. Recovery links are left
+ * alone — the flow still reads `type=recovery` from the hash.
+ */
+function scrubAuthTokensFromUrl() {
+  if (typeof window === "undefined") return;
+  const { hash, search, pathname } = window.location;
+  if (!hash.includes("access_token")) return;
+  if (hash.includes("type=recovery")) return;
+  window.history.replaceState(window.history.state, "", pathname + search);
+}
+
 /** Session + profile for the signed-in listener. Local-only when signed out. */
 export function useAuth() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -23,29 +36,33 @@ export function useAuth() {
       setReady(true);
 
       if (u) {
+        scrubAuthTokensFromUrl();
         const meta = u.user_metadata || {};
         const fallbackName = meta.display_name || meta.full_name || meta.name || u.email?.split("@")[0] || "Listener";
         const fallbackAvatar = meta.avatar_url || null;
         setProfile((prev) => prev || { id: u.id, display_name: fallbackName, avatar_url: fallbackAvatar });
 
         // Guarantee user entry is recorded in Supabase public.profiles table
-        void supabase
-          .from("profiles")
-          .upsert(
-            {
-              id: u.id,
-              display_name: fallbackName,
-              avatar_url: fallbackAvatar,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "id" }
-          )
-          .then(({ data, error }) => {
+        void (async () => {
+          try {
+            const { data, error } = await supabase
+              .from("profiles")
+              .upsert(
+                {
+                  id: u.id,
+                  display_name: fallbackName,
+                  avatar_url: fallbackAvatar,
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "id" }
+              );
             if (!error && data) {
               setProfile(data as any);
             }
-          })
-          .catch(() => {});
+          } catch {
+            // Non-blocking: profile sync is best-effort
+          }
+        })();
       } else {
         setProfile(null);
       }
@@ -68,15 +85,18 @@ export function useAuth() {
       return;
     }
     let cancelled = false;
-    void supabase
-      .from("profiles")
-      .select("id, display_name, avatar_url")
-      .eq("id", userId)
-      .maybeSingle()
-      .then(({ data }) => {
+    void (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url")
+          .eq("id", userId)
+          .maybeSingle();
         if (!cancelled && data) setProfile(data as Profile);
-      })
-      .catch(() => {});
+      } catch {
+        // Non-blocking: profile fetch is best-effort
+      }
+    })();
     return () => {
       cancelled = true;
     };

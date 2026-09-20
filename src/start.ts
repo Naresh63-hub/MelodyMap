@@ -18,13 +18,46 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
-const securityHeadersMiddleware = createMiddleware().server(async ({ next }) => {
-  const res = await next();
+function isLocalHostHeader(host: string): boolean {
+  return (
+    host.startsWith("localhost") ||
+    host.startsWith("127.0.0.1") ||
+    host.startsWith("192.168.") ||
+    host.startsWith("10.") ||
+    host.startsWith("[::1]")
+  );
+}
+
+const securityHeadersMiddleware = createMiddleware().server(async ({ request, next }) => {
+  // Publish the client IP into request-scoped context so server code (e.g.
+  // per-IP search rate limiting) can read it. Dynamic import keeps the
+  // node-only module out of client bundles.
+  const { clientIpFromRequest, runWithRequestContext } = await import(
+    "./lib/request-context.server"
+  );
+  const res = await runWithRequestContext(
+    { clientIp: clientIpFromRequest(request) },
+    () => next(),
+  );
   if (res instanceof Response) {
     res.headers.set("X-Content-Type-Options", "nosniff");
     res.headers.set("X-Frame-Options", "SAMEORIGIN");
     res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
     res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+    // HSTS only makes sense on HTTPS deployments — never pin localhost/LAN.
+    const host = request.headers.get("host") ?? "";
+    if (host && !isLocalHostHeader(host)) {
+      res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+
+    // Report-only CSP: surfaces violations in the console without blocking
+    // anything while a strict policy is tuned. frame-ancestors backs up
+    // X-Frame-Options.
+    res.headers.set(
+      "Content-Security-Policy-Report-Only",
+      "default-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+    );
   }
   return res;
 });

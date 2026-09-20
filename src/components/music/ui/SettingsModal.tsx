@@ -121,7 +121,7 @@ export function SettingsModal({
       if (userProfile.display_name) setDisplayName(userProfile.display_name);
       if (userProfile.avatar_url) setAvatarUrl(userProfile.avatar_url);
     } else if (userEmail) {
-      setDisplayName((prev) => prev || userEmail.split("@")[0]);
+      setDisplayName((prev) => prev || userEmail.split("@")[0] || "");
     }
   }, [userProfile, userEmail]);
 
@@ -138,9 +138,10 @@ export function SettingsModal({
     setProfileSaving(true);
     setProfileFeedback(null);
     try {
+      const trimmedAvatar = avatarUrl.trim();
       const res = await onUpdateProfile?.({
         display_name: displayName.trim(),
-        avatar_url: avatarUrl.trim() || undefined,
+        ...(trimmedAvatar ? { avatar_url: trimmedAvatar } : {}),
       });
       setProfileSaving(false);
       if (res && !res.success) {

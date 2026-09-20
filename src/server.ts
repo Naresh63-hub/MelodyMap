@@ -4,9 +4,10 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import {
   VIDEO_ID_REGEX,
-  isAllowedUpstreamUrl,
   isAllowedOrigin,
-  resolveAudioMimeType,
+  checkStreamRateLimit,
+  extractClientIp,
+  fetchUpstreamAudio,
 } from "./lib/stream-proxy-core";
 
 type ServerEntry = {
@@ -34,8 +35,10 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   const body = await response.clone().text();
   if (!isH3SwallowedErrorBody(body)) return response;
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+  // Capture once — consumeLastCapturedError() clears the record as a side effect,
+  // so calling it twice lost the error the first time around.
   const captured = consumeLastCapturedError();
+  console.error(captured ?? new Error(`h3 swallowed SSR error: ${body}`));
   return new Response(renderErrorPage(captured ?? new Error(`h3 swallowed SSR error: ${body}`)), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
@@ -52,7 +55,10 @@ function isH3SwallowedErrorBody(body: string): boolean {
 }
 
 /**
- * Same-origin audio stream proxy with SSRF & Origin protection and range handling.
+ * Fallback same-origin audio stream proxy. The dedicated Nitro route
+ * (server/routes/api/stream/[id].get.ts) normally serves these requests first;
+ * this path covers any deployment shape where the route layer is bypassed.
+ * All resolution/CORS/rate-limit/retry logic is shared via stream-proxy-core.ts.
  */
 async function handleStreamProxy(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
@@ -73,77 +79,36 @@ async function handleStreamProxy(request: Request): Promise<Response | null> {
     return new Response("Invalid or missing video id", { status: 400 });
   }
 
-  const { resolveStreamUrlWithMeta, invalidateStreamCache } = await import("./lib/stream.server");
-  let stream = await resolveStreamUrlWithMeta(videoId, quality);
-  if (!stream || !stream.url || !isAllowedUpstreamUrl(stream.url)) {
-    return new Response("Stream not found or invalid upstream", { status: 404 });
+  const ip = extractClientIp((name) => request.headers.get(name));
+  if (!checkStreamRateLimit(ip)) {
+    return new Response("Too many stream requests", { status: 429 });
   }
 
-  const upstreamHeaders: Record<string, string> = {
-    "User-Agent":
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-    Referer: "https://www.youtube.com/",
-  };
-  const rangeHeader = request.headers.get("range");
-  if (rangeHeader) {
-    upstreamHeaders["Range"] = rangeHeader;
+  const result = await fetchUpstreamAudio({
+    videoId,
+    quality,
+    rangeHeader: request.headers.get("range"),
+  });
+  if (!result.ok) {
+    return new Response(result.message, { status: result.status });
   }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30_000);
-
-  let upstreamRes: Response | null = null;
-  try {
-    upstreamRes = await fetch(stream.url, {
-      headers: upstreamHeaders,
-      signal: controller.signal,
-    });
-
-    // If upstream returns 403 Forbidden (e.g. expired or throttled stream URL), invalidate cache and retry once
-    if (upstreamRes.status === 403) {
-      console.warn(`[stream-proxy] Upstream 403 for ${videoId}, invalidating cache and retrying fresh stream...`);
-      invalidateStreamCache(videoId);
-      stream = await resolveStreamUrlWithMeta(videoId, quality);
-      if (stream && stream.url && isAllowedUpstreamUrl(stream.url)) {
-        upstreamRes = await fetch(stream.url, {
-          headers: upstreamHeaders,
-          signal: controller.signal,
-        });
-      }
-    }
-  } catch (err: unknown) {
-    clearTimeout(timeoutId);
-    if (err instanceof Error && err.name === "AbortError") {
-      return new Response("Upstream stream request timed out", { status: 504 });
-    }
-    invalidateStreamCache(videoId);
-    return new Response("Upstream stream fetch error", { status: 502 });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  if (!upstreamRes || (!upstreamRes.ok && upstreamRes.status !== 206)) {
-    invalidateStreamCache(videoId);
-    return new Response("Upstream stream fetch failed", { status: upstreamRes?.status || 502 });
-  }
-
-  const mimeType = resolveAudioMimeType(stream?.mimeType, upstreamRes.headers.get("content-type"));
 
   const responseHeaders = new Headers();
   responseHeaders.set("access-control-allow-origin", originHeader || "*");
+  responseHeaders.set("vary", "Origin");
   responseHeaders.set("access-control-allow-headers", "Range, Accept-Ranges, Content-Type");
   responseHeaders.set("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges");
-  responseHeaders.set("content-type", mimeType);
+  responseHeaders.set("content-type", result.mimeType);
   responseHeaders.set("accept-ranges", "bytes");
 
-  const contentRange = upstreamRes.headers.get("content-range");
+  const contentRange = result.upstream.headers.get("content-range");
   if (contentRange) responseHeaders.set("content-range", contentRange);
 
-  const contentLength = upstreamRes.headers.get("content-length");
+  const contentLength = result.upstream.headers.get("content-length");
   if (contentLength) responseHeaders.set("content-length", contentLength);
 
-  return new Response(upstreamRes.body, {
-    status: upstreamRes.status,
+  return new Response(result.upstream.body, {
+    status: result.upstream.status,
     headers: responseHeaders,
   });
 }

@@ -240,6 +240,9 @@ function MusicApp() {
 
   const [podcastLoading, setPodcastLoading] = useState(false);
   const [selectedPodcastTopic, setSelectedPodcastTopic] = useState<string>("All");
+  const [podcastQuery, setPodcastQuery] = useState("");
+  const [podcastSearching, setPodcastSearching] = useState(false);
+  const [podcastSearchResults, setPodcastSearchResults] = useState<Track[] | null>(null);
   const [loadingMoreRecs, setLoadingMoreRecs] = useState(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -707,27 +710,32 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } catch {}
   }, [runTrending, settings.languages]);
 
-  const loadDailyMix = useCallback(async () => {
-    setDailyMixLoading(true);
-    try {
-      const res = await runDailyMix({
-        data: {
-          languages: settings.languages,
-          artists: topArtists(stats, likes),
-          liked: likes.slice(0, 15).map(trackLabel),
-          count: 24,
-        },
-      });
-      if (res.tracks) {
-        const pureMusic = res.tracks as Track[];
-        const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
-        setDailyMixTracks(ranked);
+  const loadDailyMix = useCallback(
+    async (refreshNonce?: number | string) => {
+      setDailyMixLoading(true);
+      const nonce = refreshNonce ?? Date.now();
+      try {
+        const res = await runDailyMix({
+          data: {
+            languages: settings.languages,
+            artists: topArtists(stats, likes),
+            liked: likes.slice(0, 15).map(trackLabel),
+            count: 24,
+            refreshNonce: nonce,
+          },
+        });
+        if (res.tracks) {
+          const pureMusic = res.tracks as Track[];
+          const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+          setDailyMixTracks(ranked);
+        }
+      } catch {}
+      finally {
+        setDailyMixLoading(false);
       }
-    } catch {}
-    finally {
-      setDailyMixLoading(false);
-    }
-  }, [runDailyMix, settings.languages, stats, likes]);
+    },
+    [runDailyMix, settings.languages, stats, likes],
+  );
 
   const loadRecommendations = useCallback(
     async (mood?: string) => {
@@ -793,7 +801,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           })(),
           (async () => {
-            await loadDailyMix();
+            await loadDailyMix(nonce);
           })(),
         ]);
       } finally {
@@ -1134,6 +1142,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const loadPodcasts = useCallback(
     async (topic?: string) => {
       setPodcastLoading(true);
+      setPodcastSearchResults(null);
+      setPodcastQuery("");
       const chosenTopic = topic !== undefined ? topic : selectedPodcastTopic;
       if (topic !== undefined) setSelectedPodcastTopic(topic);
       try {
@@ -1156,6 +1166,39 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     },
     [runPodcastPicks, selectedPodcastTopic, settings, stats, likes],
   );
+
+  const handlePodcastSearch = useCallback(
+    async (e?: React.FormEvent) => {
+      if (e) e.preventDefault();
+      const term = podcastQuery.trim();
+      if (!term) return;
+      setPodcastSearching(true);
+      try {
+        const q = term.toLowerCase().includes("podcast") ? term : `${term} podcast`;
+        const res = await runSearch({
+          data: {
+            query: q,
+            limit: 30,
+            type: "podcasts",
+            filter: "all",
+          },
+        });
+        if (res.tracks) {
+          setPodcastSearchResults(res.tracks as Track[]);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setPodcastSearching(false);
+      }
+    },
+    [podcastQuery, runSearch],
+  );
+
+  const clearPodcastSearch = useCallback(() => {
+    setPodcastQuery("");
+    setPodcastSearchResults(null);
+  }, []);
 
   useEffect(() => {
     if (tab !== "podcasts") return;
@@ -1670,133 +1713,227 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     size="sm"
                     className="rounded-full bg-white/[0.06] text-white/70 hover:bg-white/10 hover:text-white border-white/10"
                     onClick={() => void loadPodcasts()}
-                    disabled={podcastLoading}
+                    disabled={podcastLoading || podcastSearching}
                   >
                     {podcastLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
                     Refresh
                   </Button>
                 </div>
 
-                {/* Podcast Topic Filter Chips */}
-                <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
-                  {["All", "Tech", "Motivation", "Science", "Comedy", "Business", "True Crime", "News", "History", "Health", "Finance"].map((topic) => {
-                    const active = selectedPodcastTopic === topic;
-                    return (
-                      <button
-                        key={topic}
-                        type="button"
-                        onClick={() => void loadPodcasts(topic)}
-                        disabled={podcastLoading}
-                        className={cn(
-                          "shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition-all",
-                          active
-                            ? "border-purple-500/50 bg-purple-500/20 text-white font-medium shadow-sm shadow-purple-500/20"
-                            : "border-white/10 bg-white/[0.03] text-white/50 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white/80"
-                        )}
-                      >
-                        {topic}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Recently Listened Podcasts */}
-                {podcastHistory.length > 0 && (
-                  <div className="space-y-2 pt-1 pb-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-300/70">
-                        Continue Listening
-                      </h3>
+                {/* Podcast In-Tab Search */}
+                <form onSubmit={handlePodcastSearch} className="relative flex items-center w-full">
+                  <Search className="absolute left-3.5 h-4 w-4 text-white/40 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={podcastQuery}
+                    onChange={(e) => {
+                      setPodcastQuery(e.target.value);
+                      if (!e.target.value.trim() && podcastSearchResults !== null) {
+                        setPodcastSearchResults(null);
+                      }
+                    }}
+                    placeholder="Search podcast shows, episodes, creators..."
+                    className="w-full rounded-xl bg-white/[0.06] border border-white/10 pl-10 pr-24 py-2 text-sm text-white placeholder-white/40 focus:border-purple-500/60 focus:bg-white/[0.08] focus:outline-none transition-all"
+                  />
+                  <div className="absolute right-1.5 flex items-center gap-1">
+                    {podcastQuery && (
                       <button
                         type="button"
-                        onClick={clearPodcastHistory}
-                        className="text-[11px] text-white/40 hover:text-white/70"
+                        onClick={clearPodcastSearch}
+                        className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                        title="Clear search"
                       >
-                        Clear
+                        <X className="h-3.5 w-3.5" />
                       </button>
-                    </div>
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x">
-                      {podcastHistory.slice(0, 10).map((ep, i) => (
-                        <button
-                          key={ep.id}
-                          type="button"
-                          onClick={() => {
-                            if (current?.id === ep.id) {
-                              player.isPlaying ? pause() : play();
-                              return;
-                            }
-                            startQueue(podcastHistory, i);
-                          }}
-                          className="w-[140px] shrink-0 snap-start text-left group"
-                        >
-                          <div className="relative mb-1.5 aspect-video w-full overflow-hidden rounded-xl bg-purple-950/40 border border-purple-500/20">
-                            {ep.thumbnail ? (
-                              <img src={ep.thumbnail} alt="" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
-                            ) : (
-                              <div className="flex h-full items-center justify-center">
-                                <MessageSquare className="h-6 w-6 text-purple-400/40" />
-                              </div>
-                            )}
-                            {current?.id === ep.id && player.isPlaying && (
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                <div className="flex items-end gap-0.5 h-4">
-                                  <div className="w-1 bg-purple-400 animate-bar" />
-                                  <div className="w-1 bg-purple-400 animate-bar" style={{ animationDelay: "0.2s" }} />
-                                  <div className="w-1 bg-purple-400 animate-bar" style={{ animationDelay: "0.4s" }} />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <p className="truncate text-xs font-semibold text-white/90 leading-tight">{ep.title}</p>
-                          <p className="truncate text-[11px] text-purple-300/50 mt-0.5">{ep.artist}</p>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {podcastLoading && podcastTracks.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-16 text-white/30">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <p className="text-sm">Finding podcast picks…</p>
-                  </div>
-                ) : podcastTracks.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-16 text-center">
-                    <MessageSquare className="h-12 w-12 text-white/20" />
-                    <h3 className="text-lg font-semibold text-white/60">No podcasts yet</h3>
-                    <p className="text-sm text-white/40 max-w-xs">
-                      Configure your podcast topics in Settings to get personalized picks.
-                    </p>
-                    <Button variant="secondary" size="sm" className="mt-2" onClick={() => setShowSettings(true)}>
-                      Open Settings
+                    )}
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={podcastSearching || !podcastQuery.trim()}
+                      className="h-7 px-3 text-xs font-medium rounded-lg bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-40"
+                    >
+                      {podcastSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Search"}
                     </Button>
                   </div>
+                </form>
+
+                {podcastSearchResults !== null ? (
+                  /* Podcast Search Results View */
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-white">Results for &ldquo;{podcastQuery}&rdquo;</h3>
+                        <span className="text-xs text-purple-300/60 font-medium">({podcastSearchResults.length} episodes)</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearPodcastSearch}
+                        className="text-xs text-purple-400 hover:text-purple-300 underline font-medium"
+                      >
+                        Show Recommended
+                      </button>
+                    </div>
+                    {podcastSearchResults.length === 0 ? (
+                      <div className="flex flex-col items-center gap-2 py-12 text-center">
+                        <MessageSquare className="h-10 w-10 text-white/20" />
+                        <p className="text-sm text-white/60">No podcast episodes found for &ldquo;{podcastQuery}&rdquo;</p>
+                        <Button variant="secondary" size="sm" onClick={clearPodcastSearch} className="mt-2">
+                          Clear Search
+                        </Button>
+                      </div>
+                    ) : (
+                      <TrackList
+                        tracks={podcastSearchResults}
+                        currentId={current?.id}
+                        isPlaying={player.isPlaying}
+                        likedIds={likedIds}
+                        dislikedIds={dislikedIds}
+                        onPlay={(track, i) => {
+                          if (current?.id === track.id) {
+                            player.isPlaying ? pause() : play();
+                            return;
+                          }
+                          startQueue(podcastSearchResults, i);
+                        }}
+                        onToggleLike={toggleLike}
+                        onToggleDislike={(track) => {
+                          toggleDislike(track);
+                          setRecs((prev) => prev.filter((t) => t.id !== track.id));
+                        }}
+                        onArtistClick={openArtist}
+                        playlists={playlists}
+                        onAddToPlaylist={addToPlaylist}
+                        onAddToQueue={(track) => enqueue([track])}
+                        onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
+                        emptyMessage="No podcasts found."
+                      />
+                    )}
+                  </div>
                 ) : (
-                  <TrackList
-                    tracks={podcastTracks}
-                    currentId={current?.id}
-                    isPlaying={player.isPlaying}
-                    likedIds={likedIds}
-                    dislikedIds={dislikedIds}
-                    onPlay={(track, i) => {
-                      if (current?.id === track.id) {
-                        player.isPlaying ? pause() : play();
-                        return;
-                      }
-                      startQueue(podcastTracks, i);
-                    }}
-                    onToggleLike={toggleLike}
-                    onToggleDislike={(track) => {
-                      toggleDislike(track);
-                      setRecs((prev) => prev.filter((t) => t.id !== track.id));
-                    }}
-                    onArtistClick={openArtist}
-                    playlists={playlists}
-                    onAddToPlaylist={addToPlaylist}
-                    onAddToQueue={(track) => enqueue([track])}
-                    onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
-                    emptyMessage="Pick topics in Settings to get podcast recommendations."
-                  />
+                  /* Default Recommendations & Topics View */
+                  <>
+                    {/* Podcast Topic Filter Chips */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
+                      {["All", "Tech", "Motivation", "Science", "Comedy", "Business", "True Crime", "News", "History", "Health", "Finance"].map((topic) => {
+                        const active = selectedPodcastTopic === topic;
+                        return (
+                          <button
+                            key={topic}
+                            type="button"
+                            onClick={() => void loadPodcasts(topic)}
+                            disabled={podcastLoading}
+                            className={cn(
+                              "shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition-all",
+                              active
+                                ? "border-purple-500/50 bg-purple-500/20 text-white font-medium shadow-sm shadow-purple-500/20"
+                                : "border-white/10 bg-white/[0.03] text-white/50 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white/80"
+                            )}
+                          >
+                            {topic}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Recently Listened Podcasts */}
+                    {podcastHistory.length > 0 && (
+                      <div className="space-y-2 pt-1 pb-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-300/70">
+                            Continue Listening
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={clearPodcastHistory}
+                            className="text-[11px] text-white/40 hover:text-white/70"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x">
+                          {podcastHistory.slice(0, 10).map((ep, i) => (
+                            <button
+                              key={ep.id}
+                              type="button"
+                              onClick={() => {
+                                if (current?.id === ep.id) {
+                                  player.isPlaying ? pause() : play();
+                                  return;
+                                }
+                                startQueue(podcastHistory, i);
+                              }}
+                              className="w-[140px] shrink-0 snap-start text-left group"
+                            >
+                              <div className="relative mb-1.5 aspect-video w-full overflow-hidden rounded-xl bg-purple-950/40 border border-purple-500/20">
+                                {ep.thumbnail ? (
+                                  <img src={ep.thumbnail} alt="" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
+                                ) : (
+                                  <div className="flex h-full items-center justify-center">
+                                    <MessageSquare className="h-6 w-6 text-purple-400/40" />
+                                  </div>
+                                )}
+                                {current?.id === ep.id && player.isPlaying && (
+                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                    <div className="flex items-end gap-0.5 h-4">
+                                      <div className="w-1 bg-purple-400 animate-bar" />
+                                      <div className="w-1 bg-purple-400 animate-bar" style={{ animationDelay: "0.2s" }} />
+                                      <div className="w-1 bg-purple-400 animate-bar" style={{ animationDelay: "0.4s" }} />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <p className="truncate text-xs font-semibold text-white/90 leading-tight">{ep.title}</p>
+                              <p className="truncate text-[11px] text-purple-300/50 mt-0.5">{ep.artist}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {podcastLoading && podcastTracks.length === 0 ? (
+                      <div className="flex flex-col items-center gap-3 py-16 text-white/30">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <p className="text-sm">Finding podcast picks…</p>
+                      </div>
+                    ) : podcastTracks.length === 0 ? (
+                      <div className="flex flex-col items-center gap-3 py-16 text-center">
+                        <MessageSquare className="h-12 w-12 text-white/20" />
+                        <h3 className="text-lg font-semibold text-white/60">No podcasts yet</h3>
+                        <p className="text-sm text-white/40 max-w-xs">
+                          Configure your podcast topics in Settings to get personalized picks.
+                        </p>
+                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setShowSettings(true)}>
+                          Open Settings
+                        </Button>
+                      </div>
+                    ) : (
+                      <TrackList
+                        tracks={podcastTracks}
+                        currentId={current?.id}
+                        isPlaying={player.isPlaying}
+                        likedIds={likedIds}
+                        dislikedIds={dislikedIds}
+                        onPlay={(track, i) => {
+                          if (current?.id === track.id) {
+                            player.isPlaying ? pause() : play();
+                            return;
+                          }
+                          startQueue(podcastTracks, i);
+                        }}
+                        onToggleLike={toggleLike}
+                        onToggleDislike={(track) => {
+                          toggleDislike(track);
+                          setRecs((prev) => prev.filter((t) => t.id !== track.id));
+                        }}
+                        onArtistClick={openArtist}
+                        playlists={playlists}
+                        onAddToPlaylist={addToPlaylist}
+                        onAddToQueue={(track) => enqueue([track])}
+                        onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
+                        emptyMessage="Pick topics in Settings to get podcast recommendations."
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}

@@ -76,8 +76,13 @@ export function useAudioPlayer(options: {
     return `/api/stream/${encodeURIComponent(id)}?quality=${encodeURIComponent(q)}`;
   }, []);
 
-  // Initialize and attach core audio + prebuffer + YouTube iframe container to DOM
-  if (typeof document !== "undefined") {
+  // Initialize and attach core audio + prebuffer + YouTube iframe container to DOM.
+  // Must run in an effect, not during render: creating/appending DOM nodes is a
+  // side effect and violates render purity (breaks under StrictMode re-renders
+  // and can double-append during hydration).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
     if (!audioRef.current) {
       let el = document.getElementById("melodymap-core-audio") as HTMLAudioElement | null;
       if (!el) {
@@ -143,7 +148,7 @@ export function useAudioPlayer(options: {
         document.body.appendChild(holder);
       } catch {}
     }
-  }
+  }, []);
 
   const endedRef = useRef(options.onEnded);
   endedRef.current = options.onEnded;

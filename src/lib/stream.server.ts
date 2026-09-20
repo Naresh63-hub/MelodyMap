@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { createHash } from "node:crypto";
 import { createLruCache } from "./lru-cache";
 
 export type StreamQuality = "saver" | "standard" | "high";
@@ -37,8 +38,47 @@ const BROWSER_UA =
 
 // ─── Serverless Binary Auto-Resolution (Vercel / Linux) ──────────────
 
+const YT_DLP_RELEASE_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
+
 let resolvedYtDlpInstance: any = null;
 let downloadPromise: Promise<void> | null = null;
+
+/**
+ * Download the standalone yt-dlp binary and verify it against the SHA2-256SUMS
+ * asset published with the same release. A binary that cannot be verified is
+ * refused (fail closed) — the app then falls back to the InnerTube resolver.
+ */
+async function downloadVerifiedYtDlpBinary(
+  tmpPath: string,
+  binaryName: string,
+  isWindows: boolean,
+): Promise<boolean> {
+  const [binRes, sumsRes] = await Promise.all([
+    fetch(`${YT_DLP_RELEASE_BASE}/${binaryName}`),
+    fetch(`${YT_DLP_RELEASE_BASE}/SHA2-256SUMS`),
+  ]);
+  if (!binRes.ok || !sumsRes.ok) return false;
+
+  const buffer = Buffer.from(await binRes.arrayBuffer());
+  const sums = await sumsRes.text();
+  // GNU-style lines: "<sha256>  <filename>"
+  const expectedSha = sums
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/))
+    .filter((parts) => parts.length >= 2)
+    .find((parts) => parts.slice(1).join(" ") === binaryName)?.[0]
+    ?.toLowerCase();
+
+  if (!expectedSha) return false;
+  const actualSha = createHash("sha256").update(buffer).digest("hex");
+  if (actualSha !== expectedSha) return false;
+
+  fs.writeFileSync(tmpPath, buffer);
+  if (!isWindows) {
+    fs.chmodSync(tmpPath, 0o755);
+  }
+  return true;
+}
 
 async function getYtDlpInstance() {
   const ytdlModule = (await import("youtube-dl-exec")) as any;
@@ -71,18 +111,12 @@ async function getYtDlpInstance() {
     downloadPromise = (async () => {
       try {
         console.info(`[stream] yt-dlp binary missing from bundle, downloading to ${tmpPath}...`);
-        const downloadUrl = isWindows
-          ? "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-          : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
-        const res = await fetch(downloadUrl);
-        if (res.ok) {
-          const buffer = Buffer.from(await res.arrayBuffer());
-          fs.writeFileSync(tmpPath, buffer);
-          if (!isWindows) {
-            fs.chmodSync(tmpPath, 0o755);
-          }
-          console.info(`[stream] Successfully installed yt-dlp to ${tmpPath}`);
-        }
+        const installed = await downloadVerifiedYtDlpBinary(tmpPath, binaryName, isWindows);
+        console.info(
+          installed
+            ? `[stream] Installed checksum-verified yt-dlp to ${tmpPath}`
+            : `[stream] yt-dlp install refused (release unavailable or checksum verification failed)`,
+        );
       } catch (err) {
         console.warn(`[stream] Failed to download yt-dlp binary to /tmp:`, err);
       }
@@ -166,67 +200,82 @@ const EXTRACTOR_CLIENT_PRESETS: Array<string | undefined> = [
   "youtube:player_client=web,mweb",
 ];
 
+async function resolveWithPreset(
+  videoId: string,
+  quality: StreamQuality = "high",
+  extractorArgs: string | undefined,
+): Promise<StreamMeta | null> {
+  const youtubedl = await getYtDlpInstance();
+
+  const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+    dumpJson: true,
+    noCheckCertificates: true,
+    noWarnings: true,
+    ...(extractorArgs ? { extractorArgs } : {}),
+  } as any);
+
+  const fmts = (output as any).formats || [];
+
+  // Priority 1: Pure audio-only formats (no video tracks)
+  const audioFormats = fmts.filter(
+    (f: any) =>
+      f.url &&
+      f.acodec &&
+      f.acodec !== "none" &&
+      (!f.vcodec || f.vcodec === "none"),
+  );
+
+  if (audioFormats.length === 0) return null;
+
+  if (quality === "saver") {
+    audioFormats.sort((a: any, b: any) => (a.abr || 0) - (b.abr || 0));
+  } else if (quality === "standard") {
+    audioFormats.sort(
+      (a: any, b: any) =>
+        Math.abs((a.abr || 128) - 128) - Math.abs((b.abr || 128) - 128),
+    );
+  } else {
+    audioFormats.sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0));
+  }
+
+  for (const bestFormat of audioFormats.slice(0, 3)) {
+    if (!bestFormat || !bestFormat.url) continue;
+
+    const isHealthy = await probeStream(bestFormat.url);
+    if (!isHealthy) continue;
+
+    const contentLen = bestFormat.filesize || bestFormat.filesize_approx;
+    return {
+      url: bestFormat.url,
+      mimeType: bestFormat.ext === "webm" ? "audio/webm" : "audio/mp4",
+      contentLength: contentLen ? Number(contentLen) : null,
+      audioBitrate: bestFormat.abr ? Number(bestFormat.abr) * 1000 : null,
+    };
+  }
+
+  return null;
+}
+
 async function resolveWithYtDlp(
   videoId: string,
   quality: StreamQuality = "high",
 ): Promise<StreamMeta | null> {
-  const youtubedl = await getYtDlpInstance();
-
-  for (const extractorArgs of EXTRACTOR_CLIENT_PRESETS) {
-    try {
-      const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
-        dumpJson: true,
-        noCheckCertificates: true,
-        noWarnings: true,
-        ...(extractorArgs ? { extractorArgs } : {}),
-      } as any);
-
-      const fmts = (output as any).formats || [];
-
-      // Priority 1: Pure audio-only formats (no video tracks)
-      const audioFormats = fmts.filter(
-        (f: any) =>
-          f.url &&
-          f.acodec &&
-          f.acodec !== "none" &&
-          (!f.vcodec || f.vcodec === "none"),
-      );
-
-      // If audio-only formats exist for this client preset, probe and sort them
-      if (audioFormats.length > 0) {
-        if (quality === "saver") {
-          audioFormats.sort((a: any, b: any) => (a.abr || 0) - (b.abr || 0));
-        } else if (quality === "standard") {
-          audioFormats.sort(
-            (a: any, b: any) =>
-              Math.abs((a.abr || 128) - 128) - Math.abs((b.abr || 128) - 128),
-          );
-        } else {
-          audioFormats.sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0));
-        }
-
-        for (const bestFormat of audioFormats.slice(0, 3)) {
-          if (!bestFormat || !bestFormat.url) continue;
-
-          const isHealthy = await probeStream(bestFormat.url);
-          if (!isHealthy) continue;
-
-          const contentLen = bestFormat.filesize || bestFormat.filesize_approx;
-          return {
-            url: bestFormat.url,
-            mimeType: bestFormat.ext === "webm" ? "audio/webm" : "audio/mp4",
-            contentLength: contentLen ? Number(contentLen) : null,
-            audioBitrate: bestFormat.abr ? Number(bestFormat.abr) * 1000 : null,
-          };
-        }
-      }
-    } catch (presetErr) {
+  // Run all client presets concurrently — each full extraction can take
+  // several seconds, and the previous sequential chain pushed cold starts
+  // past the proxy timeout on serverless.
+  const attempts = EXTRACTOR_CLIENT_PRESETS.map((extractorArgs) =>
+    resolveWithPreset(videoId, quality, extractorArgs).catch((presetErr) => {
       console.warn(`[stream] yt-dlp preset (${extractorArgs ?? "default"}) failed for ${videoId}:`, presetErr);
-    }
-  }
+      return null;
+    }),
+  );
+  const settled = await Promise.all(attempts);
+  const firstHealthy = settled.find((meta): meta is StreamMeta => Boolean(meta));
+  if (firstHealthy) return firstHealthy;
 
   // Last resort fallback across all formats (muxed with audio) if no audio-only format succeeded
   try {
+    const youtubedl = await getYtDlpInstance();
     const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
       dumpJson: true,
       noCheckCertificates: true,
