@@ -521,12 +521,15 @@ export function useAudioPlayer(options: {
       setIsPlaying(false);
       setIsLoading(false);
 
+      // Synchronously grab next track BEFORE index is mutated in endedRef callback
+      const nextTrack = getNextTrackRef.current?.();
+
       // Notify parent component
       endedRef.current();
 
-      // Synchronous background advance
-      const nextTrack = getNextTrackRef.current?.();
+      // Synchronous background advance for continuous playback with screen locked
       if (nextTrack && wantPlayRef.current) {
+        currentTrackIdRef.current = nextTrack.id;
         const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
         audio.src = nextUrl;
         audio.playbackRate = playbackSpeed;
@@ -828,7 +831,7 @@ export function useAudioPlayer(options: {
 
   /** Load a track and auto-play */
   const load = useCallback(
-    async (id: string, directUrl?: string) => {
+    async (id: string, directUrl?: string, startAt = 0) => {
       wantPlayRef.current = true;
       currentTrackIdRef.current = id;
       qualityFallbackStepRef.current = 0;
@@ -843,23 +846,23 @@ export function useAudioPlayer(options: {
         });
       }
 
-      if (await playOffline(id)) return;
+      if (await playOffline(id, startAt)) return;
       if (directUrl) {
         activeEngineRef.current = "html5";
         try {
           ytPlayerRef.current?.stopVideo();
         } catch {}
-        setStream(directUrl);
+        setStream(directUrl, startAt);
         return;
       }
 
       // If YouTube engine was already active from previous fallback, directly use YouTube player
       if (activeEngineRef.current === "youtube") {
-        playViaYouTube(id, 0, true);
+        playViaYouTube(id, startAt, true);
         return;
       }
 
-      setStream(streamUrl(id));
+      setStream(streamUrl(id), startAt);
     },
     [setStream, playOffline, streamUrl, playViaYouTube],
   );

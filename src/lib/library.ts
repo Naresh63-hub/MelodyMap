@@ -237,6 +237,7 @@ export type SavedPlayback = {
   queue: Track[];
   index: number;
   position: number;
+  isPlaying?: boolean;
 };
 
 /** Last queue + seek position, so reopening the app resumes where you left off. */

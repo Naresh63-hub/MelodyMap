@@ -206,6 +206,7 @@ function MusicApp() {
   const [results, setResults] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchContinuation, setSearchContinuation] = useState<string | undefined>(undefined);
+  const searchPageRef = useRef<number>(1);
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [recs, setRecs] = useState<Track[]>([]);
@@ -553,7 +554,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
 
       if (continuousRef.current) {
-        void extendQueue().then(() => {
+        void extendQueue().then((added) => {
+          if (added && added.length > 0) {
+            const firstTrack = added[0];
+            if (firstTrack) {
+              setQueue((prev) => {
+                const targetIdx = prev.findIndex((t) => t.id === firstTrack.id);
+                if (targetIdx !== -1) {
+                  indexRef.current = targetIdx;
+                  setIndex(targetIdx);
+                }
+                return prev;
+              });
+              return;
+            }
+          }
           const updated = queueRef.current;
           const loopIdx = findNextValidTrackIndex(updated, -1, false);
           if (loopIdx !== -1) {
@@ -740,7 +755,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const loadRecommendations = useCallback(
     async (mood?: string) => {
       setRecLoading(true);
-      const nonce = Date.now();
+      const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       try {
         await Promise.allSettled([
           (async () => {
@@ -848,6 +863,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     setExtending(true);
     try {
       const currentTrack = currentRef.current;
+      const currentQueue = queueRef.current;
+      let candidateTracks: Track[] = [];
+
       // 1. Try YouTube RD Song Radio for continuous similar tracks
       if (currentTrack?.id) {
         try {
@@ -864,12 +882,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           if (radioRes.tracks && radioRes.tracks.length > 0) {
             const pureMusic = radioRes.tracks as Track[];
             const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
-            let added: Track[] = [];
-            setQueue((prev) => {
-              added = ranked.filter((t) => !trackExistsIn(prev, t as TrackLike));
-              return added.length > 0 ? [...prev, ...added] : prev;
-            });
-            if (added.length > 0) return added;
+            candidateTracks = ranked.filter((t) => !trackExistsIn(currentQueue, t as TrackLike));
           }
         } catch {
           // fall back to AI recommendation
@@ -877,29 +890,46 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
 
       // 2. Fallback to recommendation engine
-      const res = await runRecommend({
-        data: {
-          liked: likes.slice(0, 20).map(trackLabel),
-          recent: history.slice(0, 20).map(trackLabel),
-          disliked: dislikes.slice(0, 20).map(trackLabel),
-          sequence: sequenceBrief(history, stats),
-          skipped: skippedLabels(stats),
-          count: 12,
-          languages: settings.languages,
-          brief: settingsToBrief(settings),
-          artists: topArtists(stats, likes),
-          refreshNonce: Date.now(),
-        },
-      });
-      if (res.tracks && res.tracks.length > 0) {
-        const pureMusic = res.tracks as Track[];
-        const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
-        let added: Track[] = [];
-        setQueue((prev) => {
-          added = ranked.filter((t) => !trackExistsIn(prev, t as TrackLike));
-          return added.length > 0 ? [...prev, ...added] : prev;
+      if (candidateTracks.length === 0) {
+        const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const res = await runRecommend({
+          data: {
+            liked: likes.slice(0, 20).map(trackLabel),
+            recent: history.slice(0, 20).map(trackLabel),
+            disliked: dislikes.slice(0, 20).map(trackLabel),
+            sequence: sequenceBrief(history, stats),
+            skipped: skippedLabels(stats),
+            count: 16,
+            languages: settings.languages,
+            brief: settingsToBrief(settings),
+            artists: topArtists(stats, likes),
+            refreshNonce: nonce,
+          },
         });
-        return added;
+        if (res.tracks && res.tracks.length > 0) {
+          const pureMusic = res.tracks as Track[];
+          const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
+          candidateTracks = ranked.filter((t) => !trackExistsIn(currentQueue, t as TrackLike));
+        }
+      }
+
+      // 3. Fallback to cached pool if still empty
+      if (candidateTracks.length === 0) {
+        const pool = dedupeTracks([
+          ...recsRef.current,
+          ...trendingRef.current,
+          ...(mixTracksRef.current?.discover || []),
+          ...(mixTracksRef.current?.newrelease || []),
+        ]);
+        candidateTracks = pool.filter(
+          (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
+        );
+      }
+
+      if (candidateTracks.length > 0) {
+        const batchToAdd = candidateTracks.slice(0, 15);
+        setQueue((prev) => [...prev, ...batchToAdd]);
+        return batchToAdd;
       }
       return [];
     } finally {
@@ -916,6 +946,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setShowSuggestions(false);
       setSearching(true);
       setSearchContinuation(undefined);
+      searchPageRef.current = 1;
+      setQuery(term);
       setMessage(null);
       try {
         const res = await runSearch({
@@ -924,6 +956,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             limit: 50,
             type: t,
             filter: f,
+            page: 1,
+            offset: 0,
           },
         });
         if (res.error) setMessage(res.error);
@@ -941,17 +975,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   );
 
   const loadMoreResults = useCallback(async () => {
-    if (!searchContinuation || loadingMoreSearch || !query.trim()) return;
+    if (loadingMoreSearch || !query.trim()) return;
     setLoadingMoreSearch(true);
+    const nextPage = searchPageRef.current + 1;
     try {
       const res = await runSearch({
         data: {
           query: query.trim(),
           filter: searchFilter,
           continuation: searchContinuation,
+          page: nextPage,
+          offset: results.length,
         },
       });
       if (res.tracks && res.tracks.length > 0) {
+        searchPageRef.current = nextPage;
         const raw = res.tracks as Track[];
         setResults((prev) => dedupeTracks([...prev, ...raw]));
       }
@@ -962,7 +1000,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } finally {
       setLoadingMoreSearch(false);
     }
-  }, [searchContinuation, loadingMoreSearch, query, searchFilter, runSearch]);
+  }, [searchContinuation, loadingMoreSearch, query, searchFilter, runSearch, results.length]);
 
   const openArtist = useCallback(
     (artist: string) => {
@@ -1009,8 +1047,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
     if (candidateTracks.length > 0) {
       const added = candidateTracks.slice(0, 10);
-      setQueue((prev) => [...prev, ...added]);
       const targetIdx = q.length;
+      setQueue((prev) => [...prev, ...added]);
       indexRef.current = targetIdx;
       setIndex(targetIdx);
       void extendQueue();
@@ -1018,7 +1056,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
 
     // 3. If no local candidates, fetch fresh tracks or loop back
-    void extendQueue().then(() => {
+    void extendQueue().then((added) => {
+      if (added && added.length > 0) {
+        const firstTrack = added[0];
+        if (firstTrack) {
+          setQueue((prev) => {
+            const targetIdx = prev.findIndex((t) => t.id === firstTrack.id);
+            if (targetIdx !== -1) {
+              indexRef.current = targetIdx;
+              setIndex(targetIdx);
+            }
+            return prev;
+          });
+          return;
+        }
+      }
       const updated = queueRef.current;
       const fallbackIdx = findNextValidTrackIndex(updated, i, true);
       if (fallbackIdx !== -1) {
@@ -1206,16 +1258,39 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     void loadPodcasts();
   }, [tab, podcastTracks.length, loadPodcasts]);
 
-  useEffect(() => {
-    if (restored.current) return;
-    restored.current = true;
-    setResumed(true);
-  }, []);
-
   const restored = useRef(false);
   const resumeRef = useRef<number | null>(null);
-
   const loadedTrackIdRef = useRef<string | null>(null);
+
+  // Restore last playing track, queue, and seek position on mount / page refresh
+  useEffect(() => {
+    if (restored.current || !player.ready) return;
+    restored.current = true;
+    try {
+      const saved = readPlayback();
+      if (saved && Array.isArray(saved.queue) && saved.queue.length > 0) {
+        setQueue(saved.queue);
+        const safeIndex = Math.min(Math.max(0, saved.index || 0), saved.queue.length - 1);
+        setIndex(safeIndex);
+        const savedPos = typeof saved.position === "number" && !isNaN(saved.position) ? saved.position : 0;
+        resumeRef.current = savedPos;
+        setResumed(true);
+        const targetTrack = saved.queue[safeIndex];
+        if (targetTrack) {
+          loadedTrackIdRef.current = targetTrack.id;
+          if (saved.isPlaying) {
+            void load(targetTrack.id, targetTrack.previewUrl, savedPos);
+          } else {
+            cue(targetTrack.id, savedPos, targetTrack.previewUrl);
+          }
+        }
+      } else {
+        setResumed(true);
+      }
+    } catch {
+      setResumed(true);
+    }
+  }, [player.ready, load, cue]);
 
   useEffect(() => {
     const track = current;
@@ -1300,18 +1375,36 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
   }, [index, queue, runPrewarm]);
 
+  const saveCurrentPlayback = useCallback(() => {
+    const q = queueRef.current;
+    if (q.length === 0) return;
+    const pos = playerPositionRef.current;
+    const safePos = typeof pos === "number" && !isNaN(pos) ? pos : 0;
+    writePlayback({
+      queue: q,
+      index: indexRef.current,
+      position: safePos,
+      isPlaying: isPlayingRef.current,
+    });
+    const cur = currentRef.current;
+    if (cur && (isPodcastTrack(cur) || parseDurationSeconds(cur.duration) > 900)) {
+      savePodcastResumePosition(cur.id, safePos);
+    }
+  }, []);
+
   useEffect(() => {
     if (!resumed || queue.length === 0) return;
-    const timer = window.setInterval(() => {
-      const pos = playerPositionRef.current;
-      writePlayback({ queue, index, position: pos });
-      const cur = currentRef.current;
-      if (cur && (isPodcastTrack(cur) || parseDurationSeconds(cur.duration) > 900)) {
-        savePodcastResumePosition(cur.id, pos);
-      }
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [resumed, queue, index]);
+    saveCurrentPlayback();
+    const timer = window.setInterval(saveCurrentPlayback, 2500);
+    const handleUnload = () => saveCurrentPlayback();
+    window.addEventListener("beforeunload", handleUnload);
+    document.addEventListener("visibilitychange", handleUnload);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("beforeunload", handleUnload);
+      document.removeEventListener("visibilitychange", handleUnload);
+    };
+  }, [resumed, queue, index, saveCurrentPlayback]);
 
   useEffect(() => {
     if (player.ready) applyVolume(volume);
@@ -1463,6 +1556,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               <form onSubmit={onSearch} className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
                 <input
+                  id="main-search-input"
                   type="search"
                   value={query}
                   onChange={(e) => {
@@ -1665,7 +1759,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   setSearchFilter("all");
                   void searchFor(q, type, "all");
                 }}
-                hasMore={Boolean(searchContinuation)}
+                hasMore={Boolean(searchContinuation) || results.length >= 10}
                 loadingMore={loadingMoreSearch}
                 onLoadMore={() => void loadMoreResults()}
               />

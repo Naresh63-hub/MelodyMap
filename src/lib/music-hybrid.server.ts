@@ -29,17 +29,43 @@ export async function searchHybrid(
   limit = 20,
   continuation?: string,
   filter: SearchFilter = "all",
+  offset?: number,
+  page?: number,
 ): Promise<HybridSearchResult> {
   // If continuation token provided, paginate YouTube directly
   if (continuation) {
     try {
       const { searchYouTubePaginated } = await import("./music.server");
       const res = await searchYouTubePaginated(query, filter, continuation, limit);
-      return res;
+      if (res.tracks.length > 0) {
+        return res;
+      }
     } catch (err) {
       console.warn("[MelodyMap] YouTube continuation search failed:", err);
-      return { tracks: [] };
     }
+  }
+
+  // If continuation was empty or pagination requested with offset / page > 1:
+  if (page && page > 1) {
+    try {
+      const { searchYouTubePaginated } = await import("./music.server");
+      const pageVariations = ["all songs", "popular hits", "music tracks", "best songs"];
+      const variation = pageVariations[(page - 1) % pageVariations.length];
+      const res = await searchYouTubePaginated(`${query} ${variation}`, filter, undefined, limit);
+      if (res.tracks.length > 0) {
+        return res;
+      }
+    } catch (err) {
+      console.warn("[MelodyMap] Page search variation failed:", err);
+    }
+
+    try {
+      const { searchDeezer } = await import("./deezer.server");
+      const dzTracks = await searchDeezer(query, limit);
+      if (dzTracks.length > 0) {
+        return { tracks: dzTracks };
+      }
+    } catch {}
   }
 
   // Try YouTube first

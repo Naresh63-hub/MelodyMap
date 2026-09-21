@@ -32,6 +32,8 @@ const SearchInput = z.object({
   type: z.enum(["songs", "podcasts"]).optional(),
   filter: z.enum(["all", "songs", "artists", "albums", "playlists"]).optional(),
   continuation: z.string().optional(),
+  page: z.number().optional(),
+  offset: z.number().optional(),
 });
 
 export const searchTracks = createServerFn({ method: "POST" })
@@ -44,7 +46,14 @@ export const searchTracks = createServerFn({ method: "POST" })
     if (isMusicOnly) {
       try {
         const { searchHybrid } = await import("./music-hybrid.server");
-        const res = await searchHybrid(data.query, limit, data.continuation, filter);
+        const res = await searchHybrid(
+          data.query,
+          limit,
+          data.continuation,
+          filter,
+          data.offset,
+          data.page,
+        );
         return { tracks: res.tracks, continuation: res.continuation, error: null };
       } catch (error) {
         console.error("Search failed:", error);
@@ -499,6 +508,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
     const sanitizedBrief = sanitizePromptInput(data.brief);
     const sanitizedLangs = data.languages.map(sanitizePromptInput).filter(Boolean);
 
+    const seedNonce = `${data.refreshNonce ?? Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+
     const prompt = [
       "You map the sonic DNA of a listener's taste — tempo, pitch, instrumentation, vocal texture and energy — and read their behaviour sequentially: the order they play, replay and skip tracks.",
       hasTaste
@@ -521,7 +532,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
       "",
       `Recommend ${count} songs with a dynamic 50/50 balance: exactly 50% brand new songs (released in ${PREV_YEAR}-${CURRENT_YEAR} or current trending hits) and 50% classic evergreen songs (90s, 2000s, iconic timeless tracks). Respect tuning preferences above.`,
       "CRITICAL: Do NOT suggest songs that are already in recently played list above. Every suggestion MUST be a different, unplayed song that the listener has not heard recently.",
-      "CRITICAL: On every refresh, provide a completely fresh, diverse, and newly randomized selection with zero repetitive patterns.",
+      `CRITICAL DIVERSITY INSTRUCTION: Refresh session entropy token: [${seedNonce}]. On every refresh you MUST explore completely different tracks, unexpected classics, and fresh popular hits. Do not repeat songs.`,
       'Reply with ONLY a JSON array like: [{"title":"Song name","artist":"Artist name","reason":"why, max 8 words"}]',
     ]
       .filter(Boolean)
@@ -533,6 +544,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
       const result = await generateText({
         model: gateway(resolveAiModelId()),
         prompt,
+        temperature: 0.95,
       });
       raw = result.text;
     } catch (err) {
@@ -570,7 +582,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
       const batch = await Promise.all(
         chunk.map(async (p) => {
           try {
-            const found = await searchYouTube(`${p.artist} ${p.title} audio`, 3);
+            const found = await searchYouTube(`${p.artist} ${p.title} audio`, 3, true, undefined, true);
             if (found.length === 0) return null;
             const target = { id: "", title: p.title ?? "", artist: p.artist ?? "", duration: 0 };
             const track = found.find((candidate) => areSameTrack(candidate, target)) ?? found[0];
