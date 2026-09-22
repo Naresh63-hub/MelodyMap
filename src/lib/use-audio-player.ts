@@ -27,6 +27,10 @@ declare global {
   }
 }
 
+/** 1-second silent WAV loop to maintain native mobile OS audio focus & lockscreen session */
+const SILENT_AUDIO_URI =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAP8A/w==";
+
 /**
  * HTML5-Audio + Web Audio API backed player with Spotify-like background playback,
  * screen-off & lockscreen continuous playback, 10-band hardware equalizer, sound presets,
@@ -643,10 +647,18 @@ export function useAudioPlayer(options: {
                 setIsLoading(false);
               } else if (event.data === 2) {
                 // 2 = Paused
-                // If user is seeking or wants to play, don't flip isPlaying to false (avoid pause/play bounce)
                 if (!isSeekingRef.current && !wantPlayRef.current) {
                   setIsPlaying(false);
                   setIsLoading(false);
+                } else if (!isSeekingRef.current && wantPlayRef.current) {
+                  // Screen locked / app backgrounded: immediately resume playback!
+                  setTimeout(() => {
+                    if (wantPlayRef.current && ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === "function") {
+                      try {
+                        ytPlayerRef.current.playVideo();
+                      } catch {}
+                    }
+                  }, 60);
                 }
               } else if (event.data === 3) {
                 // 3 = Buffering
@@ -753,14 +765,45 @@ export function useAudioPlayer(options: {
     };
   }, [isPlaying, streamUrl]);
 
+  // Maintain background / screen-off playback when mobile screen turns off
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVisibilityChange = () => {
+      if (document.hidden && wantPlayRef.current) {
+        if (activeEngineRef.current === "youtube" && ytPlayerRef.current) {
+          setTimeout(() => {
+            if (wantPlayRef.current && typeof ytPlayerRef.current.playVideo === "function") {
+              try {
+                ytPlayerRef.current.playVideo();
+              } catch {}
+            }
+          }, 80);
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
   /** Direct YouTube IFrame API play */
   const playViaYouTube = useCallback(
     (id: string, startAt = 0, autoPlay = true) => {
       activeEngineRef.current = "youtube";
       setIsLoading(true);
-      try {
-        audioRef.current?.pause();
-      } catch {}
+      // Play silent background audio loop to keep Android system audio focus and lockscreen controls active
+      if (audioRef.current && autoPlay) {
+        try {
+          if (!audioRef.current.src || !audioRef.current.src.startsWith("data:audio")) {
+            audioRef.current.src = SILENT_AUDIO_URI;
+            audioRef.current.loop = true;
+            audioRef.current.volume = 0.001;
+          }
+          const p = audioRef.current.play();
+          if (p !== undefined) p.catch(() => {});
+        } catch {}
+      }
 
       const p = ytPlayerRef.current;
       if (p && ytReadyRef.current && typeof p.loadVideoById === "function") {
@@ -907,6 +950,17 @@ export function useAudioPlayer(options: {
   const play = useCallback(() => {
     wantPlayRef.current = true;
     if (activeEngineRef.current === "youtube") {
+      if (audioRef.current) {
+        try {
+          if (!audioRef.current.src || !audioRef.current.src.startsWith("data:audio")) {
+            audioRef.current.src = SILENT_AUDIO_URI;
+            audioRef.current.loop = true;
+            audioRef.current.volume = 0.001;
+          }
+          const p = audioRef.current.play();
+          if (p !== undefined) p.catch(() => {});
+        } catch {}
+      }
       ytPlayerRef.current?.playVideo();
       return;
     }
@@ -934,9 +988,8 @@ export function useAudioPlayer(options: {
     }
     if (activeEngineRef.current === "youtube") {
       ytPlayerRef.current?.pauseVideo();
-    } else {
-      audioRef.current?.pause();
     }
+    audioRef.current?.pause();
   }, []);
 
   const seek = useCallback((seconds: number) => {
