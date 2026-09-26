@@ -291,6 +291,8 @@ export function clearEpisodePosition(videoId: string) {
 }
 
 
+import type { BanditModelState } from "./bandit-policy";
+
 type LibraryDoc = {
   likes: Track[];
   dislikes: Track[];
@@ -299,6 +301,8 @@ type LibraryDoc = {
   playlists: Playlist[];
   settings: RecSettings;
   stats?: Stats;
+  banditModel?: BanditModelState;
+  telemetryEvents?: any[];
 };
 
 function mergeStats(a: Stats, b: Stats): Stats {
@@ -439,6 +443,12 @@ export function useLibrary(userId?: string | null) {
             setSettings(next);
             write(SETTINGS_KEY, next);
           }
+          if (doc.banditModel) {
+            try {
+              const { thompsonSamplingPolicy } = await import("@/lib/bandit-policy");
+              thompsonSamplingPolicy.setModelState(doc.banditModel);
+            } catch {}
+          }
         }
         // Mark synced only AFTER pull finishes and merges so push won't overwrite cloud data
         setSyncedUser(userId);
@@ -469,7 +479,13 @@ export function useLibrary(userId?: string | null) {
     const timer = window.setTimeout(async () => {
       try {
         const { supabase } = await import("@/integrations/supabase/client");
+        const { thompsonSamplingPolicy } = await import("@/lib/bandit-policy");
+        const { telemetry } = await import("@/lib/telemetry");
         if (cancelled) return;
+        
+        const banditModel = thompsonSamplingPolicy.getModelState();
+        const recentTelemetry = telemetry.drainEvents(30);
+
         const { error } = await supabase.from("user_library").upsert({
           user_id: userId,
           data: {
@@ -480,7 +496,9 @@ export function useLibrary(userId?: string | null) {
             playlists,
             settings,
             stats,
-          } satisfies LibraryDoc,
+            banditModel,
+            telemetryEvents: recentTelemetry,
+          } as any,
         });
         if (error) console.warn("[MelodyMap] Library sync failed:", error.message);
       } catch (err) {

@@ -110,9 +110,14 @@ import { formatTime, useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
 import { getBlob, listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
 import { cn } from "@/lib/utils";
-import { areSameTrack, trackExistsIn, dedupeTracks } from "@/lib/track-dedup";
-import type { TrackLike } from "@/lib/track-dedup";
-import { contextEngine, applyDiscoveryDistribution } from "@/lib/context-engine";
+import { areSameTrack, trackExistsIn, dedupeTracks, type TrackLike } from "@/lib/track-dedup";
+import {
+  contextEngine,
+  applyDiscoveryDistribution,
+  thompsonSamplingPolicy,
+  type SessionContext,
+} from "@/lib/context-engine";
+import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import {
   Dialog,
@@ -247,6 +252,7 @@ function MusicApp() {
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [recs, setRecs] = useState<Track[]>(() => cachedFeed.recs || []);
   const [trendingList, setTrendingList] = useState<Track[]>(() => cachedFeed.trendingList || []);
+  const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
@@ -534,6 +540,23 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const consecutiveErrorsRef = useRef<number>(0);
   const lastErrorTimeRef = useRef<number>(0);
 
+  const progressTrackerRef = useRef(new TrackProgressTracker());
+  const sessionCompletionsRef = useRef<number>(0);
+  const sessionSkipsRef = useRef<number>(0);
+
+  const getSessionContext = useCallback((): SessionContext => {
+    return {
+      currentTrack: currentRef.current,
+      hourOfDay: new Date().getHours(),
+      discoveryPercent: settings.discovery ?? 40,
+      recentHistory: history.slice(0, 15),
+      stats,
+      sessionCompletions: sessionCompletionsRef.current,
+      sessionSkips: sessionSkipsRef.current,
+      familiarArtists: new Set(likes.map((t) => (t.artist || "").toLowerCase().trim()).filter(Boolean)),
+    };
+  }, [settings.discovery, history, stats, likes]);
+
   // --- Player ---
   const player = useAudioPlayer({
     onSponsorBlockSkipped: (category) => {
@@ -565,10 +588,37 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         logComplete(track);
         contextEngine.recordCompletion(track, previousTrackRef.current);
         previousTrackRef.current = track;
+        sessionCompletionsRef.current += 1;
+        const ctx = getSessionContext();
+        const event = telemetry.logEvent({
+          trackId: track.id,
+          artist: track.artist,
+          title: track.title,
+          eventType: "COMPLETED",
+          positionSeconds: player.duration || player.position,
+          durationSeconds: player.duration || player.position,
+          fractionPlayed: 1.0,
+          timestamp: Date.now(),
+          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+        });
+        thompsonSamplingPolicy.recordFeedback(event, ctx);
       }
 
       // Repeat One Mode: replay current song
       if (repeatModeRef.current === "one" && track) {
+        const ctx = getSessionContext();
+        const replayEv = telemetry.logEvent({
+          trackId: track.id,
+          artist: track.artist,
+          title: track.title,
+          eventType: "REPLAYED",
+          positionSeconds: 0,
+          durationSeconds: player.duration,
+          fractionPlayed: 0,
+          timestamp: Date.now(),
+          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+        });
+        thompsonSamplingPolicy.recordFeedback(replayEv, ctx);
         player.seek(0);
         player.play();
         return;
@@ -582,6 +632,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       if (nextIdx !== -1) {
         indexRef.current = nextIdx;
         setIndex(nextIdx);
+        const nextTrack = q[nextIdx];
+        if (nextTrack) {
+          player.seek(0);
+          progressTrackerRef.current.reset(nextTrack.id);
+          loadedTrackIdRef.current = nextTrack.id;
+          void load(nextTrack.id, nextTrack.previewUrl, 0);
+        }
         // Proactively extend upcoming songs before reaching the end
         if (continuousRef.current && nextIdx + 3 >= q.length) {
           void extendQueue();
@@ -599,6 +656,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 if (targetIdx !== -1) {
                   indexRef.current = targetIdx;
                   setIndex(targetIdx);
+                  player.seek(0);
+                  progressTrackerRef.current.reset(firstTrack.id);
+                  loadedTrackIdRef.current = firstTrack.id;
+                  void load(firstTrack.id, firstTrack.previewUrl, 0);
                 }
                 return prev;
               });
@@ -610,6 +671,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           if (loopIdx !== -1) {
             indexRef.current = loopIdx;
             setIndex(loopIdx);
+            const loopTrack = updated[loopIdx];
+            if (loopTrack) {
+              player.seek(0);
+              progressTrackerRef.current.reset(loopTrack.id);
+              loadedTrackIdRef.current = loopTrack.id;
+              void load(loopTrack.id, loopTrack.previewUrl, 0);
+            }
           } else {
             player.pause();
           }
@@ -647,6 +715,35 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const { load, cue, setVolume: applyVolume, play, pause } = player;
 
+  // Granular playback telemetry milestones (PLAY_START, PLAY_10S, PLAY_25S, PLAY_50_PERCENT, PLAY_85_PERCENT)
+  useEffect(() => {
+    const track = current;
+    if (!track || !player.isPlaying) return;
+
+    const milestones = progressTrackerRef.current.checkProgress(track, player.position, player.duration);
+    if (milestones.length > 0) {
+      const ctx = getSessionContext();
+      for (const milestone of milestones) {
+        const frac = player.duration > 0 ? player.position / player.duration : 0;
+        const event = telemetry.logEvent({
+          trackId: track.id,
+          artist: track.artist,
+          title: track.title,
+          eventType: milestone,
+          positionSeconds: player.position,
+          durationSeconds: player.duration,
+          fractionPlayed: frac,
+          timestamp: Date.now(),
+          context: {
+            hourOfDay: ctx.hourOfDay,
+            discoverySetting: ctx.discoveryPercent,
+          },
+        });
+        thompsonSamplingPolicy.recordFeedback(event, ctx);
+      }
+    }
+  }, [current, player.isPlaying, player.position, player.duration, getSessionContext]);
+
   const togglePlay = useCallback(() => {
     if (!current) return;
     if (player.isPlaying) {
@@ -671,24 +768,63 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const loadedTrackIdRef = useRef<string | null>(null);
 
+  /**
+   * Explicit Single-Track Playback:
+   * Sets the given track as the strictly active current song, updates the queue of
+   * individual tracks, resets seek/progress to 0, resets telemetry progress tracking,
+   * and loads & plays only that track.
+   */
+  const playSong = useCallback(
+    (track: Track, surroundingQueue?: Track[]) => {
+      if (!track?.id) return;
+
+      // 1. Reset progress and seek position for clean single-track start
+      player.seek(0);
+      progressTrackerRef.current.reset(track.id);
+
+      // 2. Set up queue of independent tracks
+      if (surroundingQueue && surroundingQueue.length > 0) {
+        const dq = dedupeTracks(surroundingQueue);
+        const targetIdx = dq.findIndex((t) => t.id === track.id);
+        if (targetIdx !== -1) {
+          setQueue(dq);
+          setIndex(targetIdx);
+          indexRef.current = targetIdx;
+        } else {
+          const newQueue = [track, ...dq.filter((t) => t.id !== track.id)];
+          setQueue(newQueue);
+          setIndex(0);
+          indexRef.current = 0;
+        }
+      } else {
+        const curQ = queueRef.current;
+        const existingIdx = curQ.findIndex((t) => t.id === track.id);
+        if (existingIdx !== -1) {
+          setIndex(existingIdx);
+          indexRef.current = existingIdx;
+        } else {
+          setQueue([track, ...curQ.filter((t) => t.id !== track.id)]);
+          setIndex(0);
+          indexRef.current = 0;
+        }
+      }
+
+      // 3. Mark active track and synchronously load & play ONLY this track
+      loadedTrackIdRef.current = track.id;
+      void load(track.id, track.previewUrl, 0);
+    },
+    [load, player],
+  );
+
   const startQueue = useCallback(
     (tracks: Track[], startIndex = 0) => {
       if (tracks.length === 0) return;
-      const dq = dedupeTracks(tracks);
-      setQueue(dq);
-      const targetId = tracks[startIndex]?.id;
-      const newIdx = targetId ? dq.findIndex((t) => t.id === targetId) : 0;
-      const safeIdx = newIdx !== -1 ? newIdx : 0;
-      setIndex(safeIdx);
-
-      const targetTrack = dq[safeIdx] || tracks[startIndex];
-      if (targetTrack?.id) {
-        // Synchronously initiate audio load inside user click gesture for instant playback (<50ms)
-        loadedTrackIdRef.current = targetTrack.id;
-        void load(targetTrack.id, targetTrack.previewUrl);
+      const target = tracks[startIndex] || tracks[0];
+      if (target) {
+        playSong(target, tracks);
       }
     },
-    [load],
+    [playSong],
   );
 
   const handleReorderQueue = useCallback((from: number, to: number) => {
@@ -744,14 +880,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         });
         if (res.tracks) {
           const pureMusic = res.tracks as Track[];
-          const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+          const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
           setMixTracks((prev) => ({ ...prev, [kind]: ranked }));
         }
       } finally {
         setMixLoading(false);
       }
     },
-    [runMix, likes, history, stats, settings],
+    [runMix, likes, history, stats, settings, getSessionContext],
   );
 
   const loadTrending = useCallback(async () => {
@@ -765,12 +901,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       });
       if (res.tracks) {
         const pureMusic = res.tracks as Track[];
-        const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+        const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
         setTrendingList(ranked);
         writeHomeCache({ trendingList: ranked });
       }
     } catch {}
-  }, [runTrending, settings.languages]);
+  }, [runTrending, settings.languages, getSessionContext]);
 
   const loadDailyMix = useCallback(
     async (refreshNonce?: number | string) => {
@@ -788,7 +924,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         });
         if (res.tracks) {
           const pureMusic = res.tracks as Track[];
-          const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+          const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
           setDailyMixTracks(ranked);
           writeHomeCache({ dailyMixTracks: ranked });
         }
@@ -797,7 +933,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setDailyMixLoading(false);
       }
     },
-    [runDailyMix, settings.languages, stats, likes],
+    [runDailyMix, settings.languages, stats, likes, getSessionContext],
   );
 
   const loadRecommendations = useCallback(
@@ -831,7 +967,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
-              const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+              const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
               const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
               setRecs(distributed);
               writeHomeCache({ recs: distributed });
@@ -848,7 +984,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
-              const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+              const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
               setTrendingList(ranked);
               writeHomeCache({ trendingList: ranked });
             }
@@ -870,7 +1006,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
-              const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
+              const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
               setMixTracks((prev) => {
                 const next = { ...prev, newrelease: ranked };
                 writeHomeCache({ mixTracks: next });
@@ -886,7 +1022,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setRecLoading(false);
       }
     },
-    [runRecommend, runTrending, runMix, loadDailyMix, likes, history, dislikes, stats, settings],
+    [runRecommend, runTrending, runMix, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext],
   );
 
   const loadMoreRecommendations = useCallback(
@@ -917,14 +1053,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         });
         if (res.tracks && res.tracks.length > 0) {
           const pureMusic = res.tracks as Track[];
-          const ranked = contextEngine.rankTracks(pureMusic, currentRef.current);
+          const ranked = thompsonSamplingPolicy.rankCandidates(pureMusic, getSessionContext());
           setRecs((prev) => dedupeTracks([...prev, ...ranked]));
         }
       } finally {
         setLoadingMoreRecs(false);
       }
     },
-    [loadingMoreRecs, runRecommend, likes, history, dislikes, stats, settings],
+    [loadingMoreRecs, runRecommend, likes, history, dislikes, stats, settings, getSessionContext],
   );
 
   const extendQueue = useCallback(async (): Promise<Track[]> => {
@@ -961,7 +1097,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           }
           if (radioRes.tracks && radioRes.tracks.length > 0) {
             const pureMusic = radioRes.tracks as Track[];
-            const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
+            const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
             const fresh = ranked.filter(
               (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
             );
@@ -998,7 +1134,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         });
         if (res.tracks && res.tracks.length > 0) {
           const pureMusic = res.tracks as Track[];
-          const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
+          const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
           candidateTracks = ranked.filter(
             (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
           );
@@ -1013,7 +1149,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           ...(mixTracksRef.current?.discover || []),
           ...(mixTracksRef.current?.newrelease || []),
         ]);
-        const rankedPool = contextEngine.rankTracks(pool, currentTrack);
+        const rankedPool = thompsonSamplingPolicy.rankCandidates(pool, getSessionContext());
         candidateTracks = rankedPool.filter(
           (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
         );
@@ -1028,7 +1164,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } finally {
       setExtending(false);
     }
-  }, [extending, runRecommend, likes, history, dislikes, stats, settings]);
+  }, [extending, runRecommend, likes, history, dislikes, stats, settings, getSessionContext]);
 
   const searchFor = useCallback(
     async (term: string, searchType?: "songs" | "podcasts", filter?: SearchFilter) => {
@@ -1110,6 +1246,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         logSkip(currentTrack);
         contextEngine.recordSkip(currentTrack);
       }
+      sessionSkipsRef.current += 1;
+      const frac = player.duration > 0 ? player.position / player.duration : 0;
+      const ctx = getSessionContext();
+      const event = telemetry.logEvent({
+        trackId: currentTrack.id,
+        artist: currentTrack.artist,
+        title: currentTrack.title,
+        eventType: "SKIPPED",
+        positionSeconds: player.position,
+        durationSeconds: player.duration,
+        fractionPlayed: frac,
+        timestamp: Date.now(),
+        context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+      });
+      thompsonSamplingPolicy.recordFeedback(event, ctx);
       previousTrackRef.current = currentTrack;
     }
 
@@ -1121,6 +1272,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (nextIdx !== -1) {
       indexRef.current = nextIdx;
       setIndex(nextIdx);
+      const nextTrack = q[nextIdx];
+      if (nextTrack) {
+        player.seek(0);
+        progressTrackerRef.current.reset(nextTrack.id);
+        loadedTrackIdRef.current = nextTrack.id;
+        void load(nextTrack.id, nextTrack.previewUrl, 0);
+      }
       if (nextIdx + 3 >= q.length) {
         void extendQueue();
       }
@@ -1144,6 +1302,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setQueue((prev) => [...prev, ...added]);
       indexRef.current = targetIdx;
       setIndex(targetIdx);
+      const nextTrack = added[0];
+      if (nextTrack) {
+        player.seek(0);
+        progressTrackerRef.current.reset(nextTrack.id);
+        loadedTrackIdRef.current = nextTrack.id;
+        void load(nextTrack.id, nextTrack.previewUrl, 0);
+      }
       void extendQueue();
       return;
     }
@@ -1158,6 +1323,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             if (targetIdx !== -1) {
               indexRef.current = targetIdx;
               setIndex(targetIdx);
+              player.seek(0);
+              progressTrackerRef.current.reset(firstTrack.id);
+              loadedTrackIdRef.current = firstTrack.id;
+              void load(firstTrack.id, firstTrack.previewUrl, 0);
             }
             return prev;
           });
@@ -1169,19 +1338,38 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       if (fallbackIdx !== -1) {
         indexRef.current = fallbackIdx;
         setIndex(fallbackIdx);
+        const fbTrack = updated[fallbackIdx];
+        if (fbTrack) {
+          player.seek(0);
+          progressTrackerRef.current.reset(fbTrack.id);
+          loadedTrackIdRef.current = fbTrack.id;
+          void load(fbTrack.id, fbTrack.previewUrl, 0);
+        }
       }
     });
-  }, [extendQueue, findNextValidTrackIndex, logSkip, player.position]);
+  }, [extendQueue, findNextValidTrackIndex, logSkip, player, load, getSessionContext]);
 
   const goPrev = useCallback(() => {
     const q = queueRef.current;
     const i = indexRef.current;
+    let targetIdx = -1;
     if (i > 0) {
-      setIndex(i - 1);
+      targetIdx = i - 1;
     } else if (q.length > 0) {
-      setIndex(q.length - 1); // Loop to last track
+      targetIdx = q.length - 1; // Loop to last track
     }
-  }, []);
+    if (targetIdx !== -1) {
+      const prevTrack = q[targetIdx];
+      indexRef.current = targetIdx;
+      setIndex(targetIdx);
+      if (prevTrack) {
+        player.seek(0);
+        progressTrackerRef.current.reset(prevTrack.id);
+        loadedTrackIdRef.current = prevTrack.id;
+        void load(prevTrack.id, prevTrack.previewUrl, 0);
+      }
+    }
+  }, [load, player]);
 
   const dislikeCurrent = useCallback(() => {
     const track = currentRef.current;
@@ -1189,9 +1377,66 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     logSkip(track);
     contextEngine.recordSkip(track);
     toggleDislike(track);
+    const ctx = getSessionContext();
+    const event = telemetry.logEvent({
+      trackId: track.id,
+      artist: track.artist,
+      title: track.title,
+      eventType: "DISLIKED",
+      positionSeconds: player.position,
+      durationSeconds: player.duration,
+      fractionPlayed: player.duration > 0 ? player.position / player.duration : 0,
+      timestamp: Date.now(),
+      context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+    });
+    thompsonSamplingPolicy.recordFeedback(event, ctx);
     setRecs((prev) => prev.filter((t) => t.id !== track.id));
     goNext();
-  }, [toggleDislike, logSkip, goNext]);
+  }, [toggleDislike, logSkip, goNext, getSessionContext, player.position, player.duration]);
+
+  const handleToggleLike = useCallback(
+    (track: Track) => {
+      const wasLiked = likedIds.has(track.id);
+      toggleLike(track);
+      if (!wasLiked) {
+        const ctx = getSessionContext();
+        const event = telemetry.logEvent({
+          trackId: track.id,
+          artist: track.artist,
+          title: track.title,
+          eventType: "LIKED",
+          positionSeconds: track.id === currentRef.current?.id ? player.position : 0,
+          durationSeconds: track.id === currentRef.current?.id ? player.duration : 0,
+          fractionPlayed:
+            track.id === currentRef.current?.id && player.duration > 0 ? player.position / player.duration : 0,
+          timestamp: Date.now(),
+          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+        });
+        thompsonSamplingPolicy.recordFeedback(event, ctx);
+      }
+    },
+    [likedIds, toggleLike, getSessionContext, player.position, player.duration],
+  );
+
+  const handleAddToPlaylist = useCallback(
+    (playlistId: string, track: Track) => {
+      addToPlaylist(playlistId, track);
+      const ctx = getSessionContext();
+      const event = telemetry.logEvent({
+        trackId: track.id,
+        artist: track.artist,
+        title: track.title,
+        eventType: "ADDED_TO_LIBRARY",
+        positionSeconds: 0,
+        durationSeconds: 0,
+        fractionPlayed: 0,
+        timestamp: Date.now(),
+        context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+      });
+      thompsonSamplingPolicy.recordFeedback(event, ctx);
+    },
+    [addToPlaylist, getSessionContext],
+  );
 
   // --- Global Keyboard Shortcuts ---
   useKeyboardShortcuts({
@@ -1582,15 +1827,26 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   });
 
 
+  // Filter history by search query for instant client-side history searching
+  const filteredHistory = useMemo(() => {
+    const q = historyQuery.trim().toLowerCase();
+    if (!q) return history;
+    return history.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        t.artist.toLowerCase().includes(q),
+    );
+  }, [history, historyQuery]);
+
   // --- Track list for each tab ---
   const listForTab: Record<string, Track[]> = useMemo(
     () => ({
       likes,
-      history,
+      history: filteredHistory,
       search: results,
       foryou: recs,
     }),
-    [likes, history, results, recs],
+    [likes, filteredHistory, results, recs],
   );
   const visible = listForTab[tab] ?? [];
 
@@ -1789,7 +2045,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       }
                       startQueue(sectionTracks, i);
                     }}
-                    onToggleLike={toggleLike}
+                    onToggleLike={handleToggleLike}
                     onOpenOptions={(t) => setOptionsTrack(t)}
                     likedIds={likedIds}
                     currentId={current?.id ?? null}
@@ -1840,7 +2096,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   }
                   startQueue(results, i);
                 }}
-                onToggleLike={toggleLike}
+                onToggleLike={handleToggleLike}
                 onOpenOptions={(t) => setOptionsTrack(t)}
                 likedIds={likedIds}
                 currentId={current?.id ?? null}
@@ -1892,10 +2148,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   }
                   startQueue(visibleMix, i);
                 }}
-                onToggleLike={toggleLike}
+                onToggleLike={handleToggleLike}
                 onToggleDislike={toggleDislike}
                 onArtistClick={openArtist}
-                onAddToPlaylist={addToPlaylist}
+                onAddToPlaylist={handleAddToPlaylist}
                 onAddToQueue={(track) => enqueue([track])}
                 onCreatePlaylistWith={(track) => {
                   setCreatePlaylistTrack(track);
@@ -2135,14 +2391,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                           }
                           startQueue(podcastTracks, i);
                         }}
-                        onToggleLike={toggleLike}
+                        onToggleLike={handleToggleLike}
                         onToggleDislike={(track) => {
                           toggleDislike(track);
                           setRecs((prev) => prev.filter((t) => t.id !== track.id));
                         }}
                         onArtistClick={openArtist}
                         playlists={playlists}
-                        onAddToPlaylist={addToPlaylist}
+                        onAddToPlaylist={handleAddToPlaylist}
                         onAddToQueue={(track) => enqueue([track])}
                         onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
                         emptyMessage="Pick topics in Settings to get podcast recommendations."
@@ -2182,10 +2438,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 likedIds={likedIds}
                 dislikedIds={dislikedIds}
                 playlists={playlists}
-                onToggleLike={toggleLike}
+                onToggleLike={handleToggleLike}
                 onToggleDislike={toggleDislike}
                 onArtistClick={openArtist}
-                onAddToPlaylist={addToPlaylist}
+                onAddToPlaylist={handleAddToPlaylist}
                 onAddToQueue={(track) => enqueue([track])}
                 onCreatePlaylistWith={(track) => {
                   setCreatePlaylistTrack(track);
@@ -2226,15 +2482,46 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             {(tab === "likes" || tab === "history") && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-white">
-                    {tab === "likes" ? "Your Favourites" : "Recently Played"}
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-white">
+                      {tab === "likes" ? "Your Favourites" : "Recently Played"}
+                    </h2>
+                    {tab === "history" && history.length > 0 && (
+                      <span className="text-xs text-white/40 font-medium">
+                        ({historyQuery ? `${filteredHistory.length} of ${history.length}` : `${history.length}`})
+                      </span>
+                    )}
+                  </div>
                   {tab === "history" && history.length > 0 && (
                     <Button variant="ghost" size="sm" onClick={() => setShowClearHistory(true)} className="text-xs text-white/50 hover:text-white">
                       Clear history
                     </Button>
                   )}
                 </div>
+
+                {/* History in-tab real-time search bar */}
+                {tab === "history" && history.length > 0 && (
+                  <div className="relative flex items-center w-full">
+                    <Search className="absolute left-3.5 h-4 w-4 text-white/40 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={historyQuery}
+                      onChange={(e) => setHistoryQuery(e.target.value)}
+                      placeholder="Search listening history..."
+                      className="w-full rounded-xl bg-white/[0.06] border border-white/10 pl-10 pr-9 py-2 text-sm text-white placeholder-white/40 focus:border-purple-500/60 focus:bg-white/[0.08] focus:outline-none transition-all"
+                    />
+                    {historyQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setHistoryQuery("")}
+                        className="absolute right-2.5 p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                        title="Clear history search"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <TrackList
                   tracks={visible}
@@ -2257,20 +2544,22 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     }
                     startQueue(visible, i);
                   }}
-                  onToggleLike={toggleLike}
+                  onToggleLike={handleToggleLike}
                   onToggleDislike={(track) => {
                     toggleDislike(track);
                     setRecs((prev) => prev.filter((t) => t.id !== track.id));
                   }}
                   onArtistClick={openArtist}
                   playlists={playlists}
-                  onAddToPlaylist={addToPlaylist}
+                  onAddToPlaylist={handleAddToPlaylist}
                   onAddToQueue={(track) => enqueue([track])}
                   onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
                   emptyMessage={
                     tab === "likes"
                       ? "Tap the heart on any song to save your favourites."
-                      : "Songs you listen to will appear here."
+                      : historyQuery
+                        ? `No songs found matching "${historyQuery}" in your history.`
+                        : "Songs you listen to will appear here."
                   }
                 />
               </div>
@@ -2290,7 +2579,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           position={player.position}
           duration={player.duration}
           onTogglePlay={togglePlay}
-          onToggleLike={() => current && toggleLike(current)}
+          onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
@@ -2309,7 +2598,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           duration={player.duration}
           volume={volume}
           onTogglePlay={togglePlay}
-          onToggleLike={() => current && toggleLike(current)}
+          onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
           onPrevious={goPrev}
           onSeek={(s) => player.seek(s)}
@@ -2341,7 +2630,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           tracks={queue}
           index={index}
           isPlaying={player.isPlaying}
-          onJump={(i) => setIndex(i)}
+          onJump={(i) => {
+            const target = queue[i];
+            if (target) {
+              playSong(target);
+            } else {
+              setIndex(i);
+            }
+          }}
           onReorder={handleReorderQueue}
           onRemove={(i) => {
             setQueue((prev) => prev.filter((_, x) => x !== i));
@@ -2374,7 +2670,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             onToggleShuffle={toggleShuffle}
             onToggleRepeat={toggleRepeat}
             onTogglePlay={togglePlay}
-            onToggleLike={() => current && toggleLike(current)}
+            onToggleLike={() => current && handleToggleLike(current)}
             onNext={goNext}
             onPrevious={goPrev}
             onSeek={(s) => player.seek(s)}
@@ -2408,7 +2704,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           isLiked={likedIds.has(optionsTrack?.id ?? "")}
           isDownloaded={downloadedIds.has(optionsTrack?.id ?? "")}
           onClose={() => setOptionsTrack(null)}
-          onToggleLike={(t) => toggleLike(t)}
+          onToggleLike={(t) => handleToggleLike(t)}
           onAddToPlaylist={(t) => setCreatePlaylistTrack(t)}
           onDownload={(t) =>
             downloadedIds.has(t.id) ? void handleRemoveDownload(t) : void handleDownload(t)
@@ -2417,7 +2713,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onGoToArtist={(artist) => openArtist(artist)}
           onShare={(t) => setShareTrack(t)}
           onDeleteFromLibrary={(t) => {
-            if (likedIds.has(t.id)) toggleLike(t);
+            if (likedIds.has(t.id)) handleToggleLike(t);
           }}
         />
 

@@ -471,3 +471,11 @@ export function applyDiscoveryDistribution<T extends TrackLike>(
 }
 
 export const contextEngine = new ContextEngineSession();
+
+export {
+  thompsonSamplingPolicy,
+  ThompsonSamplingPolicy,
+  type RecommendationPolicy,
+  type SessionContext,
+  type BanditModelState,
+} from "./bandit-policy";
