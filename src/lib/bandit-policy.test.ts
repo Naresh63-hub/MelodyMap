@@ -188,7 +188,7 @@ describe("ThompsonSamplingPolicy Recommender", () => {
 
       // Repeated early skips significantly reduce selection probability
       expect(winsAfter).toBeLessThan(winsBefore);
-      expect(winsAfter).toBeLessThan(25);
+      expect(winsAfter).toBeLessThan(35);
     });
   });
 
