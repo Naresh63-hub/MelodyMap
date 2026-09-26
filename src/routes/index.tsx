@@ -112,7 +112,7 @@ import { getBlob, listDownloads, removeDownload, saveDownload, type DownloadInfo
 import { cn } from "@/lib/utils";
 import { areSameTrack, trackExistsIn, dedupeTracks } from "@/lib/track-dedup";
 import type { TrackLike } from "@/lib/track-dedup";
-import { contextEngine } from "@/lib/context-engine";
+import { contextEngine, applyDiscoveryDistribution } from "@/lib/context-engine";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import {
   Dialog,
@@ -756,6 +756,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     async (mood?: string) => {
       setRecLoading(true);
       const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const clientHour = new Date().getHours();
+      const affinity = contextEngine.getAffinityWeights(stats);
+
       try {
         await Promise.allSettled([
           (async () => {
@@ -772,12 +775,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 brief: settingsToBrief(settings),
                 artists: topArtists(stats, likes),
                 refreshNonce: nonce,
+                discovery: settings.discovery ?? 40,
+                affinityArtists: affinity.affinityArtists,
+                penalizedArtists: affinity.penalizedArtists,
+                clientHour,
               },
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
               const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
-              setRecs(ranked);
+              const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+              setRecs(distributed);
             }
           })(),
           (async () => {
@@ -786,6 +794,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 count: 24,
                 refreshNonce: nonce,
+                clientHour,
               },
             });
             if (res.tracks) {
@@ -831,6 +840,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       if (loadingMoreRecs) return;
       setLoadingMoreRecs(true);
       try {
+        const clientHour = new Date().getHours();
+        const affinity = contextEngine.getAffinityWeights(stats);
         const res = await runRecommend({
           data: {
             liked: likes.slice(0, 15).map(trackLabel),
@@ -844,6 +855,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             brief: settingsToBrief(settings),
             artists: topArtists(stats, likes),
             refreshNonce: Date.now(),
+            discovery: settings.discovery ?? 40,
+            affinityArtists: affinity.affinityArtists,
+            penalizedArtists: affinity.penalizedArtists,
+            clientHour,
           },
         });
         if (res.tracks && res.tracks.length > 0) {
@@ -866,12 +881,23 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const currentQueue = queueRef.current;
       let candidateTracks: Track[] = [];
 
-      // 1. Try YouTube RD Song Radio for continuous similar tracks
-      if (currentTrack?.id) {
+      // AutoDJ 1–3 recent seed tracks from current track and recent queue/history
+      const seedTracks: Track[] = [];
+      if (currentTrack?.id) seedTracks.push(currentTrack);
+      for (const t of [...currentQueue].reverse()) {
+        if (t.id && !seedTracks.some((s) => s.id === t.id)) {
+          seedTracks.push(t);
+        }
+        if (seedTracks.length >= 3) break;
+      }
+
+      // 1. Try YouTube RD Song Radio across recent seeds for continuous similar vibe
+      for (const seed of seedTracks) {
+        if (!seed.id) continue;
         try {
           const radioRes = await getSongRadio({
             data: {
-              videoId: currentTrack.id,
+              videoId: seed.id,
               limit: 15,
               continuation: radioContinuationRef.current,
             },
@@ -882,16 +908,22 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           if (radioRes.tracks && radioRes.tracks.length > 0) {
             const pureMusic = radioRes.tracks as Track[];
             const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
-            candidateTracks = ranked.filter((t) => !trackExistsIn(currentQueue, t as TrackLike));
+            const fresh = ranked.filter(
+              (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
+            );
+            candidateTracks.push(...fresh);
+            if (candidateTracks.length >= 10) break;
           }
         } catch {
-          // fall back to AI recommendation
+          // fall through to next seed or AI recommendation
         }
       }
 
-      // 2. Fallback to recommendation engine
+      // 2. Fallback to recommendation engine with circadian, affinity, and discovery context
       if (candidateTracks.length === 0) {
         const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const clientHour = new Date().getHours();
+        const affinity = contextEngine.getAffinityWeights(stats);
         const res = await runRecommend({
           data: {
             liked: likes.slice(0, 20).map(trackLabel),
@@ -904,12 +936,18 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             brief: settingsToBrief(settings),
             artists: topArtists(stats, likes),
             refreshNonce: nonce,
+            discovery: settings.discovery ?? 40,
+            affinityArtists: affinity.affinityArtists,
+            penalizedArtists: affinity.penalizedArtists,
+            clientHour,
           },
         });
         if (res.tracks && res.tracks.length > 0) {
           const pureMusic = res.tracks as Track[];
           const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentTrack);
-          candidateTracks = ranked.filter((t) => !trackExistsIn(currentQueue, t as TrackLike));
+          candidateTracks = ranked.filter(
+            (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
+          );
         }
       }
 
@@ -921,15 +959,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           ...(mixTracksRef.current?.discover || []),
           ...(mixTracksRef.current?.newrelease || []),
         ]);
-        candidateTracks = pool.filter(
+        const rankedPool = contextEngine.rankTracks(pool, currentTrack);
+        candidateTracks = rankedPool.filter(
           (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
         );
       }
 
       if (candidateTracks.length > 0) {
-        const batchToAdd = candidateTracks.slice(0, 15);
-        setQueue((prev) => [...prev, ...batchToAdd]);
-        return batchToAdd;
+        const deduplicatedBatch = dedupeTracks(candidateTracks).slice(0, 15);
+        setQueue((prev) => [...prev, ...deduplicatedBatch]);
+        return deduplicatedBatch;
       }
       return [];
     } finally {

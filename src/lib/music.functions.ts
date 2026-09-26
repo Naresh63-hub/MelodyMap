@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Track } from "./types";
 import { norm, areSameTrack } from "./track-dedup";
 import { resolveAiModelId } from "./ai-gateway.server";
+import { getTemporalContext } from "./context-engine";
 
 /** Sanitizes user-provided strings to prevent AI prompt injection while preserving real song/artist names */
 function sanitizePromptInput(str: string | undefined): string {
@@ -168,6 +169,11 @@ const RecommendInput = z.object({
   artists: z.array(z.string()).max(20).default([]),
   languages: z.array(z.string()).max(10).default([]),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
+  discovery: z.number().min(0).max(100).default(40),
+  affinityArtists: z.array(z.string()).max(20).default([]),
+  penalizedArtists: z.array(z.string()).max(20).default([]),
+  clientHour: z.number().min(0).max(23).optional(),
+  temporalContext: z.string().max(300).optional(),
 });
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -231,14 +237,29 @@ const DIVERSE_THEMES = [
   "indie new artist discovery",
 ];
 
-function getDynamicQueries(languages: string[], userArtists: string[]): { newQueries: string[]; oldQueries: string[] } {
+function getDynamicQueries(
+  languages: string[],
+  userArtists: string[],
+  options?: {
+    affinityArtists?: string[] | undefined;
+    penalizedArtists?: string[] | undefined;
+    relatedArtists?: string[] | undefined;
+    discovery?: number | undefined;
+    clientHour?: number | undefined;
+  },
+): { newQueries: string[]; oldQueries: string[] } {
   let langs = languages.map((l) => l.trim()).filter(Boolean);
+  const penalizedSet = new Set((options?.penalizedArtists ?? []).map((a) => a.toLowerCase().trim()));
+
+  const filteredUserArtists = userArtists.filter((a) => !penalizedSet.has(a.toLowerCase().trim()));
+  const filteredAffinityArtists = (options?.affinityArtists ?? []).filter((a) => !penalizedSet.has(a.toLowerCase().trim()));
+  const filteredRelatedArtists = (options?.relatedArtists ?? []).filter((a) => !penalizedSet.has(a.toLowerCase().trim()));
 
   // If no language chosen, infer from user artists or blend top language categories
   if (langs.length === 0) {
     const matchedLangs: string[] = [];
     for (const [langName, artistList] of Object.entries(LANGUAGE_ARTISTS)) {
-      if (userArtists.some((ua) => artistList.some((la) => la.toLowerCase() === ua.toLowerCase()))) {
+      if (filteredUserArtists.some((ua) => artistList.some((la) => la.toLowerCase() === ua.toLowerCase()))) {
         matchedLangs.push(langName);
       }
     }
@@ -246,16 +267,18 @@ function getDynamicQueries(languages: string[], userArtists: string[]): { newQue
   }
 
   const primaryLang = langs[0] || "";
-  const langArtistPool = primaryLang && LANGUAGE_ARTISTS[primaryLang] ? LANGUAGE_ARTISTS[primaryLang] : Object.values(LANGUAGE_ARTISTS).flat();
+  const langArtistPool = (primaryLang && LANGUAGE_ARTISTS[primaryLang] ? LANGUAGE_ARTISTS[primaryLang] : Object.values(LANGUAGE_ARTISTS).flat())
+    .filter((a) => !penalizedSet.has(a.toLowerCase().trim()));
 
   const userNewQ: string[] = [];
   const userOldQ: string[] = [];
   const generalNewQ: string[] = [];
   const generalOldQ: string[] = [];
 
-  // 1. High-priority queries for user's explicitly favorited artists (guarantee top 3 included)
-  if (userArtists.length > 0) {
-    for (const art of userArtists) {
+  // 1. High-priority queries for user's affinity + favorited artists
+  const priorityArtists = [...new Set([...filteredAffinityArtists, ...filteredUserArtists])];
+  if (priorityArtists.length > 0) {
+    for (const art of priorityArtists.slice(0, 6)) {
       userNewQ.push(`${art} latest songs ${CURRENT_YEAR}`);
       userNewQ.push(`${art} top hit songs`);
       userNewQ.push(`${art} popular tracks`);
@@ -265,20 +288,40 @@ function getDynamicQueries(languages: string[], userArtists: string[]): { newQue
     }
   }
 
-  // 2. Supplementary queries across active languages
-  const otherArtists = shuffleArray(langArtistPool.filter((a) => !userArtists.includes(a)));
+  // 2. Exploration / Related artists queries if discovery slider > 30
+  const discovery = options?.discovery ?? 40;
+  if (discovery > 30 && filteredRelatedArtists.length > 0) {
+    for (const art of filteredRelatedArtists.slice(0, 4)) {
+      generalNewQ.push(`${art} top songs ${CURRENT_YEAR}`);
+      generalNewQ.push(`${art} viral hit songs`);
+      generalOldQ.push(`${art} best hits`);
+    }
+  }
+
+  // 3. Circadian temporal queries
+  const temporalCtx = getTemporalContext(options?.clientHour);
+  for (const theme of temporalCtx.queryThemes) {
+    for (const lang of langs.slice(0, 2)) {
+      if (theme.includes("evergreen") || theme.includes("classic")) {
+        generalOldQ.push(`${lang} ${theme}`);
+      } else {
+        generalNewQ.push(`${lang} ${theme}`);
+      }
+    }
+  }
+
+  // 4. Supplementary queries across active languages
+  const otherArtists = shuffleArray(langArtistPool.filter((a) => !priorityArtists.includes(a)));
   for (const lang of langs.slice(0, 3)) {
     const langPrefix = `${lang} `;
-    for (const art of otherArtists.slice(0, 4)) {
+    for (const art of otherArtists.slice(0, 3)) {
       generalNewQ.push(`${art} ${langPrefix}latest new hit songs ${CURRENT_YEAR}`);
       generalNewQ.push(`${art} ${langPrefix}top songs`);
-      generalNewQ.push(`${art} ${langPrefix}viral hit tracks`);
       generalOldQ.push(`${art} ${langPrefix}all time classic evergreen hits`);
       generalOldQ.push(`${art} ${langPrefix}best melody songs`);
-      generalOldQ.push(`${art} ${langPrefix}golden nostalgic superhits`);
     }
 
-    for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 4)) {
+    for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 3)) {
       if (theme.includes("classic") || theme.includes("90s") || theme.includes("2000s") || theme.includes("evergreen")) {
         generalOldQ.push(`${langPrefix}${theme}`);
       } else {
@@ -350,13 +393,38 @@ async function getLocalPicks(data: {
   languages?: string[] | undefined;
   refreshNonce?: string | number | undefined;
   exclude?: string[] | undefined;
+  discovery?: number | undefined;
+  affinityArtists?: string[] | undefined;
+  penalizedArtists?: string[] | undefined;
+  clientHour?: number | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
   const bypassCache = !!data.refreshNonce;
   const artists = data.artists.map((a) => a.trim()).filter(Boolean);
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
   const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
-  const { newQueries, oldQueries } = getDynamicQueries(languages, artists);
+  const penalizedSet = new Set((data.penalizedArtists ?? []).map((s) => norm(s)));
+
+  // Expand with related artists via Deezer
+  const relatedArtists: string[] = [];
+  try {
+    const { getRelatedArtists } = await import("./deezer.server");
+    const seedPool = [...(data.affinityArtists ?? []), ...artists].slice(0, 3);
+    const settled = await Promise.allSettled(seedPool.map((a) => getRelatedArtists(a, 3)));
+    for (const r of settled) {
+      if (r.status === "fulfilled" && Array.isArray(r.value)) {
+        relatedArtists.push(...r.value);
+      }
+    }
+  } catch {}
+
+  const { newQueries, oldQueries } = getDynamicQueries(languages, artists, {
+    affinityArtists: data.affinityArtists,
+    penalizedArtists: data.penalizedArtists,
+    relatedArtists,
+    discovery: data.discovery,
+    clientHour: data.clientHour,
+  });
 
   // Sample queries concurrently with randomized selection
   const pickedNew = shuffleArray(newQueries).slice(0, 5);
@@ -370,25 +438,26 @@ async function getLocalPicks(data: {
   const newQuota = Math.ceil(count / 2);
   const oldQuota = count - newQuota;
 
-  // Filter out any excluded / recently played tracks
-  const filteredNew = newCandidates.filter((t) => {
+  // Filter out any excluded / recently played / penalized tracks
+  const isCandidateValid = (t: Track) => {
     const key = norm(`${t.artist} - ${t.title}`);
     const titleKey = norm(t.title);
-    return !excludeSet.has(key) && !excludeSet.has(titleKey);
-  });
-  const filteredOld = oldCandidates.filter((t) => {
-    const key = norm(`${t.artist} - ${t.title}`);
-    const titleKey = norm(t.title);
-    return !excludeSet.has(key) && !excludeSet.has(titleKey);
-  });
+    const artKey = norm(t.artist);
+    if (excludeSet.has(key) || excludeSet.has(titleKey)) return false;
+    if (penalizedSet.has(artKey)) return false;
+    return true;
+  };
+
+  const filteredNew = newCandidates.filter(isCandidateValid);
+  const filteredOld = oldCandidates.filter(isCandidateValid);
 
   // Draw 50% new releases
-  const selectedNew = shuffleArray(filteredNew.length >= newQuota ? filteredNew : newCandidates).slice(0, newQuota);
+  const selectedNew = shuffleArray(filteredNew.length >= newQuota ? filteredNew : newCandidates.filter(isCandidateValid)).slice(0, newQuota);
   const chosenKeys = new Set<string>(selectedNew.map((t) => getTrackDedupeKey(t.title, t.artist)));
   const chosenIds = new Set<string>(selectedNew.map((t) => t.id));
 
   // Draw 50% golden classics, avoiding cross-bucket duplicates
-  const distinctOldCandidates = shuffleArray(filteredOld.length >= oldQuota ? filteredOld : oldCandidates).filter(
+  const distinctOldCandidates = shuffleArray(filteredOld.length >= oldQuota ? filteredOld : oldCandidates.filter(isCandidateValid)).filter(
     (t) => !chosenIds.has(t.id) && !chosenKeys.has(getTrackDedupeKey(t.title, t.artist)),
   );
   const selectedOld = distinctOldCandidates.slice(0, oldQuota);
@@ -411,6 +480,7 @@ const TrendingInput = z.object({
   languages: z.array(z.string()).max(10).default([]),
   count: z.number().min(1).max(50).optional(),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
+  clientHour: z.number().min(0).max(23).optional(),
 });
 
 /** Multi-category query pools for REAL-WORLD global and chart-topping trending music */
@@ -449,14 +519,23 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
     const userLangs = langs.length > 0 ? langs : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
     const queries: string[] = [];
 
-    // 1. Add language-specific trending chart queries
+    // 1. Add circadian temporal keywords if clientHour provided
+    if (typeof data.clientHour === "number") {
+      const { getTemporalContext } = await import("./context-engine");
+      const ctx = getTemporalContext(data.clientHour);
+      for (const lang of userLangs.slice(0, 2)) {
+        queries.push(`${lang} ${ctx.queryThemes[0] || "top trending songs"}`);
+      }
+    }
+
+    // 2. Add language-specific trending chart queries
     for (const lang of userLangs.slice(0, 3)) {
       queries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
       queries.push(`${lang} Official Music Hits Chart`);
       queries.push(`${lang} Most Popular Viral Songs`);
     }
 
-    // 2. Add global categorized queries
+    // 3. Add global categorized queries
     const categories = Object.values(CATEGORIZED_TRENDING_QUERIES);
     for (const cat of categories) {
       queries.push(...shuffleArray(cat).slice(0, 2));
@@ -477,11 +556,11 @@ export const recommendTracks = createServerFn({ method: "POST" })
       // No AI key — fall back to local YouTube-based picks with dynamic New & Old mix
       const artists = [
         ...new Set(
-          [...data.liked, ...data.recent, ...(data.artists ?? [])]
+          [...(data.affinityArtists ?? []), ...data.liked, ...data.recent, ...(data.artists ?? [])]
             .map((s) => s.split(" - ")[0]?.trim())
             .filter((a): a is string => !!a),
         ),
-      ].slice(0, 5);
+      ].slice(0, 8);
       const tracks = await getLocalPicks({
         artists,
         mode: "feed",
@@ -489,6 +568,10 @@ export const recommendTracks = createServerFn({ method: "POST" })
         languages: data.languages,
         refreshNonce: data.refreshNonce,
         exclude: data.recent,
+        discovery: data.discovery,
+        affinityArtists: data.affinityArtists,
+        penalizedArtists: data.penalizedArtists,
+        clientHour: data.clientHour,
       });
       return { tracks, error: null };
     }
@@ -504,9 +587,17 @@ export const recommendTracks = createServerFn({ method: "POST" })
     const sanitizedSequence = (data.sequence ?? []).slice(0, 20).map(sanitizePromptInput).filter(Boolean);
     const sanitizedSkipped = (data.skipped ?? []).slice(0, 20).map(sanitizePromptInput).filter(Boolean);
     const sanitizedDisliked = (data.disliked ?? []).slice(0, 20).map(sanitizePromptInput).filter(Boolean);
+    const sanitizedAffinity = (data.affinityArtists ?? []).slice(0, 10).map(sanitizePromptInput).filter(Boolean);
+    const sanitizedPenalized = (data.penalizedArtists ?? []).slice(0, 10).map(sanitizePromptInput).filter(Boolean);
     const sanitizedMood = sanitizePromptInput(data.mood);
     const sanitizedBrief = sanitizePromptInput(data.brief);
     const sanitizedLangs = data.languages.map(sanitizePromptInput).filter(Boolean);
+
+    const temporalCtx = getTemporalContext(data.clientHour);
+    const timeInstruction = data.temporalContext || temporalCtx.promptContext;
+    const discovery = typeof data.discovery === "number" ? Math.max(0, Math.min(100, data.discovery)) : 40;
+    const exploreRatio = Math.round(discovery);
+    const familiarRatio = 100 - exploreRatio;
 
     const seedNonce = `${data.refreshNonce ?? Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
@@ -524,6 +615,14 @@ export const recommendTracks = createServerFn({ method: "POST" })
       sanitizedDisliked.length
         ? `They disliked these songs — never suggest them or very similar tracks:\n${sanitizedDisliked.join("\n")}`
         : "",
+      timeInstruction ? `SESSION TIME CONTEXT: ${timeInstruction}` : "",
+      sanitizedAffinity.length > 0
+        ? `AFFINITY BOOST: Listener has high completion rates for: ${sanitizedAffinity.join(", ")}. Favor these artists and related sounds.`
+        : "",
+      sanitizedPenalized.length > 0
+        ? `STRICT EXCLUSION: Listener dislikes and repeatedly skips songs by: ${sanitizedPenalized.join(", ")}. Never suggest any songs by these artists.`
+        : "",
+      `DISCOVERY MIX: Set to ${discovery}% (${familiarRatio}% familiar comfort-zone hits from preferred artists, ${exploreRatio}% exciting new releases & unexpected gems).`,
       sanitizedMood ? `They asked for: ${sanitizedMood}` : "",
       sanitizedBrief ? `Tuning preferences: ${sanitizedBrief}` : "",
       sanitizedLangs.length > 0
@@ -566,12 +665,16 @@ export const recommendTracks = createServerFn({ method: "POST" })
     }
 
     const recentSet = new Set(data.recent.map((s) => norm(s)));
+    const penalizedSet = new Set((data.penalizedArtists ?? []).map((s) => norm(s)));
     const valid = picks
       .filter((p) => {
         if (!p.title || !p.artist) return false;
         const fullKey = norm(`${p.artist} - ${p.title}`);
         const titleKey = norm(p.title);
-        return !recentSet.has(fullKey) && !recentSet.has(titleKey);
+        const artKey = norm(p.artist);
+        if (recentSet.has(fullKey) || recentSet.has(titleKey)) return false;
+        if (penalizedSet.has(artKey)) return false;
+        return true;
       })
       .slice(0, count);
 
