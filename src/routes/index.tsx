@@ -136,6 +136,39 @@ export const Route = createFileRoute("/")({
   component: MusicApp,
 });
 
+interface HomeCacheData {
+  recs: Track[];
+  trendingList: Track[];
+  dailyMixTracks: Track[];
+  mixTracks: Record<"discover" | "newrelease" | "explore", Track[]>;
+  timestamp: number;
+}
+
+const HOME_CACHE_KEY = "melodymap.home_cache.v2";
+
+function readHomeCache(): Partial<HomeCacheData> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(HOME_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeHomeCache(patch: Partial<HomeCacheData>) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = readHomeCache();
+    const updated = { ...current, ...patch, timestamp: Date.now() };
+    localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(updated));
+  } catch {
+    // quota exceeded — ignore
+  }
+}
+
 function MusicApp() {
   const navigate = useNavigate();
   const runSearch = useServerFn(searchTracks);
@@ -195,6 +228,9 @@ function MusicApp() {
     resetSettings,
   } = useLibrary(auth.userId);
 
+  // Cached home feed loaded synchronously for instant 0ms startup without flashing
+  const [cachedFeed] = useState(() => readHomeCache());
+
   // --- UI state ---
   const [tab, setTab] = useState<NavTab>("foryou");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -209,8 +245,8 @@ function MusicApp() {
   const searchPageRef = useRef<number>(1);
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
-  const [recs, setRecs] = useState<Track[]>([]);
-  const [trendingList, setTrendingList] = useState<Track[]>([]);
+  const [recs, setRecs] = useState<Track[]>(() => cachedFeed.recs || []);
+  const [trendingList, setTrendingList] = useState<Track[]>(() => cachedFeed.trendingList || []);
   const [recLoading, setRecLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
@@ -233,9 +269,9 @@ function MusicApp() {
   const [mix, setMix] = useState<MixId>("discover");
   const [mixTracks, setMixTracks] = useState<
     Record<"discover" | "newrelease" | "explore", Track[]>
-  >({ discover: [], newrelease: [], explore: [] });
+  >(() => cachedFeed.mixTracks || { discover: [], newrelease: [], explore: [] });
   const [mixLoading, setMixLoading] = useState(false);
-  const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>([]);
+  const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>(() => cachedFeed.dailyMixTracks || []);
   const [dailyMixLoading, setDailyMixLoading] = useState(false);
   const [podcastTracks, setPodcastTracks] = useState<Track[]>([]);
 
@@ -633,6 +669,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
   }, [isMuted, volume, prevVolume, applyVolume]);
 
+  const loadedTrackIdRef = useRef<string | null>(null);
+
   const startQueue = useCallback(
     (tracks: Track[], startIndex = 0) => {
       if (tracks.length === 0) return;
@@ -640,9 +678,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setQueue(dq);
       const targetId = tracks[startIndex]?.id;
       const newIdx = targetId ? dq.findIndex((t) => t.id === targetId) : 0;
-      setIndex(newIdx !== -1 ? newIdx : 0);
+      const safeIdx = newIdx !== -1 ? newIdx : 0;
+      setIndex(safeIdx);
+
+      const targetTrack = dq[safeIdx] || tracks[startIndex];
+      if (targetTrack?.id) {
+        // Synchronously initiate audio load inside user click gesture for instant playback (<50ms)
+        loadedTrackIdRef.current = targetTrack.id;
+        void load(targetTrack.id, targetTrack.previewUrl);
+      }
     },
-    [],
+    [load],
   );
 
   const handleReorderQueue = useCallback((from: number, to: number) => {
@@ -721,6 +767,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         const pureMusic = res.tracks as Track[];
         const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
         setTrendingList(ranked);
+        writeHomeCache({ trendingList: ranked });
       }
     } catch {}
   }, [runTrending, settings.languages]);
@@ -743,6 +790,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           const pureMusic = res.tracks as Track[];
           const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
           setDailyMixTracks(ranked);
+          writeHomeCache({ dailyMixTracks: ranked });
         }
       } catch {}
       finally {
@@ -786,6 +834,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
               const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
               setRecs(distributed);
+              writeHomeCache({ recs: distributed });
             }
           })(),
           (async () => {
@@ -801,6 +850,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               const pureMusic = res.tracks as Track[];
               const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
               setTrendingList(ranked);
+              writeHomeCache({ trendingList: ranked });
             }
           })(),
           (async () => {
@@ -821,7 +871,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
               const ranked = contextEngine.rankTracks(dedupeTracks(pureMusic), currentRef.current);
-              setMixTracks((prev) => ({ ...prev, newrelease: ranked }));
+              setMixTracks((prev) => {
+                const next = { ...prev, newrelease: ranked };
+                writeHomeCache({ mixTracks: next });
+                return next;
+              });
             }
           })(),
           (async () => {
@@ -1299,7 +1353,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const restored = useRef(false);
   const resumeRef = useRef<number | null>(null);
-  const loadedTrackIdRef = useRef<string | null>(null);
 
   // Restore last playing track, queue, and seek position on mount / page refresh
   useEffect(() => {
@@ -1475,23 +1528,32 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (!hydrated || bootstrapped.current) return;
     bootstrapped.current = true;
     runStartupMigrations();
-    void loadRecommendations();
-  }, [hydrated, loadRecommendations]);
 
-  // Reload recommendations, trending, and mixes whenever language preferences change
-  const prevLanguagesRef = useRef(settings.languages.join(","));
+    // Auto-refresh recommendations on startup ONLY if the local feed cache is empty.
+    // If the user already has cached picks, show them instantly without network delay or flashing.
+    const hasCachedFeed =
+      (cachedFeed.recs && cachedFeed.recs.length > 0) ||
+      (cachedFeed.trendingList && cachedFeed.trendingList.length > 0);
+    if (!hasCachedFeed) {
+      void loadRecommendations();
+    }
+  }, [hydrated, cachedFeed, loadRecommendations]);
+
+  // Reload recommendations ONLY when language preferences actually change in settings
+  const prevLanguagesRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!bootstrapped.current) return;
+    if (!hydrated) return;
     const currentLangs = settings.languages.join(",");
+    if (prevLanguagesRef.current === null) {
+      // First hydration — record current languages without firing re-fetch
+      prevLanguagesRef.current = currentLangs;
+      return;
+    }
     if (prevLanguagesRef.current !== currentLangs) {
       prevLanguagesRef.current = currentLangs;
       void loadRecommendations();
-      void loadTrending();
-      void loadMix("newrelease");
-      void loadMix("explore");
-      void loadMix("discover");
     }
-  }, [settings.languages, loadRecommendations, loadTrending, loadMix]);
+  }, [hydrated, settings.languages, loadRecommendations]);
 
   useEffect(() => {
     const term = query.trim();
@@ -1721,12 +1783,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     newReleases={mixTracks.newrelease.slice(0, 12)}
                     recommended={recs}
                     onPlayTrack={(track, sectionTracks, i) => {
-                      if (current?.id === track.id) {
-                        if (player.isPlaying) {
-                          pause();
-                        } else {
-                          play();
-                        }
+                      if (current?.id === track.id && player.isPlaying) {
+                        pause();
                         return;
                       }
                       startQueue(sectionTracks, i);

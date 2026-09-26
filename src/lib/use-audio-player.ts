@@ -55,6 +55,7 @@ export function useAudioPlayer(options: {
 
   // Dual-engine playback state ("html5" or "youtube")
   // In deployed production environments (e.g. Vercel), default directly to client-side YouTube engine
+  // for instant 0ms startup without proxy latency or serverless timeouts
   const activeEngineRef = useRef<"html5" | "youtube">(
     typeof window !== "undefined" &&
       window.location.hostname !== "localhost" &&
@@ -140,8 +141,8 @@ export function useAudioPlayer(options: {
       holder.style.position = "fixed";
       holder.style.bottom = "0";
       holder.style.right = "0";
-      holder.style.width = "320px";
-      holder.style.height = "180px";
+      holder.style.width = "1px";
+      holder.style.height = "1px";
       holder.style.opacity = "0.001";
       holder.style.pointerEvents = "none";
       holder.style.zIndex = "-999";
@@ -610,8 +611,8 @@ export function useAudioPlayer(options: {
       if (!targetEl) return;
       try {
         ytPlayerRef.current = new window.YT.Player("melodymap-yt-iframe", {
-          height: "180",
-          width: "320",
+          height: "1",
+          width: "1",
           playerVars: {
             autoplay: 1,
             controls: 0,
@@ -622,18 +623,24 @@ export function useAudioPlayer(options: {
             enablejsapi: 1,
             origin: window.location.origin,
             widget_referrer: window.location.href,
+            suggestedQuality: "small",
+            vq: "small",
           },
           events: {
             onReady: (event: any) => {
               ytReadyRef.current = true;
               try {
                 event.target.setVolume(80);
+                event.target.setPlaybackQuality?.("small");
               } catch {}
               if (pendingYtActionRef.current) {
                 const { id, startAt, autoPlay } = pendingYtActionRef.current;
                 pendingYtActionRef.current = null;
                 if (autoPlay) {
                   event.target.loadVideoById(id, startAt);
+                  try {
+                    event.target.playVideo();
+                  } catch {}
                 } else {
                   event.target.cueVideoById(id, startAt);
                 }
@@ -645,6 +652,9 @@ export function useAudioPlayer(options: {
                 isSeekingRef.current = false;
                 setIsPlaying(true);
                 setIsLoading(false);
+                try {
+                  event.target.setPlaybackQuality?.("small");
+                } catch {}
               } else if (event.data === 2) {
                 // 2 = Paused
                 if (!isSeekingRef.current && !wantPlayRef.current) {
@@ -770,14 +780,42 @@ export function useAudioPlayer(options: {
     if (typeof document === "undefined") return;
     const onVisibilityChange = () => {
       if (document.hidden && wantPlayRef.current) {
-        if (activeEngineRef.current === "youtube" && ytPlayerRef.current) {
-          setTimeout(() => {
-            if (wantPlayRef.current && typeof ytPlayerRef.current.playVideo === "function") {
-              try {
-                ytPlayerRef.current.playVideo();
-              } catch {}
-            }
-          }, 80);
+        if (activeEngineRef.current === "youtube") {
+          // In mobile browsers (Chrome / Safari on Vercel), YouTube iframes get frozen on screen-off / background.
+          // Smoothly switch audioRef to the stream URL so music plays through HTML5 audio with REAL SOUND!
+          const curId = currentTrackIdRef.current;
+          const curTime = (ytPlayerRef.current?.getCurrentTime?.() ?? 0) || position;
+          if (curId && audioRef.current) {
+            audioRef.current.src = streamUrl(curId);
+            audioRef.current.currentTime = Math.max(0, curTime);
+            audioRef.current.volume = 1;
+            audioRef.current.loop = false;
+            audioRef.current.play().catch((err) => {
+              console.warn("[BackgroundPlayback] Audio take-over notice:", err);
+            });
+          }
+        }
+      } else if (!document.hidden && wantPlayRef.current) {
+        if (
+          activeEngineRef.current === "youtube" &&
+          audioRef.current &&
+          audioRef.current.src &&
+          !audioRef.current.src.startsWith("data:audio")
+        ) {
+          // Screen turned back on / app returned to foreground:
+          // Sync position back to YouTube player
+          const curTime = audioRef.current.currentTime || 0;
+          try {
+            audioRef.current.pause();
+            audioRef.current.src = SILENT_AUDIO_URI;
+            audioRef.current.volume = 0.001;
+            audioRef.current.loop = true;
+            audioRef.current.play().catch(() => {});
+          } catch {}
+          try {
+            ytPlayerRef.current?.seekTo?.(curTime, true);
+            ytPlayerRef.current?.playVideo?.();
+          } catch {}
         }
       }
     };
@@ -785,7 +823,7 @@ export function useAudioPlayer(options: {
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, []);
+  }, [position, streamUrl]);
 
   /** Direct YouTube IFrame API play */
   const playViaYouTube = useCallback(
@@ -809,11 +847,15 @@ export function useAudioPlayer(options: {
       if (p && ytReadyRef.current && typeof p.loadVideoById === "function") {
         if (autoPlay) {
           p.loadVideoById(id, startAt);
+          try {
+            p.playVideo();
+          } catch {}
         } else {
           p.cueVideoById(id, startAt);
         }
         try {
           p.setPlaybackRate(playbackSpeed);
+          p.setPlaybackQuality?.("small");
         } catch {}
       } else {
         pendingYtActionRef.current = { id, startAt, autoPlay };
@@ -899,7 +941,6 @@ export function useAudioPlayer(options: {
         return;
       }
 
-      // If YouTube engine was already active from previous fallback, directly use YouTube player
       if (activeEngineRef.current === "youtube") {
         playViaYouTube(id, startAt, true);
         return;
@@ -961,7 +1002,15 @@ export function useAudioPlayer(options: {
           if (p !== undefined) p.catch(() => {});
         } catch {}
       }
-      ytPlayerRef.current?.playVideo();
+      const curId = currentTrackIdRef.current;
+      const p = ytPlayerRef.current;
+      if (p && ytReadyRef.current && typeof p.playVideo === "function") {
+        try {
+          p.playVideo();
+        } catch {}
+      } else if (curId) {
+        playViaYouTube(curId, position, true);
+      }
       return;
     }
     initWebAudio();

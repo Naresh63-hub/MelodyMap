@@ -129,6 +129,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script src="https://www.youtube.com/iframe_api" async></script>
       </head>
       <body>
         {children}
