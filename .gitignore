@@ -52,3 +52,7 @@ android/local.properties
 android/.gradle
 *.apk
 test.m4a
+
+# Playwright Test Output
+test-results/
+playwright-report/
