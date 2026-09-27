@@ -250,6 +250,69 @@ describe("ThompsonSamplingPolicy Recommender", () => {
     });
   });
 
+  describe("Circadian temporal context alignment (Time-based checking)", () => {
+    it("at late night (hour 23 / 11 PM), prioritizes chill/acoustic melodies over high-energy dance tracks", () => {
+      const chillTrack: TrackLike = {
+        id: "night-chill-1",
+        title: "Peaceful Midnight Lofi & Acoustic Melody",
+        artist: "Calm Waves",
+      };
+      const highEnergyTrack: TrackLike = {
+        id: "night-club-1",
+        title: "Bass Boosted EDM Dance Workout Club Banger",
+        artist: "Club DJ",
+      };
+
+      // Current local time: hour 23
+      const nightContext: SessionContext = {
+        hourOfDay: 23,
+        discoveryPercent: 40,
+      };
+
+      // Test feature vector extraction: x1 is circadian alignment
+      const featureChill = (policy as any).extractFeatureVector(chillTrack, nightContext);
+      const featureHigh = (policy as any).extractFeatureVector(highEnergyTrack, nightContext);
+
+      // Chill track gets maximum circadian score (1.0) at late night
+      expect(featureChill[1]).toBe(1.0);
+      // High-energy track gets low circadian score (0.2) at late night
+      expect(featureHigh[1]).toBe(0.2);
+
+      // Verify Thompson sampling ranking over 100 draws strongly favors the chill track at hour 23
+      let chillWins = 0;
+      for (let i = 0; i < 100; i++) {
+        const top = policy.selectNextTrack([chillTrack, highEnergyTrack], nightContext);
+        if (top?.id === chillTrack.id) chillWins++;
+      }
+      expect(chillWins).toBeGreaterThan(60);
+    });
+
+    it("at afternoon (hour 14 / 2 PM), prioritizes energizing focus tracks over slow night tracks", () => {
+      const chillTrack: TrackLike = {
+        id: "day-chill-1",
+        title: "Sleep Midnight Ambient Melancholy",
+        artist: "Ambient Artist",
+      };
+      const energizingTrack: TrackLike = {
+        id: "day-energy-1",
+        title: "Workout Drill Fast Beat Energy",
+        artist: "Upbeat Band",
+      };
+
+      const afternoonContext: SessionContext = {
+        hourOfDay: 14,
+        discoveryPercent: 40,
+      };
+
+      const featureChill = (policy as any).extractFeatureVector(chillTrack, afternoonContext);
+      const featureHigh = (policy as any).extractFeatureVector(energizingTrack, afternoonContext);
+
+      // In the afternoon, energizing track gets 1.0 circadian score, chill gets 0.3
+      expect(featureHigh[1]).toBe(1.0);
+      expect(featureChill[1]).toBe(0.3);
+    });
+  });
+
   describe("Performance benchmark", () => {
     it("ranks 50 candidate tracks well under the performance target", () => {
       const bench = policy.benchmarkRanking(50);
