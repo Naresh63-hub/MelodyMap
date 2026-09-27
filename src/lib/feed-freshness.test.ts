@@ -35,6 +35,10 @@ function buildExclusions(
     recentlyPlayedIds,
     likedIds: new Set(liked.map((t) => t.id)),
     currentTrackId: current?.id ?? null,
+    previouslyDisplayed: displayed,
+    liked,
+    recentlyPlayed: recentlyPlayed,
+    current,
   };
 }
 
@@ -135,6 +139,46 @@ describe("Feed freshness: session exclusion set and duration gate", () => {
     const survivors = filterFeedCandidates(pool, exclusions);
     expect(survivors.map((t) => t.id)).toEqual(["good"]);
     expect(survivors.length).toBeLessThan(pool.length);
+  });
+
+  it("same song from multiple users/channels (different IDs) appears only once", () => {
+    const exclusions = buildExclusions([], [], [], undefined);
+    const uploadA: Track = { ...mkTrack("tseries_1", "4:22", "Arijit Singh"), title: "Tum Hi Ho (Official Video)" };
+    const uploadB: Track = { ...mkTrack("sony_1", "4:23", "Arijit Singh - Topic"), title: "Tum Hi Ho Full Song" };
+    const otherSong: Track = { ...mkTrack("other_1", "3:45", "Arijit Singh"), title: "Kesariya" };
+
+    const fresh = filterFeedCandidates([uploadA, uploadB, otherSong], exclusions);
+    // One entry per actual song, not per upload ID
+    expect(fresh).toHaveLength(2);
+    expect(fresh.map((t) => t.id)).toEqual(["tseries_1", "other_1"]);
+  });
+
+  it("a different-ID re-upload of a LIKED song is excluded from recommendations", () => {
+    const likedOriginal: Track = { ...mkTrack("like_1", "4:22", "Arijit Singh"), title: "Tum Hi Ho" };
+    const exclusions = buildExclusions([], [likedOriginal], [], undefined);
+
+    const reUpload: Track = { ...mkTrack("other_channel", "4:23", "Arijit Singh - Topic"), title: "Tum Hi Ho Lyrical" };
+    expect(filterFeedCandidates([reUpload], exclusions)).toHaveLength(0);
+  });
+
+  it("different songs by the same artist or sharing a title never merge", () => {
+    const exclusions = buildExclusions([], [], [], undefined);
+    const loveA: Track = { ...mkTrack("love_a", "3:30", "Artist A"), title: "Love" };
+    const loveB: Track = { ...mkTrack("love_b", "3:30", "Artist B"), title: "Love" };
+    const songA: Track = { ...mkTrack("ax_1", "4:00", "Artist X"), title: "Sunrise" };
+    const songB: Track = { ...mkTrack("ax_2", "3:50", "Artist X"), title: "Moonlight" };
+
+    const fresh = filterFeedCandidates([loveA, loveB, songA, songB], exclusions);
+    expect(fresh).toHaveLength(4);
+  });
+
+  it("different-ID re-upload of a PREVIOUSLY DISPLAYED song is excluded on refresh", () => {
+    const shownLastRefresh: Track = { ...mkTrack("yt_1", "4:22", "Arijit Singh"), title: "Tum Hi Ho" };
+    const exclusions = buildExclusions([shownLastRefresh], [], [], undefined);
+
+    const reUpload: Track = { ...mkTrack("topic_2", "4:23", "Arijit Singh - Topic"), title: "Tum Hi Ho Video Song" };
+    const fresh: Track[] = filterFeedCandidates([reUpload], exclusions);
+    expect(fresh).toHaveLength(0);
   });
 
   it("createSessionFeedState tracks displayed IDs across multiple feeds in one session", () => {

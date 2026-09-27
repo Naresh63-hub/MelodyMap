@@ -476,6 +476,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   // permanently blacklisting them.
   const previouslyDisplayedIdsRef = useRef<Set<string>>(new Set());
   const recentlyPlayedIdsRef = useRef<Set<string>>(new Set());
+  // Real track objects (bounded) so fuzzy same-song matching works across different upload IDs.
+  const displayedTracksRef = useRef<Track[]>([]);
+  const rememberDisplayedTracks = useCallback((tracks: readonly Track[]) => {
+    const displayedTracks = displayedTracksRef.current;
+    for (const t of tracks) {
+      if (!displayedTracks.some((d) => areSameTrack(d, t as TrackLike))) displayedTracks.push(t);
+    }
+    if (displayedTracks.length > 200) displayedTracksRef.current = displayedTracks.slice(-200);
+  }, []);
   const applyFeedFilters = useCallback(
     (pool: Track[], opts?: { ignoreDisplay?: boolean }) => {
       if (!opts?.ignoreDisplay) {
@@ -487,20 +496,34 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
         for (const t of queueRef.current) previouslyDisplayedIdsRef.current.add(t.id);
         for (const h of history) recentlyPlayedIdsRef.current.add(h.id);
+        rememberDisplayedTracks([
+          ...recsRef.current,
+          ...trendingRef.current,
+          ...dailyMixTracksRef.current,
+          ...queueRef.current,
+        ]);
       }
       return filterFeedCandidates(pool, {
         previouslyDisplayedIds: previouslyDisplayedIdsRef.current,
         likedIds,
         recentlyPlayedIds: recentlyPlayedIdsRef.current,
         currentTrackId: currentRef.current?.id ?? null,
+        previouslyDisplayed: displayedTracksRef.current,
+        liked: likes,
+        recentlyPlayed: history,
+        current: currentRef.current ?? null,
       });
     },
-    [likedIds, history],
+    [likedIds, likes, history, rememberDisplayedTracks],
   );
   /** Mark tracks as displayed so future refreshes exclude them. */
-  const markFeedDisplayed = useCallback((tracks: readonly Track[]) => {
-    recordDisplayedTracks(previouslyDisplayedIdsRef.current, tracks);
-  }, []);
+  const markFeedDisplayed = useCallback(
+    (tracks: readonly Track[]) => {
+      recordDisplayedTracks(previouslyDisplayedIdsRef.current, tracks);
+      rememberDisplayedTracks(tracks);
+    },
+    [rememberDisplayedTracks],
+  );
   const dislikedIdsRef = useRef(dislikedIds);
   dislikedIdsRef.current = dislikedIds;
   const canPrev = queue.length > 0;

@@ -22,7 +22,9 @@ import {
   HardDrive,
   Copy,
   ChevronRight,
+  Activity,
 } from "lucide-react";
+import { ListeningInsightsPanel } from "./ListeningInsightsPanel";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -96,7 +98,7 @@ export function SettingsModal({
   onSignOut,
   onLibraryRestored,
 }: Props) {
-  const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback">("account");
+  const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "insights">("account");
   const [sponsorBlockOn, setSponsorBlockOn] = useState<boolean>(getSponsorBlockEnabled);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -309,6 +311,19 @@ export function SettingsModal({
           >
             <Volume2 className="h-3.5 w-3.5 text-purple-400" />
             Playback &amp; Hardware
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("insights")}
+            className={cn(
+              "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
+              activeSection === "insights"
+                ? "bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-white border border-purple-500/30 shadow-sm"
+                : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
+            )}
+          >
+            <Activity className="h-3.5 w-3.5 text-emerald-400" />
+            Listening Insights
           </button>
         </div>
 
@@ -812,6 +827,11 @@ export function SettingsModal({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* 5. LISTENING INSIGHTS & AI RADAR SECTION */}
+          {activeSection === "insights" && (
+            <ListeningInsightsPanel />
           )}
         </div>
       </DialogContent>

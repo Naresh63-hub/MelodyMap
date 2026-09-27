@@ -6,7 +6,11 @@
  *  - Liked track IDs are excluded from fresh candidates (they stay in the Library).
  *  - Recently played track IDs are excluded where available.
  *  - The currently playing track is excluded.
- *  - Duplicate track IDs are removed (first occurrence wins, order preserved).
+ *  - ONE ENTRY PER ACTUAL SONG, not per upload ID: the same song re-uploaded by
+ *    another user/channel (different track ID) is collapsed via fuzzy matching —
+ *    areSameTrack() (title similarity + duration tolerance) PLUS an artist
+ *    similarity gate. Artist/movie names alone NEVER merge two songs ("Love" by
+ *    Artist A and "Love" by Artist B stay distinct).
  *  - Only tracks with a KNOWN duration in (0, 600] seconds pass the duration gate.
  *    Unknown / null / invalid durations are NEVER assumed short — they are excluded.
  *
@@ -15,6 +19,7 @@
  * next-track selection.
  */
 
+import { areSameTrack, norm, stringSimilarity, type TrackLike } from "./track-dedup";
 import { MAX_TRACK_DURATION_SECONDS, parseDurationSeconds } from "./track-filters";
 import type { Track } from "./types";
 
@@ -27,6 +32,30 @@ export interface FeedExclusions {
   recentlyPlayedIds?: ReadonlySet<string> | undefined;
   /** ID of the track currently loaded/playing. Always excluded. */
   currentTrackId?: string | null | undefined;
+  /** Real track objects already displayed — enables fuzzy same-song matching across upload IDs. */
+  previouslyDisplayed?: readonly TrackLike[] | undefined;
+  /** Real liked track objects — a re-upload of a liked song is also excluded. */
+  liked?: readonly TrackLike[] | undefined;
+  /** Real recently-played track objects — fuzzy exclusion across upload IDs. */
+  recentlyPlayed?: readonly TrackLike[] | undefined;
+  /** The currently loaded track object — fuzzy exclusion across upload IDs. */
+  current?: TrackLike | null | undefined;
+}
+
+/**
+ * Same LOGICAL song check: areSameTrack() (title similarity + duration tolerance)
+ * as the core signal, with artist similarity as ADDITIONAL evidence when both
+ * artists are known. Artist name alone never merges two songs, and a missing
+ * artist field falls back to title + duration only.
+ */
+function sameSong(a: TrackLike, b: TrackLike): boolean {
+  if (!areSameTrack(a, b)) return false;
+  const artistA = norm(a.artist || "");
+  const artistB = norm(b.artist || "");
+  if (!artistA || !artistB) return true; // metadata missing: title + duration decide
+  // 0.9 gate: "Arijit Singh" vs "Arijit Singh - Topic" merges (norm strips "topic"),
+  // but "Love" by Artist A vs "Love" by Artist B stays distinct.
+  return stringSimilarity(artistA, artistB) >= 0.9;
 }
 
 /**
@@ -44,9 +73,15 @@ export function trackIdOf(candidate: unknown): string | null {
  * known and satisfies 0 < durationSeconds <= 600 (10 minutes).
  * 10:00 exactly is ALLOWED; 10:01 is REJECTED; unknown duration is REJECTED.
  */
-export function hasPlayableDuration(track: { duration?: string | null } | null | undefined): boolean {
+export function hasPlayableDuration(
+  track: { duration?: string | number | null | undefined } | null | undefined,
+): boolean {
   if (!track) return false;
-  const secs = parseDurationSeconds(track.duration ?? undefined);
+  const d = track.duration;
+  if (typeof d === "number") {
+    return Number.isFinite(d) && d > 0 && d <= MAX_TRACK_DURATION_SECONDS;
+  }
+  const secs = parseDurationSeconds(d ?? undefined);
   return secs > 0 && secs <= MAX_TRACK_DURATION_SECONDS;
 }
 
@@ -76,27 +111,37 @@ export function uniqueByTrackId<T>(tracks: readonly T[]): T[] {
  *   5. current-track exclusion
  *   6. duration gate (0 < secs <= 600)
  */
-export function filterFeedCandidates<T extends { duration?: string }>(
+export function filterFeedCandidates<T extends TrackLike>(
   tracks: readonly T[],
   exclusions: FeedExclusions,
 ): T[] {
-  const displayed = exclusions.previouslyDisplayedIds;
-  const liked = exclusions.likedIds;
-  const played = exclusions.recentlyPlayedIds;
+  const displayedIds = exclusions.previouslyDisplayedIds;
+  const likedIds = exclusions.likedIds;
+  const playedIds = exclusions.recentlyPlayedIds;
   const currentId = exclusions.currentTrackId ?? null;
 
-  const seen = new Set<string>();
+  const displayedTracks = exclusions.previouslyDisplayed ?? [];
+  const likedTracks = exclusions.liked ?? [];
+  const playedTracks = exclusions.recentlyPlayed ?? [];
+  const currentTrack = exclusions.current ?? null;
+
   const out: T[] = [];
   for (const t of tracks) {
     const id = trackIdOf(t);
     if (!id) continue;
-    if (seen.has(id)) continue; // duplicates
-    if (displayed?.has(id)) continue; // previously displayed this session
-    if (liked?.has(id)) continue; // liked — remains in Library, not fresh picks
-    if (played?.has(id)) continue; // recently played
+    // Fast exact-ID pass (O(1))
+    if (displayedIds?.has(id)) continue; // previously displayed this session
+    if (likedIds?.has(id)) continue; // liked — remains in Library, not fresh picks
+    if (playedIds?.has(id)) continue; // recently played
     if (currentId && id === currentId) continue; // currently playing
-    if (!hasPlayableDuration(t)) continue; // <=10 min, known duration
-    seen.add(id);
+    // Fuzzy same-song pass: a re-upload with a DIFFERENT ID is still the same song.
+    if (displayedTracks.some((r) => sameSong(r, t))) continue;
+    if (likedTracks.some((r) => sameSong(r, t))) continue;
+    if (playedTracks.some((r) => sameSong(r, t))) continue;
+    if (currentTrack && sameSong(currentTrack, t)) continue;
+    // In-pool duplicate uploads: same song from multiple users keeps first occurrence.
+    if (out.some((existing) => sameSong(existing, t))) continue;
+    if (!hasPlayableDuration(t)) continue; // 0 < secs <= 600, known duration
     out.push(t);
   }
   return out;
