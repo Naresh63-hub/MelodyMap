@@ -44,17 +44,22 @@ export interface FeedExclusions {
 
 /**
  * Same LOGICAL song check: areSameTrack() (title similarity + duration tolerance)
- * as the core signal, with artist similarity as ADDITIONAL evidence when both
- * artists are known. Artist name alone never merges two songs, and a missing
- * artist field falls back to title + duration only.
+ * as the core signal, with artist similarity >= 0.9 as an additional identity
+ * safeguard when both artist fields are populated. This is a heuristic
+ * threshold, not a guarantee: unusually similar artist names could still merge.
+ * When artist metadata is missing on either side, the fallback to title +
+ * duration means identical titles with near-identical durations CAN merge.
+ * Artist name alone never merges two songs (the gate is conjunctive with
+ * areSameTrack).
  */
 function sameSong(a: TrackLike, b: TrackLike): boolean {
   if (!areSameTrack(a, b)) return false;
   const artistA = norm(a.artist || "");
   const artistB = norm(b.artist || "");
-  if (!artistA || !artistB) return true; // metadata missing: title + duration decide
-  // 0.9 gate: "Arijit Singh" vs "Arijit Singh - Topic" merges (norm strips "topic"),
-  // but "Love" by Artist A vs "Love" by Artist B stays distinct.
+  if (!artistA || !artistB) return true; // metadata missing: title + duration decide (see caveat above)
+  // Heuristic gate (additional safeguard, not a correctness guarantee):
+  // "Arijit Singh" vs "Arijit Singh - Topic" merges (norm strips "topic");
+  // "Love" by Artist A vs "Love" by Artist B stays distinct in practice.
   return stringSimilarity(artistA, artistB) >= 0.9;
 }
 
