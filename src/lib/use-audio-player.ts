@@ -1102,12 +1102,12 @@ export function useAudioPlayer(options: {
     }
   }, []);
 
-  const skipForward = useCallback((seconds = 30) => {
+  const skipForward = useCallback((seconds = 5) => {
     const current = position;
     seek(current + seconds);
   }, [position, seek]);
 
-  const skipBackward = useCallback((seconds = 15) => {
+  const skipBackward = useCallback((seconds = 5) => {
     const current = position;
     seek(Math.max(0, current - seconds));
   }, [position, seek]);

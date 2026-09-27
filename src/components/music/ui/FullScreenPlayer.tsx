@@ -246,9 +246,9 @@ export function FullScreenPlayer({
             {onSkipBackward && (
               <button
                 type="button"
-                onClick={() => onSkipBackward(15)}
+                onClick={() => onSkipBackward(5)}
                 className="p-2 text-white/60 hover:text-white active:scale-95 transition-all"
-                title="Rewind 15 seconds"
+                title="Rewind 5 seconds"
               >
                 <RotateCcw className="h-5 w-5" />
               </button>
@@ -297,9 +297,9 @@ export function FullScreenPlayer({
             {onSkipForward && (
               <button
                 type="button"
-                onClick={() => onSkipForward(30)}
+                onClick={() => onSkipForward(5)}
                 className="p-2 text-white/60 hover:text-white active:scale-95 transition-all"
-                title="Forward 30 seconds"
+                title="Forward 5 seconds"
               >
                 <RotateCw className="h-5 w-5" />
               </button>

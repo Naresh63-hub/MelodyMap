@@ -119,8 +119,11 @@ export function parseDurationSeconds(dur: string | undefined | null): number {
 
 /**
  * Strict validator to guarantee a track is a single, pure musical song.
- * Max duration 900s (15 min) for songs, allows jukeboxes if query explicitly asks.
+ * Hard rule: only tracks <= 600s (10 min) are playable recommendations.
+ * Unknown/invalid durations are rejected (parseDurationSeconds returns 0).
  */
+export const MAX_TRACK_DURATION_SECONDS = 600;
+
 export function isMusicTrack(
   track: { title?: string; artist?: string; duration?: string } | null | undefined,
   allowLong?: boolean | unknown,
@@ -135,8 +138,10 @@ export function isMusicTrack(
   if (!isAllowLong && COMPILATION_KEYWORDS.some((kw) => title.includes(kw))) return false;
 
   const secs = parseDurationSeconds(track.duration);
-  const maxCap = isAllowLong ? 7200 : 900;
-  if (secs > 0 && (secs < 30 || secs > maxCap)) return false;
+  const maxCap = isAllowLong ? 7200 : MAX_TRACK_DURATION_SECONDS;
+  // Unknown duration (secs === 0) must NOT be assumed short: exclude it.
+  if (secs <= 0) return false;
+  if (secs < 30 || secs > maxCap) return false;
 
   return true;
 }
