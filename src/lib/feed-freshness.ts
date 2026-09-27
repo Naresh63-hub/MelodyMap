@@ -113,3 +113,37 @@ export function recordDisplayedTracks(targetSet: Set<string>, tracks: readonly u
     if (id) targetSet.add(id);
   }
 }
+
+export interface SessionFeedState {
+  /** Live view of displayed IDs for this session. */
+  readonly previouslyDisplayedIds: ReadonlySet<string>;
+  /** Mark tracks as displayed for the remainder of this session. */
+  record(tracks: readonly unknown[]): void;
+  /** Build exclusions for a feed build, merging the given recently-played IDs. */
+  snapshot(
+    recentlyPlayed?: readonly unknown[],
+    likedIds?: ReadonlySet<string>,
+    currentTrackId?: string | null,
+  ): FeedExclusions;
+}
+
+/** Create a session-scoped feed freshness state (lives only for this page session). */
+export function createSessionFeedState(): SessionFeedState {
+  const displayed = new Set<string>();
+  const recent = new Set<string>();
+  return {
+    previouslyDisplayedIds: displayed,
+    record(tracks) {
+      recordDisplayedTracks(displayed, tracks);
+    },
+    snapshot(recentlyPlayed, likedIds, currentTrackId) {
+      if (recentlyPlayed) recordDisplayedTracks(recent, recentlyPlayed);
+      return {
+        previouslyDisplayedIds: displayed,
+        recentlyPlayedIds: recent,
+        likedIds,
+        currentTrackId: currentTrackId ?? null,
+      };
+    },
+  };
+}

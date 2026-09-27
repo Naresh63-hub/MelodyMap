@@ -20,6 +20,14 @@ export type NextTrackInfo = {
   previewUrl?: string | undefined;
 };
 
+/**
+ * Seek step sizes for the forward/backward scrub buttons.
+ * NOTE: the Next/Skip-Track control is separate (queue advance in routes/index.tsx)
+ * and must NEVER seek — these constants are only for within-track seeking.
+ */
+export const SKIP_FORWARD_SECONDS = 5;
+export const SKIP_BACKWARD_SECONDS = 5;
+
 declare global {
   interface Window {
     YT?: any;
@@ -1102,12 +1110,12 @@ export function useAudioPlayer(options: {
     }
   }, []);
 
-  const skipForward = useCallback((seconds = 5) => {
+  const skipForward = useCallback((seconds = SKIP_FORWARD_SECONDS) => {
     const current = position;
     seek(current + seconds);
   }, [position, seek]);
 
-  const skipBackward = useCallback((seconds = 5) => {
+  const skipBackward = useCallback((seconds = SKIP_BACKWARD_SECONDS) => {
     const current = position;
     seek(Math.max(0, current - seconds));
   }, [position, seek]);

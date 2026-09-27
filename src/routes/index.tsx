@@ -112,6 +112,11 @@ import { getBlob, listDownloads, removeDownload, saveDownload, type DownloadInfo
 import { cn } from "@/lib/utils";
 import { areSameTrack, trackExistsIn, dedupeTracks, type TrackLike } from "@/lib/track-dedup";
 import {
+  filterFeedCandidates,
+  hasPlayableDuration,
+  recordDisplayedTracks,
+} from "@/lib/feed-freshness";
+import {
   contextEngine,
   applyDiscoveryDistribution,
   thompsonSamplingPolicy,
@@ -462,8 +467,40 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   trendingRef.current = trendingList;
   const mixTracksRef = useRef<Record<"discover" | "newrelease" | "explore", Track[]>>(mixTracks);
   mixTracksRef.current = mixTracks;
+  const dailyMixTracksRef = useRef<Track[]>(dailyMixTracks);
+  dailyMixTracksRef.current = dailyMixTracks;
   const likedIds = useMemo(() => new Set(likes.map((t) => t.id)), [likes]);
   const dislikedIds = useMemo(() => new Set(dislikes.map((t) => t.id)), [dislikes]);
+  // Session-scoped feed freshness (never persisted): tracks shown in feeds this session,
+  // plus recently-played IDs. Prevents refresh from re-serving the same songs without
+  // permanently blacklisting them.
+  const previouslyDisplayedIdsRef = useRef<Set<string>>(new Set());
+  const recentlyPlayedIdsRef = useRef<Set<string>>(new Set());
+  const applyFeedFilters = useCallback(
+    (pool: Track[], opts?: { ignoreDisplay?: boolean }) => {
+      if (!opts?.ignoreDisplay) {
+        for (const t of recsRef.current) previouslyDisplayedIdsRef.current.add(t.id);
+        for (const t of trendingRef.current) previouslyDisplayedIdsRef.current.add(t.id);
+        for (const t of dailyMixTracksRef.current) previouslyDisplayedIdsRef.current.add(t.id);
+        for (const lists of Object.values(mixTracksRef.current)) {
+          for (const t of lists) previouslyDisplayedIdsRef.current.add(t.id);
+        }
+        for (const t of queueRef.current) previouslyDisplayedIdsRef.current.add(t.id);
+        for (const h of history) recentlyPlayedIdsRef.current.add(h.id);
+      }
+      return filterFeedCandidates(pool, {
+        previouslyDisplayedIds: previouslyDisplayedIdsRef.current,
+        likedIds,
+        recentlyPlayedIds: recentlyPlayedIdsRef.current,
+        currentTrackId: currentRef.current?.id ?? null,
+      });
+    },
+    [likedIds, history],
+  );
+  /** Mark tracks as displayed so future refreshes exclude them. */
+  const markFeedDisplayed = useCallback((tracks: readonly Track[]) => {
+    recordDisplayedTracks(previouslyDisplayedIdsRef.current, tracks);
+  }, []);
   const dislikedIdsRef = useRef(dislikedIds);
   dislikedIdsRef.current = dislikedIds;
   const canPrev = queue.length > 0;
@@ -777,6 +814,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const playSong = useCallback(
     (track: Track, surroundingQueue?: Track[]) => {
       if (!track?.id) return;
+      // Hard rule: music tracks need a known duration <= 600s to enter playback.
+      // Podcasts are exempt (long-form by design, never in the music recommendation pool).
+      if (!isPodcastTrack(track) && !hasPlayableDuration(track)) return;
 
       // 1. Reset progress and seek position for clean single-track start
       player.seek(0);
@@ -879,15 +919,38 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks) {
-          const pureMusic = res.tracks as Track[];
-          const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
+          let pureMusic = res.tracks as Track[];
+          // Freshness: exclude displayed/liked/recent/overlong tracks; fetch MORE rather than reuse.
+          let fresh = applyFeedFilters(pureMusic);
+          if (fresh.length < 6) {
+            const res2 = await runMix({
+              data: {
+                kind,
+                liked: likes.slice(0, 15).map(trackLabel),
+                recent: history.slice(0, 15).map(trackLabel),
+                sequence: sequenceBrief(history, stats),
+                skipped: skippedLabels(stats),
+                artists: topArtists(stats, likes),
+                languages: settings.languages,
+                brief: settingsToBrief(settings),
+                count: 14,
+                refreshNonce: `${Date.now()}-2`,
+              },
+            });
+            if (res2.tracks) {
+              pureMusic = pureMusic.concat(res2.tracks as Track[]);
+              fresh = applyFeedFilters(pureMusic);
+            }
+          }
+          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           setMixTracks((prev) => ({ ...prev, [kind]: ranked }));
+          markFeedDisplayed(ranked);
         }
       } finally {
         setMixLoading(false);
       }
     },
-    [runMix, likes, history, stats, settings, getSessionContext],
+    [runMix, likes, history, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
   const loadTrending = useCallback(async () => {
@@ -900,13 +963,29 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         },
       });
       if (res.tracks) {
-        const pureMusic = res.tracks as Track[];
-        const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
+        let pureMusic = res.tracks as Track[];
+        // Freshness: fetch MORE candidates instead of re-serving displayed songs.
+        let fresh = applyFeedFilters(pureMusic);
+        if (fresh.length < 8) {
+          const res2 = await runTrending({
+            data: {
+              languages: settings.languages,
+              count: 24,
+              refreshNonce: `${Date.now()}-2`,
+            },
+          });
+          if (res2.tracks) {
+            pureMusic = pureMusic.concat(res2.tracks as Track[]);
+            fresh = applyFeedFilters(pureMusic);
+          }
+        }
+        const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
         setTrendingList(ranked);
+        markFeedDisplayed(ranked);
         writeHomeCache({ trendingList: ranked });
       }
     } catch {}
-  }, [runTrending, settings.languages, getSessionContext]);
+  }, [runTrending, settings.languages, getSessionContext, applyFeedFilters, markFeedDisplayed]);
 
   const loadDailyMix = useCallback(
     async (refreshNonce?: number | string) => {
@@ -923,9 +1002,27 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks) {
-          const pureMusic = res.tracks as Track[];
-          const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
+          let pureMusic = res.tracks as Track[];
+          // Freshness: fetch MORE candidates instead of re-serving displayed songs.
+          let fresh = applyFeedFilters(pureMusic);
+          if (fresh.length < 8) {
+            const res2 = await runDailyMix({
+              data: {
+                languages: settings.languages,
+                artists: topArtists(stats, likes),
+                liked: likes.slice(0, 15).map(trackLabel),
+                count: 24,
+                refreshNonce: `${nonce}-2`,
+              },
+            });
+            if (res2.tracks) {
+              pureMusic = pureMusic.concat(res2.tracks as Track[]);
+              fresh = applyFeedFilters(pureMusic);
+            }
+          }
+          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           setDailyMixTracks(ranked);
+          markFeedDisplayed(ranked);
           writeHomeCache({ dailyMixTracks: ranked });
         }
       } catch {}
@@ -933,7 +1030,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setDailyMixLoading(false);
       }
     },
-    [runDailyMix, settings.languages, stats, likes, getSessionContext],
+    [runDailyMix, settings.languages, stats, likes, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
   const loadRecommendations = useCallback(
@@ -966,10 +1063,38 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               },
             });
             if (res.tracks) {
-              const pureMusic = res.tracks as Track[];
-              const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
+              let pureMusic = res.tracks as Track[];
+              // Freshness: fetch MORE candidates instead of re-serving displayed songs.
+              let fresh = applyFeedFilters(pureMusic);
+              if (fresh.length < 8) {
+                const res2 = await runRecommend({
+                  data: {
+                    liked: likes.slice(0, 15).map(trackLabel),
+                    recent: history.slice(0, 15).map(trackLabel),
+                    disliked: dislikes.slice(0, 15).map(trackLabel),
+                    sequence: sequenceBrief(history, stats),
+                    skipped: skippedLabels(stats),
+                    count: 24,
+                    ...(mood ? { mood } : {}),
+                    languages: settings.languages,
+                    brief: settingsToBrief(settings),
+                    artists: topArtists(stats, likes),
+                    refreshNonce: `${nonce}-2`,
+                    discovery: settings.discovery ?? 40,
+                    affinityArtists: affinity.affinityArtists,
+                    penalizedArtists: affinity.penalizedArtists,
+                    clientHour,
+                  },
+                });
+                if (res2.tracks) {
+                  pureMusic = pureMusic.concat(res2.tracks as Track[]);
+                  fresh = applyFeedFilters(pureMusic);
+                }
+              }
+              const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
               const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
               setRecs(distributed);
+              markFeedDisplayed(distributed);
               writeHomeCache({ recs: distributed });
             }
           })(),
@@ -1022,7 +1147,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setRecLoading(false);
       }
     },
-    [runRecommend, runTrending, runMix, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext],
+    [runRecommend, runTrending, runMix, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
   const loadMoreRecommendations = useCallback(
@@ -1052,15 +1177,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks && res.tracks.length > 0) {
-          const pureMusic = res.tracks as Track[];
-          const ranked = thompsonSamplingPolicy.rankCandidates(pureMusic, getSessionContext());
+          const fresh = applyFeedFilters(res.tracks as Track[]);
+          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           setRecs((prev) => dedupeTracks([...prev, ...ranked]));
+          markFeedDisplayed(ranked);
         }
       } finally {
         setLoadingMoreRecs(false);
       }
     },
-    [loadingMoreRecs, runRecommend, likes, history, dislikes, stats, settings, getSessionContext],
+    [loadingMoreRecs, runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
   const extendQueue = useCallback(async (): Promise<Track[]> => {
@@ -1096,8 +1222,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             radioContinuationRef.current = radioRes.continuation;
           }
           if (radioRes.tracks && radioRes.tracks.length > 0) {
-            const pureMusic = radioRes.tracks as Track[];
-            const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
+            const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(radioRes.tracks as Track[]), getSessionContext());
             const fresh = ranked.filter(
               (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
             );
@@ -1133,17 +1258,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks && res.tracks.length > 0) {
-          const pureMusic = res.tracks as Track[];
-          const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
+          const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(res.tracks as Track[]), getSessionContext());
           candidateTracks = ranked.filter(
             (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
           );
         }
       }
 
-      // 3. Fallback to cached pool if still empty
+      // 3. Last resort: cached pool passed through the same freshness filter
+      // (displayed songs are excluded — we never refill AutoDJ with already-shown tracks).
       if (candidateTracks.length === 0) {
-        const pool = dedupeTracks([
+        const pool = applyFeedFilters([
           ...recsRef.current,
           ...trendingRef.current,
           ...(mixTracksRef.current?.discover || []),
@@ -1164,7 +1289,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } finally {
       setExtending(false);
     }
-  }, [extending, runRecommend, likes, history, dislikes, stats, settings, getSessionContext]);
+  }, [extending, runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed]);
 
   const searchFor = useCallback(
     async (term: string, searchType?: "songs" | "podcasts", filter?: SearchFilter) => {
@@ -1286,7 +1411,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
 
     // 2. Queue reached the end: find unplayed tracks from recs, trending, or mixTracks
-    const pool = dedupeTracks([
+    const pool = applyFeedFilters([
       ...recsRef.current,
       ...trendingRef.current,
       ...(mixTracksRef.current?.discover || []),
@@ -1347,7 +1472,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       }
     });
-  }, [extendQueue, findNextValidTrackIndex, logSkip, player, load, getSessionContext]);
+  }, [extendQueue, findNextValidTrackIndex, logSkip, player, load, getSessionContext, applyFeedFilters]);
 
   const goPrev = useCallback(() => {
     const q = queueRef.current;
@@ -1606,13 +1731,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     try {
       const saved = readPlayback();
       if (saved && Array.isArray(saved.queue) && saved.queue.length > 0) {
-        setQueue(saved.queue);
-        const safeIndex = Math.min(Math.max(0, saved.index || 0), saved.queue.length - 1);
+        // Hard rule: restore only tracks with known duration <= 600s (podcasts exempt).
+        const cleanQueue = saved.queue.filter((t: Track) => isPodcastTrack(t) || hasPlayableDuration(t));
+        if (cleanQueue.length === 0) {
+          setResumed(true);
+          return;
+        }
+        setQueue(cleanQueue);
+        markFeedDisplayed(cleanQueue);
+        const safeIndex = Math.min(Math.max(0, saved.index || 0), cleanQueue.length - 1);
         setIndex(safeIndex);
         const savedPos = typeof saved.position === "number" && !isNaN(saved.position) ? saved.position : 0;
         resumeRef.current = savedPos;
         setResumed(true);
-        const targetTrack = saved.queue[safeIndex];
+        const targetTrack = cleanQueue[safeIndex];
         if (targetTrack) {
           loadedTrackIdRef.current = targetTrack.id;
           if (saved.isPlaying) {
@@ -1779,10 +1911,18 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     const hasCachedFeed =
       (cachedFeed.recs && cachedFeed.recs.length > 0) ||
       (cachedFeed.trendingList && cachedFeed.trendingList.length > 0);
+    // Cached feeds restored for instant paint count as "previously displayed" for
+    // this session, so a refresh never re-serves them.
+    markFeedDisplayed([
+      ...(cachedFeed.recs || []),
+      ...(cachedFeed.trendingList || []),
+      ...(cachedFeed.dailyMixTracks || []),
+      ...Object.values(cachedFeed.mixTracks || {}).flat(),
+    ]);
     if (!hasCachedFeed) {
       void loadRecommendations();
     }
-  }, [hydrated, cachedFeed, loadRecommendations]);
+  }, [hydrated, cachedFeed, loadRecommendations, markFeedDisplayed]);
 
   // Reload recommendations ONLY when language preferences actually change in settings
   const prevLanguagesRef = useRef<string | null>(null);
