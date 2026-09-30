@@ -57,7 +57,17 @@ export function isAllowedOrigin(
 ): boolean {
   if (!originHeader) return true;
   try {
-    const originHost = new URL(originHeader).host.toLowerCase();
+    const parsed = new URL(originHeader);
+    // Allow native mobile app WebView schemes (Capacitor/Ionic)
+    if (
+      parsed.protocol === "capacitor:" ||
+      parsed.protocol === "ionic:" ||
+      parsed.protocol === "content:" ||
+      parsed.protocol === "file:"
+    ) {
+      return true;
+    }
+    const originHost = parsed.host.toLowerCase();
     if (hostHeader) {
       const requestHost = hostHeader.toLowerCase();
       if (originHost === requestHost) return true;
@@ -72,7 +82,7 @@ export function isAllowedOrigin(
 // ─── Per-IP rate limiting ────────────────────────────────────────────
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_PER_IP = 120; // audio seeks trigger several range requests per track
+const RATE_LIMIT_MAX_PER_IP = 360; // accommodates multi-device NAT environments and frequent range scrubbing
 const ipHits = new Map<string, number[]>();
 let lastSweepAt = 0;
 

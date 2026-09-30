@@ -381,11 +381,13 @@ async function resolveWithInnerTubePlayer(
 
 const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
 
+const inFlightResolutions = new Map<string, Promise<StreamMeta | null>>();
+
 // ─── Main resolvers ───────────────────────────────────────────────────
 
 /**
  * Resolve a stream URL *and* return metadata (content length, MIME type,
- * bitrate).
+ * bitrate). Deduplicates concurrent requests from multiple devices or prebuffering.
  */
 export async function resolveStreamUrlWithMeta(
   videoId: string,
@@ -398,25 +400,37 @@ export async function resolveStreamUrlWithMeta(
   const cached = streamCache.get(cacheKey);
   if (cached) return cached;
 
-  if (!isCooledDown()) return null;
+  const existing = inFlightResolutions.get(cacheKey);
+  if (existing) return existing;
 
-  // Strategy 1: yt-dlp
-  let entry = await resolveWithYtDlp(videoId, quality);
+  const resolutionPromise = (async () => {
+    try {
+      if (!isCooledDown()) return null;
 
-  // Strategy 2: InnerTube Player direct API fallback
-  if (!entry) {
-    console.info(`[stream] yt-dlp unavailable or failed for ${videoId}, attempting InnerTube fallback...`);
-    entry = await resolveWithInnerTubePlayer(videoId, quality);
-  }
+      // Strategy 1: yt-dlp
+      let entry = await resolveWithYtDlp(videoId, quality);
 
-  if (entry) {
-    streamCache.set(cacheKey, entry);
-    recordSuccess();
-    return entry;
-  }
+      // Strategy 2: InnerTube Player direct API fallback
+      if (!entry) {
+        console.info(`[stream] yt-dlp unavailable or failed for ${videoId}, attempting InnerTube fallback...`);
+        entry = await resolveWithInnerTubePlayer(videoId, quality);
+      }
 
-  recordFailure();
-  return null;
+      if (entry) {
+        streamCache.set(cacheKey, entry);
+        recordSuccess();
+        return entry;
+      }
+
+      recordFailure();
+      return null;
+    } finally {
+      inFlightResolutions.delete(cacheKey);
+    }
+  })();
+
+  inFlightResolutions.set(cacheKey, resolutionPromise);
+  return resolutionPromise;
 }
 
 /**

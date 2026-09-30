@@ -187,8 +187,14 @@ export function useAudioPlayer(options: {
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
-    const saved = localStorage.getItem("melodymap.playback_speed.v1");
-    return saved ? Math.min(3, Math.max(0.25, Number(saved) || 1)) : 1;
+    try {
+      const saved = localStorage.getItem("melodymap.playback_speed.v1");
+      if (!saved) return 1;
+      const parsed = Number(saved);
+      return Number.isFinite(parsed) && parsed >= 0.25 && parsed <= 3 ? parsed : 1;
+    } catch {
+      return 1;
+    }
   });
 
   const currentTrackIdRef = useRef<string | null>(null);
@@ -216,8 +222,17 @@ export function useAudioPlayer(options: {
       try {
         const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         if (!AudioCtx) return;
-        const ctx = new AudioCtx();
+        // latencyHint: "playback" provides an adequate jitter buffer (2048-4096 samples)
+        // preventing buffer underruns, stuttering, and slow-pitch clock drift over Bluetooth A2DP
+        const ctx = new AudioCtx({ latencyHint: "playback" });
         audioCtxRef.current = ctx;
+
+        // Auto-resume if AudioContext is suspended by the browser on Bluetooth device switch
+        ctx.onstatechange = () => {
+          if (ctx.state === "suspended" && wantPlayRef.current) {
+            ctx.resume().catch(() => {});
+          }
+        };
 
         const source = ctx.createMediaElementSource(audio);
         sourceNodeRef.current = source;
@@ -280,6 +295,21 @@ export function useAudioPlayer(options: {
     if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
       audioCtxRef.current.resume().catch(() => {});
     }
+  }, []);
+
+  // Auto-resume AudioContext when Bluetooth or other audio output devices change
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.addEventListener) return;
+    const onDeviceChange = () => {
+      const ctx = audioCtxRef.current;
+      if (ctx && ctx.state === "suspended" && wantPlayRef.current) {
+        ctx.resume().catch(() => {});
+      }
+    };
+    navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
+    return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", onDeviceChange);
+    };
   }, []);
 
   // Update physical filter gains when equalizer settings change
@@ -396,7 +426,8 @@ export function useAudioPlayer(options: {
       audio.volume = 1;
       audio.muted = false;
       audio.src = url;
-      audio.playbackRate = playbackSpeed;
+      const validSpeed = Number.isFinite(playbackSpeed) && playbackSpeed > 0 ? playbackSpeed : 1;
+      audio.playbackRate = validSpeed;
       audio.load();
 
       if (wantPlayRef.current) {
@@ -469,12 +500,18 @@ export function useAudioPlayer(options: {
       if (activeEngineRef.current !== "html5") return;
       audio.muted = false;
       initWebAudio();
+      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
       setIsPlaying(true);
       setIsLoading(false);
       applyPendingSeek();
     };
     const onPlaying = () => {
       if (activeEngineRef.current !== "html5") return;
+      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
       setIsPlaying(true);
       setIsLoading(false);
       applyPendingSeek();
@@ -555,7 +592,8 @@ export function useAudioPlayer(options: {
         setDuration(0);
         const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
         audio.src = nextUrl;
-        audio.playbackRate = playbackSpeed;
+        const validSpeed = Number.isFinite(playbackSpeed) && playbackSpeed > 0 ? playbackSpeed : 1;
+        audio.playbackRate = validSpeed;
         audio.load();
         const p = audio.play();
         if (p !== undefined) {
@@ -1042,6 +1080,9 @@ export function useAudioPlayer(options: {
       return;
     }
     initWebAudio();
+    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume().catch(() => {});
+    }
     const audio = audioRef.current;
     if (audio && audio.src && audio.src.length > 0 && !audio.src.endsWith("/")) {
       audio.muted = false;
@@ -1121,10 +1162,12 @@ export function useAudioPlayer(options: {
   }, [position, seek]);
 
   const setSpeed = useCallback((speed: number) => {
-    const clamped = Math.min(3, Math.max(0.25, speed));
+    const clamped = Number.isFinite(speed) ? Math.min(3, Math.max(0.25, speed)) : 1;
     setPlaybackSpeed(clamped);
     if (typeof window !== "undefined") {
-      localStorage.setItem("melodymap.playback_speed.v1", String(clamped));
+      try {
+        localStorage.setItem("melodymap.playback_speed.v1", String(clamped));
+      } catch {}
     }
     if (activeEngineRef.current === "youtube") {
       try {

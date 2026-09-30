@@ -1770,11 +1770,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         const targetTrack = cleanQueue[safeIndex];
         if (targetTrack) {
           loadedTrackIdRef.current = targetTrack.id;
-          if (saved.isPlaying) {
-            void load(targetTrack.id, targetTrack.previewUrl, savedPos);
-          } else {
-            cue(targetTrack.id, savedPos, targetTrack.previewUrl);
-          }
+          // Always cue on initial restore to avoid NotAllowedError on mobile and audio clashes across devices
+          cue(targetTrack.id, savedPos, targetTrack.previewUrl);
         }
       } else {
         setResumed(true);
@@ -1782,7 +1779,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } catch {
       setResumed(true);
     }
-  }, [player.ready, load, cue]);
+  }, [player.ready, cue]);
 
   useEffect(() => {
     const track = current;
@@ -1855,6 +1852,40 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       consecutiveErrorsRef.current = 0;
     }
   }, [player.isPlaying]);
+
+  // Cross-tab playback coordination: pause if another tab begins playback
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
+    try {
+      const channel = new BroadcastChannel("melodymap_playback_sync");
+      channelRef.current = channel;
+      channel.onmessage = (event) => {
+        if (event?.data?.type === "PLAYING") {
+          // If another tab started playing, pause this tab so they don't fight or play over each other
+          if (isPlayingRef.current) {
+            pause();
+          }
+        }
+      };
+      return () => {
+        try {
+          channel.close();
+        } catch {}
+      };
+    } catch {
+      return;
+    }
+  }, [pause]);
+
+  // Broadcast when this tab starts playing
+  useEffect(() => {
+    if (player.isPlaying && channelRef.current) {
+      try {
+        channelRef.current.postMessage({ type: "PLAYING", trackId: current?.id });
+      } catch {}
+    }
+  }, [player.isPlaying, current?.id]);
 
   // Pre-warm the next upcoming 3 tracks' audio streams in background for zero-gap screen-off playback
   useEffect(() => {

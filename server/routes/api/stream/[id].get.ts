@@ -64,5 +64,12 @@ export default defineEventHandler(async (event) => {
     event.node.res.statusCode = 206;
   }
 
-  return sendStream(event, result.upstream.body as any);
+  try {
+    return await sendStream(event, result.upstream.body as any);
+  } catch (err: any) {
+    if (err?.name === "AbortError" || err?.code === "ECONNRESET" || err?.message?.includes("aborted")) {
+      return;
+    }
+    throw err;
+  }
 });

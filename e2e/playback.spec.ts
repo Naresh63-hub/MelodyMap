@@ -36,6 +36,7 @@ test.describe("MelodyMap Spotify-Style Playback E2E Flow", () => {
     });
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("#melodymap-core-audio")).toBeAttached({ timeout: 15000 });
   });
 
   test("1. Single-track playback: loads single track and core audio element exists", async ({ page }) => {

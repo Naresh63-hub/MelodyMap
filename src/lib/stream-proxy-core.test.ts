@@ -62,12 +62,17 @@ describe("isAllowedOrigin", () => {
     expect(isAllowedOrigin("http://localhost:5173", "melodymap-pi.vercel.app")).toBe(false);
     expect(isAllowedOrigin("http://192.168.1.5", "app.example.com")).toBe(false);
   });
+
+  it("allows native mobile app schemes (Capacitor/Ionic)", () => {
+    expect(isAllowedOrigin("capacitor://localhost", "melodymap-pi.vercel.app")).toBe(true);
+    expect(isAllowedOrigin("ionic://localhost", "melodymap-pi.vercel.app")).toBe(true);
+  });
 });
 
 describe("checkStreamRateLimit", () => {
   it("allows requests under the per-IP cap and blocks above it", () => {
     const ip = `test-ip-${Math.random()}`;
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 360; i++) {
       expect(checkStreamRateLimit(ip)).toBe(true);
     }
     expect(checkStreamRateLimit(ip)).toBe(false);
