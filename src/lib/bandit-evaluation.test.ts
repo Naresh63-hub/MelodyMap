@@ -95,10 +95,15 @@ describe("Contextual Bandit Offline Evaluation Harness", () => {
     });
 
     it("Thompson Sampling adapts and discovers optimal arms when user preferences deviate from default prior", () => {
-      // User with strong discovery & momentum preferences that invert the standard prior
+      // User whose taste is dominated by time-of-day energy fit (x1) — a strong
+      // deviation from the default prior's diffuse weights. NOTE: the deviation
+      // must land on a per-candidate feature (x1 circadian/energy varies across
+      // candidates; x0/x2/x4/x5 are session-constant in the simulation and x3 is
+      // neutral without listening stats), otherwise no policy can outperform
+      // random and the premise is inexpressible.
       const discoveryUserProfile: UserPreferenceProfile = {
-        name: "Discovery & Novelty Hunter",
-        trueWeights: [0.0, 0.1, 0.1, 0.2, 0.95, 0.8],
+        name: "Circadian Energy Matcher",
+        trueWeights: [0.1, 0.9, 0.1, 0.1, 0.0, 0.0],
         rewardNoiseStd: 0.02,
       };
 
@@ -117,18 +122,29 @@ describe("Contextual Bandit Offline Evaluation Harness", () => {
         report.results.random.cumulativeRegret,
       );
 
-      // Trajectory of regret should be sub-linear (average regret per round drops over time)
+      // "Model learns" check: the context (hourOfDay) sweeps 8→24 over the run,
+      // so early and late rounds face different phases — comparing Thompson's own
+      // early vs late rates mixes non-comparable contexts. The phase-matched,
+      // meaningful check is that Thompson's LATE regret rate beats Random's LATE
+      // regret rate over the exact same rounds.
       const firstQuarter = report.results.thompson.trajectory.find((s) => s.round >= 50);
       const lastQuarter = report.results.thompson.trajectory.at(-1);
+      const randomFirst = report.results.random.trajectory.find((s) => s.round >= 50);
+      // Each policy's late rate must come from its OWN trajectory endpoints;
+      // mixing trackers (Thompson's last with random's first) is meaningless.
+      const randomLast = report.results.random.trajectory.at(-1);
 
-      if (firstQuarter && lastQuarter) {
-        const earlyRegretRate = firstQuarter.cumulativeRegret / firstQuarter.round;
-        const lateRegretRate =
+      if (firstQuarter && lastQuarter && randomFirst && randomLast) {
+        const thompsonLateRate =
           (lastQuarter.cumulativeRegret - firstQuarter.cumulativeRegret) /
           (lastQuarter.round - firstQuarter.round);
+        const randomLateRate =
+          (randomLast.cumulativeRegret - randomFirst.cumulativeRegret) /
+          (randomLast.round - randomFirst.round);
 
-        // Regret rate in later rounds is lower than in early rounds as the model learns
-        expect(lateRegretRate).toBeLessThanOrEqual(earlyRegretRate + 0.05);
+        // Learned policy accumulates strictly less regret than random over the
+        // same late phase, proving the posterior actually uses the context.
+        expect(thompsonLateRate).toBeLessThan(randomLateRate);
       }
     });
   });

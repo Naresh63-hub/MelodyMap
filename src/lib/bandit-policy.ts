@@ -46,12 +46,23 @@ const BANDIT_STORAGE_KEY = "melodymap.bandit_state.v1";
 const REGULARIZATION_LAMBDA = 1.0;
 const EXPLORATION_VARIANCE_V = 0.5;
 
+/**
+ * Swappable RNG source for the bandit's stochastic steps (posterior sampling and
+ * exact-tie splitting). Defaults to Math.random() for production; offline
+ * evaluation injects a seeded PRNG via setBanditRngSource() so simulations are
+ * fully deterministic and CI never flakes.
+ */
+let rngSource: () => number = Math.random;
+export function setBanditRngSource(rng: (() => number) | null): void {
+  rngSource = rng ?? Math.random;
+}
+
 /** Box-Muller transform for standard Gaussian random variate N(0, 1) */
 function standardNormal(): number {
   let u = 0;
   let v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
+  while (u === 0) u = rngSource();
+  while (v === 0) v = rngSource();
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 }
 
@@ -290,11 +301,11 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
       return { track, score: predictedReward, originalIndex };
     });
 
-    // Sort descending by sampled score (exact ties randomly split)
+    // Sort descending by sampled score (exact ties split via the RNG source)
     scored.sort((a, b) => {
       const diff = b.score - a.score;
       if (Math.abs(diff) > 1e-7) return diff;
-      return Math.random() - 0.5;
+      return rngSource() - 0.5;
     });
     return scored.map((s) => s.track);
   }

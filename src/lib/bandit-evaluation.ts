@@ -1,6 +1,7 @@
 import type { TrackLike } from "./track-dedup";
 import {
   ThompsonSamplingPolicy,
+  setBanditRngSource,
   type SessionContext,
   type RecommendationPolicy,
   type BanditModelState,
@@ -378,6 +379,10 @@ export function runBanditSimulation(
     },
   };
 
+  // Thompson Sampling draws posterior samples via an injectable RNG source;
+  // wiring the seeded PRNG in makes the whole simulation deterministic.
+  setBanditRngSource(rng);
+  try {
   // Run simulation over T rounds
   for (let t = 1; t <= mergedConfig.rounds; t++) {
     // Generate context for round t
@@ -429,14 +434,35 @@ export function runBanditSimulation(
         });
       }
 
-      // Record feedback telemetry event for online updating
+      // Record feedback telemetry event for online updating.
+      // The mapping MUST be monotone in realizedReward: the previous version gave
+      // mediocre arms (0 < r <= 0.3) LIKED (+2.0) while great arms (> 0.3) only got
+      // COMPLETED (+1.0), so Thompson correctly learned to prefer mediocre tracks
+      // and late regret EXCEEDED random. Milestone events now act as graded
+      // listening depth; LIKED/REPLAYED remain reserved for genuine user actions
+      // and are never simulated.
+      const mappedEvent =
+        realizedReward <= -0.5
+          ? { eventType: "SKIPPED" as const, positionSeconds: 5 } // fastSkip -1.2
+          : realizedReward <= 0
+            ? { eventType: "SKIPPED" as const, positionSeconds: 15 } // midSkip -0.6
+            : realizedReward <= 0.15
+              ? { eventType: "PLAY_10S" as const, positionSeconds: 10 } // +0.1
+              : realizedReward <= 0.35
+                ? { eventType: "PLAY_25S" as const, positionSeconds: 25 } // +0.2
+                : realizedReward <= 0.55
+                  ? { eventType: "PLAY_50_PERCENT" as const, positionSeconds: 90 } // +0.4
+                  : realizedReward <= 0.8
+                    ? { eventType: "PLAY_85_PERCENT" as const, positionSeconds: 153 } // +0.7
+                    : { eventType: "COMPLETED" as const, positionSeconds: 180 }; // +1.0
+
       const feedbackEvent: PlaybackTelemetryEvent = {
         id: `sim-ev-${key}-${t}`,
         trackId: chosenTrack.id,
         artist: chosenTrack.artist || "",
         title: chosenTrack.title || "",
-        eventType: realizedReward > 0.3 ? "COMPLETED" : realizedReward > 0 ? "LIKED" : "SKIPPED",
-        positionSeconds: realizedReward > 0 ? 180 : 15,
+        eventType: mappedEvent.eventType,
+        positionSeconds: mappedEvent.positionSeconds,
         durationSeconds: 180,
         fractionPlayed: Math.max(0.1, Math.min(1.0, (realizedReward + 1) / 2)),
         timestamp: Date.now(),
@@ -445,6 +471,9 @@ export function runBanditSimulation(
 
       tracker.policy.recordFeedback(feedbackEvent, context);
     }
+  }
+  } finally {
+    setBanditRngSource(null); // restore Math.random() for production behavior
   }
 
   // Format report
