@@ -3,7 +3,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.melodymap.music',
   appName: 'MelodyMap',
-  webDir: 'dist/client',
+  webDir: '.output/public',
   server: {
     url: 'https://melodymap-pi.vercel.app',
     cleartext: true,

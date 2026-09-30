@@ -11,8 +11,11 @@
   </p>
 
   <p>
+    <a href="https://github.com/Naresh63-hub/Musicplayer/releases/tag/v1.0.0">
+      <img src="https://img.shields.io/badge/Release-v1.0.0-1DB954?style=flat-square&logo=android" alt="Release v1.0.0" />
+    </a>
     <img src="https://img.shields.io/badge/CI-Passing-brightgreen?style=flat-square&logo=githubactions" alt="CI Passing" />
-    <img src="https://img.shields.io/badge/Unit_Tests-95_Passed-brightgreen?style=flat-square&logo=vitest" alt="Vitest 95 Passed" />
+    <img src="https://img.shields.io/badge/Unit_Tests-119_Passed-brightgreen?style=flat-square&logo=vitest" alt="Vitest 119 Passed" />
     <img src="https://img.shields.io/badge/E2E_Tests-6_Passed-brightgreen?style=flat-square&logo=playwright" alt="Playwright E2E 6 Passed" />
     <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square&logo=react" alt="React 19" />
     <img src="https://img.shields.io/badge/TanStack-Start-ff4154?style=flat-square" alt="TanStack Start" />
@@ -159,6 +162,9 @@ Accessible directly from **Settings & Profile $\rightarrow$ Listening Insights**
 
 ## ✨ Key Features
 
+- 🔍 **Live Debounced Search**: Fast auto-search (~400-500ms debounce) that discovers tracks while you type, with stale request cancellation and provider fallbacks.
+- 🔄 **Fresh-Session Feed Discovery**: Dynamic session-level feed exclusions guarantee that refreshing the feed discovers genuinely new songs without repeating already displayed tracks.
+- 🎯 **Logical-Song Deduplication**: Collapses multiple redundant uploads, lyric videos, and re-uploads of the same song while preserving distinct artist releases.
 - ⚡ **Zero-Failure Hybrid Streaming**: High-speed Node server-side proxy paired with client-side direct streams.
 - 🎚️ **Touch-Friendly Scrub Bars**: Draggable mini and full-screen scrub bars with live time previews.
 - 📱 **PWA & Android Support**: Offline capability via IndexedDB and full APK compilation via Capacitor.
@@ -173,7 +179,7 @@ Accessible directly from **Settings & Profile $\rightarrow$ Listening Insights**
 MelodyMap enforces strict engineering rigor through automated testing and continuous integration:
 
 ```bash
-# Run 95 Vitest unit & integration tests
+# Run 119 Vitest unit & integration tests
 npm run test
 
 # Run TypeScript strict typecheck (tsc --noEmit)
@@ -217,21 +223,36 @@ Visit **`http://localhost:3000`** in your browser.
 
 ---
 
-## 📱 Mobile & Android APK Build
+## 📱 Android APK Release (v1.0.0)
 
-MelodyMap is fully configured for native Android builds via **Capacitor**:
+MelodyMap provides a fully native Android application packaged via **Capacitor**.
+
+### Download Android APK
+
+- 🚀 **[Download MelodyMap v1.0.0 APK](https://github.com/Naresh63-hub/Musicplayer/releases/download/v1.0.0/MelodyMap-v1.0.0.apk)** *(Direct APK Download)*
+- 📦 **GitHub Release**: [MelodyMap v1.0.0](https://github.com/Naresh63-hub/Musicplayer/releases/tag/v1.0.0)
+
+### Installation Instructions
+1. Download **`MelodyMap-v1.0.0.apk`** to your Android phone or tablet.
+2. Tap the downloaded `.apk` file from your notification tray or File Manager.
+3. If prompted by Android, enable **"Allow from this source"** for your browser or file manager.
+4. Tap **Install** and open **MelodyMap**.
+5. Start listening immediately (supports offline playback, guest mode, or cloud sync).
+
+### Building the APK from Source
 
 ```bash
-# Sync web build assets and compile debug APK
-npm run android:build
+# 1. Build web application assets
+npm run build
 
-# Open native project in Android Studio
-npm run android:open
-```
+# 2. Sync Capacitor with Android assets
+npx cap sync android
 
-The compiled Android debug APK is generated at:
-```
-android/app/build/outputs/apk/debug/app-debug.apk
+# 3. Compile signed Release APK with Gradle
+cd android && .\gradlew.bat assembleRelease
+
+# The generated APK is located at:
+# android/app/build/outputs/apk/release/app-release.apk
 ```
 
 ---
