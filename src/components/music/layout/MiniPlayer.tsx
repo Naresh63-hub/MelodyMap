@@ -1,8 +1,7 @@
-import { useCallback, useRef, useState } from "react";
-import { Heart, Loader2, Pause, Play, SkipForward, Sliders } from "lucide-react";
+import { useRef } from "react";
+import { Heart, Loader2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
-import { formatTime } from "@/lib/use-audio-player";
 
 type Props = {
   track: Track | undefined;
@@ -14,15 +13,16 @@ type Props = {
   onTogglePlay: () => void;
   onToggleLike?: () => void;
   onNext: () => void;
+  onPrevious?: () => void;
   onOpenPlayer: () => void;
   onOpenEqualizer?: () => void;
   onSeek?: (seconds: number) => void;
 };
 
 /**
- * Compact mini player docked above the mobile bottom navigation.
- * Styled with Deep Royal Violet glass and ambient glow.
- * Features an interactive, draggable scrub bar at the top with touch-friendly controls.
+ * Clean, human-designed music player dock anchored above bottom navigation.
+ * Standard streaming architecture: [Artwork] [Song/Artist] [Like] [Prev] [Play/Pause] [Next]
+ * Very thin progress hairline on top edge.
  */
 export function MiniPlayer({
   track,
@@ -34,163 +34,79 @@ export function MiniPlayer({
   onTogglePlay,
   onToggleLike,
   onNext,
+  onPrevious,
   onOpenPlayer,
-  onOpenEqualizer,
+  onOpenEqualizer: _onOpenEqualizer,
   onSeek,
 }: Props) {
   const barRef = useRef<HTMLDivElement | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragPosition, setDragPosition] = useState(0);
 
-  const activePosition = isDragging ? dragPosition : position;
-  const progressPct = duration > 0 ? Math.min(100, Math.max(0, (activePosition / duration) * 100)) : 0;
+  const progressPct =
+    duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
 
-  const getRatio = useCallback((clientX: number) => {
-    const rect = barRef.current?.getBoundingClientRect();
-    if (!rect || rect.width === 0) return 0;
-    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-  }, []);
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+  const handleBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!onSeek || duration <= 0) return;
-    e.stopPropagation();
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {}
-    setIsDragging(true);
-    const ratio = getRatio(e.clientX);
-    const target = ratio * duration;
-    setDragPosition(target);
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || duration <= 0) return;
-    e.stopPropagation();
-    const ratio = getRatio(e.clientX);
-    setDragPosition(ratio * duration);
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    e.stopPropagation();
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {}
-    setIsDragging(false);
-    if (onSeek && duration > 0) {
-      const ratio = getRatio(e.clientX);
-      onSeek(ratio * duration);
-    }
-  };
-
-  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {}
-    setIsDragging(false);
+    const rect = barRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return;
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    onSeek(ratio * duration);
   };
 
   return (
     <div
-      className="fixed z-40 border-t border-purple-500/20 bg-[#120d22]/95 backdrop-blur-2xl shadow-2xl max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0"
+      className="fixed z-40 border-t border-white/[0.08] bg-[#121212]/95 backdrop-blur-md shadow-2xl max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
-      {/* Interactive Draggable Scrub Bar at Top of MiniPlayer */}
+      {/* 1.5px Hairline Progress Indicator at Top */}
       <div
         ref={barRef}
-        role="slider"
-        tabIndex={0}
-        aria-label="Seek track"
+        role="progressbar"
+        aria-label="Track progress"
+        aria-valuenow={Math.round(position)}
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
-        aria-valuenow={Math.round(activePosition)}
-        className="group relative -mt-2 h-4 w-full cursor-pointer touch-none select-none flex items-center py-1.5"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
+        onClick={handleBarClick}
+        className="relative w-full h-[2px] bg-white/[0.08] cursor-pointer"
       >
-        {/* Floating timestamp tooltip while dragging */}
-        {isDragging && duration > 0 && (
-          <div
-            className="pointer-events-none absolute -top-8 -translate-x-1/2 rounded-md bg-purple-900/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-sm border border-purple-400/30"
-            style={{ left: `${progressPct}%` }}
-          >
-            {formatTime(dragPosition)} / {formatTime(duration)}
-          </div>
-        )}
-
-        {/* Track groove */}
-        <div className="relative h-1 w-full bg-purple-950/60 rounded-full transition-all group-hover:h-1.5 overflow-visible">
-          <div
-            className="h-full bg-gradient-to-r from-purple-500 via-indigo-400 to-pink-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.5)] transition-all duration-75"
-            style={{ width: `${progressPct}%` }}
-          />
-          {/* Thumb handle */}
-          <span
-            className={cn(
-              "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md shadow-purple-600/50 transition-transform duration-75",
-              isDragging ? "scale-125 opacity-100 ring-2 ring-purple-400" : "opacity-0 group-hover:opacity-100 scale-100",
-            )}
-            style={{ left: `${progressPct}%` }}
-          />
-        </div>
+        <div
+          className="h-full bg-[#1DB954] transition-all duration-150 ease-linear"
+          style={{ width: `${progressPct}%` }}
+        />
       </div>
 
-      <div className="flex items-center gap-3 px-3.5 py-2.5">
-        {/* Artwork + Track Info — tap to open full player */}
+      {/* Main Track Row */}
+      <div className="flex-1 flex items-center justify-between px-3 gap-2.5">
+        {/* Artwork + Title/Artist -> tap anywhere to expand to Full Player */}
         <button
           type="button"
           onClick={onOpenPlayer}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left"
-          aria-label={`Open player for ${track?.title ?? "no track"}`}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          aria-label={`Open now playing view for ${track?.title ?? "current track"}`}
         >
-          <div
-            className={cn(
-              "relative h-11 w-11 shrink-0 overflow-hidden rounded-xl shadow-md shadow-purple-950/50 transition-all duration-300",
-              isPlaying && "ring-2 ring-purple-500/50 shadow-[0_0_12px_rgba(168,85,247,0.35)]"
-            )}
-          >
+          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-[#181818] border border-white/[0.08]">
             {track?.thumbnail ? (
               <img
                 src={track.thumbnail}
                 alt=""
-                className={cn(
-                  "h-full w-full object-cover transition-transform duration-500",
-                  isPlaying && "scale-105"
-                )}
+                className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-purple-900/30" />
-            )}
-            {isPlaying && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[0.5px]">
-                <div className="flex items-end gap-[2px] h-4">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="w-[2.5px] rounded-full bg-white animate-bar shadow-[0_0_6px_rgba(255,255,255,0.8)]"
-                      style={{ animationDelay: `${i * 0.15}s`, height: "100%" }}
-                    />
-                  ))}
-                </div>
-              </div>
+              <div className="flex h-full w-full items-center justify-center bg-[#1c1c1c]" />
             )}
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-bold text-white leading-tight">
-              <span className="truncate">{track?.title ?? "Pick a song"}</span>
+            <p className="truncate text-xs sm:text-[13px] font-semibold text-white/95 leading-tight">
+              {track?.title ?? "No track"}
             </p>
-            <p className="truncate text-[11px] text-purple-300/60 leading-tight mt-0.5 font-medium">
+            <p className="truncate text-[11px] text-neutral-400 leading-tight mt-0.5">
               {track?.artist ?? "—"}
             </p>
           </div>
         </button>
 
-        {/* Transport controls */}
-        <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+        {/* Playback Controls */}
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           {onToggleLike && (
             <button
               type="button"
@@ -198,59 +114,53 @@ export function MiniPlayer({
                 e.stopPropagation();
                 onToggleLike();
               }}
-              className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-full active:scale-90 transition-all",
-                liked
-                  ? "text-pink-400 hover:text-pink-300 hover:bg-pink-500/10 shadow-[0_0_12px_rgba(244,114,182,0.35)]"
-                  : "text-purple-300/70 hover:text-white hover:bg-white/5"
-              )}
-              aria-label={liked ? "Remove from favourites" : "Add to favourites (trains AI recommendations)"}
-              title={liked ? "In your favourites" : "Save to favourites (tunes your recommendations)"}
+              className="p-2 text-neutral-400 hover:text-white transition-colors"
+              aria-label={liked ? "Remove from favourites" : "Save to favourites"}
             >
               <Heart
                 className={cn(
-                  "h-4 w-4 transition-all duration-200",
-                  liked ? "fill-pink-500 text-pink-500 scale-110 drop-shadow-[0_0_8px_rgba(236,72,153,0.6)]" : "hover:scale-110"
+                  "h-4 w-4 transition-colors",
+                  liked && "fill-[#1DB954] text-[#1DB954]",
                 )}
               />
             </button>
           )}
 
-          {onOpenEqualizer && (
+          {onPrevious && (
             <button
               type="button"
-              onClick={onOpenEqualizer}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-purple-300 hover:text-white hover:bg-white/5 active:scale-90 transition-all"
-              aria-label="Equalizer & FX"
-              title="Equalizer & FX"
+              onClick={onPrevious}
+              className="p-1.5 text-neutral-400 hover:text-white transition-colors"
+              aria-label="Previous track"
             >
-              <Sliders className="h-4 w-4" />
+              <SkipBack className="h-4 w-4" />
             </button>
           )}
 
+          {/* Primary Play/Pause Button */}
           <button
             type="button"
             onClick={onTogglePlay}
             disabled={isLoading}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-600 text-white shadow-md shadow-purple-600/40 active:scale-90 transition-all disabled:opacity-80"
+            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-white" />
+              <Loader2 className="h-4 w-4 animate-spin text-black" />
             ) : isPlaying ? (
-              <Pause className="h-4 w-4 fill-current" />
+              <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-black text-black" />
             ) : (
-              <Play className="ml-0.5 h-4 w-4 fill-current" />
+              <Play className="ml-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 fill-black text-black" />
             )}
           </button>
 
           <button
             type="button"
             onClick={onNext}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-white/60 hover:text-white active:scale-90 transition-all"
+            className="p-1.5 text-neutral-400 hover:text-white transition-colors"
             aria-label="Next track"
           >
-            <SkipForward className="h-4 w-4 fill-current" />
+            <SkipForward className="h-4 w-4" />
           </button>
         </div>
       </div>

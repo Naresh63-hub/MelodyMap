@@ -84,37 +84,37 @@ export function TrackList({
           <li
             key={track.id}
             className={cn(
-              "group flex items-center gap-3 rounded-xl px-2 py-2.5 transition-all duration-200 sm:px-3 button-press focus-ring-neon",
+              "group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors sm:px-3",
               active
-                ? "bg-gradient-to-r from-pink-500/15 via-purple-500/15 to-cyan-500/5 border border-purple-500/30 shadow-[0_0_20px_rgba(168,85,247,0.15)]"
-                : "hover:bg-white/[0.04] border border-transparent hover:border-white/5",
+                ? "bg-white/[0.08]"
+                : "hover:bg-white/[0.04]",
             )}
           >
             <button
               type="button"
               onClick={() => onPlay(track, index)}
-              className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg bg-white/5 transition-all duration-300 group-hover:scale-105 group-hover:shadow-lg"
+              className="relative h-11 w-16 sm:w-20 shrink-0 overflow-hidden rounded-md bg-white/5 transition-transform duration-200 group-hover:scale-102"
               aria-label={`Play ${track.title}`}
             >
               <img
                 src={track.thumbnail}
                 alt=""
                 loading="lazy"
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                className="h-full w-full object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-              <span className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+              <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+              <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                 {active && isPlaying ? (
                   <div className="flex items-center gap-0.5">
-                    <Equalizer active className="h-4 w-4 text-pink-400 icon-glow" />
+                    <Equalizer active className="h-4 w-4 text-[#1DB954]" />
                   </div>
                 ) : (
-                  <Play className="h-5 w-5 text-white" />
+                  <Play className="h-4 w-4 text-white fill-current" />
                 )}
               </span>
               {active && (
                 <div className="absolute left-2 top-2">
-                  <Equalizer active className="h-3 w-3 text-pink-400 icon-glow" />
+                  <Equalizer active className="h-3 w-3 text-[#1DB954]" />
                 </div>
               )}
             </button>
@@ -128,19 +128,19 @@ export function TrackList({
                 <p
                   className={cn(
                     "truncate text-sm font-semibold transition-colors duration-200",
-                    active ? "text-pink-400 icon-glow" : "text-white/90 group-hover:text-white",
+                    active ? "text-[#1DB954]" : "text-white/90 group-hover:text-white",
                   )}
                 >
-                  {active && isPlaying && <Music2 className="inline mr-1 h-3 w-3 text-pink-400 icon-glow" />}
+                  {active && isPlaying && <Music2 className="inline mr-1 h-3 w-3 text-[#1DB954]" />}
                   {track.title}
                 </p>
               </button>
-              <p className="truncate text-xs text-white/40 group-hover:text-white/60 transition-colors duration-200">
+              <p className="truncate text-xs text-white/50 group-hover:text-white/70 transition-colors duration-200 mt-0.5">
                 {onArtistClick ? (
                   <button
                     type="button"
                     onClick={() => onArtistClick(track.artist)}
-                    className="underline-offset-2 hover:text-pink-400 hover:underline transition-colors"
+                    className="hover:text-white hover:underline transition-colors"
                   >
                     {track.artist}
                   </button>
@@ -151,7 +151,7 @@ export function TrackList({
               </p>
             </div>
 
-            <span className="hidden text-xs tabular-nums text-white/30 group-hover:text-white/50 transition-colors sm:block">
+            <span className="hidden text-xs tabular-nums text-white/40 group-hover:text-white/60 transition-colors sm:block">
               {track.duration}
             </span>
 
@@ -168,12 +168,12 @@ export function TrackList({
                       ? "Remove offline copy"
                       : "Download for offline"
                   }
-                  className="rounded-full p-2 text-white/30 transition-colors hover:text-pink-400 button-press"
+                  className="rounded-full p-2 text-white/40 transition-colors hover:text-white active:scale-95"
                 >
                   {downloadingIds?.has(track.id) ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin text-white/60" />
                   ) : downloadedIds?.has(track.id) ? (
-                    <CheckCircle2 className="h-4 w-4 text-primary icon-glow" />
+                    <CheckCircle2 className="h-4 w-4 text-[#1DB954]" />
                   ) : (
                     <Download className="h-4 w-4" />
                   )}
@@ -184,9 +184,9 @@ export function TrackList({
                 type="button"
                 onClick={() => onToggleLike(track)}
                 aria-label={liked ? "Remove from favourites" : "Add to favourites"}
-                className="rounded-full p-2 text-muted-foreground transition-colors hover:text-pink-400 button-press"
+                className="rounded-full p-2 text-white/40 transition-colors hover:text-white active:scale-95"
               >
-                <Heart className={cn("h-4 w-4 transition-colors", liked && "fill-pink-400 text-pink-400 icon-glow")} />
+                <Heart className={cn("h-4 w-4 transition-colors", liked && "fill-[#1DB954] text-[#1DB954]")} />
               </button>
 
               {onToggleDislike && (
@@ -194,12 +194,12 @@ export function TrackList({
                   type="button"
                   onClick={() => onToggleDislike(track)}
                   aria-label="Not for me"
-                  className="rounded-full p-2 text-muted-foreground transition-colors hover:text-destructive button-press"
+                  className="rounded-full p-2 text-white/40 transition-colors hover:text-red-400 active:scale-95"
                 >
                   <ThumbsDown
                     className={cn(
                       "h-4 w-4 transition-colors",
-                      dislikedIds?.has(track.id) && "fill-destructive text-destructive",
+                      dislikedIds?.has(track.id) && "fill-red-500 text-red-500",
                     )}
                   />
                 </button>
@@ -209,7 +209,7 @@ export function TrackList({
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     aria-label="Add to playlist"
-                    className="rounded-full p-2 text-white/30 transition-colors hover:text-pink-400 button-press"
+                    className="rounded-full p-2 text-white/40 transition-colors hover:text-white active:scale-95"
                   >
                     <Plus className="h-4 w-4" />
                   </DropdownMenuTrigger>

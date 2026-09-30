@@ -81,20 +81,18 @@ export function MobileDrawer({
       />
 
       {/* Drawer panel */}
-      <div className="relative flex w-4/5 max-w-xs flex-1 flex-col bg-[#0f0f18] border-r border-white/10 shadow-2xl z-10 animate-slide-in">
+      <div className="relative flex w-4/5 max-w-xs flex-1 flex-col bg-[#121212] border-r border-white/10 shadow-2xl z-10 animate-slide-in">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <div className="flex items-center gap-2.5">
             <img
               src="/brand/app-icon.png"
               alt="MelodyMap"
-              className="h-8 w-8 rounded-lg object-cover shadow-md"
+              className="h-8 w-8 rounded-lg object-cover shadow-sm"
             />
             <span className="font-display text-base font-bold">
               <span className="text-white">Melody</span>
-              <span className="bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent">
-                Map
-              </span>
+              <span className="text-[#1DB954]">Map</span>
             </span>
           </div>
           <button
@@ -113,17 +111,17 @@ export function MobileDrawer({
               <img
                 src={userAvatar}
                 alt=""
-                className="h-10 w-10 rounded-full object-cover border border-white/15"
+                className="h-9 w-9 rounded-full object-cover border border-white/15"
               />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-pink-600 text-white font-semibold text-sm">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#242424] text-white font-semibold text-xs border border-white/10">
                 {userInitial}
               </div>
             )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{userName}</p>
               <p className="text-[11px] text-white/40">
-                {isSynced ? "Account synced" : "Local guest mode"}
+                {isSynced ? "Account synced" : "Local mode"}
               </p>
             </div>
           </div>
@@ -135,7 +133,7 @@ export function MobileDrawer({
                 onClose();
                 onSignIn();
               }}
-              className="shrink-0 rounded-full bg-purple-600/30 border border-purple-500/40 px-3 py-1 text-xs font-semibold text-purple-200 hover:bg-purple-600/50 transition-colors"
+              className="shrink-0 rounded-full bg-white/[0.08] border border-white/10 px-3 py-1 text-xs font-semibold text-white/90 hover:bg-white/[0.12] transition-colors"
             >
               Sign In
             </button>
@@ -146,7 +144,7 @@ export function MobileDrawer({
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 scrollbar-hide">
           {navGroups.map((group) => (
             <div key={group.title}>
-              <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-1.5">
+              <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1.5">
                 {group.title}
               </p>
               <div className="space-y-0.5">
@@ -159,16 +157,16 @@ export function MobileDrawer({
                       type="button"
                       onClick={() => handleNav(item.id)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-medium transition-colors text-left",
+                        "flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors text-left",
                         active
-                          ? "bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-white border border-pink-500/30"
+                          ? "bg-white/[0.08] text-white font-semibold"
                           : "text-white/60 hover:bg-white/[0.04] hover:text-white"
                       )}
                     >
                       <Icon
                         className={cn(
                           "h-4 w-4 shrink-0",
-                          active ? "text-pink-400" : "text-white/40"
+                          active ? "text-[#1DB954]" : "text-white/40"
                         )}
                       />
                       <span>{item.label}</span>
@@ -188,10 +186,10 @@ export function MobileDrawer({
               onClose();
               onOpenSettings();
             }}
-            className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-medium text-white/60 hover:bg-white/[0.04] hover:text-white text-left"
+            className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.04] hover:text-white text-left transition-colors"
           >
             <Settings2 className="h-4 w-4 text-white/40" />
-            <span>Settings & Preferences</span>
+            <span>Settings</span>
           </button>
 
           {isSynced && onSignOut ? (
@@ -201,7 +199,7 @@ export function MobileDrawer({
                 onClose();
                 void onSignOut();
               }}
-              className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-medium text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 text-left transition-colors"
+              className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 text-left transition-colors"
             >
               <LogOut className="h-4 w-4 text-rose-400" />
               <span>Sign Out</span>
@@ -214,10 +212,10 @@ export function MobileDrawer({
                   onClose();
                   onSignIn();
                 }}
-                className="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-purple-300 hover:bg-purple-500/10 hover:text-purple-200 text-left transition-colors"
+                className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium text-white/80 hover:bg-white/[0.06] hover:text-white text-left transition-colors"
               >
-                <LogIn className="h-4 w-4 text-purple-400" />
-                <span>Sign In to Sync</span>
+                <LogIn className="h-4 w-4 text-white/60" />
+                <span>Sign In</span>
               </button>
             )
           )}

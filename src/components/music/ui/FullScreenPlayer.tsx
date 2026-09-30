@@ -108,34 +108,34 @@ export function FullScreenPlayer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b0813] overflow-hidden animate-fade-in">
-      {/* Blurred background cover art glow */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black overflow-hidden animate-fade-in">
+      {/* Soft ambient background art glow */}
       <div
-        className="absolute inset-0 bg-cover bg-center blur-3xl opacity-30 scale-125 transition-all duration-700 pointer-events-none"
+        className="absolute inset-0 bg-cover bg-center blur-3xl opacity-20 scale-125 transition-all duration-700 pointer-events-none"
         style={{
           backgroundImage: `url(${track.thumbnail})`,
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#0b0813]/60 via-[#0b0813]/85 to-[#0b0813]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/80 to-black pointer-events-none" />
 
       {/* Main Container */}
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col justify-between px-6 py-6 safe-top safe-bottom">
+      <div className="relative z-10 flex h-full w-full max-w-md flex-col justify-between px-6 py-6 pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pt-[calc(env(safe-area-inset-top,0px)+16px)]">
         {/* Top Header */}
         <div className="flex w-full items-center justify-between">
           <button
             type="button"
             onClick={onClose}
             aria-label="Collapse player"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.04] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-95"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-95"
           >
             <ChevronDown className="h-5 w-5" />
           </button>
 
-          <div className="text-center">
-            <p className="text-[10px] font-semibold tracking-[0.2em] uppercase text-purple-400">
+          <div className="text-center px-4 min-w-0">
+            <p className="text-[10px] font-semibold tracking-[0.16em] uppercase text-white/40">
               PLAYING FROM
             </p>
-            <p className="text-xs font-bold text-white/90 truncate max-w-[180px]">
+            <p className="text-xs font-semibold text-white/90 truncate max-w-[200px]">
               {playlistName}
             </p>
           </div>
@@ -144,32 +144,29 @@ export function FullScreenPlayer({
             type="button"
             onClick={() => onOpenOptions?.(track)}
             aria-label="Song options"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.04] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-95"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all active:scale-95"
           >
             <MoreVertical className="h-4 w-4" />
           </button>
         </div>
 
         {/* Center Artwork */}
-        <div className="flex flex-col items-center justify-center my-auto w-full">
-          <div className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-3xl shadow-2xl shadow-purple-950/80 ring-1 ring-purple-500/20">
+        <div className="flex flex-col items-center justify-center my-auto w-full py-4">
+          <div className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-2xl shadow-2xl shadow-black/80 border border-white/10">
             <img
               src={track.thumbnail}
               alt={track.title}
               className="h-full w-full object-cover"
             />
-            {isPlaying && (
-              <div className="absolute -inset-4 rounded-3xl bg-purple-600/20 blur-2xl animate-pulse -z-10" />
-            )}
           </div>
 
           {/* Track Info Row */}
           <div className="flex items-center justify-between w-full mt-6 px-1">
-            <div className="min-w-0 flex-1 pr-3">
-              <h2 className="text-xl font-bold text-white truncate">
+            <div className="min-w-0 flex-1 pr-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-white truncate tracking-tight">
                 {track.title}
               </h2>
-              <p className="text-sm font-medium text-purple-300/60 truncate mt-0.5">
+              <p className="text-sm font-medium text-white/60 truncate mt-0.5">
                 {track.artist}
               </p>
               {(track.album || track.year) && (
@@ -179,18 +176,18 @@ export function FullScreenPlayer({
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={onToggleLike}
                 aria-label="Favourite"
-                className="flex h-10 w-10 items-center justify-center rounded-full text-white/60 hover:text-purple-400 active:scale-90 transition-all"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-white/50 hover:text-white active:scale-90 transition-all"
               >
                 <Heart
                   className={cn(
                     "h-6 w-6 transition-all",
                     liked
-                      ? "fill-purple-500 text-purple-500 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]"
+                      ? "fill-[#1DB954] text-[#1DB954]"
                       : "text-white/50"
                   )}
                 />
@@ -210,9 +207,9 @@ export function FullScreenPlayer({
         </div>
 
         {/* Bottom Controls Area */}
-        <div className="w-full space-y-5 pb-2">
+        <div className="w-full space-y-4">
           {/* Seek Scrubber Bar */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <ScrubBar
               position={position}
               duration={duration}
@@ -220,21 +217,21 @@ export function FullScreenPlayer({
               onSeek={onSeek}
               className="w-full"
             />
-            <div className="flex justify-between text-[11px] font-semibold tabular-nums text-purple-300/50">
+            <div className="flex justify-between text-[11px] font-medium tabular-nums text-white/50">
               <span>{formatTime(position)}</span>
               <span>{formatTime(duration)}</span>
             </div>
           </div>
 
           {/* Primary Transport Controls Row */}
-          <div className="flex items-center justify-between px-1">
+          <div className="flex items-center justify-between px-2">
             {/* Shuffle */}
             <button
               type="button"
               onClick={onToggleShuffle}
               className={cn(
                 "p-2 text-white/40 hover:text-white transition-colors active:scale-95",
-                shuffle && "text-purple-400"
+                shuffle && "text-[#1DB954]"
               )}
               aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
               title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
@@ -242,7 +239,7 @@ export function FullScreenPlayer({
               <Shuffle className="h-5 w-5" />
             </button>
 
-            {/* Jump Backward 15s */}
+            {/* Jump Backward 5s */}
             {onSkipBackward && (
               <button
                 type="button"
@@ -270,15 +267,15 @@ export function FullScreenPlayer({
               type="button"
               onClick={onTogglePlay}
               disabled={isLoading}
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-[#0b0813] shadow-[0_0_25px_rgba(139,92,246,0.5)] hover:scale-105 active:scale-95 transition-all disabled:opacity-80"
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-black shadow-xl shadow-black/50 hover:scale-105 active:scale-95 transition-transform disabled:opacity-70"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isLoading ? (
-                <Loader2 className="h-7 w-7 animate-spin text-[#0b0813]" />
+                <Loader2 className="h-7 w-7 animate-spin text-black" />
               ) : isPlaying ? (
                 <Pause className="h-7 w-7 fill-current" />
               ) : (
-                <Play className="ml-1 h-7 w-7 fill-current" />
+                <Play className="ml-0.5 h-7 w-7 fill-current" />
               )}
             </button>
 
@@ -293,7 +290,7 @@ export function FullScreenPlayer({
               <SkipForward className="h-6 w-6 fill-current" />
             </button>
 
-            {/* Jump Forward 30s */}
+            {/* Jump Forward 5s */}
             {onSkipForward && (
               <button
                 type="button"
@@ -305,13 +302,13 @@ export function FullScreenPlayer({
               </button>
             )}
 
-            {/* Repeat (3 states: off -> all -> one -> off) */}
+            {/* Repeat */}
             <button
               type="button"
               onClick={onToggleRepeat}
               className={cn(
                 "relative p-2 text-white/40 hover:text-white transition-colors active:scale-95",
-                repeatMode !== "off" && "text-purple-400"
+                repeatMode !== "off" && "text-[#1DB954]"
               )}
               aria-label={`Repeat mode: ${repeatMode}`}
               title={
@@ -323,7 +320,7 @@ export function FullScreenPlayer({
               }
             >
               {repeatMode === "one" ? (
-                <Repeat1 className="h-5 w-5 text-purple-400" />
+                <Repeat1 className="h-5 w-5 text-[#1DB954]" />
               ) : (
                 <Repeat className="h-5 w-5" />
               )}
@@ -331,15 +328,15 @@ export function FullScreenPlayer({
           </div>
 
           {/* Bottom Toolbar Row: Speed, EQ, PiP, Shortcuts, Lyrics, Queue */}
-          <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-white/50">
+          <div className="flex items-center justify-between pt-3 border-t border-white/[0.08] text-white/50">
             {/* Left group: Speed Badge & Equalizer */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={cycleSpeed}
-                className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/10 px-3 py-1.5 text-xs font-semibold text-purple-300 hover:text-white transition-all"
+                className="flex items-center gap-1.5 rounded-full bg-white/[0.06] border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all"
               >
-                <Gauge className="h-3.5 w-3.5 text-purple-400" />
+                <Gauge className="h-3.5 w-3.5 text-white/70" />
                 <span>{playbackSpeed}x</span>
               </button>
 
@@ -349,23 +346,23 @@ export function FullScreenPlayer({
                   onClick={onOpenEqualizer}
                   aria-label="Equalizer & FX"
                   title="Equalizer & FX"
-                  className="flex items-center gap-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 px-3 py-1.5 text-xs font-semibold text-purple-300 hover:bg-purple-500/20 hover:text-white transition-all"
+                  className="flex items-center gap-1.5 rounded-full bg-white/[0.06] border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white transition-all"
                 >
-                  <Sliders className="h-3.5 w-3.5 text-purple-400" />
+                  <Sliders className="h-3.5 w-3.5 text-white/70" />
                   <span className="hidden sm:inline">EQ</span>
                 </button>
               )}
             </div>
 
             {/* Right group: PiP, Shortcuts, Lyrics, Queue */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2">
               {onOpenPip && (
                 <button
                   type="button"
                   onClick={onOpenPip}
                   aria-label="Picture-in-Picture"
                   title="Mini Floating Player"
-                  className="p-2 text-white/50 hover:text-purple-400 hover:bg-white/5 rounded-full transition-colors"
+                  className="p-2 text-white/50 hover:text-white hover:bg-white/[0.08] rounded-full transition-colors"
                 >
                   <PictureInPicture2 className="h-5 w-5" />
                 </button>
@@ -377,7 +374,7 @@ export function FullScreenPlayer({
                   onClick={onOpenShortcuts}
                   aria-label="Keyboard Shortcuts"
                   title="Keyboard Shortcuts (?)"
-                  className="p-2 text-white/50 hover:text-purple-400 hover:bg-white/5 rounded-full transition-colors"
+                  className="p-2 text-white/50 hover:text-white hover:bg-white/[0.08] rounded-full transition-colors"
                 >
                   <HelpCircle className="h-5 w-5" />
                 </button>
@@ -389,7 +386,7 @@ export function FullScreenPlayer({
                   onClick={onOpenLyrics}
                   aria-label="Lyrics"
                   title="Lyrics"
-                  className="p-2 text-white/50 hover:text-purple-400 hover:bg-white/5 rounded-full transition-colors"
+                  className="p-2 text-white/50 hover:text-white hover:bg-white/[0.08] rounded-full transition-colors"
                 >
                   <MessageSquare className="h-5 w-5" />
                 </button>
@@ -401,7 +398,7 @@ export function FullScreenPlayer({
                   onClick={onOpenQueue}
                   aria-label="Queue"
                   title="Queue"
-                  className="p-2 text-white/50 hover:text-purple-400 hover:bg-white/5 rounded-full transition-colors"
+                  className="p-2 text-white/50 hover:text-white hover:bg-white/[0.08] rounded-full transition-colors"
                 >
                   <ListMusic className="h-5 w-5" />
                 </button>

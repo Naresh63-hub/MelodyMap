@@ -52,7 +52,9 @@ export interface FeedExclusions {
  * Artist name alone never merges two songs (the gate is conjunctive with
  * areSameTrack).
  */
-function sameSong(a: TrackLike, b: TrackLike): boolean {
+export function sameSong(a: TrackLike, b: TrackLike): boolean {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
   if (!areSameTrack(a, b)) return false;
   const artistA = norm(a.artist || "");
   const artistB = norm(b.artist || "");
@@ -108,13 +110,14 @@ export function uniqueByTrackId<T>(tracks: readonly T[]): T[] {
 
 /**
  * Apply ALL hard freshness + duration filters to a candidate pool.
- * Run this BEFORE Thompson Sampling ranking. Order inside this function:
- *   1. duplicate removal
- *   2. previously-displayed exclusion
- *   3. liked exclusion
- *   4. recently-played exclusion
- *   5. current-track exclusion
- *   6. duration gate (0 < secs <= 600)
+ * Run this BEFORE Thompson Sampling ranking.
+ * Strict pipeline order:
+ *   1. duration filter (0 < secs <= 600, unknown rejected)
+ *   2. in-pool logical duplicate removal (first occurrence wins)
+ *   3. previously-displayed exclusion (exact ID or logical same song)
+ *   4. liked exclusion (exact ID or logical same song)
+ *   5. recently-played exclusion (exact ID or logical same song)
+ *   6. current-track exclusion (exact ID or logical same song)
  */
 export function filterFeedCandidates<T extends TrackLike>(
   tracks: readonly T[],
@@ -134,22 +137,76 @@ export function filterFeedCandidates<T extends TrackLike>(
   for (const t of tracks) {
     const id = trackIdOf(t);
     if (!id) continue;
-    // Fast exact-ID pass (O(1))
-    if (displayedIds?.has(id)) continue; // previously displayed this session
-    if (likedIds?.has(id)) continue; // liked — remains in Library, not fresh picks
-    if (playedIds?.has(id)) continue; // recently played
-    if (currentId && id === currentId) continue; // currently playing
-    // Fuzzy same-song pass: a re-upload with a DIFFERENT ID is still the same song.
-    if (displayedTracks.some((r) => sameSong(r, t))) continue;
-    if (likedTracks.some((r) => sameSong(r, t))) continue;
-    if (playedTracks.some((r) => sameSong(r, t))) continue;
-    if (currentTrack && sameSong(currentTrack, t)) continue;
-    // In-pool duplicate uploads: same song from multiple users keeps first occurrence.
+
+    // 1. Duration filter: only 0 < secs <= 600
+    if (!hasPlayableDuration(t)) continue;
+
+    // 2. In-pool logical duplicate removal: first valid occurrence wins
     if (out.some((existing) => sameSong(existing, t))) continue;
-    if (!hasPlayableDuration(t)) continue; // 0 < secs <= 600, known duration
+
+    // 3. Exclude previously displayed songs in this session
+    if (displayedIds?.has(id)) continue;
+    if (displayedTracks.some((r) => sameSong(r, t))) continue;
+
+    // 4. Exclude liked songs (they stay in the Library)
+    if (likedIds?.has(id)) continue;
+    if (likedTracks.some((r) => sameSong(r, t))) continue;
+
+    // 5. Exclude recently played songs
+    if (playedIds?.has(id)) continue;
+    if (playedTracks.some((r) => sameSong(r, t))) continue;
+
+    // 6. Exclude current track
+    if (currentId && id === currentId) continue;
+    if (currentTrack && sameSong(currentTrack, t)) continue;
+
     out.push(t);
   }
   return out;
+}
+
+/**
+ * Deep candidate search: iterates through candidate batches (pages/providers)
+ * until enough fresh, un-displayed songs are collected or sources are exhausted.
+ */
+export async function collectFreshCandidates<T extends TrackLike>(
+  fetchBatch: (depth: number) => Promise<readonly T[] | null | undefined> | readonly T[] | null | undefined,
+  exclusions: FeedExclusions,
+  options?: {
+    targetCount?: number;
+    maxDepth?: number;
+  },
+): Promise<T[]> {
+  const targetCount = options?.targetCount ?? 16;
+  const maxDepth = options?.maxDepth ?? 5;
+  const candidates: T[] = [];
+  let depth = 1;
+
+  while (depth <= maxDepth) {
+    const batch = await fetchBatch(depth);
+    if (!batch || batch.length === 0) break;
+
+    const prevCount = candidates.length;
+    for (const t of batch) {
+      if (t && !candidates.some((existing) => sameSong(existing, t))) {
+        candidates.push(t);
+      }
+    }
+
+    const fresh = filterFeedCandidates(candidates, exclusions);
+    if (fresh.length >= targetCount) {
+      return fresh;
+    }
+
+    // Stop if batch added no new candidates (source exhausted)
+    if (candidates.length === prevCount) {
+      break;
+    }
+
+    depth++;
+  }
+
+  return filterFeedCandidates(candidates, exclusions);
 }
 
 /**

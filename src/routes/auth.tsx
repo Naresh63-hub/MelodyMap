@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getSupabaseEnv, setLocalSupabaseCredentials, supabase } from "@/integrations/supabase/client";
+import { getSupabaseEnv, supabase } from "@/integrations/supabase/client";
 
 function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -96,9 +96,6 @@ function AuthPage() {
   const [successNote, setSuccessNote] = useState<string | null>(() => {
     return isRecoveryUrl() ? "Password recovery link verified. Enter your new password below." : null;
   });
-  const [customUrl, setCustomUrl] = useState("");
-  const [customKey, setCustomKey] = useState("");
-  const [showConfigBox, setShowConfigBox] = useState(false);
   const supabaseEnv = getSupabaseEnv();
   const isConfigured = supabaseEnv.isConfigured;
 
@@ -163,10 +160,27 @@ function AuthPage() {
     setSuccessNote(null);
 
     if (!isConfigured) {
+      if (mode === "reset_password" || mode === "forgot") {
+        setBusy(false);
+        setErrorNote("Password reset requires a cloud account. You can sign in directly or continue as guest.");
+        return;
+      }
+
+      // Free flow of login: immediately log in locally
+      const displayName = name.trim() || email.split("@")[0] || "Listener";
+      if (typeof window !== "undefined") {
+        localStorage.setItem("melodymap.guest_mode", "true");
+        localStorage.setItem(
+          "melodymap.local_user",
+          JSON.stringify({
+            id: "local-" + Math.random().toString(36).substring(2, 9),
+            name: displayName,
+            email: email.trim(),
+          }),
+        );
+      }
       setBusy(false);
-      setErrorNote(
-        "Supabase is not configured on this deployment. Please add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your Vercel Project Settings > Environment Variables.",
-      );
+      void navigate({ to: "/", replace: true });
       return;
     }
 
@@ -255,6 +269,23 @@ function AuthPage() {
         });
         setBusy(false);
         if (error) {
+          const msg = error.message?.toLowerCase() || "";
+          if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("connection")) {
+            const displayName = name.trim() || email.split("@")[0] || "Listener";
+            if (typeof window !== "undefined") {
+              localStorage.setItem("melodymap.guest_mode", "true");
+              localStorage.setItem(
+                "melodymap.local_user",
+                JSON.stringify({
+                  id: "local-" + Math.random().toString(36).substring(2, 9),
+                  name: displayName,
+                  email: email.trim(),
+                }),
+              );
+            }
+            void navigate({ to: "/", replace: true });
+            return;
+          }
           setErrorNote(formatAuthError(error.message));
           return;
         }
@@ -283,7 +314,19 @@ function AuthPage() {
         void navigate({ to: "/", replace: true });
       } catch (err: any) {
         setBusy(false);
-        setErrorNote(err?.message || "Sign up failed.");
+        const displayName = name.trim() || email.split("@")[0] || "Listener";
+        if (typeof window !== "undefined") {
+          localStorage.setItem("melodymap.guest_mode", "true");
+          localStorage.setItem(
+            "melodymap.local_user",
+            JSON.stringify({
+              id: "local-" + Math.random().toString(36).substring(2, 9),
+              name: displayName,
+              email: email.trim(),
+            }),
+          );
+        }
+        void navigate({ to: "/", replace: true });
       }
       return;
     }
@@ -296,6 +339,23 @@ function AuthPage() {
       });
       setBusy(false);
       if (error) {
+        const msg = error.message?.toLowerCase() || "";
+        if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("connection")) {
+          const displayName = email.split("@")[0] || "Listener";
+          if (typeof window !== "undefined") {
+            localStorage.setItem("melodymap.guest_mode", "true");
+            localStorage.setItem(
+              "melodymap.local_user",
+              JSON.stringify({
+                id: "local-" + Math.random().toString(36).substring(2, 9),
+                name: displayName,
+                email: email.trim(),
+              }),
+            );
+          }
+          void navigate({ to: "/", replace: true });
+          return;
+        }
         setErrorNote(formatAuthError(error.message));
         return;
       }
@@ -320,7 +380,19 @@ function AuthPage() {
       void navigate({ to: "/", replace: true });
     } catch (err: any) {
       setBusy(false);
-      setErrorNote(err?.message || "Sign in failed.");
+      const displayName = email.split("@")[0] || "Listener";
+      if (typeof window !== "undefined") {
+        localStorage.setItem("melodymap.guest_mode", "true");
+        localStorage.setItem(
+          "melodymap.local_user",
+          JSON.stringify({
+            id: "local-" + Math.random().toString(36).substring(2, 9),
+            name: displayName,
+            email: email.trim(),
+          }),
+        );
+      }
+      void navigate({ to: "/", replace: true });
     }
   };
 
@@ -329,9 +401,18 @@ function AuthPage() {
     setSuccessNote(null);
 
     if (!isConfigured) {
-      setErrorNote(
-        "Google Sign-In requires Supabase credentials. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your Vercel Project Settings > Environment Variables.",
-      );
+      if (typeof window !== "undefined") {
+        localStorage.setItem("melodymap.guest_mode", "true");
+        localStorage.setItem(
+          "melodymap.local_user",
+          JSON.stringify({
+            id: "local-google-" + Math.random().toString(36).substring(2, 9),
+            name: "Listener",
+            email: "listener@local.dev",
+          }),
+        );
+      }
+      void navigate({ to: "/", replace: true });
       return;
     }
 
@@ -359,17 +440,17 @@ function AuthPage() {
 
   if (oauthLoading) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-[#07060d] px-4 py-8 text-foreground">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-8 text-foreground">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl p-0.5 shadow-2xl shadow-purple-500/30 animate-pulse">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl p-0.5 shadow-2xl shadow-black/60 animate-pulse">
             <img
               src="/brand/app-icon.png"
               alt="MelodyMap"
               className="h-full w-full rounded-2xl object-cover"
             />
           </div>
-          <div className="flex items-center gap-2 text-purple-300">
-            <Loader2 className="h-5 w-5 animate-spin" />
+          <div className="flex items-center gap-2 text-white/70">
+            <Loader2 className="h-5 w-5 animate-spin text-[#1DB954]" />
             <span className="text-sm font-semibold">Completing secure sign-in...</span>
           </div>
         </div>
@@ -378,13 +459,13 @@ function AuthPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#07060d] px-4 py-8 text-foreground selection:bg-purple-500/30">
+    <main className="flex min-h-screen items-center justify-center bg-black px-4 py-8 text-foreground selection:bg-white/20">
       <div className="w-full max-w-md space-y-6">
         {/* Header Branding */}
         <div className="flex flex-col items-center gap-3 text-center">
           <Link
             to="/"
-            className="flex h-16 w-16 items-center justify-center rounded-2xl p-0.5 shadow-2xl shadow-purple-500/30 hover:scale-105 transition-transform"
+            className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl shadow-black/40 hover:scale-105 transition-transform"
           >
             <img
               src="/brand/app-icon.png"
@@ -394,19 +475,19 @@ function AuthPage() {
           </Link>
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Melody<span className="bg-gradient-to-r from-pink-400 via-purple-300 to-cyan-300 bg-clip-text text-transparent">Map</span>
+              Melody<span className="text-[#1DB954]">Map</span>
             </h1>
-            <p className="text-xs text-purple-200/60 mt-1">
-              Sync your favourites, playlists, and AI picks across all your devices
+            <p className="text-xs text-white/50 mt-1">
+              Your personalized music space
             </p>
           </div>
         </div>
 
         {/* Auth Card */}
-        <div className="rounded-3xl border border-white/10 bg-[#100d1d]/90 p-6 sm:p-7 shadow-2xl backdrop-blur-xl">
+        <div className="rounded-2xl border border-white/10 bg-[#121212] p-6 sm:p-7 shadow-2xl">
           {/* Mode Switcher */}
           {mode === "signin" || mode === "signup" ? (
-            <div className="mb-6 flex rounded-full bg-white/[0.04] p-1 border border-white/5 text-xs font-semibold">
+            <div className="mb-6 flex rounded-full bg-white/[0.04] p-1 border border-white/10 text-xs font-semibold">
               {(["signin", "signup"] as const).map((m) => (
                 <button
                   key={m}
@@ -418,8 +499,8 @@ function AuthPage() {
                   }}
                   className={`flex-1 rounded-full py-2.5 transition-all duration-200 ${
                     mode === m
-                      ? "bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/25"
-                      : "text-white/50 hover:text-white"
+                      ? "bg-white text-black font-semibold shadow-sm"
+                      : "text-white/60 hover:text-white"
                   }`}
                 >
                   {m === "signin" ? "Sign In" : "Create Account"}
@@ -435,7 +516,7 @@ function AuthPage() {
                   setErrorNote(null);
                   setSuccessNote(null);
                 }}
-                className="inline-flex items-center gap-1.5 text-xs text-purple-300 hover:text-white transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5" /> Back to Sign In
               </button>
@@ -445,94 +526,9 @@ function AuthPage() {
             </div>
           )}
 
-          {/* Supabase Connection Status / Quick Connect */}
-          {isConfigured && !showConfigBox ? (
-            <div className="mb-4 flex items-center justify-between rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-2 text-[11px] text-emerald-300">
-              <div className="flex items-center gap-2 truncate">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <span className="truncate font-mono">
-                  Connected: {supabaseEnv.url.replace(/^https?:\/\//, "").replace(/\/.*$/, "")}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowConfigBox(true)}
-                className="text-[10px] text-emerald-400/80 hover:text-emerald-200 underline shrink-0 cursor-pointer ml-2"
-              >
-                Change
-              </button>
-            </div>
-          ) : (
-            <div className="mb-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 leading-relaxed space-y-3">
-              <div>
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold text-amber-300 text-xs flex items-center gap-1.5">
-                    <span>⚡ Connect Supabase for Cloud Login</span>
-                  </p>
-                  {isConfigured && (
-                    <button
-                      type="button"
-                      onClick={() => setShowConfigBox(false)}
-                      className="text-[11px] text-white/50 hover:text-white"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
-                <p className="text-amber-200/70 text-[11px] mt-1">
-                  Enter your Supabase Project URL and Anon Key to record logins and sync your playlists, or set them in Vercel Project Settings.
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-1">
-                <Input
-                  placeholder="https://your-project.supabase.co"
-                  value={customUrl}
-                  onChange={(e) => setCustomUrl(e.target.value)}
-                  className="h-8 rounded-lg border-amber-500/30 bg-black/40 text-xs text-white placeholder:text-white/30 font-mono"
-                />
-                <Input
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9... (anon key)"
-                  type="password"
-                  value={customKey}
-                  onChange={(e) => setCustomKey(e.target.value)}
-                  className="h-8 rounded-lg border-amber-500/30 bg-black/40 text-xs text-white placeholder:text-white/30 font-mono"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      if (!customUrl.trim() || !customKey.trim()) return;
-                      setLocalSupabaseCredentials(customUrl.trim(), customKey.trim());
-                      window.location.reload();
-                    }}
-                    className="flex-1 h-8 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs cursor-pointer shadow-md"
-                  >
-                    Save &amp; Connect Project
-                  </Button>
-                  {isConfigured && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setLocalSupabaseCredentials("", "");
-                        window.location.reload();
-                      }}
-                      className="h-8 rounded-lg border-white/10 text-xs text-white/70 hover:text-white cursor-pointer"
-                    >
-                      Reset
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Error Banner */}
           {errorNote && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-300 animate-in fade-in">
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-300 animate-in fade-in">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
               <p className="flex-1 leading-relaxed">{errorNote}</p>
             </div>
@@ -540,7 +536,7 @@ function AuthPage() {
 
           {/* Success Banner */}
           {successNote && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-300 animate-in fade-in">
+            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-300 animate-in fade-in">
               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
               <p className="flex-1 leading-relaxed">{successNote}</p>
             </div>
@@ -558,7 +554,7 @@ function AuthPage() {
                     onChange={(e) => setName(e.target.value)}
                     maxLength={60}
                     placeholder="Your name or nickname"
-                    className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                    className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-white/30"
                   />
                 </div>
               </div>
@@ -578,7 +574,7 @@ function AuthPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@example.com"
-                    className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                    className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-white/30"
                   />
                 </div>
               </div>
@@ -599,7 +595,7 @@ function AuthPage() {
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value)}
                   placeholder="e.g. 123456 or token"
-                  className="h-10 rounded-xl border-white/10 bg-white/[0.04] px-3.5 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50 font-mono"
+                  className="h-10 rounded-xl border-white/10 bg-white/[0.04] px-3.5 text-xs text-white placeholder:text-white/30 focus:border-white/30 font-mono"
                 />
               </div>
             )}
@@ -617,14 +613,14 @@ function AuthPage() {
                         setErrorNote(null);
                         setSuccessNote(null);
                       }}
-                      className="text-[11px] text-purple-300 hover:text-purple-200 transition-colors cursor-pointer"
+                      className="text-[11px] text-white/50 hover:text-white transition-colors cursor-pointer"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
@@ -634,7 +630,7 @@ function AuthPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 6 characters"
-                    className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 pr-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                    className="h-10 rounded-lg border-white/10 bg-white/[0.06] pl-10 pr-10 text-xs text-white placeholder:text-white/40 focus:border-white/30"
                   />
                   <button
                     type="button"
@@ -654,7 +650,7 @@ function AuthPage() {
                 <div className="space-y-1.5">
                   <Label htmlFor="new-password" className="text-xs text-white/80 font-medium">New Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
                     <Input
                       id="new-password"
                       type={showPassword ? "text" : "password"}
@@ -664,7 +660,7 @@ function AuthPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter at least 6 characters"
-                      className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 pr-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                      className="h-10 rounded-lg border-white/10 bg-white/[0.06] pl-10 pr-10 text-xs text-white placeholder:text-white/40 focus:border-white/30"
                     />
                     <button
                       type="button"
@@ -680,7 +676,7 @@ function AuthPage() {
                 <div className="space-y-1.5">
                   <Label htmlFor="confirm-password" className="text-xs text-white/80 font-medium">Confirm New Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
                     <Input
                       id="confirm-password"
                       type={showPassword ? "text" : "password"}
@@ -690,7 +686,7 @@ function AuthPage() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Re-enter your new password"
-                      className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                      className="h-10 rounded-lg border-white/10 bg-white/[0.06] pl-10 text-xs text-white placeholder:text-white/40 focus:border-white/30"
                     />
                   </div>
                 </div>
@@ -699,21 +695,33 @@ function AuthPage() {
 
             <Button
               type="submit"
-              className="w-full h-10 rounded-xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 font-semibold text-white shadow-lg shadow-purple-500/20 hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer"
+              className="w-full h-11 rounded-full bg-white hover:bg-white/90 font-semibold text-black text-sm active:scale-[0.99] transition-all cursor-pointer shadow-md"
               disabled={busy}
             >
               {busy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin text-black" />
               ) : mode === "signin" ? (
-                "Sign In to MelodyMap"
+                "Sign In"
               ) : mode === "signup" ? (
                 "Create Account"
               ) : mode === "forgot" ? (
-                "Send Password Reset Link"
+                "Send Reset Link"
               ) : (
-                "Save New Password & Continue"
+                "Save Password & Continue"
               )}
             </Button>
+
+            {mode === "signin" && (
+              <div className="pt-1 text-center">
+                <button
+                  type="button"
+                  onClick={handleContinueAsGuest}
+                  className="text-xs text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                  Or continue without signing in →
+                </button>
+              </div>
+            )}
 
             {mode === "forgot" && (
               <div className="pt-2 text-center">
@@ -724,9 +732,9 @@ function AuthPage() {
                     setErrorNote(null);
                     setSuccessNote(null);
                   }}
-                  className="text-xs text-purple-300 hover:text-white underline underline-offset-4 transition-colors cursor-pointer"
+                  className="text-xs text-white/60 hover:text-white underline underline-offset-4 transition-colors cursor-pointer"
                 >
-                  Already have a reset code or clicked email link? Enter new password
+                  Already have a reset code? Enter new password
                 </button>
               </div>
             )}
@@ -743,7 +751,7 @@ function AuthPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full h-10 rounded-xl border-white/10 bg-white/[0.03] text-xs font-medium text-white hover:bg-white/[0.08] hover:text-white transition-colors"
+                className="w-full h-11 rounded-full border-white/10 bg-white/[0.04] text-xs font-semibold text-white hover:bg-white/[0.08] hover:text-white transition-colors"
                 disabled={googleBusy}
                 onClick={() => void google()}
               >
@@ -775,14 +783,14 @@ function AuthPage() {
           )}
         </div>
 
-        {/* Guest Mode Back Link */}
+        {/* Free flow footer */}
         <p className="text-center text-xs text-white/40">
           <button
             type="button"
             onClick={handleContinueAsGuest}
-            className="inline-flex items-center gap-1.5 hover:text-purple-300 underline underline-offset-4 transition-colors cursor-pointer"
+            className="hover:text-white transition-colors cursor-pointer"
           >
-            <span>Continue listening as guest (local only)</span>
+            <span>Skip and listen as guest (local only)</span>
           </button>
         </p>
       </div>

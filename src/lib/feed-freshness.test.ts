@@ -6,6 +6,8 @@ import {
   recordDisplayedTracks,
   uniqueByTrackId,
   trackIdOf,
+  sameSong,
+  collectFreshCandidates,
 } from "./feed-freshness";
 import type { Track } from "./types";
 
@@ -193,4 +195,170 @@ describe("Feed freshness: session exclusion set and duration gate", () => {
     const exclusions2 = session.snapshot([]);
     expect(filterFeedCandidates(feed2Pool, exclusions2).map((t) => t.id)).toEqual(["c"]);
   });
+
+  describe("Session-level never-show-again guarantee (Tests A through G)", () => {
+    it("Test A: previously displayed track is rejected ([A, B, C] displayed, [A, B, C, D, E] candidates -> [D, E])", () => {
+      const displayed = [mkTrack("A", "3:00"), mkTrack("B", "3:30"), mkTrack("C", "4:00")];
+      const exclusions = buildExclusions(displayed, [], [], undefined);
+      const candidates = [
+        mkTrack("A", "3:00"),
+        mkTrack("B", "3:30"),
+        mkTrack("C", "4:00"),
+        mkTrack("D", "4:15"),
+        mkTrack("E", "2:50"),
+      ];
+      const fresh = filterFeedCandidates(candidates, exclusions);
+      expect(fresh.map((t) => t.id)).toEqual(["D", "E"]);
+    });
+
+    it("Test B: previously displayed logical duplicate is rejected (Tum Hi Ho - Artist - 262s vs Tum Hi Ho - Artist - Topic - 261s)", () => {
+      const displayed: Track = {
+        ...mkTrack("orig_1", "4:22", "Arijit Singh"),
+        title: "Tum Hi Ho",
+      };
+      const exclusions = buildExclusions([displayed], [], [], undefined);
+
+      const reUploadCandidate: Track = {
+        ...mkTrack("topic_2", "4:21", "Arijit Singh - Topic"),
+        title: "Tum Hi Ho",
+      };
+      const freshCandidate: Track = {
+        ...mkTrack("kesariya_3", "4:28", "Arijit Singh"),
+        title: "Kesariya",
+      };
+
+      expect(sameSong(displayed, reUploadCandidate)).toBe(true);
+      const fresh = filterFeedCandidates([reUploadCandidate, freshCandidate], exclusions);
+      expect(fresh.map((t) => t.id)).toEqual(["kesariya_3"]);
+    });
+
+    it("Test C: same title with different artists remain distinct (Love by Artist A vs Love by Artist B)", () => {
+      const loveA: Track = { ...mkTrack("love_a", "3:30", "Artist A"), title: "Love" };
+      const loveB: Track = { ...mkTrack("love_b", "3:30", "Artist B"), title: "Love" };
+
+      expect(sameSong(loveA, loveB)).toBe(false);
+
+      // If loveA was displayed, loveB should NOT be excluded
+      const exclusions = buildExclusions([loveA], [], [], undefined);
+      const fresh = filterFeedCandidates([loveB], exclusions);
+      expect(fresh.map((t) => t.id)).toEqual(["love_b"]);
+    });
+
+    it("Test D: refresh twice never repeats any previously displayed logical song (Feed 1 -> Feed 2 -> Feed 3)", () => {
+      const displayedHistory: Track[] = [];
+      const displayedIds = new Set<string>();
+
+      const recordFeed = (tracks: Track[]) => {
+        for (const t of tracks) {
+          displayedIds.add(t.id);
+          if (!displayedHistory.some((existing) => sameSong(existing, t))) {
+            displayedHistory.push(t);
+          }
+        }
+      };
+
+      // Feed 1: A, B, C
+      const feed1 = [mkTrack("A", "3:00"), mkTrack("B", "3:30"), mkTrack("C", "4:00")];
+      recordFeed(feed1);
+
+      // Refresh 2: pool with A, B, C, D, E, F
+      const pool2 = [
+        mkTrack("A", "3:00"),
+        mkTrack("B", "3:30"),
+        mkTrack("C", "4:00"),
+        mkTrack("D", "3:20"),
+        mkTrack("E", "3:40"),
+        mkTrack("F", "4:10"),
+      ];
+      const exclusions2 = {
+        previouslyDisplayedIds: displayedIds,
+        previouslyDisplayed: displayedHistory,
+        likedIds: new Set<string>(),
+        recentlyPlayedIds: new Set<string>(),
+        currentTrackId: null,
+      };
+      const feed2 = filterFeedCandidates(pool2, exclusions2);
+      expect(feed2.map((t) => t.id)).toEqual(["D", "E", "F"]);
+      recordFeed(feed2);
+
+      // Refresh 3: pool with A..I (including topic re-upload of D)
+      const dReupload: Track = {
+        ...mkTrack("D_topic", "3:21", "Artist - Topic"),
+        title: "Song D",
+      };
+      const pool3 = [
+        mkTrack("A", "3:00"),
+        mkTrack("B", "3:30"),
+        dReupload,
+        mkTrack("E", "3:40"),
+        mkTrack("G", "3:15"),
+        mkTrack("H", "4:05"),
+        mkTrack("I", "3:55"),
+      ];
+      const exclusions3 = {
+        previouslyDisplayedIds: displayedIds,
+        previouslyDisplayed: displayedHistory,
+        likedIds: new Set<string>(),
+        recentlyPlayedIds: new Set<string>(),
+        currentTrackId: null,
+      };
+      const feed3 = filterFeedCandidates(pool3, exclusions3);
+      // None of A, B, C, D, E, F (or D_topic) appear!
+      expect(feed3.map((t) => t.id)).toEqual(["G", "H", "I"]);
+    });
+
+    it("Test E: deeper search continues fetching batches if batch 1 yields only displayed songs", async () => {
+      const displayed = [mkTrack("A", "3:00"), mkTrack("B", "3:30"), mkTrack("C", "4:00")];
+      const exclusions = buildExclusions(displayed, [], [], undefined);
+
+      const batches: Record<number, Track[]> = {
+        1: [mkTrack("A", "3:00"), mkTrack("B", "3:30"), mkTrack("C", "4:00")], // All already displayed
+        2: [mkTrack("D", "3:10"), mkTrack("E", "3:20"), mkTrack("F", "3:30")], // Fresh songs
+      };
+
+      let fetchCount = 0;
+      const fresh = await collectFreshCandidates(
+        (depth) => {
+          fetchCount++;
+          return batches[depth] ?? [];
+        },
+        exclusions,
+        { targetCount: 3, maxDepth: 4 },
+      );
+
+      expect(fetchCount).toBe(2);
+      expect(fresh.map((t) => t.id)).toEqual(["D", "E", "F"]);
+    });
+
+    it("Test F: liked, recently played, and current track exclusions continue working", () => {
+      const current = mkTrack("now_playing", "3:00");
+      const liked = [mkTrack("liked_1", "3:10"), mkTrack("liked_2", "3:20")];
+      const played = [mkTrack("played_1", "3:30"), mkTrack("played_2", "3:40")];
+      const exclusions = buildExclusions([], liked, played, current);
+
+      const candidates = [
+        mkTrack("now_playing", "3:00"),
+        mkTrack("liked_1", "3:10"),
+        mkTrack("played_1", "3:30"),
+        mkTrack("fresh_track", "3:50"),
+      ];
+
+      const result = filterFeedCandidates(candidates, exclusions);
+      expect(result.map((t) => t.id)).toEqual(["fresh_track"]);
+    });
+
+    it("Test G: duration > 600s rejected (10:01, 15:00), exactly 600s (10:00) allowed", () => {
+      const exclusions = buildExclusions([], [], [], undefined);
+      const candidates = [
+        mkTrack("too_long_1", "10:01"),
+        mkTrack("too_long_2", "15:00"),
+        mkTrack("exact_limit", "10:00"),
+        mkTrack("normal", "3:45"),
+      ];
+
+      const result = filterFeedCandidates(candidates, exclusions);
+      expect(result.map((t) => t.id)).toEqual(["exact_limit", "normal"]);
+    });
+  });
 });
+

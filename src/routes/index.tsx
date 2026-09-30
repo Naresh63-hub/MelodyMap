@@ -111,10 +111,12 @@ import { useMediaSession } from "@/lib/use-media-session";
 import { getBlob, listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 import { areSameTrack, trackExistsIn, dedupeTracks, type TrackLike } from "@/lib/track-dedup";
+import { resolveRestorablePlayback } from "@/lib/playback-restore";
 import {
   filterFeedCandidates,
   hasPlayableDuration,
   recordDisplayedTracks,
+  sameSong,
 } from "@/lib/feed-freshness";
 import {
   contextEngine,
@@ -253,6 +255,8 @@ function MusicApp() {
   const [searching, setSearching] = useState(false);
   const [searchContinuation, setSearchContinuation] = useState<string | undefined>(undefined);
   const searchPageRef = useRef<number>(1);
+  const activeSearchIdRef = useRef<number>(0);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [recs, setRecs] = useState<Track[]>(() => cachedFeed.recs || []);
@@ -471,42 +475,41 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   dailyMixTracksRef.current = dailyMixTracks;
   const likedIds = useMemo(() => new Set(likes.map((t) => t.id)), [likes]);
   const dislikedIds = useMemo(() => new Set(dislikes.map((t) => t.id)), [dislikes]);
-  // Session-scoped feed freshness (never persisted): tracks shown in feeds this session,
-  // plus recently-played IDs. Prevents refresh from re-serving the same songs without
-  // permanently blacklisting them.
+  // Session-scoped feed freshness (never persisted across browser reloads):
+  // tracks shown in feeds this session, plus recently-played and liked tracks.
+  // Guarantees songs already displayed earlier in the SAME session never appear again on refresh.
   const previouslyDisplayedIdsRef = useRef<Set<string>>(new Set());
-  const recentlyPlayedIdsRef = useRef<Set<string>>(new Set());
-  // Real track objects (bounded) so fuzzy same-song matching works across different upload IDs.
+  // Real logical Track objects for fuzzy same-song matching across different upload IDs
   const displayedTracksRef = useRef<Track[]>([]);
-  const rememberDisplayedTracks = useCallback((tracks: readonly Track[]) => {
-    const displayedTracks = displayedTracksRef.current;
+
+  /** Mark tracks as displayed for this session so subsequent refreshes never repeat them. */
+  const markFeedDisplayed = useCallback((tracks: readonly Track[]) => {
+    if (!tracks || tracks.length === 0) return;
+    const displayed = displayedTracksRef.current;
+    const ids = previouslyDisplayedIdsRef.current;
     for (const t of tracks) {
-      if (!displayedTracks.some((d) => areSameTrack(d, t as TrackLike))) displayedTracks.push(t);
+      if (!t?.id) continue;
+      ids.add(t.id);
+      if (!displayed.some((d) => sameSong(d, t as TrackLike))) {
+        displayed.push(t);
+      }
     }
-    if (displayedTracks.length > 200) displayedTracksRef.current = displayedTracks.slice(-200);
+    // High session bound to prevent memory leaks while guaranteeing session-long freshness
+    if (displayed.length > 1000) {
+      displayedTracksRef.current = displayed.slice(-1000);
+    }
   }, []);
+
   const applyFeedFilters = useCallback(
-    (pool: Track[], opts?: { ignoreDisplay?: boolean }) => {
-      if (!opts?.ignoreDisplay) {
-        for (const t of recsRef.current) previouslyDisplayedIdsRef.current.add(t.id);
-        for (const t of trendingRef.current) previouslyDisplayedIdsRef.current.add(t.id);
-        for (const t of dailyMixTracksRef.current) previouslyDisplayedIdsRef.current.add(t.id);
-        for (const lists of Object.values(mixTracksRef.current)) {
-          for (const t of lists) previouslyDisplayedIdsRef.current.add(t.id);
-        }
-        for (const t of queueRef.current) previouslyDisplayedIdsRef.current.add(t.id);
-        for (const h of history) recentlyPlayedIdsRef.current.add(h.id);
-        rememberDisplayedTracks([
-          ...recsRef.current,
-          ...trendingRef.current,
-          ...dailyMixTracksRef.current,
-          ...queueRef.current,
-        ]);
+    (pool: Track[]) => {
+      const recentIds = new Set<string>();
+      for (const h of history) {
+        if (h?.id) recentIds.add(h.id);
       }
       return filterFeedCandidates(pool, {
         previouslyDisplayedIds: previouslyDisplayedIdsRef.current,
         likedIds,
-        recentlyPlayedIds: recentlyPlayedIdsRef.current,
+        recentlyPlayedIds: recentIds,
         currentTrackId: currentRef.current?.id ?? null,
         previouslyDisplayed: displayedTracksRef.current,
         liked: likes,
@@ -514,16 +517,25 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         current: currentRef.current ?? null,
       });
     },
-    [likedIds, likes, history, rememberDisplayedTracks],
+    [likedIds, likes, history],
   );
-  /** Mark tracks as displayed so future refreshes exclude them. */
-  const markFeedDisplayed = useCallback(
-    (tracks: readonly Track[]) => {
-      recordDisplayedTracks(previouslyDisplayedIdsRef.current, tracks);
-      rememberDisplayedTracks(tracks);
-    },
-    [rememberDisplayedTracks],
-  );
+
+  // Record initially visible tracks into session displayed-tracks tracking on mount
+  const initialRecordedRef = useRef(false);
+  useEffect(() => {
+    if (initialRecordedRef.current) return;
+    initialRecordedRef.current = true;
+    const initial = [
+      ...recsRef.current,
+      ...trendingRef.current,
+      ...dailyMixTracksRef.current,
+      ...Object.values(mixTracksRef.current).flat(),
+    ];
+    if (initial.length > 0) {
+      markFeedDisplayed(initial);
+    }
+  }, [markFeedDisplayed]);
+
   const dislikedIdsRef = useRef(dislikedIds);
   dislikedIdsRef.current = dislikedIds;
   const canPrev = queue.length > 0;
@@ -961,7 +973,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               },
             });
             if (res2.tracks) {
-              pureMusic = pureMusic.concat(res2.tracks as Track[]);
+              for (const t of res2.tracks as Track[]) {
+                if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                  pureMusic.push(t);
+                }
+              }
               fresh = applyFeedFilters(pureMusic);
             }
           }
@@ -998,7 +1014,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             },
           });
           if (res2.tracks) {
-            pureMusic = pureMusic.concat(res2.tracks as Track[]);
+            for (const t of res2.tracks as Track[]) {
+              if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                pureMusic.push(t);
+              }
+            }
             fresh = applyFeedFilters(pureMusic);
           }
         }
@@ -1039,7 +1059,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               },
             });
             if (res2.tracks) {
-              pureMusic = pureMusic.concat(res2.tracks as Track[]);
+              for (const t of res2.tracks as Track[]) {
+                if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                  pureMusic.push(t);
+                }
+              }
               fresh = applyFeedFilters(pureMusic);
             }
           }
@@ -1066,60 +1090,65 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       try {
         await Promise.allSettled([
           (async () => {
-            const res = await runRecommend({
-              data: {
-                liked: likes.slice(0, 15).map(trackLabel),
-                recent: history.slice(0, 15).map(trackLabel),
-                disliked: dislikes.slice(0, 15).map(trackLabel),
-                sequence: sequenceBrief(history, stats),
-                skipped: skippedLabels(stats),
-                count: 24,
-                ...(mood ? { mood } : {}),
-                languages: settings.languages,
-                brief: settingsToBrief(settings),
-                artists: topArtists(stats, likes),
-                refreshNonce: nonce,
-                discovery: settings.discovery ?? 40,
-                affinityArtists: affinity.affinityArtists,
-                penalizedArtists: affinity.penalizedArtists,
-                clientHour,
-              },
-            });
-            if (res.tracks) {
-              let pureMusic = res.tracks as Track[];
-              // Freshness: fetch MORE candidates instead of re-serving displayed songs.
-              let fresh = applyFeedFilters(pureMusic);
-              if (fresh.length < 8) {
-                const res2 = await runRecommend({
-                  data: {
-                    liked: likes.slice(0, 15).map(trackLabel),
-                    recent: history.slice(0, 15).map(trackLabel),
-                    disliked: dislikes.slice(0, 15).map(trackLabel),
-                    sequence: sequenceBrief(history, stats),
-                    skipped: skippedLabels(stats),
-                    count: 24,
-                    ...(mood ? { mood } : {}),
-                    languages: settings.languages,
-                    brief: settingsToBrief(settings),
-                    artists: topArtists(stats, likes),
-                    refreshNonce: `${nonce}-2`,
-                    discovery: settings.discovery ?? 40,
-                    affinityArtists: affinity.affinityArtists,
-                    penalizedArtists: affinity.penalizedArtists,
-                    clientHour,
-                  },
-                });
-                if (res2.tracks) {
-                  pureMusic = pureMusic.concat(res2.tracks as Track[]);
-                  fresh = applyFeedFilters(pureMusic);
+            const pureMusic: Track[] = [];
+            let fresh: Track[] = [];
+            const maxDepth = 4;
+            for (let depth = 1; depth <= maxDepth; depth++) {
+              const res = await runRecommend({
+                data: {
+                  liked: likes.slice(0, 15).map(trackLabel),
+                  recent: history.slice(0, 15).map(trackLabel),
+                  disliked: dislikes.slice(0, 15).map(trackLabel),
+                  sequence: sequenceBrief(history, stats),
+                  skipped: skippedLabels(stats),
+                  count: 24,
+                  ...(mood ? { mood } : {}),
+                  languages: settings.languages,
+                  brief: settingsToBrief(settings),
+                  artists: topArtists(stats, likes),
+                  refreshNonce: depth === 1 ? nonce : `${nonce}-depth-${depth}`,
+                  discovery: settings.discovery ?? 40,
+                  affinityArtists: affinity.affinityArtists,
+                  penalizedArtists: affinity.penalizedArtists,
+                  clientHour,
+                },
+              });
+              if (res.tracks) {
+                for (const t of res.tracks as Track[]) {
+                  if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                    pureMusic.push(t);
+                  }
                 }
+                fresh = applyFeedFilters(pureMusic);
+                if (fresh.length >= 12) break;
               }
-              const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-              const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
-              setRecs(distributed);
-              markFeedDisplayed(distributed);
-              writeHomeCache({ recs: distributed });
             }
+
+            // Fallback to trending catalog if deep search is still sparse
+            if (fresh.length < 8) {
+              const fallbackRes = await runTrending({
+                data: {
+                  languages: settings.languages,
+                  count: 24,
+                  refreshNonce: `${nonce}-fallback`,
+                  clientHour,
+                },
+              });
+              if (fallbackRes.tracks) {
+                for (const t of fallbackRes.tracks as Track[]) {
+                  if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                    pureMusic.push(t);
+                  }
+                }
+                fresh = applyFeedFilters(pureMusic);
+              }
+            }
+
+            const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+            const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+            setRecs(distributed);
+            markFeedDisplayed(distributed);
+            writeHomeCache({ recs: distributed });
           })(),
           (async () => {
             const res = await runTrending({
@@ -1132,8 +1161,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
-              const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
+              const fresh = applyFeedFilters(pureMusic);
+              const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
               setTrendingList(ranked);
+              markFeedDisplayed(ranked);
               writeHomeCache({ trendingList: ranked });
             }
           })(),
@@ -1154,12 +1185,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (res.tracks) {
               const pureMusic = res.tracks as Track[];
-              const ranked = thompsonSamplingPolicy.rankCandidates(dedupeTracks(pureMusic), getSessionContext());
+              const fresh = applyFeedFilters(pureMusic);
+              const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
               setMixTracks((prev) => {
                 const next = { ...prev, newrelease: ranked };
                 writeHomeCache({ mixTracks: next });
                 return next;
               });
+              markFeedDisplayed(ranked);
             }
           })(),
           (async () => {
@@ -1180,27 +1213,40 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       try {
         const clientHour = new Date().getHours();
         const affinity = contextEngine.getAffinityWeights(stats);
-        const res = await runRecommend({
-          data: {
-            liked: likes.slice(0, 15).map(trackLabel),
-            recent: history.slice(0, 15).map(trackLabel),
-            disliked: dislikes.slice(0, 15).map(trackLabel),
-            sequence: sequenceBrief(history, stats),
-            skipped: skippedLabels(stats),
-            count: 16,
-            ...(mood ? { mood } : {}),
-            languages: settings.languages,
-            brief: settingsToBrief(settings),
-            artists: topArtists(stats, likes),
-            refreshNonce: Date.now(),
-            discovery: settings.discovery ?? 40,
-            affinityArtists: affinity.affinityArtists,
-            penalizedArtists: affinity.penalizedArtists,
-            clientHour,
-          },
-        });
-        if (res.tracks && res.tracks.length > 0) {
-          const fresh = applyFeedFilters(res.tracks as Track[]);
+        const moreCandidates: Track[] = [];
+        let fresh: Track[] = [];
+        const baseNonce = Date.now();
+        for (let depth = 1; depth <= 3; depth++) {
+          const res = await runRecommend({
+            data: {
+              liked: likes.slice(0, 15).map(trackLabel),
+              recent: history.slice(0, 15).map(trackLabel),
+              disliked: dislikes.slice(0, 15).map(trackLabel),
+              sequence: sequenceBrief(history, stats),
+              skipped: skippedLabels(stats),
+              count: 16,
+              ...(mood ? { mood } : {}),
+              languages: settings.languages,
+              brief: settingsToBrief(settings),
+              artists: topArtists(stats, likes),
+              refreshNonce: `${baseNonce}-more-${depth}`,
+              discovery: settings.discovery ?? 40,
+              affinityArtists: affinity.affinityArtists,
+              penalizedArtists: affinity.penalizedArtists,
+              clientHour,
+            },
+          });
+          if (res.tracks && res.tracks.length > 0) {
+            for (const t of res.tracks as Track[]) {
+              if (!moreCandidates.some((existing) => sameSong(existing, t))) {
+                moreCandidates.push(t);
+              }
+            }
+            fresh = applyFeedFilters(moreCandidates);
+            if (fresh.length >= 8) break;
+          }
+        }
+        if (fresh.length > 0) {
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           setRecs((prev) => dedupeTracks([...prev, ...ranked]));
           markFeedDisplayed(ranked);
@@ -1316,9 +1362,23 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const searchFor = useCallback(
     async (term: string, searchType?: "songs" | "podcasts", filter?: SearchFilter) => {
-      if (!term.trim()) return;
+      // Clear any pending debounce timer on explicit search trigger
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+
+      const q = term.trim();
+      if (!q) {
+        activeSearchIdRef.current++;
+        setSearching(false);
+        setResults([]);
+        setSearchContinuation(undefined);
+        return;
+      }
+
       const t = searchType ?? "songs";
-      const f = filter ?? "all";
+      const f = filter ?? searchFilter;
       setTab("search");
       setShowSuggestions(false);
       setSearching(true);
@@ -1326,10 +1386,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       searchPageRef.current = 1;
       setQuery(term);
       setMessage(null);
+
+      const requestId = ++activeSearchIdRef.current;
+
       try {
         const res = await runSearch({
           data: {
-            query: term.trim(),
+            query: q,
             limit: 50,
             type: t,
             filter: f,
@@ -1337,6 +1400,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             offset: 0,
           },
         });
+
+        // Cancel / ignore stale responses
+        if (requestId !== activeSearchIdRef.current) return;
+
         if (res.error) setMessage(res.error);
         if (res.tracks) {
           const raw = res.tracks as Track[];
@@ -1344,12 +1411,47 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           setResults(dedupeTracks(filtered));
           setSearchContinuation(res.continuation);
         }
+      } catch {
+        if (requestId !== activeSearchIdRef.current) return;
+        setMessage("Search failed. Please try again.");
       } finally {
-        setSearching(false);
+        if (requestId === activeSearchIdRef.current) {
+          setSearching(false);
+        }
       }
     },
-    [runSearch],
+    [runSearch, searchFilter],
   );
+
+  // Automatic debounced search as user types (~450ms debounce)
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+
+    const trimmed = query.trim();
+    if (!trimmed) {
+      // Empty input: do not search, clear results to show trending/empty state
+      activeSearchIdRef.current++;
+      setSearching(false);
+      setResults([]);
+      setSearchContinuation(undefined);
+      return;
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      void searchFor(trimmed, "songs", searchFilter);
+    }, 450);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, [query, searchFilter, searchFor]);
 
   const loadMoreResults = useCallback(async () => {
     if (loadingMoreSearch || !query.trim()) return;
@@ -1621,7 +1723,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const onSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    void searchFor(query);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    void searchFor(trimmed, "songs", searchFilter);
   };
 
   /** Remove a track from a playlist with undo support (5-second window). */
@@ -1754,21 +1862,23 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     try {
       const saved = readPlayback();
       if (saved && Array.isArray(saved.queue) && saved.queue.length > 0) {
-        // Hard rule: restore only tracks with known duration <= 600s (podcasts exempt).
-        const cleanQueue = saved.queue.filter((t: Track) => isPodcastTrack(t) || hasPlayableDuration(t));
-        if (cleanQueue.length === 0) {
+        // Resolve BEFORE filtering: relocate the interrupted song by ID in the cleaned
+        // queue so a refresh restores the SAME track (naive index clamping points at
+        // the wrong song when unplayable tracks precede it). Music restarts at 0:00;
+        // podcasts keep their saved resume position.
+        const resolved = resolveRestorablePlayback(saved);
+        if (resolved.empty) {
           setResumed(true);
           return;
         }
-        setQueue(cleanQueue);
-        markFeedDisplayed(cleanQueue);
-        const safeIndex = Math.min(Math.max(0, saved.index || 0), cleanQueue.length - 1);
-        setIndex(safeIndex);
-        const savedPos = typeof saved.position === "number" && !isNaN(saved.position) ? saved.position : 0;
-        resumeRef.current = savedPos;
+        setQueue(resolved.queue);
+        markFeedDisplayed(resolved.queue);
+        setIndex(resolved.index);
         setResumed(true);
-        const targetTrack = cleanQueue[safeIndex];
+        const targetTrack = resolved.queue[resolved.index];
         if (targetTrack) {
+          const savedPos = isPodcastTrack(targetTrack) ? resolved.position : 0;
+          resumeRef.current = savedPos;
           loadedTrackIdRef.current = targetTrack.id;
           // Always cue on initial restore to avoid NotAllowedError on mobile and audio clashes across devices
           cue(targetTrack.id, savedPos, targetTrack.previewUrl);
@@ -2104,33 +2214,59 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               >
                 <Menu className="h-5 w-5" />
               </button>
-              <form onSubmit={onSearch} className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-                <input
-                  id="main-search-input"
-                  type="search"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setShowSuggestions(true);
-                  }}
-                  placeholder="Search songs, artists, podcasts..."
-                  className="h-10 w-full rounded-full border border-white/10 bg-white/[0.04] pl-10 pr-9 text-sm text-white placeholder:text-white/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 focus:outline-none"
-                  autoComplete="off"
-                />
-                {query && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuery("");
-                      setResults([]);
-                      setSuggestions([]);
+              <form onSubmit={onSearch} className="relative flex-1 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <input
+                    id="main-search-input"
+                    type="search"
+                    value={query}
+                    onChange={(e) => {
+                      setQuery(e.target.value);
+                      setShowSuggestions(true);
                     }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 active:text-white/60"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+                    placeholder="Search songs, artists, podcasts..."
+                    className="h-10 w-full rounded-full border border-white/10 bg-white/[0.04] pl-10 pr-9 text-sm text-white placeholder:text-white/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 focus:outline-none"
+                    autoComplete="off"
+                  />
+                  {searching ? (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                    </div>
+                  ) : query ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (debounceTimerRef.current) {
+                          clearTimeout(debounceTimerRef.current);
+                          debounceTimerRef.current = null;
+                        }
+                        activeSearchIdRef.current++;
+                        setQuery("");
+                        setResults([]);
+                        setSuggestions([]);
+                        setSearching(false);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 active:text-white/60"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                </div>
+                {/* Optional manual Search trigger button */}
+                <button
+                  type="submit"
+                  aria-label="Search"
+                  title="Search"
+                  className="flex h-10 px-3.5 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-semibold text-white/90 active:scale-95 transition-all"
+                >
+                  {searching ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" />
+                  ) : (
+                    <Search className="h-3.5 w-3.5 text-white/70" />
+                  )}
+                  <span className="hidden sm:inline">Search</span>
+                </button>
               </form>
               <button
                 type="button"
@@ -2151,8 +2287,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   className={cn(
                     "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all",
                     tab === id
-                      ? "border-purple-500/50 bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-cyan-500/10 text-white font-medium"
-                      : "border-white/10 bg-white/[0.03] text-white/40 hover:text-white/70",
+                      ? "bg-white text-black font-semibold border-white shadow-sm"
+                      : "border-white/10 bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08]",
                   )}
                 >
                   {NAV_ITEMS.find((n) => n.id === id)?.label ?? id}
@@ -2167,15 +2303,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             <div className="relative w-full px-4 py-5 sm:px-6 pb-32">
               {message && (
                 <div className="pointer-events-auto fixed bottom-28 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center gap-3 rounded-full border border-white/10 bg-[#1a1a2e]/95 px-5 py-2.5 shadow-2xl backdrop-blur-md">
-                    <p className="text-xs font-medium text-white/80">
+                  <div className="flex items-center gap-3 rounded-full border border-white/10 bg-[#181818]/95 px-5 py-2.5 shadow-2xl backdrop-blur-md">
+                    <p className="text-xs font-medium text-white/90">
                       {message}
                     </p>
                     {undoLabel && (
                       <button
                         type="button"
                         onClick={handleUndo}
-                        className="text-xs font-semibold text-purple-400 hover:text-purple-300 transition-colors"
+                        className="text-xs font-semibold text-[#1DB954] hover:underline transition-colors"
                       >
                         {undoLabel}
                       </button>
@@ -2191,21 +2327,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <h1 className="text-2xl font-bold tracking-tight text-white">
-                        Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {auth.profile?.display_name?.split(" ")[0] || "Listener"} 👋
+                        Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {auth.profile?.display_name?.split(" ")[0] || "Listener"}
                       </h1>
-                      <p className="text-xs text-white/40 mt-0.5">Your personalized feed based on your mood & tastes</p>
+                      <p className="text-xs text-white/50 mt-0.5">Recommended based on your recent listening</p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="rounded-full bg-white/[0.06] text-white/70 hover:bg-white/10 hover:text-white border-white/10"
+                        className="rounded-full bg-white/[0.06] text-white/80 hover:bg-white/10 hover:text-white border-white/10 text-xs font-medium"
                         onClick={() => void loadRecommendations()}
                         disabled={recLoading}
                       >
-                        {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                        Refresh picks
+                        {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-white/60" /> : null}
+                        Refresh
                       </Button>
                     </div>
                   </div>
@@ -2218,7 +2354,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         type="button"
                         onClick={() => void loadRecommendations(mood)}
                         disabled={recLoading}
-                        className="shrink-0 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-white/50 transition-all hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white/80"
+                        className="shrink-0 rounded-full border border-white/10 bg-[#181818] px-3.5 py-1 text-xs font-medium text-white/70 transition-all hover:bg-[#242424] hover:text-white active:scale-95"
                       >
                         {mood}
                       </button>
@@ -2775,6 +2911,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onTogglePlay={togglePlay}
           onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
+          onPrevious={goPrev}
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
           onSeek={(s) => player.seek(s)}

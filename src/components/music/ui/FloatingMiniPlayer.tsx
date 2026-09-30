@@ -159,13 +159,13 @@ export function FloatingMiniPlayer({
           : undefined
       }
       className={cn(
-        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-3xl bg-[#0e0a1c]/95 backdrop-blur-2xl border border-purple-500/30 text-white shadow-2xl shadow-purple-950/80 overflow-hidden transition-shadow select-none",
-        isDragging && "cursor-grabbing ring-2 ring-purple-500 shadow-purple-900/80"
+        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl bg-[#121212]/95 backdrop-blur-2xl border border-white/10 text-white shadow-2xl shadow-black/80 overflow-hidden transition-shadow select-none",
+        isDragging && "cursor-grabbing ring-1 ring-white/30"
       )}
     >
       {/* Background ambient glow */}
       <div
-        className="absolute inset-0 bg-cover bg-center blur-2xl opacity-20 pointer-events-none -z-10"
+        className="absolute inset-0 bg-cover bg-center blur-2xl opacity-10 pointer-events-none -z-10"
         style={{ backgroundImage: `url(${track.thumbnail})` }}
       />
 
@@ -178,20 +178,20 @@ export function FloatingMiniPlayer({
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         aria-valuenow={Math.round(activePosition)}
-        className="scrubber-bar group relative h-2.5 w-full bg-white/10 cursor-pointer touch-none select-none flex items-center py-0.5"
+        className="scrubber-bar group relative h-2 w-full bg-white/15 cursor-pointer touch-none select-none flex items-center"
         onPointerDown={handleScrubPointerDown}
         onPointerMove={handleScrubPointerMove}
         onPointerUp={handleScrubPointerUp}
         onPointerCancel={handleScrubPointerCancel}
       >
         <div
-          className="h-1.5 w-full bg-gradient-to-r from-purple-500 via-indigo-400 to-pink-500 transition-all rounded-full"
+          className="h-1 w-full bg-white group-hover:bg-[#1DB954] transition-all rounded-full"
           style={{ width: `${progressPct}%` }}
         />
         <span
           className={cn(
-            "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md shadow-purple-600/50 transition-transform duration-75",
-            isScrubbing ? "scale-125 opacity-100 ring-2 ring-purple-400" : "opacity-0 group-hover:opacity-100 scale-100",
+            "absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md transition-transform duration-75",
+            isScrubbing ? "scale-125 opacity-100 ring-2 ring-[#1DB954]/40" : "opacity-0 group-hover:opacity-100 scale-100",
           )}
           style={{ left: `${progressPct}%` }}
         />
@@ -201,8 +201,7 @@ export function FloatingMiniPlayer({
       <div className="p-3.5 space-y-3">
         {/* Header: Draggable handle & Action buttons */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-purple-400 tracking-wider">
-            <Sparkles className="h-3 w-3" />
+          <div className="text-[10px] uppercase font-semibold text-white/40 tracking-wider">
             <span>Mini Player</span>
           </div>
 
@@ -228,15 +227,15 @@ export function FloatingMiniPlayer({
 
         {/* Track Thumbnail & Info */}
         <div className="flex items-center gap-3">
-          <div className="relative h-12 w-12 shrink-0 rounded-xl overflow-hidden shadow-md shadow-purple-950/60 border border-purple-500/20">
+          <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-white/10 bg-[#181818]">
             <img src={track.thumbnail} alt={track.title} className="h-full w-full object-cover" />
             {isPlaying && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                <div className="flex items-end gap-0.5 h-4">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div className="flex items-end gap-0.5 h-3.5">
                   {[0, 1, 2].map((i) => (
                     <div
                       key={i}
-                      className="w-0.5 bg-purple-400 rounded-full animate-bar"
+                      className="w-0.5 bg-[#1DB954] rounded-full animate-bar"
                       style={{ animationDelay: `${i * 0.15}s`, height: "100%" }}
                     />
                   ))}
@@ -246,11 +245,11 @@ export function FloatingMiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <h4 className="text-xs font-bold text-white truncate leading-tight">{track.title}</h4>
-            <p className="text-[11px] text-purple-300/70 truncate mt-0.5 font-medium leading-tight">
+            <h4 className="text-xs font-semibold text-white truncate leading-tight">{track.title}</h4>
+            <p className="text-[11px] text-white/60 truncate mt-0.5 leading-tight">
               {track.artist}
             </p>
-            <div className="flex items-center justify-between text-[10px] text-white/40 mt-1 font-mono">
+            <div className="flex items-center justify-between text-[10px] text-white/40 mt-1 tabular-nums font-mono">
               <span>{formatTime(position)}</span>
               <span>{formatTime(duration)}</span>
             </div>
@@ -259,24 +258,19 @@ export function FloatingMiniPlayer({
 
         {/* Transport Controls */}
         <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-1.5 flex-1 justify-center">
+          <div className="flex items-center gap-2 flex-1 justify-center">
             {onToggleLike && (
               <button
                 type="button"
                 onClick={onToggleLike}
-                className={cn(
-                  "p-1.5 rounded-full active:scale-90 transition-all",
-                  liked
-                    ? "text-pink-400 hover:text-pink-300 hover:bg-pink-500/10 shadow-[0_0_10px_rgba(244,114,182,0.3)]"
-                    : "text-white/60 hover:text-white hover:bg-white/5"
-                )}
-                aria-label={liked ? "Remove from favourites" : "Add to favourites (trains recommendations)"}
-                title={liked ? "In your favourites" : "Save to favourites (tunes your recommendations)"}
+                className="p-1.5 rounded-full active:scale-90 transition-all text-white/60 hover:text-white hover:bg-white/5"
+                aria-label={liked ? "Remove from favourites" : "Add to favourites"}
+                title={liked ? "In your favourites" : "Save to favourites"}
               >
                 <Heart
                   className={cn(
                     "h-4 w-4 transition-transform duration-200",
-                    liked ? "fill-pink-500 text-pink-500 scale-110 drop-shadow-[0_0_6px_rgba(236,72,153,0.5)]" : "hover:scale-110"
+                    liked ? "fill-[#1DB954] text-[#1DB954] scale-110" : "hover:scale-110"
                   )}
                 />
               </button>
@@ -295,7 +289,7 @@ export function FloatingMiniPlayer({
               type="button"
               onClick={onTogglePlay}
               disabled={isLoading}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-600 text-white shadow-md shadow-purple-600/40 hover:bg-purple-500 active:scale-90 transition-all"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow-md hover:scale-105 active:scale-95 transition-transform"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (

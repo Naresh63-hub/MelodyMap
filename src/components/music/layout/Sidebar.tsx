@@ -111,19 +111,17 @@ export function Sidebar({
           <img
             src="/brand/app-icon.png"
             alt="MelodyMap"
-            className="h-10 w-10 rounded-xl object-cover shadow-lg shadow-purple-500/25"
+            className="h-9 w-9 rounded-lg object-cover shadow-sm"
           />
         </div>
         {!collapsed && (
           <div className="min-w-0 animate-fade-in-up">
-            <p className="truncate font-display text-xl font-bold tracking-tight">
+            <p className="truncate font-display text-lg font-bold tracking-tight">
               <span className="text-white">Melody</span>
-              <span className="bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent">
-                Map
-              </span>
+              <span className="text-[#1DB954]">Map</span>
             </p>
-            <p className="text-[10px] uppercase tracking-[0.15em] text-white/30 font-medium">
-              Your music. Your mood.
+            <p className="text-[10px] uppercase tracking-[0.14em] text-white/30 font-medium">
+              Music player
             </p>
           </div>
         )}
@@ -134,7 +132,7 @@ export function Sidebar({
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             {!collapsed && (
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/25">
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/30">
                 {section.label}
               </p>
             )}
@@ -148,24 +146,24 @@ export function Sidebar({
                     onClick={() => onNavigate(id)}
                     title={collapsed ? label : undefined}
                     className={cn(
-                      "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200 button-press focus-ring-neon",
+                      "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
                       collapsed && "justify-center px-2",
                       active
-                        ? "bg-white/[0.08] text-white shadow-[inset_0_0_20px_rgba(168,85,247,0.08)]"
-                        : "text-white/45 hover:bg-white/[0.04] hover:text-white/80",
+                        ? "bg-white/[0.08] text-white font-semibold"
+                        : "text-white/60 hover:bg-white/[0.04] hover:text-white",
                     )}
                   >
                     {/* Active indicator bar */}
                     {active && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-[3px] rounded-full bg-gradient-to-b from-pink-400 via-purple-400 to-cyan-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-[#1DB954]" />
                     )}
 
                     <Icon
                       className={cn(
-                        "h-[18px] w-[18px] shrink-0 transition-all duration-200",
+                        "h-[18px] w-[18px] shrink-0 transition-colors",
                         active
-                          ? "text-purple-400 drop-shadow-[0_0_6px_rgba(168,85,247,0.5)]"
-                          : "text-white/35 group-hover:text-white/55",
+                          ? "text-white"
+                          : "text-white/40 group-hover:text-white/70",
                       )}
                     />
                     {!collapsed && (
@@ -255,23 +253,23 @@ export function Sidebar({
       <div className="border-t border-white/[0.06] p-3">
         {/* User card (expanded only) */}
         {!collapsed && (
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 hover:bg-white/[0.04] transition-all duration-200 cursor-default group/user">
+          <div className="mb-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 hover:bg-white/[0.04] transition-colors cursor-default group/user">
             <div className="relative shrink-0">
-              <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-pink-500/40 to-purple-500/40 text-xs font-bold text-white ring-2 ring-purple-500/20 ring-offset-1 ring-offset-[#0a0a18] group-hover/user:ring-purple-500/40 transition-all">
+              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#242424] text-xs font-semibold text-white border border-white/10">
                 {userAvatar ? (
                   <img src={userAvatar} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <User className="h-4 w-4 text-white/80" />
+                  <User className="h-4 w-4 text-white/70" />
                 )}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#0a0a18] bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]" />
+              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#121212] bg-[#1DB954]" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[13px] font-semibold text-white/85">
+              <p className="truncate text-xs font-semibold text-white/90">
                 {userName ?? "Listener"}
               </p>
-              <p className="truncate text-[10px] text-white/30">
-                {isSynced ? "☁ Synced to account" : "📱 Local mode"}
+              <p className="truncate text-[10px] text-white/40">
+                {isSynced ? "Synced to cloud" : "Local mode"}
               </p>
             </div>
           </div>

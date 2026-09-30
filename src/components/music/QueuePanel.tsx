@@ -40,7 +40,7 @@ export function QueuePanel({
     <div className="mx-auto w-full border-b border-white/5 bg-white/[0.02] px-4 pb-3 pt-3 sm:px-8 glass-panel animate-slide-up">
       <div className="mb-3 flex items-center gap-2">
         <div className="flex items-center gap-2">
-          <Music2 className="h-4 w-4 text-pink-400 icon-glow" />
+          <Music2 className="h-4 w-4 text-[#1DB954]" />
           <p className="text-sm font-semibold text-white">Queue</p>
         </div>
         <span className="text-xs text-white/40">
@@ -52,15 +52,15 @@ export function QueuePanel({
           type="button"
           onClick={onToggleContinuous}
           className={cn(
-            "ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all duration-200 button-press focus-ring-neon",
+            "ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all duration-200 button-press",
             continuous
-              ? "border-purple-500/50 bg-purple-500/20 text-white shadow-[0_0_12px_rgba(168,85,247,0.2)]"
+              ? "border-[#1DB954]/50 bg-[#1DB954]/20 text-white"
               : "border-white/10 bg-white/[0.04] text-white/50 hover:text-white/70 hover:border-white/20",
           )}
           aria-pressed={continuous}
         >
           {loadingMore ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-white/60" />
           ) : (
             <InfinityIcon className="h-3.5 w-3.5" />
           )}
@@ -71,7 +71,7 @@ export function QueuePanel({
           size="sm" 
           onClick={onClear} 
           disabled={tracks.length === 0}
-          className="text-white/50 hover:text-white hover:bg-white/5 button-press focus-ring-neon"
+          className="text-white/50 hover:text-white hover:bg-white/5 button-press"
         >
           Clear
         </Button>
@@ -80,7 +80,7 @@ export function QueuePanel({
           size="icon" 
           aria-label="Close queue" 
           onClick={onClose}
-          className="text-white/50 hover:text-white hover:bg-white/5 button-press focus-ring-neon"
+          className="text-white/50 hover:text-white hover:bg-white/5 button-press"
         >
           <X className="h-4 w-4" />
         </Button>
@@ -122,14 +122,14 @@ export function QueuePanel({
                   setOverIndex(null);
                 }}
                 className={cn(
-                  "group flex items-center gap-3 rounded-xl px-3 py-2 transition-all duration-200 button-press focus-ring-neon",
+                  "group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors",
                   active 
-                    ? "bg-gradient-to-r from-pink-500/15 via-purple-500/15 to-cyan-500/5 border border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.1)]" 
+                    ? "bg-white/[0.08]" 
                     : isPast 
                       ? "opacity-40" 
-                      : "hover:bg-white/[0.04] border border-transparent hover:border-white/5",
+                      : "hover:bg-white/[0.04]",
                   isDragging && "opacity-30 scale-95",
-                  isOver && dragIndex !== null && dragIndex !== i && "ring-2 ring-purple-500 bg-purple-500/20",
+                  isOver && dragIndex !== null && dragIndex !== i && "ring-1 ring-white/30 bg-white/10",
                 )}
               >
                 <span className="cursor-grab active:cursor-grabbing p-1 text-white/30 hover:text-white transition-colors">
@@ -139,10 +139,10 @@ export function QueuePanel({
                   {active ? (
                     isPlaying ? (
                       <div className="flex items-center justify-center">
-                        <Equalizer active className="h-3 w-3 text-pink-400 icon-glow" />
+                        <Equalizer active className="h-3 w-3 text-[#1DB954]" />
                       </div>
                     ) : (
-                      <Play className="h-3 w-3 text-pink-400" />
+                      <Play className="h-3 w-3 text-[#1DB954] fill-current" />
                     )
                   ) : (
                     i + 1
@@ -155,13 +155,13 @@ export function QueuePanel({
                 >
                   <p
                     className={cn(
-                      "truncate text-sm transition-colors duration-200",
-                      active ? "font-semibold text-pink-400" : "text-white/80 group-hover:text-white",
+                      "truncate text-sm transition-colors",
+                      active ? "font-semibold text-[#1DB954]" : "text-white/80 group-hover:text-white",
                     )}
                   >
                     {track.title}
                   </p>
-                  <p className="truncate text-xs text-white/40 group-hover:text-white/60 transition-colors duration-200">{track.artist}</p>
+                  <p className="truncate text-xs text-white/40 group-hover:text-white/60 transition-colors mt-0.5">{track.artist}</p>
                 </button>
                 <span className="hidden text-xs tabular-nums text-white/30 group-hover:text-white/50 transition-colors sm:block">
                   {track.duration}

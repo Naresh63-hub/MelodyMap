@@ -121,18 +121,18 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
     >
       {hoverX !== null && duration > 0 && (
         <div
-          className="pointer-events-none absolute bottom-6 z-30 -translate-x-1/2 rounded-lg border border-white/10 bg-[#121220]/95 p-1.5 shadow-2xl backdrop-blur-md"
+          className="pointer-events-none absolute bottom-6 z-30 -translate-x-1/2 rounded-md border border-white/10 bg-[#181818] p-1.5 shadow-xl backdrop-blur-md"
           style={{ left: hoverX }}
         >
           {thumbnail && (
             <img
               src={thumbnail}
               alt=""
-              className="h-16 w-28 rounded-md object-cover"
+              className="h-16 w-28 rounded object-cover"
               loading="lazy"
             />
           )}
-          <p className="mt-1 text-center text-[11px] tabular-nums font-semibold text-white/90">
+          <p className="mt-1 text-center text-[11px] tabular-nums font-medium text-white/90">
             {formatTime(hoverTime)}
           </p>
         </div>
@@ -154,17 +154,20 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
       >
-        <div className="relative h-1.5 w-full overflow-visible rounded-full bg-white/15 transition-all group-hover:h-2">
+        <div className="relative h-1 w-full overflow-visible rounded-full bg-white/20 transition-all group-hover:h-1.5">
           {/* Progress bar fill */}
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]"
+            className={cn(
+              "absolute inset-y-0 left-0 rounded-full transition-colors",
+              isDragging ? "bg-[#1DB954]" : "bg-white group-hover:bg-[#1DB954]"
+            )}
             style={{ width: `${pct}%` }}
           />
           {/* Thumb handle */}
           <span
             className={cn(
-              "absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-lg shadow-purple-500/50 transition-transform duration-100",
-              isDragging ? "scale-125 opacity-100 ring-4 ring-purple-500/30" : "opacity-0 group-hover:opacity-100 group-hover:scale-110",
+              "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md transition-transform duration-100",
+              isDragging ? "scale-125 opacity-100 ring-4 ring-[#1DB954]/25" : "opacity-0 group-hover:opacity-100 group-hover:scale-110",
             )}
             style={{ left: `${pct}%` }}
           />

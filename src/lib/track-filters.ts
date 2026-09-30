@@ -108,10 +108,11 @@ export const PODCAST_POSITIVE_KEYWORDS = [
 ] as const;
 
 /**
- * Unified duration string parser (e.g. "3:45", "1:02:15", "45") -> seconds.
+ * Unified duration string parser (e.g. "3:45", "1:02:15", "45", or 225) -> seconds.
  */
-export function parseDurationSeconds(dur: string | undefined | null): number {
-  if (!dur) return 0;
+export function parseDurationSeconds(dur: string | number | undefined | null): number {
+  if (dur == null) return 0;
+  if (typeof dur === "number") return Number.isFinite(dur) ? Math.max(0, Math.floor(dur)) : 0;
   const parts = dur.split(":").map((p) => Number(p.trim()));
   if (parts.some((n) => Number.isNaN(n))) return 0;
   return parts.reduce((acc, n) => acc * 60 + n, 0);
@@ -125,7 +126,7 @@ export function parseDurationSeconds(dur: string | undefined | null): number {
 export const MAX_TRACK_DURATION_SECONDS = 600;
 
 export function isMusicTrack(
-  track: { title?: string; artist?: string; duration?: string } | null | undefined,
+  track: { title?: string; artist?: string; duration?: string | number | undefined } | null | undefined,
   allowLong?: boolean | unknown,
 ): boolean {
   if (!track || !track.title) return false;
@@ -150,7 +151,7 @@ export function isMusicTrack(
  * Strict validator to guarantee a track is a genuine podcast episode.
  */
 export function isPodcastTrack(
-  track: { title?: string; artist?: string; duration?: string } | null | undefined,
+  track: { title?: string; artist?: string; duration?: string | number | undefined } | null | undefined,
   _ignored?: unknown,
 ): boolean {
   if (!track || !track.title) return false;

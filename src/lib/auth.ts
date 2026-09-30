@@ -64,6 +64,26 @@ export function useAuth() {
           }
         })();
       } else {
+        if (typeof window !== "undefined") {
+          const raw = localStorage.getItem("melodymap.local_user");
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed && typeof parsed === "object") {
+                const localId = parsed.id || "local-listener";
+                const localName = parsed.name || parsed.display_name || "Listener";
+                setUserId(localId);
+                setEmail(parsed.email || null);
+                setProfile({
+                  id: localId,
+                  display_name: localName,
+                  avatar_url: parsed.avatar_url || null,
+                });
+                return;
+              }
+            } catch {}
+          }
+        }
         setProfile(null);
       }
     };
@@ -105,6 +125,22 @@ export function useAuth() {
   const updateProfile = useCallback(
     async (patch: { display_name?: string; avatar_url?: string }): Promise<{ success: boolean; error?: string }> => {
       if (!userId) return { success: false, error: "Not signed in" };
+
+      if (userId.startsWith("local-")) {
+        const updated = {
+          id: userId,
+          display_name: patch.display_name ?? profile?.display_name ?? "Listener",
+          avatar_url: patch.avatar_url ?? profile?.avatar_url ?? null,
+        };
+        setProfile(updated);
+        if (typeof window !== "undefined") {
+          const raw = localStorage.getItem("melodymap.local_user");
+          const existing = raw ? JSON.parse(raw) : {};
+          localStorage.setItem("melodymap.local_user", JSON.stringify({ ...existing, ...updated }));
+        }
+        return { success: true };
+      }
+
       try {
         // 1. Update Supabase Auth user metadata
         const { error: metaError } = await supabase.auth.updateUser({
@@ -140,7 +176,7 @@ export function useAuth() {
         return { success: false, error: err?.message || "Failed to update profile." };
       }
     },
-    [userId],
+    [userId, profile],
   );
 
   const updatePassword = useCallback(
@@ -166,6 +202,7 @@ export function useAuth() {
     } finally {
       if (typeof window !== "undefined") {
         localStorage.removeItem("melodymap.guest_mode");
+        localStorage.removeItem("melodymap.local_user");
       }
       setUserId(null);
       setEmail(null);
