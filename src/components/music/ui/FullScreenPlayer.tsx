@@ -51,6 +51,7 @@ type Props = {
   onVolumeChange: (volume: number) => void;
   onClose: () => void;
   onOpenQueue?: () => void;
+  isQueueOpen?: boolean;
   onOpenLyrics?: () => void;
   onOpenEqualizer?: () => void;
   onOpenPip?: () => void;
@@ -88,6 +89,7 @@ export function FullScreenPlayer({
   onVolumeChange,
   onClose,
   onOpenQueue,
+  isQueueOpen = false,
   onOpenLyrics,
   onOpenEqualizer,
   onOpenPip,
@@ -395,10 +397,18 @@ export function FullScreenPlayer({
               {onOpenQueue && (
                 <button
                   type="button"
-                  onClick={onOpenQueue}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenQueue();
+                  }}
                   aria-label="Queue"
-                  title="Queue"
-                  className="p-2 text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.04] rounded-full transition-colors"
+                  title="Queue / Up Next"
+                  className={cn(
+                    "flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-95",
+                    isQueueOpen
+                      ? "text-[#1DB954] bg-[#1DB954]/15"
+                      : "text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.06]"
+                  )}
                 >
                   <ListMusic className="h-5 w-5" />
                 </button>

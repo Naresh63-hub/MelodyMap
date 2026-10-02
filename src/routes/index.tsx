@@ -2809,33 +2809,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         hasTrack={!!current}
       />
 
-      {/* MOBILE QUEUE BOTTOM SHEET */}
-      {showQueue && (
-        <MobileQueue
-          tracks={queue}
-          index={index}
-          isPlaying={player.isPlaying}
-          onJump={(i) => {
-            const target = queue[i];
-            if (target) {
-              playSong(target);
-            } else {
-              setIndex(i);
-            }
-          }}
-          onReorder={handleReorderQueue}
-          onRemove={(i) => {
-            setQueue((prev) => prev.filter((_, x) => x !== i));
-            if (i < index) setIndex((x) => Math.max(0, x - 1));
-          }}
-          onClear={() => {
-            setQueue([]);
-            setIndex(0);
-          }}
-          onClose={() => setShowQueue(false)}
-        />
-      )}
-
       {/* SUSPENSE-WRAPPED CODE-SPLIT MODALS & PANELS */}
       <Suspense fallback={null}>
         {/* FULL SCREEN PLAYER MODAL */}
@@ -2867,7 +2840,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               applyVolume(v);
             }}
             onClose={() => setShowFullScreen(false)}
-            onOpenQueue={() => setShowQueue(true)}
+            onOpenQueue={() => setShowQueue((v) => !v)}
+            isQueueOpen={showQueue}
             onOpenLyrics={() => setShowLyrics(true)}
             onOpenEqualizer={() => setShowEqualizer(true)}
             onOpenPip={() => {
@@ -3021,6 +2995,47 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onOpenChange={setShowShortcuts}
         />
       </Suspense>
+
+      {/* MOBILE QUEUE BOTTOM SHEET (Top stacking order z-[70] over full-screen player and modals) */}
+      {showQueue && (
+        <MobileQueue
+          tracks={queue}
+          index={index}
+          isPlaying={player.isPlaying}
+          onJump={(i) => {
+            const target = queue[i];
+            if (target) {
+              setIndex(i);
+              indexRef.current = i;
+              loadedTrackIdRef.current = target.id;
+              player.seek(0);
+              progressTrackerRef.current.reset(target.id);
+              void load(target.id, target.previewUrl, 0);
+            }
+          }}
+          onReorder={handleReorderQueue}
+          onRemove={(i) => {
+            setQueue((prev) => prev.filter((_, x) => x !== i));
+            if (i < index) {
+              setIndex((x) => Math.max(0, x - 1));
+              indexRef.current = Math.max(0, indexRef.current - 1);
+            }
+          }}
+          onClear={() => {
+            const cur = currentRef.current;
+            if (cur) {
+              setQueue([cur]);
+              setIndex(0);
+              indexRef.current = 0;
+            } else {
+              setQueue([]);
+              setIndex(0);
+              indexRef.current = 0;
+            }
+          }}
+          onClose={() => setShowQueue(false)}
+        />
+      )}
     </div>
   );
 }

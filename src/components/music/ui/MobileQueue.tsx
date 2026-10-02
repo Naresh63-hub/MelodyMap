@@ -38,10 +38,13 @@ export function MobileQueue({
   const past = tracks.slice(0, index);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[70] flex flex-col justify-end bg-black/75 backdrop-blur-md animate-fade-in"
+      onClick={onClose}
+    >
       {/* Sheet */}
       <div
-        className="relative max-h-[80vh] flex flex-col rounded-t-3xl bg-[#101010] border-t border-white/[0.06] shadow-2xl animate-slide-up"
+        className="relative max-h-[82vh] w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto flex flex-col rounded-t-3xl bg-[#121212] border-t border-white/10 shadow-2xl animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle */}
@@ -78,14 +81,15 @@ export function MobileQueue({
         </div>
 
         {/* Track list */}
-        <div className="flex-1 overflow-y-auto overscroll-none px-4 py-3">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3">
           {/* Now Playing */}
           {current && (
             <div className="mb-4">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-[#737373] mb-2 px-1">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-[#1DB954] mb-2 px-1 flex items-center gap-1.5">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse" />
                 Now Playing
               </p>
-              <div className="flex items-center gap-3 rounded-xl bg-[#1D1D1D] border border-white/[0.06] p-3">
+              <div className="flex items-center gap-3 rounded-xl bg-[#1D1D1D] border border-[#1DB954]/30 p-3 shadow-md">
                 <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[#161616]">
                   {current.thumbnail ? (
                     <img src={current.thumbnail} alt="" className="h-full w-full object-cover" />
@@ -109,7 +113,7 @@ export function MobileQueue({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-[#F5F5F5]">{current.title}</p>
+                  <p className="truncate text-sm font-semibold text-[#F5F5F5]">{current.title}</p>
                   <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{current.artist}</p>
                 </div>
                 <Equalizer active={isPlaying} className="h-4 w-4 text-[#1DB954] shrink-0" />
@@ -194,6 +198,14 @@ export function MobileQueue({
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Empty upcoming state */}
+          {current && upcoming.length === 0 && (
+            <div className="py-8 text-center">
+              <p className="text-xs text-[#737373]">No more songs in queue</p>
+              <p className="text-[11px] text-[#737373]/60 mt-1">Select any song or album to add to Up Next</p>
             </div>
           )}
 
