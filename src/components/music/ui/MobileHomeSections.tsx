@@ -1,4 +1,4 @@
-import { Clock, Flame, MoreVertical, Music2, TrendingUp, Sparkles, ChevronRight, Disc3 } from "lucide-react";
+import { Clock, Flame, MoreVertical, Music2, TrendingUp, Disc3 } from "lucide-react";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";

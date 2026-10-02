@@ -10,7 +10,6 @@ import {
 } from "@/lib/equalizer";
 import {
   fetchSponsorBlockSegments,
-  findSkipTarget,
   getSponsorBlockEnabled,
   type SponsorBlockSegment,
 } from "@/lib/sponsorblock";
@@ -206,7 +205,6 @@ export function useAudioPlayer(options: {
 
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
-  const prebufferGainRef = useRef<GainNode | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
 
   /** Calculate equal-power trigonometric curve for smooth crossfading without volume drop */

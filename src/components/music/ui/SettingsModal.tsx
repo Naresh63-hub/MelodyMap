@@ -18,10 +18,7 @@ import {
   KeyRound,
   Check,
   Loader2,
-  Sparkle,
   HardDrive,
-  Copy,
-  ChevronRight,
   Activity,
 } from "lucide-react";
 import { ListeningInsightsPanel } from "./ListeningInsightsPanel";

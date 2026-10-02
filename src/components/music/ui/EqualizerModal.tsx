@@ -1,15 +1,11 @@
 import { useState } from "react";
 import {
-  Activity,
   Check,
   Disc,
   Power,
-  RotateCcw,
   Sliders,
   Sparkles,
-  Volume2,
   Waves,
-  X,
   Zap,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

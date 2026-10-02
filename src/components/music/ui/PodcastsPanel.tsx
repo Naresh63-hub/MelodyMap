@@ -11,7 +11,6 @@ import {
   Play,
   RotateCcw,
   Search,
-  Sparkles,
   X,
 } from "lucide-react";
 

@@ -7,7 +7,6 @@ import {
   generateCandidatePool,
   type UserPreferenceProfile,
 } from "./bandit-evaluation";
-import { ThompsonSamplingPolicy } from "./bandit-policy";
 
 describe("Contextual Bandit Offline Evaluation Harness", () => {
   it("generates synthetic candidate pools of requested size with non-empty metadata", () => {

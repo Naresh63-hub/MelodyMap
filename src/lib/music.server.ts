@@ -4,7 +4,6 @@ import { getRequestClientIp } from "./request-context.server";
 import {
   isMusicTrack,
   isPodcastTrack,
-  parseDurationSeconds,
   NON_MUSIC_KEYWORDS,
   JUNK_MEDIA_KEYWORDS,
 } from "./track-filters";
@@ -424,7 +423,7 @@ export async function searchYouTubeDeep(
 export async function searchYouTubePage(
   continuation: string,
   musicOnly = true,
-  allowLong = false,
+  _allowLong = false,
 ): Promise<SearchPageResult> {
   return searchYouTubePaginated("", musicOnly ? "songs" : "all", continuation);
 }

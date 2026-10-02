@@ -4,7 +4,6 @@ import {
   ListMusic,
   Download,
   ChevronRight,
-  Music2,
   MoreVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";

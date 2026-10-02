@@ -30,7 +30,6 @@ export function LyricsPanel({
   onClose,
 }: Props) {
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
-  const [plainLyrics, setPlainLyrics] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
@@ -43,7 +42,6 @@ export function LyricsPanel({
     let cancelled = false;
     setLoading(true);
     setLyrics([]);
-    setPlainLyrics(null);
 
     void getTrackLyrics({
       data: {
@@ -57,7 +55,6 @@ export function LyricsPanel({
           if (res.lyrics.synced && res.lyrics.synced.length > 0) {
             setLyrics(res.lyrics.synced);
           } else if (res.lyrics.plain) {
-            setPlainLyrics(res.lyrics.plain);
             // Break plain lyrics into readable non-timed chunks
             const lines = res.lyrics.plain
               .split("\n")

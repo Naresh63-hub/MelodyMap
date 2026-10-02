@@ -1,5 +1,5 @@
-import { X, Trash2, GripVertical, Music2, Pause, Play } from "lucide-react";
-import { useRef, useState, useCallback } from "react";
+import { X, Trash2, GripVertical, Music2 } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,6 @@ export function MobileQueue({
 
   const current = tracks[index];
   const upcoming = tracks.slice(index + 1);
-  const past = tracks.slice(0, index);
 
   return (
     <div

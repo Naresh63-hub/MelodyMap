@@ -1,7 +1,6 @@
 import {
   Clock,
   Compass,
-  Disc3,
   Globe2,
   Heart,
   Layers,
@@ -12,7 +11,6 @@ import {
   Search,
   Settings2,
   Sparkles,
-  User,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";

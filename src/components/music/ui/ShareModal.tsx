@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Copy, MessageCircle, Send, Share2, Twitter, X } from "lucide-react";
+import { Check, Copy, MessageCircle, Send, Twitter, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 

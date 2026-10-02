@@ -1,4 +1,4 @@
-import { Infinity as InfinityIcon, Loader2, Pause, Play, X, GripVertical, Music2 } from "lucide-react";
+import { Infinity as InfinityIcon, Loader2, Play, X, GripVertical, Music2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/library";

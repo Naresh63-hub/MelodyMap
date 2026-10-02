@@ -1,4 +1,4 @@
-import { Clock, Flame, Music2, TrendingUp } from "lucide-react";
+import { Music2 } from "lucide-react";
 import { MediaCard } from "./MediaCard";
 import { CardGrid } from "@/components/common/CardGrid";
 import type { Track } from "@/lib/library";

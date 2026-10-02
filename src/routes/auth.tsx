@@ -3,7 +3,6 @@ import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
-  Disc3,
   Eye,
   EyeOff,
   Loader2,
@@ -312,7 +311,7 @@ function AuthPage() {
           return;
         }
         void navigate({ to: "/", replace: true });
-      } catch (err: any) {
+      } catch {
         setBusy(false);
         const displayName = name.trim() || email.split("@")[0] || "Listener";
         if (typeof window !== "undefined") {
@@ -378,7 +377,7 @@ function AuthPage() {
       }
 
       void navigate({ to: "/", replace: true });
-    } catch (err: any) {
+    } catch {
       setBusy(false);
       const displayName = email.split("@")[0] || "Listener";
       if (typeof window !== "undefined") {

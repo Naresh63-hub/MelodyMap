@@ -3,7 +3,6 @@ import {
   Download,
   Heart,
   Loader2,
-  Pause,
   Play,
   Plus,
   ThumbsDown,

@@ -2,27 +2,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Download,
-  Heart,
   Loader2,
-  Maximize2,
   Menu,
-  MessageSquare,
-  Pause,
-  Play,
-  Repeat,
   Search,
   Settings2,
-  Shuffle,
-  SkipBack,
-  SkipForward,
-  ThumbsDown,
-  Volume2,
-  VolumeX,
   X,
 } from "lucide-react";
-
-import { Equalizer, SpinningArt } from "@/components/music/NowPlayingViz";
 import { type NavTab, NAV_ITEMS } from "@/components/music/layout/Sidebar";
 import { MobileNav } from "@/components/music/layout/MobileNav";
 import { MobileDrawer } from "@/components/music/layout/MobileDrawer";
@@ -74,13 +59,8 @@ import { PodcastsPanel } from "@/components/music/ui/PodcastsPanel";
 import { AddToPlaylistModal } from "@/components/music/ui/AddToPlaylistModal";
 import { ExploreSections } from "@/components/music/ui/ExploreSections";
 import { episodeToTrack, type PodcastEpisode } from "@/lib/podcast.types";
-import { QueuePanel } from "@/components/music/QueuePanel";
-import { ScrubBar } from "@/components/music/ScrubBar";
-import { SleepTimer } from "@/components/music/SleepTimer";
 import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 
 import { useAuth } from "@/lib/auth";
 import {
@@ -105,23 +85,20 @@ import {
   getRealTrendingTracks,
   getOldSongsTracks,
   getSongRadio,
-  newSongs,
   prewarmStreams,
   recommendTracks,
   searchTracks,
-  suggestSearch,
   getDailyMix,
 } from "@/lib/music.functions";
-import { formatTime, useAudioPlayer } from "@/lib/use-audio-player";
+import { useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
-import { getBlob, listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
+import { listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
 import { cn } from "@/lib/utils";
-import { areSameTrack, trackExistsIn, dedupeTracks, type TrackLike } from "@/lib/track-dedup";
+import { trackExistsIn, dedupeTracks, type TrackLike } from "@/lib/track-dedup";
 import { resolveRestorablePlayback } from "@/lib/playback-restore";
 import {
   filterFeedCandidates,
   hasPlayableDuration,
-  recordDisplayedTracks,
   sameSong,
 } from "@/lib/feed-freshness";
 import {
@@ -132,14 +109,6 @@ import {
 } from "@/lib/context-engine";
 import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { runStartupMigrations } from "@/lib/startup-migration";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -195,8 +164,6 @@ function MusicApp() {
   const runTrending = useServerFn(getRealTrendingTracks);
   const runOldSongs = useServerFn(getOldSongsTracks);
   const runMix = useServerFn(buildMix);
-  const runNewSongs = useServerFn(newSongs);
-  const runSuggest = useServerFn(suggestSearch);
   const runPrewarm = useServerFn(prewarmStreams);
   const runDailyMix = useServerFn(getDailyMix);
 
@@ -252,12 +219,8 @@ function MusicApp() {
 
   // --- UI state ---
   const [tab, setTab] = useState<NavTab>("foryou");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [librarySection, setLibrarySection] = useState<null | "liked" | "history" | "playlists" | "downloads">(null);
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [results, setResults] = useState<Track[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchContinuation, setSearchContinuation] = useState<string | undefined>(undefined);
@@ -295,7 +258,6 @@ function MusicApp() {
   >(() => cachedFeed.mixTracks || { discover: [], newrelease: [], explore: [] });
   const [mixLoading, setMixLoading] = useState(false);
   const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>(() => cachedFeed.dailyMixTracks || []);
-  const [dailyMixLoading, setDailyMixLoading] = useState(false);
 
   const [loadingMoreRecs, setLoadingMoreRecs] = useState(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
@@ -312,8 +274,6 @@ function MusicApp() {
   const [prevVolume, setPrevVolume] = useState(80);
   // Playlist creation dialog state
   const [createPlaylistTrack, setCreatePlaylistTrack] = useState<Track | null>(null);
-  const [newPlaylistName, setNewPlaylistName] = useState("");
-  const [showClearHistory, setShowClearHistory] = useState(false);
   // Undo support for playlist track removal
   const undoRef = useRef<{ timeout: ReturnType<typeof setTimeout>; restore: () => void } | null>(null);
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
@@ -1050,71 +1010,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     [runMix, likes, history, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
-  const loadTrending = useCallback(async () => {
-    try {
-      const res = await runTrending({
-        data: {
-          languages: settings.languages,
-          count: 24,
-          refreshNonce: Date.now(),
-        },
-      });
-      if (res.tracks) {
-        const pureMusic = res.tracks as Track[];
-        // Freshness: fetch MORE candidates instead of re-serving displayed songs.
-        let fresh = applyFeedFilters(pureMusic);
-        if (fresh.length < 8) {
-          const res2 = await runTrending({
-            data: {
-              languages: settings.languages,
-              count: 24,
-              refreshNonce: `${Date.now()}-2`,
-            },
-          });
-          if (res2.tracks) {
-            for (const t of res2.tracks as Track[]) {
-              if (!pureMusic.some((existing) => sameSong(existing, t))) {
-                pureMusic.push(t);
-              }
-            }
-            fresh = applyFeedFilters(pureMusic);
-          }
-        }
-        const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-        setTrendingList(ranked);
-        markFeedDisplayed(ranked);
-        writeHomeCache({ trendingList: ranked });
-      }
-    } catch {}
-  }, [runTrending, settings.languages, getSessionContext, applyFeedFilters, markFeedDisplayed]);
-
-  const loadOldSongs = useCallback(
-    async (refreshNonce?: number | string) => {
-      try {
-        const res = await runOldSongs({
-          data: {
-            languages: settings.languages,
-            count: 24,
-            refreshNonce: refreshNonce ?? Date.now(),
-            artists: topArtists(stats, likes),
-          },
-        });
-        if (res.tracks) {
-          const pureMusic = (res.tracks as Track[]).filter(isOldEraTrack);
-          const fresh = applyFeedFilters(pureMusic);
-          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-          setOldSongsList(ranked);
-          markFeedDisplayed(ranked);
-          writeHomeCache({ oldSongsList: ranked });
-        }
-      } catch {}
-    },
-    [runOldSongs, settings.languages, stats, likes, getSessionContext, applyFeedFilters, markFeedDisplayed],
-  );
-
   const loadDailyMix = useCallback(
     async (refreshNonce?: number | string) => {
-      setDailyMixLoading(true);
       const nonce = refreshNonce ?? Date.now();
       try {
         const res = await runDailyMix({
@@ -1155,9 +1052,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           writeHomeCache({ dailyMixTracks: ranked });
         }
       } catch {}
-      finally {
-        setDailyMixLoading(false);
-      }
     },
     [runDailyMix, settings.languages, stats, likes, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
@@ -1481,7 +1375,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const t = searchType ?? "songs";
       const f = filter ?? searchFilter;
       setTab("search");
-      setShowSuggestions(false);
       setSearching(true);
       setSearchContinuation(undefined);
       searchPageRef.current = 1;
@@ -1730,33 +1623,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
   }, [load, player]);
 
-  const dislikeCurrent = useCallback(() => {
-    const track = currentRef.current;
-    if (!track) return;
-    if (!isPodcastTrack(track)) {
-      logSkip(track);
-      contextEngine.recordSkip(track);
-    }
-    toggleDislike(track);
-    if (!isPodcastTrack(track)) {
-      const ctx = getSessionContext();
-      const event = telemetry.logEvent({
-        trackId: track.id,
-        artist: track.artist,
-        title: track.title,
-        eventType: "DISLIKED",
-        positionSeconds: player.position,
-        durationSeconds: player.duration,
-        fractionPlayed: player.duration > 0 ? player.position / player.duration : 0,
-        timestamp: Date.now(),
-        context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
-      });
-      thompsonSamplingPolicy.recordFeedback(event, ctx);
-    }
-    setRecs((prev) => prev.filter((t) => t.id !== track.id));
-    goNext();
-  }, [toggleDislike, logSkip, goNext, getSessionContext, player.position, player.duration]);
-
   const handleToggleLike = useCallback(
     (track: Track) => {
       const wasLiked = likedIds.has(track.id);
@@ -1912,7 +1778,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   );
 
   const handlePlayPodcastHistory = useCallback(
-    (track: Track, allHistory: Track[], idx: number) => {
+    (track: Track, allHistory: Track[]) => {
       playSong(track, allHistory);
     },
     [playSong],
@@ -2200,24 +2066,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
   }, [hydrated, tab, oldSongsList.length, trendingList.length, mixTracks.newrelease, recLoading, loadRecommendations]);
 
-  useEffect(() => {
-    const term = query.trim();
-    if (term.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      void runSuggest({ data: { query: term } }).then((res) => {
-        if (!cancelled) setSuggestions(res.suggestions);
-      });
-    }, 220);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [query, runSuggest]);
-
   useMediaSession(current, player.isPlaying, player.position, player.duration, {
     onPlay: () => {
       if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
@@ -2263,7 +2111,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   // Mobile library sub-view navigation
   const handleMobileLibraryNav = useCallback((section: null | "liked" | "history" | "playlists" | "downloads") => {
-    setLibrarySection(section);
     if (section === "liked") setTab("likes");
     else if (section === "history") setTab("history");
     else if (section === "playlists") setTab("playlists");
@@ -2276,10 +2123,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         open={drawerOpen}
         activeTab={tab}
         onClose={() => setDrawerOpen(false)}
-        onNavigate={(t) => {
-          setTab(t);
-          setLibrarySection(null);
-        }}
+        onNavigate={setTab}
         onOpenSettings={() => {
           setDrawerOpen(false);
           setShowSettings(true);
@@ -2330,7 +2174,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     value={query}
                     onChange={(e) => {
                       setQuery(e.target.value);
-                      setShowSuggestions(true);
                     }}
                     placeholder="Search songs, artists, podcasts..."
                     className="h-10 w-full rounded-full border border-white/10 bg-white/[0.04] pl-10 pr-9 text-sm text-white placeholder:text-white/30 focus:border-white/20 focus:ring-1 focus:ring-white/10 focus:outline-none"
@@ -2351,7 +2194,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         activeSearchIdRef.current++;
                         setQuery("");
                         setResults([]);
-                        setSuggestions([]);
                         setSearching(false);
                       }}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 active:text-white/60"
@@ -2587,7 +2429,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onClear={() => {
                   setQuery("");
                   setResults([]);
-                  setSuggestions([]);
                   setSearchContinuation(undefined);
                 }}
                 onSearch={(q, type) => {
@@ -2742,7 +2583,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     )}
                   </div>
                   {tab === "history" && history.length > 0 && (
-                    <Button variant="ghost" size="sm" onClick={() => setShowClearHistory(true)} className="text-xs text-white/50 hover:text-white">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (typeof window !== "undefined" && window.confirm("Clear playback history?")) {
+                          clearHistory();
+                        }
+                      }}
+                      className="text-xs text-white/50 hover:text-white"
+                    >
                       Clear history
                     </Button>
                   )}
@@ -2867,10 +2717,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       {/* 5-Tab Bottom Navigation */}
       <MobileNav
         activeTab={tab}
-        onNavigate={(t) => {
-          setTab(t);
-          setLibrarySection(null);
-        }}
+        onNavigate={setTab}
         hasTrack={!!current}
       />
 

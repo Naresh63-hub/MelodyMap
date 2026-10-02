@@ -1,18 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ExternalLink,
   Heart,
   Maximize2,
-  Minimize2,
-  Move,
   Pause,
   Play,
   SkipBack,
   SkipForward,
-  Volume2,
-  VolumeX,
   X,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
@@ -43,13 +37,13 @@ export function FloatingMiniPlayer({
   liked = false,
   position,
   duration,
-  volume,
+  volume: _volume,
   onTogglePlay,
   onToggleLike,
   onNext,
   onPrevious,
   onSeek,
-  onVolumeChange,
+  onVolumeChange: _onVolumeChange,
   onOpenFullScreen,
   onClose,
 }: Props) {

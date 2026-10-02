@@ -846,8 +846,6 @@ export const buildMix = createServerFn({ method: "POST" })
       const year = new Date().getFullYear();
       const langArtists = primaryLang && LANGUAGE_ARTISTS[primaryLang] ? LANGUAGE_ARTISTS[primaryLang] : Object.values(LANGUAGE_ARTISTS).flat();
       const combinedArtists = shuffleArray([...new Set([...data.artists, ...langArtists])]);
-      const seenIds = new Set<string>();
-      const seenTitles = new Set<string>();
 
       const freshReleaseQueries: string[] = primaryLang
         ? [

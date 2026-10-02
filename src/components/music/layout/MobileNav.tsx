@@ -1,4 +1,4 @@
-import { Compass, Home, Globe2, Mic, ListMusic, Library as LibraryIcon, Search } from "lucide-react";
+import { Compass, Home, Mic, Library as LibraryIcon, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavTab } from "./Sidebar";
 
@@ -17,7 +17,7 @@ type Props = {
   hasTrack: boolean;
 };
 
-export function MobileNav({ activeTab, onNavigate, hasTrack }: Props) {
+export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props) {
   return (
     <nav
       className="fixed z-40 flex items-stretch justify-around border-t border-white/[0.06] bg-[#080808]/95 backdrop-blur-xl safe-bottom max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 bottom-0"

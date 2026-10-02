@@ -1,21 +1,4 @@
-import {
-  Command,
-  FastForward,
-  Headphones,
-  Maximize2,
-  Mic,
-  Moon,
-  Pause,
-  Play,
-  Repeat,
-  Rewind,
-  Search,
-  Shuffle,
-  Sliders,
-  Volume2,
-  VolumeX,
-  X,
-} from "lucide-react";
+import { Command } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
