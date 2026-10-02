@@ -7,11 +7,17 @@ import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private static MainActivity instance;
     private PowerManager.WakeLock wakeLock;
+
+    public static MainActivity getInstance() {
+        return instance;
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        instance = this;
 
         // Allow media autoplay without requiring immediate user gesture on each track transition
         try {
@@ -19,6 +25,9 @@ public class MainActivity extends BridgeActivity {
             if (webView != null) {
                 WebSettings settings = webView.getSettings();
                 settings.setMediaPlaybackRequiresUserGesture(false);
+
+                // Register SleepTimer JavaScript interface bridge
+                webView.addJavascriptInterface(new SleepTimerBridge(this), "AndroidSleepTimer");
             }
         } catch (Exception ignored) {}
 
@@ -30,6 +39,32 @@ public class MainActivity extends BridgeActivity {
                 wakeLock.acquire();
             }
         } catch (Exception ignored) {}
+    }
+
+    public void releaseAudioWakeLock() {
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) {
+                wakeLock.release();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    public void handleSleepTimerExpired() {
+        // Release wake lock when sleep timer fires so device can enter deep sleep
+        releaseAudioWakeLock();
+
+        // Dispatch stop event into WebView javascript engine on UI thread
+        runOnUiThread(() -> {
+            try {
+                WebView webView = getBridge().getWebView();
+                if (webView != null) {
+                    webView.evaluateJavascript(
+                        "if (window.__melodymap_sleep_timer_expire) { window.__melodymap_sleep_timer_expire(); }",
+                        null
+                    );
+                }
+            } catch (Exception ignored) {}
+        });
     }
 
     @Override
@@ -46,10 +81,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
-        if (wakeLock != null && wakeLock.isHeld()) {
-            try {
-                wakeLock.release();
-            } catch (Exception ignored) {}
+        releaseAudioWakeLock();
+        if (instance == this) {
+            instance = null;
         }
         super.onDestroy();
     }

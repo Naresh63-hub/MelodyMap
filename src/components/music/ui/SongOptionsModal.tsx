@@ -8,6 +8,7 @@ import {
   Trash2,
   X,
   Radio,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
@@ -22,6 +23,7 @@ type Props = {
   onAddToPlaylist: (track: Track) => void;
   onDownload: (track: Track) => void;
   onAddToQueue: (track: Track) => void;
+  onOpenSleepTimer?: () => void;
   onGoToArtist?: (artist: string) => void;
   onShare?: (track: Track) => void;
   onDeleteFromLibrary?: (track: Track) => void;
@@ -37,6 +39,7 @@ export function SongOptionsModal({
   onAddToPlaylist,
   onDownload,
   onAddToQueue,
+  onOpenSleepTimer,
   onGoToArtist,
   onShare,
   onDeleteFromLibrary,
@@ -143,6 +146,21 @@ export function SongOptionsModal({
             <span className="font-medium">Add to Queue</span>
             <ListPlus className="h-5 w-5 text-white/40" />
           </button>
+
+          {/* Sleep Timer */}
+          {onOpenSleepTimer && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenSleepTimer();
+                onClose();
+              }}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-[#F5F5F5] hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors"
+            >
+              <span className="font-medium">Sleep Timer</span>
+              <Moon className="h-5 w-5 text-white/40" />
+            </button>
+          )}
 
           {/* Go to Artist */}
           {onGoToArtist && (

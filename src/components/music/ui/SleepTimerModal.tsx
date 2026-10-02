@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Moon, Play, Square, X } from "lucide-react";
+import { Moon, RotateCcw, X, Clock, Check, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSleepTimer } from "@/hooks/useSleepTimer";
+import { SLEEP_TIMER_PRESETS } from "@/lib/sleep-timer";
 
 type Props = {
   open: boolean;
@@ -10,14 +12,6 @@ type Props = {
   onVolumeChange?: (volume: number) => void;
 };
 
-const PRESETS = [
-  { label: "15 min", minutes: 15 },
-  { label: "30 min", minutes: 30 },
-  { label: "45 min", minutes: 45 },
-  { label: "60 min", minutes: 60 },
-  { label: "End of Track", minutes: -1 },
-];
-
 export function SleepTimerModal({
   open,
   onClose,
@@ -25,147 +19,283 @@ export function SleepTimerModal({
   volume = 80,
   onVolumeChange,
 }: Props) {
-  const [selectedMinutes, setSelectedMinutes] = useState(30);
-  const [activeEndTime, setActiveEndTime] = useState<number | null>(null);
-  const [remainingSeconds, setRemainingSeconds] = useState(0);
-  const initialVolumeRef = useRef(volume);
+  const {
+    isActive,
+    isExpired,
+    durationMinutes,
+    remainingSeconds,
+    formattedRemaining,
+    startTimer,
+    cancelTimer,
+    restartTimer,
+    resetExpired,
+  } = useSleepTimer(onSleep);
 
+  const [selectedMinutes, setSelectedMinutes] = useState<number>(30);
+  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
+  const [customInput, setCustomInput] = useState<number>(20);
+  const initialVolumeRef = useRef<number>(volume);
+
+  // Sync selected minutes from running timer if active
   useEffect(() => {
-    if (!activeEndTime) return;
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const diff = Math.max(0, Math.floor((activeEndTime - now) / 1000));
-      setRemainingSeconds(diff);
+    if (isActive && durationMinutes) {
+      setSelectedMinutes(durationMinutes);
+    }
+  }, [isActive, durationMinutes]);
 
-      // Gradual volume ramp down in final 30 seconds
-      if (diff > 0 && diff <= 30 && onVolumeChange) {
-        const fadeRatio = diff / 30;
-        onVolumeChange(Math.round(initialVolumeRef.current * fadeRatio));
-      }
-
-      if (diff <= 0) {
-        setActiveEndTime(null);
-        if (onVolumeChange) onVolumeChange(initialVolumeRef.current);
-        onSleep();
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [activeEndTime, onSleep, onVolumeChange]);
+  // Gradual volume ramp down in final 30 seconds
+  useEffect(() => {
+    if (!isActive) return;
+    if (remainingSeconds > 0 && remainingSeconds <= 30 && onVolumeChange) {
+      const ratio = remainingSeconds / 30;
+      onVolumeChange(Math.round(initialVolumeRef.current * ratio));
+    } else if (remainingSeconds === 0 && onVolumeChange) {
+      onVolumeChange(initialVolumeRef.current);
+    }
+  }, [isActive, remainingSeconds, onVolumeChange]);
 
   if (!open) return null;
 
-  const startTimer = () => {
-    if (selectedMinutes > 0) {
-      const end = Date.now() + selectedMinutes * 60 * 1000;
-      setActiveEndTime(end);
-      setRemainingSeconds(selectedMinutes * 60);
-    } else {
-      // End of track mode
-      onClose();
+  const handleStart = (minutes: number) => {
+    resetExpired();
+    startTimer(minutes);
+    onClose();
+  };
+
+  const handlePresetSelect = (minutes: number) => {
+    setIsCustomMode(false);
+    setSelectedMinutes(minutes);
+    if (isActive) {
+      // User changing timer duration while active
+      startTimer(minutes);
     }
   };
 
-  const cancelTimer = () => {
-    setActiveEndTime(null);
-    setRemainingSeconds(0);
+  const handleCustomApply = () => {
+    const mins = Math.max(1, Math.min(720, customInput));
+    setSelectedMinutes(mins);
+    if (isActive) {
+      startTimer(mins);
+    }
   };
 
-  const formatTimerDisplay = () => {
-    if (activeEndTime) {
-      const m = Math.floor(remainingSeconds / 60);
-      const s = remainingSeconds % 60;
-      return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  const formatDisplayMinutes = () => {
+    if (isActive) {
+      return formattedRemaining;
     }
-    return `${selectedMinutes}:00`;
+    const mins = isCustomMode ? customInput : selectedMinutes;
+    if (mins >= 60) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
+    return `${mins}m`;
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity animate-fade-in"
         onClick={onClose}
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-sm rounded-3xl bg-[#101010] border border-white/[0.06] p-6 shadow-2xl z-10 animate-scale-in text-center">
+      <div
+        className="relative w-full max-w-sm rounded-3xl bg-[#121212] border border-white/10 p-6 shadow-2xl z-10 animate-scale-in text-center select-none"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4">
+        <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <Moon className="h-5 w-5 text-[#1DB954]" />
-            <h2 className="text-base font-semibold text-[#F5F5F5]">Sleep Timer</h2>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1DB954]/15 text-[#1DB954]">
+              <Moon className="h-4 w-4" />
+            </div>
+            <div className="text-left">
+              <h2 className="text-sm font-semibold text-[#F5F5F5] leading-tight">Sleep Timer</h2>
+              <p className="text-[11px] text-[#737373] leading-none mt-0.5">
+                {isActive
+                  ? "Active • Automatically stops playback"
+                  : isExpired
+                  ? "Timer expired • Playback paused"
+                  : "Turn off audio automatically"}
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/40 hover:bg-white/[0.06] hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+            aria-label="Close sleep timer"
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Circular Timer Dial */}
-        <div className="my-6 relative flex flex-col items-center justify-center">
-          <div className="relative flex h-48 w-48 items-center justify-center rounded-full border-2 border-white/[0.08] bg-[#161616]">
+        {/* Circular Display */}
+        <div className="my-5 relative flex flex-col items-center justify-center">
+          <div
+            className={cn(
+              "relative flex h-40 w-40 items-center justify-center rounded-full border-2 transition-all bg-[#181818]",
+              isActive
+                ? "border-[#1DB954] shadow-[0_0_24px_rgba(29,185,84,0.2)]"
+                : isExpired
+                ? "border-amber-500/50"
+                : "border-white/10"
+            )}
+          >
             <div className="flex flex-col items-center">
-              <span className="font-display text-3xl font-semibold tracking-tight text-[#F5F5F5] tabular-nums">
-                {formatTimerDisplay()}
+              {isActive && (
+                <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-[#1DB954] mb-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse" />
+                  Remaining
+                </span>
+              )}
+              {isExpired && !isActive && (
+                <span className="text-[10px] font-medium uppercase tracking-wider text-amber-400 mb-1">
+                  Expired
+                </span>
+              )}
+              <span className="font-mono text-3xl font-bold tracking-tight text-[#F5F5F5] tabular-nums">
+                {formatDisplayMinutes()}
               </span>
-              <span className="text-xs text-[#737373] mt-0.5">min</span>
+              <span className="text-[11px] text-[#737373] mt-0.5">
+                {isActive ? "until stop" : isCustomMode ? "custom duration" : "preset duration"}
+              </span>
             </div>
           </div>
-          <p className="mt-4 text-xs text-[#737373]">
-            {activeEndTime
-              ? "Playback will automatically stop when timer reaches 0"
-              : "When timer ends: Playback will stop"}
-          </p>
         </div>
 
         {/* Preset Chips */}
-        {!activeEndTime && (
-          <div className="flex flex-wrap justify-center gap-1.5 mb-6">
-            {PRESETS.map((p) => {
-              const active = selectedMinutes === p.minutes;
-              return (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => setSelectedMinutes(p.minutes)}
-                  className={cn(
-                    "rounded-full border px-3.5 py-1.5 text-xs transition-all",
-                    active
-                      ? "border-transparent bg-[#F5F5F5] text-black font-medium shadow-sm"
-                      : "border-white/[0.06] bg-transparent text-[#A1A1A1] hover:bg-white/[0.04] hover:text-[#F5F5F5]"
-                  )}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
+        <div className="space-y-2 mb-5">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[11px] font-medium text-[#737373] uppercase tracking-wider">
+              {isActive ? "Change Duration" : "Select Duration"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsCustomMode(!isCustomMode)}
+              className={cn(
+                "text-[11px] font-medium transition-colors flex items-center gap-1",
+                isCustomMode ? "text-[#1DB954]" : "text-[#737373] hover:text-[#F5F5F5]"
+              )}
+            >
+              <Sliders className="h-3 w-3" />
+              Custom
+            </button>
           </div>
-        )}
 
-        {/* Action Button */}
-        {activeEndTime ? (
-          <button
-            type="button"
-            onClick={cancelTimer}
-            className="w-full rounded-2xl bg-red-500/15 border border-red-500/30 py-3 text-sm font-medium text-red-300 hover:bg-red-500/25 transition-all"
-          >
-            Stop Timer
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              startTimer();
-              onClose();
-            }}
-            className="w-full rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-sm font-semibold text-black shadow-lg shadow-black/40 active:scale-[0.99] transition-all"
-          >
-            Start Timer
-          </button>
-        )}
+          {!isCustomMode ? (
+            <div className="grid grid-cols-3 gap-2">
+              {SLEEP_TIMER_PRESETS.map((p) => {
+                const isSelected = selectedMinutes === p.minutes;
+                return (
+                  <button
+                    key={p.minutes}
+                    type="button"
+                    onClick={() => handlePresetSelect(p.minutes)}
+                    className={cn(
+                      "rounded-xl border py-2 px-1 text-xs font-medium transition-all text-center",
+                      isSelected
+                        ? "border-[#1DB954] bg-[#1DB954]/15 text-[#1DB954] shadow-sm"
+                        : "border-white/[0.06] bg-white/[0.03] text-[#A1A1A1] hover:bg-white/[0.06] hover:text-[#F5F5F5]"
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 text-left">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-[#A1A1A1]">Minutes:</span>
+                <span className="text-sm font-semibold text-[#1DB954] tabular-nums">
+                  {customInput} min
+                </span>
+              </div>
+              <input
+                type="range"
+                min={5}
+                max={180}
+                step={5}
+                value={customInput}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setCustomInput(val);
+                }}
+                className="w-full accent-[#1DB954] cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-[#737373] mt-1">
+                <span>5m</span>
+                <span>60m (1h)</span>
+                <span>120m (2h)</span>
+                <span>180m (3h)</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Action Controls */}
+        <div className="space-y-2">
+          {isActive ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={cancelTimer}
+                className="flex-1 rounded-2xl bg-red-500/15 border border-red-500/30 py-3 text-sm font-medium text-red-300 hover:bg-red-500/25 active:scale-[0.99] transition-all"
+              >
+                Cancel Timer
+              </button>
+              {isCustomMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleCustomApply();
+                    onClose();
+                  }}
+                  className="rounded-2xl bg-[#1DB954] py-3 px-4 text-sm font-semibold text-black hover:bg-[#1ed760] transition-all"
+                >
+                  Apply
+                </button>
+              )}
+            </div>
+          ) : isExpired ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  resetExpired();
+                  restartTimer();
+                  onClose();
+                }}
+                className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-sm font-semibold text-black active:scale-[0.99] transition-all"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Restart ({selectedMinutes}m)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  resetExpired();
+                  handleStart(isCustomMode ? customInput : selectedMinutes);
+                }}
+                className="rounded-2xl border border-white/10 bg-white/[0.05] py-3 px-4 text-xs font-medium text-white hover:bg-white/10 transition-all"
+              >
+                New
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleStart(isCustomMode ? customInput : selectedMinutes)}
+              className="w-full rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-sm font-semibold text-black shadow-lg shadow-[#1DB954]/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+            >
+              <Clock className="h-4 w-4" />
+              Start Sleep Timer ({isCustomMode ? customInput : selectedMinutes} min)
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

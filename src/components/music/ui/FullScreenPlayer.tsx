@@ -20,10 +20,12 @@ import {
   Sliders,
   Gauge,
   Plus,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrubBar } from "@/components/music/ScrubBar";
 import { formatTime } from "@/lib/use-audio-player";
+import { useSleepTimer } from "@/hooks/useSleepTimer";
 import type { Track } from "@/lib/library";
 
 type Props = {
@@ -53,6 +55,7 @@ type Props = {
   onOpenQueue?: () => void;
   isQueueOpen?: boolean;
   onOpenLyrics?: () => void;
+  onOpenSleepTimer?: () => void;
   onOpenEqualizer?: () => void;
   onOpenPip?: () => void;
   onOpenShortcuts?: () => void;
@@ -91,6 +94,7 @@ export function FullScreenPlayer({
   onOpenQueue,
   isQueueOpen = false,
   onOpenLyrics,
+  onOpenSleepTimer,
   onOpenEqualizer,
   onOpenPip,
   onOpenShortcuts,
@@ -99,6 +103,7 @@ export function FullScreenPlayer({
   canNext,
   canPrevious,
 }: Props) {
+  const { isActive: isSleepTimerActive, formattedRemaining: sleepTimerCountdown } = useSleepTimer();
 
   if (!track) return null;
 
@@ -352,6 +357,24 @@ export function FullScreenPlayer({
                 >
                   <Sliders className="h-3.5 w-3.5 text-[#737373]" />
                   <span className="hidden sm:inline">EQ</span>
+                </button>
+              )}
+
+              {onOpenSleepTimer && (
+                <button
+                  type="button"
+                  onClick={onOpenSleepTimer}
+                  aria-label="Sleep Timer"
+                  title={isSleepTimerActive ? `Sleep Timer: ${sleepTimerCountdown} remaining` : "Sleep Timer"}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-normal transition-all",
+                    isSleepTimerActive
+                      ? "border-[#1DB954]/40 bg-[#1DB954]/15 text-[#1DB954] shadow-sm font-mono font-medium"
+                      : "border-white/[0.06] bg-white/[0.04] text-[#A1A1A1] hover:bg-white/[0.08] hover:text-[#F5F5F5]"
+                  )}
+                >
+                  <Moon className={cn("h-3.5 w-3.5", isSleepTimerActive ? "text-[#1DB954]" : "text-[#737373]")} />
+                  <span>{isSleepTimerActive ? sleepTimerCountdown : "Timer"}</span>
                 </button>
               )}
             </div>

@@ -1,72 +1,59 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import {
+  sleepTimerService,
+  type SleepTimerState,
+  SLEEP_TIMER_PRESETS,
+} from "@/lib/sleep-timer";
 
-type SleepTimerDuration = number | null; // null = disabled, number = minutes
+export function useSleepTimer(onSleep?: () => void) {
+  const [state, setState] = useState<SleepTimerState>(() => sleepTimerService.getState());
 
-export function useSleepTimer(onSleep: () => void) {
-  const [duration, setDuration] = useState<SleepTimerDuration>(null);
-  const [remaining, setRemaining] = useState<number>(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const clearTimers = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+  useEffect(() => {
+    const unsub = sleepTimerService.subscribe((nextState) => {
+      setState(nextState);
+    });
+    return unsub;
   }, []);
 
+  useEffect(() => {
+    if (!onSleep) return;
+    const unsub = sleepTimerService.onExpire(onSleep);
+    return unsub;
+  }, [onSleep]);
+
   const startTimer = useCallback((minutes: number) => {
-    clearTimers();
-    setDuration(minutes);
-    setRemaining(minutes * 60); // Convert to seconds
-
-    // Set the main sleep timer
-    timerRef.current = setTimeout(() => {
-      onSleep();
-      clearTimers();
-      setDuration(null);
-      setRemaining(0);
-    }, minutes * 60 * 1000);
-
-    // Update remaining time every second
-    intervalRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 1) {
-          clearTimers();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [clearTimers, onSleep]);
+    sleepTimerService.start(minutes);
+  }, []);
 
   const cancelTimer = useCallback(() => {
-    clearTimers();
-    setDuration(null);
-    setRemaining(0);
-  }, [clearTimers]);
+    sleepTimerService.cancel();
+  }, []);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => clearTimers();
-  }, [clearTimers]);
+  const restartTimer = useCallback(() => {
+    sleepTimerService.restart();
+  }, []);
 
-  const formatRemaining = useCallback(() => {
-    if (remaining === 0) return "00:00";
-    const minutes = Math.floor(remaining / 60);
-    const seconds = remaining % 60;
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-  }, [remaining]);
+  const setDuration = useCallback((minutes: number) => {
+    sleepTimerService.setDuration(minutes);
+  }, []);
+
+  const resetExpired = useCallback(() => {
+    sleepTimerService.resetExpired();
+  }, []);
 
   return {
-    remaining,
-    formattedRemaining: formatRemaining(),
-    isActive: duration !== null,
+    state,
+    isActive: state.active,
+    isExpired: state.expired,
+    durationMinutes: state.durationMinutes,
+    remaining: state.remainingSeconds,
+    remainingSeconds: state.remainingSeconds,
+    formattedRemaining: sleepTimerService.formatRemaining(state.remainingSeconds),
+    presets: SLEEP_TIMER_PRESETS,
     startTimer,
     cancelTimer,
+    restartTimer,
+    setDuration,
+    resetExpired,
   };
 }

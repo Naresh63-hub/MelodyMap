@@ -35,6 +35,7 @@ import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
 import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchResults";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { sleepTimerService } from "@/lib/sleep-timer";
 
 // Code-split heavy modals and overlays for optimal initial load performance
 const FullScreenPlayer = lazy(() =>
@@ -632,6 +633,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     };
   }, [settings.discovery, history, stats, likes]);
 
+  const sleepTimerHaltedRef = useRef<boolean>(false);
+
   // --- Player ---
   const player = useAudioPlayer({
     onSponsorBlockSkipped: (category) => {
@@ -640,6 +643,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setTimeout(() => setMessage(null), 3000);
     },
     getNextTrack: () => {
+      if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
+        return undefined;
+      }
 
       if (repeatModeRef.current === "one") {
         const cur = currentRef.current;
@@ -658,6 +664,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       return undefined;
     },
     onEnded: () => {
+      if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
+        player.pause();
+        return;
+      }
+
       const track = currentRef.current;
       if (track) {
         logComplete(track);
@@ -767,6 +778,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       player.pause();
     },
     onError: (msg) => {
+      if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
+        player.pause();
+        return;
+      }
+
       console.warn("[Player] Stream notice:", msg);
       const track = currentRef.current;
 
@@ -842,11 +858,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
   }, [current, player.isPlaying, player.position, player.duration, getSessionContext]);
 
+  // Listen to sleep timer expiry to stop playback and display toast message
+  useEffect(() => {
+    const unsub = sleepTimerService.onExpire(() => {
+      sleepTimerHaltedRef.current = true;
+      player.pause();
+      setMessage("Sleep timer ended — playback stopped.");
+      setTimeout(() => setMessage(null), 5000);
+    });
+    return unsub;
+  }, [player]);
+
   const togglePlay = useCallback(() => {
     if (!current) return;
     if (player.isPlaying) {
       pause();
     } else {
+      sleepTimerHaltedRef.current = false;
+      sleepTimerService.resetExpired();
       play();
     }
   }, [current, player.isPlaying, pause, play]);
@@ -875,6 +904,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const playSong = useCallback(
     (track: Track, surroundingQueue?: Track[]) => {
       if (!track?.id) return;
+      sleepTimerHaltedRef.current = false;
+      sleepTimerService.resetExpired();
       // Hard rule: music tracks need a known duration <= 600s to enter playback.
       // Podcasts are exempt (long-form by design, never in the music recommendation pool).
       if (!isPodcastTrack(track) && !hasPlayableDuration(track)) return;
@@ -2178,10 +2209,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, [query, runSuggest]);
 
   useMediaSession(current, player.isPlaying, player.position, player.duration, {
-    onPlay: () => player.play(),
+    onPlay: () => {
+      if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
+        return;
+      }
+      player.play();
+    },
     onPause: () => player.pause(),
-    onNext: goNext,
-    onPrev: goPrev,
+    onNext: () => {
+      if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) return;
+      goNext();
+    },
+    onPrev: () => {
+      if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) return;
+      goPrev();
+    },
     onSeek: (s: number) => player.seek(s),
   });
 
@@ -2843,6 +2885,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             onOpenQueue={() => setShowQueue((v) => !v)}
             isQueueOpen={showQueue}
             onOpenLyrics={() => setShowLyrics(true)}
+            onOpenSleepTimer={() => setShowSleepTimer(true)}
             onOpenEqualizer={() => setShowEqualizer(true)}
             onOpenPip={() => {
               setShowFullScreen(false);
@@ -2869,6 +2912,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             downloadedIds.has(t.id) ? void handleRemoveDownload(t) : void handleDownload(t)
           }
           onAddToQueue={(t) => enqueue([t])}
+          onOpenSleepTimer={() => setShowSleepTimer(true)}
           onGoToArtist={(artist) => openArtist(artist)}
           onShare={(t) => setShareTrack(t)}
           onDeleteFromLibrary={(t) => {
@@ -2885,7 +2929,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             applyVolume(v);
           }}
           onClose={() => setShowSleepTimer(false)}
-          onSleep={() => pause()}
+          onSleep={() => {
+            sleepTimerHaltedRef.current = true;
+            pause();
+            setMessage("Sleep timer ended — playback stopped.");
+            setTimeout(() => setMessage(null), 5000);
+          }}
         />
 
         {/* SHARE SONG MODAL */}
