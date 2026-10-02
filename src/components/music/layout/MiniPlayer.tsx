@@ -60,8 +60,8 @@ export function MiniPlayer({
       {/* 2px Hairline Progress Indicator at Top */}
       <div
         ref={barRef}
-        role="progressbar"
-        aria-label="Track progress"
+        role="slider"
+        aria-label="Seek track"
         aria-valuenow={Math.round(position)}
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
@@ -81,7 +81,7 @@ export function MiniPlayer({
           type="button"
           onClick={onOpenPlayer}
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-          aria-label={`Open now playing view for ${track?.title ?? "current track"}`}
+          aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
           <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-[#181818] border border-white/[0.06]">
             {track?.thumbnail ? (
