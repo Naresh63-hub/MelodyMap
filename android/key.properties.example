@@ -1,0 +1,12 @@
+# Template for Android Release Signing (Untracked)
+# Copy this file to "android/key.properties" and provide your actual values.
+# IMPORTANT: "key.properties" and "*.keystore" / "*.jks" are gitignored.
+# Never commit your keystore file or passwords to version control.
+#
+# Generate a new release keystore if you don't already have one:
+# keytool -genkey -v -keystore release.keystore -alias melodymap -keyalg RSA -keysize 2048 -validity 10000
+#
+storeFile=../release.keystore
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD
