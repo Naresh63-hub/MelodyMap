@@ -32,8 +32,8 @@ export function MobileNav({ activeTab, onNavigate, hasTrack }: Props) {
             type="button"
             onClick={() => onNavigate(id)}
             className={cn(
-              "relative flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-normal transition-colors active:scale-95",
-              active ? "text-[#F5F5F5] font-medium" : "text-[#737373] hover:text-[#A1A1A1]"
+              "relative flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-medium transition-colors active:scale-95",
+              active ? "text-[#F5F5F5] font-semibold" : "text-[#737373] hover:text-[#A1A1A1]"
             )}
             aria-label={label}
             aria-current={active ? "page" : undefined}
@@ -48,7 +48,7 @@ export function MobileNav({ activeTab, onNavigate, hasTrack }: Props) {
             <span
               className={cn(
                 "truncate max-w-[64px]",
-                active ? "font-medium text-[#F5F5F5]" : ""
+                active ? "font-semibold text-[#F5F5F5]" : ""
               )}
             >
               {label}

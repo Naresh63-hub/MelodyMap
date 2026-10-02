@@ -109,11 +109,30 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  h1,
-  h2,
+  h1 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+  }
+
+  h2 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
   h3 {
     font-family: var(--font-sans);
+    font-weight: 600;
     letter-spacing: -0.015em;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
 
   ::selection {
@@ -326,3 +345,59 @@
 @utility h-dvh {
   height: 100dvh;
 }
+
+/* ==========================================================================
+   MelodyMap Consistent Typography Hierarchy System
+   - Bold (700): Page headings, section headers, hero titles
+   - Semibold (600): Song titles, card titles, buttons, active nav labels
+   - Medium (500): Inactive nav labels, interactive chips, speed/counters
+   - Regular (400): Subtitles, artist names, metadata, timestamps, descriptions
+   ========================================================================== */
+
+@utility text-heading-hero {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+@utility text-heading-section {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+@utility text-song-title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@utility text-card-title {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@utility text-nav-label {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+
+@utility text-nav-active {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+@utility text-button {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@utility text-metadata {
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
+

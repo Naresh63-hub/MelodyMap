@@ -104,7 +104,7 @@ export function SearchResults({
         <section className="space-y-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-[#737373]" />
-            <h2 className="text-sm font-semibold text-[#F5F5F5]">Trending Searches</h2>
+            <h2 className="text-sm font-bold text-[#F5F5F5]">Trending Searches</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {TRENDING_SEARCH_SEEDS.map((term) => (
@@ -122,7 +122,7 @@ export function SearchResults({
 
         {/* Browse By Category Cards */}
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-[#F5F5F5]">Browse Categories</h2>
+          <h2 className="text-sm font-bold text-[#F5F5F5]">Browse Categories</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
               {
@@ -164,7 +164,7 @@ export function SearchResults({
                 >
                   <Icon className="h-5 w-5 text-[#A1A1A1] group-hover:text-[#1DB954] transition-colors" />
                   <div>
-                    <p className="text-xs font-medium text-[#F5F5F5] leading-tight">
+                    <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">
                       {cat.title}
                     </p>
                     <p className="text-[10px] text-[#A1A1A1] leading-tight mt-0.5">
@@ -197,8 +197,8 @@ export function SearchResults({
               className={cn(
                 "rounded-full px-3.5 py-1 text-xs transition-all",
                 active
-                  ? "bg-[#F5F5F5] text-black font-medium"
-                  : "bg-white/[0.04] text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.08] border border-white/[0.06] font-normal"
+                  ? "bg-[#F5F5F5] text-black font-semibold"
+                  : "bg-white/[0.04] text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.08] border border-white/[0.06] font-medium"
               )}
             >
               {opt.label}
@@ -247,7 +247,7 @@ export function SearchResults({
               >
                 <p
                   className={cn(
-                    "truncate text-sm font-medium leading-tight",
+                    "truncate text-sm font-semibold leading-tight",
                     active ? "text-[#1DB954]" : "text-[#F5F5F5]"
                   )}
                 >

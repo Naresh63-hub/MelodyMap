@@ -170,7 +170,7 @@ export function FullScreenPlayer({
           {/* Track Info Row */}
           <div className="flex items-center justify-between w-full mt-6 px-1">
             <div className="min-w-0 flex-1 pr-4">
-              <h2 className="text-lg sm:text-xl font-semibold text-[#F5F5F5] truncate tracking-tight">
+              <h2 className="text-lg sm:text-xl font-bold text-[#F5F5F5] truncate tracking-tight">
                 {track.title}
               </h2>
               <p className="text-sm font-normal text-[#A1A1A1] truncate mt-0.5">

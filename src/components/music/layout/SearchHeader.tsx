@@ -151,7 +151,7 @@ export function SearchHeader({
           <Button
             type="submit"
             size="lg"
-            className="hidden h-10 shrink-0 rounded-full bg-[#F5F5F5] hover:bg-white text-black px-5 font-medium transition-colors sm:flex"
+            className="hidden h-10 shrink-0 rounded-full bg-[#F5F5F5] hover:bg-white text-black px-5 font-semibold transition-colors sm:flex"
           >
             {searching ? <Loader2 className="h-4 w-4 animate-spin text-black" /> : "Search"}
           </Button>
@@ -204,8 +204,8 @@ export function SearchHeader({
             className={cn(
               "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs transition-colors",
               activeTab === id
-                ? "bg-[#F5F5F5] text-black font-medium border-transparent shadow-sm"
-                : "border-white/[0.06] bg-transparent text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.04]",
+                ? "bg-[#F5F5F5] text-black font-semibold border-transparent shadow-sm"
+                : "border-white/[0.06] bg-transparent text-[#A1A1A1] font-medium hover:text-[#F5F5F5] hover:bg-white/[0.04]",
             )}
           >
             <Icon className="h-3.5 w-3.5" />

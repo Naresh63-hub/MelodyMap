@@ -96,7 +96,7 @@ export function MiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs sm:text-[13px] font-medium text-[#F5F5F5] leading-tight">
+            <p className="truncate text-xs sm:text-[13px] font-semibold text-[#F5F5F5] leading-tight">
               {track?.title ?? "No track"}
             </p>
             <p className="truncate text-[11px] text-[#A1A1A1] leading-tight mt-0.5">

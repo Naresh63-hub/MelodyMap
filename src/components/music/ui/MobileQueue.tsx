@@ -54,7 +54,7 @@ export function MobileQueue({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-2 border-b border-white/[0.06]">
-          <h3 className="text-base font-semibold text-[#F5F5F5]">Queue</h3>
+          <h3 className="text-base font-bold text-[#F5F5F5]">Queue</h3>
           <div className="flex items-center gap-2">
             <span className="text-xs text-[#737373]">
               {tracks.length} track{tracks.length === 1 ? "" : "s"}
@@ -85,7 +85,7 @@ export function MobileQueue({
           {/* Now Playing */}
           {current && (
             <div className="mb-4">
-              <p className="text-[10px] font-medium uppercase tracking-wider text-[#1DB954] mb-2 px-1 flex items-center gap-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#1DB954] mb-2 px-1 flex items-center gap-1.5">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse" />
                 Now Playing
               </p>
@@ -124,7 +124,7 @@ export function MobileQueue({
           {/* Upcoming */}
           {upcoming.length > 0 && (
             <div>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-[#737373] mb-2 px-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#737373] mb-2 px-1">
                 Next Up
               </p>
               <div className="space-y-1">
@@ -182,7 +182,7 @@ export function MobileQueue({
                           )}
                         </div>
                         <div className="min-w-0 flex-1 text-left">
-                          <p className="truncate text-[13px] font-medium text-[#F5F5F5]">{track.title}</p>
+                          <p className="truncate text-[13px] font-semibold text-[#F5F5F5]">{track.title}</p>
                           <p className="truncate text-[11px] text-[#A1A1A1] mt-0.5">{track.artist}</p>
                         </div>
                       </button>

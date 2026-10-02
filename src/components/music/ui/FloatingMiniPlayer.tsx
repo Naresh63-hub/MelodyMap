@@ -245,7 +245,7 @@ export function FloatingMiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <h4 className="text-xs font-medium text-[#F5F5F5] truncate leading-tight">{track.title}</h4>
+            <h4 className="text-xs font-semibold text-[#F5F5F5] truncate leading-tight">{track.title}</h4>
             <p className="text-[11px] text-[#A1A1A1] truncate mt-0.5 leading-tight">
               {track.artist}
             </p>

@@ -127,7 +127,7 @@ export function TrackList({
               >
                 <p
                   className={cn(
-                    "truncate text-sm font-medium transition-colors duration-150",
+                    "truncate text-sm font-semibold transition-colors duration-150",
                     active ? "text-[#1DB954]" : "text-[#F5F5F5] group-hover:text-white",
                   )}
                 >

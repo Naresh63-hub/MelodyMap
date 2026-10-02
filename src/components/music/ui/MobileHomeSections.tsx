@@ -80,7 +80,7 @@ function HorizontalScrollRow({
 
             <p
               className={cn(
-                "truncate text-xs font-medium leading-tight",
+                "truncate text-xs font-semibold leading-tight",
                 active ? "text-[#1DB954]" : "text-[#F5F5F5] group-hover:text-white",
               )}
             >
@@ -150,7 +150,7 @@ function VerticalSongList({
             >
               <p
                 className={cn(
-                  "truncate text-[13px] font-medium leading-tight",
+                  "truncate text-[13px] font-semibold leading-tight",
                   active ? "text-[#1DB954]" : "text-[#F5F5F5]",
                 )}
               >
@@ -190,7 +190,7 @@ function SectionHeader({
     <div className="flex items-center justify-between mb-2.5 px-0.5">
       <div className="flex items-center gap-2">
         {Icon && <Icon className="h-4 w-4 text-[#737373]" />}
-        <h2 className="text-sm font-semibold tracking-tight text-[#F5F5F5]">{title}</h2>
+        <h2 className="text-sm font-bold tracking-tight text-[#F5F5F5]">{title}</h2>
       </div>
     </div>
   );
@@ -257,7 +257,7 @@ export function MobileHomeSections({
       {dailyMix && dailyMix.length > 0 && (
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-2.5 px-0.5">
-            <h2 className="text-sm font-semibold tracking-tight text-[#F5F5F5]">Daily Mix</h2>
+            <h2 className="text-sm font-bold tracking-tight text-[#F5F5F5]">Daily Mix</h2>
             <span className="text-[11px] font-normal text-[#737373]">
               Updated today
             </span>
@@ -318,7 +318,7 @@ export function MobileHomeSections({
           <div className="flex items-center justify-between mb-2.5 px-0.5">
             <div className="flex items-center gap-2">
               <Disc3 className="h-4 w-4 text-amber-400/80" />
-              <h2 className="text-sm font-semibold tracking-tight text-[#F5F5F5]">Old Classics</h2>
+              <h2 className="text-sm font-bold tracking-tight text-[#F5F5F5]">Old Classics</h2>
             </div>
             <span className="text-[11px] font-normal text-[#737373]">
               Golden Era & Retro

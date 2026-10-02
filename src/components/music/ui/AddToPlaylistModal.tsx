@@ -55,7 +55,7 @@ export function AddToPlaylistModal({
         <div className="flex items-center justify-between pb-1">
           <div className="flex items-center gap-2">
             <ListMusic className="h-5 w-5 text-[#1DB954]" />
-            <h2 className="text-base font-semibold text-[#F5F5F5]">Add to Playlist</h2>
+            <h2 className="text-base font-bold text-[#F5F5F5]">Add to Playlist</h2>
           </div>
           <button
             type="button"
@@ -75,7 +75,7 @@ export function AddToPlaylistModal({
             className="h-11 w-11 rounded-lg object-cover bg-white/[0.04]"
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-[#F5F5F5]">{track.title}</p>
+            <p className="truncate text-sm font-semibold text-[#F5F5F5]">{track.title}</p>
             <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{track.artist}</p>
           </div>
         </div>
@@ -141,7 +141,7 @@ export function AddToPlaylistModal({
                         <ListMusic className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[#F5F5F5]">{pl.name}</p>
+                        <p className="truncate text-sm font-semibold text-[#F5F5F5]">{pl.name}</p>
                         <p className="text-xs text-[#737373] mt-0.5">
                           {pl.tracks.length} song{pl.tracks.length === 1 ? "" : "s"}
                         </p>
