@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { validateServerEnvironment } from "./env.server";
+import { validateServerEnvironment, logServerEnvironmentDiagnostics } from "./env.server";
 
 describe("validateServerEnvironment", () => {
   const originalEnv = { ...process.env };
@@ -44,5 +44,44 @@ describe("validateServerEnvironment", () => {
     process.env["YOUTUBE_API_KEY"] = "AIzaSySampleKeyValidLength";
     const status = validateServerEnvironment();
     expect(status.hasYouTubeKey).toBe(true);
+  });
+
+  it("never returns raw credential values in status object", () => {
+    process.env["AI_API_KEY"] = "sk-super-secret-key-99999";
+    process.env["YOUTUBE_API_KEY"] = "AIzaSySecretApiKey77777";
+    process.env["SUPABASE_SERVICE_ROLE_KEY"] = "secret-service-role-key";
+
+    const status = validateServerEnvironment() as unknown as Record<string, unknown>;
+    for (const val of Object.values(status)) {
+      expect(val).not.toContain("sk-super-secret-key-99999");
+      expect(val).not.toContain("AIzaSySecretApiKey77777");
+      expect(val).not.toContain("secret-service-role-key");
+    }
+  });
+
+  it("ensures diagnostics log does not print secret credential values", () => {
+    const logs: string[] = [];
+    const origInfo = console.info;
+    console.info = (...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    };
+
+    try {
+      const origNodeEnv = process.env["NODE_ENV"];
+      delete process.env["NODE_ENV"];
+      process.env["AI_API_KEY"] = "sk-super-secret-key-99999";
+      process.env["YOUTUBE_API_KEY"] = "AIzaSySecretApiKey77777";
+
+      logServerEnvironmentDiagnostics();
+
+      const combinedLogs = logs.join(" ");
+      expect(combinedLogs).not.toContain("sk-super-secret-key-99999");
+      expect(combinedLogs).not.toContain("AIzaSySecretApiKey77777");
+      expect(combinedLogs).toContain("ENABLED");
+      expect(combinedLogs).toContain("CONFIGURED");
+      process.env["NODE_ENV"] = origNodeEnv;
+    } finally {
+      console.info = origInfo;
+    }
   });
 });
