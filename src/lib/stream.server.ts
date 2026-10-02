@@ -8,9 +8,6 @@
  */
 
 import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
-import { createHash } from "node:crypto";
 import { createLruCache } from "./lru-cache";
 
 export type StreamQuality = "saver" | "standard" | "high";
@@ -36,200 +33,62 @@ export function invalidateStreamCache(videoId: string) {
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-// ─── Serverless Binary Auto-Resolution (Vercel / Linux) ──────────────
-
-const YT_DLP_RELEASE_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
-const ALLOWED_BINARIES = new Set(["yt-dlp", "yt-dlp.exe"]);
-const MAX_BINARY_SIZE = 100 * 1024 * 1024; // 100 MB max to prevent memory exhaustion
-const MAX_SUMS_SIZE = 512 * 1024; // 512 KB max for checksum file
-const SHA256_HEX_REGEX = /^[a-f0-9]{64}$/;
+// ─── Pre-Provisioned Binary Resolution ───────────────────────────────
 
 let resolvedYtDlpInstance: any = null;
-let downloadPromise: Promise<void> | null = null;
-let secureTmpDir: string | null = null;
-
-function cleanupSecureTmpDir() {
-  if (secureTmpDir && fs.existsSync(secureTmpDir)) {
-    try {
-      fs.rmSync(secureTmpDir, { recursive: true, force: true });
-      secureTmpDir = null;
-    } catch {}
-  }
-}
-
-// Register process exit cleanup handler
-if (typeof process !== "undefined" && process.once) {
-  process.once("exit", cleanupSecureTmpDir);
-}
 
 /**
- * Validates that the download URL strictly targets the official yt-dlp GitHub release repository.
- */
-export function isTrustedDownloadUrl(urlStr: string): boolean {
-  try {
-    const parsed = new URL(urlStr);
-    return (
-      parsed.protocol === "https:" &&
-      parsed.hostname === "github.com" &&
-      parsed.pathname.startsWith("/yt-dlp/yt-dlp/releases/")
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Download the standalone yt-dlp binary and verify it against the SHA2-256SUMS
- * asset published with the same release. A binary that cannot be verified is
- * refused (fail closed) — the app then falls back to the InnerTube resolver.
+ * Resolves the yt-dlp binary instance from pre-provisioned disk locations:
+ * 1. Custom path specified via YOUTUBE_DL_PATH environment variable
+ * 2. youtube-dl-exec bundled package binary (node_modules/youtube-dl-exec/bin/yt-dlp)
+ * 3. Standard system locations (/usr/local/bin/yt-dlp, /usr/bin/yt-dlp)
  *
- * Writes to a caller-provided private directory using exclusive file creation ('wx')
- * and restrictive permissions (0o700).
+ * If no pre-provisioned binary is found on disk, returns null safely.
+ * The streaming resolver seamlessly falls back to the pure TypeScript InnerTube resolver.
+ * No executable binaries are downloaded dynamically over the network at runtime.
  */
-export async function downloadVerifiedYtDlpBinary(
-  targetDir: string,
-  binaryName: string,
-  isWindows: boolean,
-): Promise<string | null> {
-  // 1. Strict binary name whitelist prevents arbitrary files or path traversal
-  if (!ALLOWED_BINARIES.has(binaryName)) {
-    return null;
-  }
+export async function getYtDlpInstance() {
+  if (resolvedYtDlpInstance) return resolvedYtDlpInstance;
 
-  // 2. Safe path validation: target path must stay strictly inside targetDir
-  const resolvedTargetDir = path.resolve(targetDir);
-  const targetPath = path.resolve(resolvedTargetDir, binaryName);
-  if (!targetPath.startsWith(resolvedTargetDir + path.sep)) {
-    return null;
-  }
-
-  // 3. Trusted download source validation
-  const binaryUrl = `${YT_DLP_RELEASE_BASE}/${binaryName}`;
-  const sumsUrl = `${YT_DLP_RELEASE_BASE}/SHA2-256SUMS`;
-  if (!isTrustedDownloadUrl(binaryUrl) || !isTrustedDownloadUrl(sumsUrl)) {
-    return null;
-  }
-
-  const [binRes, sumsRes] = await Promise.all([
-    fetch(binaryUrl),
-    fetch(sumsUrl),
-  ]);
-  if (!binRes.ok || !sumsRes.ok) return null;
-
-  // 4. Header-level payload size verification
-  const binLenHeader = Number(binRes.headers.get("content-length"));
-  if (binLenHeader && (binLenHeader > MAX_BINARY_SIZE || binLenHeader <= 0)) {
-    return null;
-  }
-  const sumsLenHeader = Number(sumsRes.headers.get("content-length"));
-  if (sumsLenHeader && sumsLenHeader > MAX_SUMS_SIZE) {
-    return null;
-  }
-
-  const buffer = Buffer.from(await binRes.arrayBuffer());
-  if (buffer.byteLength === 0 || buffer.byteLength > MAX_BINARY_SIZE) {
-    return null;
-  }
-
-  const sums = await sumsRes.text();
-  if (sums.length === 0 || sums.length > MAX_SUMS_SIZE) {
-    return null;
-  }
-
-  // GNU-style lines: "<sha256>  <filename>"
-  const expectedSha = sums
-    .split("\n")
-    .map((line) => line.trim().split(/\s+/))
-    .filter((parts) => parts.length >= 2)
-    .find((parts) => parts.slice(1).join(" ") === binaryName)?.[0]
-    ?.toLowerCase();
-
-  // 5. Strict SHA-256 format validation and cryptographic match
-  if (!expectedSha || !SHA256_HEX_REGEX.test(expectedSha)) return null;
-
-  const actualSha = createHash("sha256").update(buffer).digest("hex");
-  if (actualSha !== expectedSha) return null;
-
-  // 6. Safe exclusive file creation with restricted permissions
   try {
-    fs.writeFileSync(targetPath, buffer, {
-      mode: isWindows ? 0o600 : 0o700,
-      flag: "wx",
-    });
-    if (!isWindows) {
-      fs.chmodSync(targetPath, 0o700);
+    const ytdlModule = (await import("youtube-dl-exec")) as any;
+    const create = ytdlModule.create || ytdlModule.default?.create || ytdlModule.default;
+    const constants = ytdlModule.constants || {};
+
+    // 1. Check custom path from environment variable
+    const envPath = process.env["YOUTUBE_DL_PATH"];
+    if (envPath && fs.existsSync(envPath)) {
+      resolvedYtDlpInstance = create(envPath);
+      return resolvedYtDlpInstance;
     }
-    return targetPath;
-  } catch (err) {
-    console.warn(`[stream] Failed to safely write binary to ${targetPath}:`, err);
+
+    // 2. Check youtube-dl-exec package bundled binary
+    if (constants.YOUTUBE_DL_PATH && fs.existsSync(constants.YOUTUBE_DL_PATH)) {
+      resolvedYtDlpInstance = create(constants.YOUTUBE_DL_PATH);
+      return resolvedYtDlpInstance;
+    }
+
+    // 3. Check standard system locations on Unix/Linux
+    const isWindows = process.platform === "win32";
+    if (!isWindows) {
+      const candidatePaths = [
+        "/usr/local/bin/yt-dlp",
+        "/usr/bin/yt-dlp",
+        "/bin/yt-dlp",
+        "/opt/homebrew/bin/yt-dlp",
+      ];
+      for (const candidate of candidatePaths) {
+        if (fs.existsSync(candidate)) {
+          resolvedYtDlpInstance = create(candidate);
+          return resolvedYtDlpInstance;
+        }
+      }
+    }
+
+    return null;
+  } catch {
     return null;
   }
-}
-
-async function getYtDlpInstance() {
-  const ytdlModule = (await import("youtube-dl-exec")) as any;
-  const create = ytdlModule.create || ytdlModule.default?.create || ytdlModule.default;
-  const constants = ytdlModule.constants || {};
-
-  // 1. Check if the default binary exists on disk
-  if (constants.YOUTUBE_DL_PATH && fs.existsSync(constants.YOUTUBE_DL_PATH)) {
-    resolvedYtDlpInstance = create(constants.YOUTUBE_DL_PATH);
-    return resolvedYtDlpInstance;
-  }
-
-  // 2. Check if cached binary in secure private directory already exists
-  const isWindows = process.platform === "win32";
-  const binaryName = isWindows ? "yt-dlp.exe" : "yt-dlp";
-
-  if (secureTmpDir && fs.existsSync(path.join(secureTmpDir, binaryName))) {
-    const existingPath = path.join(secureTmpDir, binaryName);
-    try {
-      if (!isWindows) {
-        fs.chmodSync(existingPath, 0o700);
-      }
-      resolvedYtDlpInstance = create(existingPath);
-      return resolvedYtDlpInstance;
-    } catch {}
-  }
-
-  // 3. Download standalone binary to private secure directory if running on serverless Linux (e.g. Vercel)
-  if (!downloadPromise) {
-    downloadPromise = (async () => {
-      let createdDir: string | null = null;
-      try {
-        createdDir = fs.mkdtempSync(path.join(os.tmpdir(), "melodymap-ytdlp-"));
-        if (!isWindows) {
-          fs.chmodSync(createdDir, 0o700);
-        }
-        secureTmpDir = createdDir;
-        console.info(`[stream] Downloading verified yt-dlp binary to private dir ${createdDir}...`);
-        const installedPath = await downloadVerifiedYtDlpBinary(createdDir, binaryName, isWindows);
-        console.info(
-          installedPath
-            ? `[stream] Installed checksum-verified yt-dlp to ${installedPath}`
-            : `[stream] yt-dlp install refused (release unavailable or checksum verification failed)`,
-        );
-      } catch (err) {
-        console.warn(`[stream] Failed to download yt-dlp binary:`, err);
-        if (createdDir && fs.existsSync(createdDir)) {
-          try {
-            fs.rmSync(createdDir, { recursive: true, force: true });
-          } catch {}
-          if (secureTmpDir === createdDir) secureTmpDir = null;
-        }
-      }
-    })();
-  }
-
-  await downloadPromise;
-
-  if (secureTmpDir && fs.existsSync(path.join(secureTmpDir, binaryName))) {
-    resolvedYtDlpInstance = create(path.join(secureTmpDir, binaryName));
-    return resolvedYtDlpInstance;
-  }
-
-  resolvedYtDlpInstance = create(constants.YOUTUBE_DL_PATH);
-  return resolvedYtDlpInstance;
 }
 
 // ─── Circuit breaker ─────────────────────────────────────────────────
@@ -304,6 +163,7 @@ async function resolveWithPreset(
   extractorArgs: string | undefined,
 ): Promise<StreamMeta | null> {
   const youtubedl = await getYtDlpInstance();
+  if (!youtubedl) return null;
 
   const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
     dumpJson: true,
@@ -358,6 +218,9 @@ async function resolveWithYtDlp(
   videoId: string,
   quality: StreamQuality = "high",
 ): Promise<StreamMeta | null> {
+  const youtubedl = await getYtDlpInstance();
+  if (!youtubedl) return null;
+
   // Run all client presets concurrently — each full extraction can take
   // several seconds, and the previous sequential chain pushed cold starts
   // past the proxy timeout on serverless.
@@ -373,7 +236,6 @@ async function resolveWithYtDlp(
 
   // Last resort fallback across all formats (muxed with audio) if no audio-only format succeeded
   try {
-    const youtubedl = await getYtDlpInstance();
     const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
       dumpJson: true,
       noCheckCertificates: true,
@@ -402,7 +264,7 @@ async function resolveWithYtDlp(
 
 // ─── InnerTube Player Fallback (Direct YouTube API) ───────────────────
 
-async function resolveWithInnerTubePlayer(
+export async function resolveWithInnerTubePlayer(
   videoId: string,
   quality: StreamQuality = "high",
 ): Promise<StreamMeta | null> {
