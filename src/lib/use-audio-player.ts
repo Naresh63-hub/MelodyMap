@@ -142,18 +142,20 @@ export function useAudioPlayer(options: {
       prebufferAudioRef.current = pEl;
     }
 
-    // Attach hidden YouTube iframe placeholder
+    // Attach hidden YouTube iframe placeholder offscreen with real dimensions
+    // Modern browsers throttle video decoders when dimensions are <= 4px or opacity is near zero.
+    // Placing it at -9999px with standard dimensions ensures uninterrupted playback during tab transitions.
     if (!document.getElementById("melodymap-yt-wrapper")) {
       const holder = document.createElement("div");
       holder.id = "melodymap-yt-wrapper";
       holder.style.position = "fixed";
-      holder.style.bottom = "0";
-      holder.style.right = "0";
-      holder.style.width = "1px";
-      holder.style.height = "1px";
-      holder.style.opacity = "0.001";
+      holder.style.left = "-9999px";
+      holder.style.top = "-9999px";
+      holder.style.width = "200px";
+      holder.style.height = "200px";
+      holder.style.opacity = "1";
       holder.style.pointerEvents = "none";
-      holder.style.zIndex = "-999";
+      holder.style.zIndex = "-9999";
       holder.style.overflow = "hidden";
       const iframeDiv = document.createElement("div");
       iframeDiv.id = "melodymap-yt-iframe";
@@ -196,6 +198,11 @@ export function useAudioPlayer(options: {
       return 1;
     }
   });
+
+  const playbackSpeedRef = useRef(playbackSpeed);
+  playbackSpeedRef.current = playbackSpeed;
+  const lastValidPositionRef = useRef(0);
+  const seekRef = useRef<(seconds: number) => void>(() => {});
 
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
@@ -434,7 +441,7 @@ export function useAudioPlayer(options: {
       audio.volume = 1;
       audio.muted = false;
       audio.src = url;
-      const validSpeed = Number.isFinite(playbackSpeed) && playbackSpeed > 0 ? playbackSpeed : 1;
+      const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
       audio.playbackRate = validSpeed;
       audio.load();
 
@@ -466,7 +473,7 @@ export function useAudioPlayer(options: {
         }
       }
     },
-    [playbackSpeed, initWebAudio],
+    [initWebAudio],
   );
 
   const setAudioQuality = useCallback(
@@ -547,6 +554,7 @@ export function useAudioPlayer(options: {
       if (activeEngineRef.current !== "html5") return;
       const cur = audio.currentTime || 0;
       const dur = Number.isFinite(audio.duration) ? audio.duration : 0;
+      lastValidPositionRef.current = cur;
       setPosition(cur);
       setDuration(dur);
       if (cur > 0) setIsLoading(false);
@@ -596,11 +604,12 @@ export function useAudioPlayer(options: {
       // Synchronous background advance for continuous playback with screen locked
       if (nextTrack && wantPlayRef.current) {
         currentTrackIdRef.current = nextTrack.id;
+        lastValidPositionRef.current = 0;
         setPosition(0);
         setDuration(0);
         const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
         audio.src = nextUrl;
-        const validSpeed = Number.isFinite(playbackSpeed) && playbackSpeed > 0 ? playbackSpeed : 1;
+        const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
         audio.playbackRate = validSpeed;
         audio.load();
         const p = audio.play();
@@ -673,7 +682,7 @@ export function useAudioPlayer(options: {
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
     };
-  }, [playbackSpeed, initWebAudio, streamUrl]);
+  }, [initWebAudio, streamUrl]);
 
   // Initialize YouTube IFrame Player API on mount
   useEffect(() => {
@@ -803,8 +812,15 @@ export function useAudioPlayer(options: {
           try {
             const cur = p.getCurrentTime() || 0;
             const dur = p.getDuration() || 0;
-            setPosition(cur);
             if (dur > 0) setDuration(dur);
+
+            // Protect against transient backwards jumps from YouTube API buffer jitter during quality/tab adjustments
+            if (cur < lastValidPositionRef.current - 1.5 && lastValidPositionRef.current > 3 && cur > 0) {
+              // Maintain current stable position
+            } else {
+              lastValidPositionRef.current = cur;
+              setPosition(cur);
+            }
 
             // SponsorBlock Auto-Skip: skip each matching segment exactly once
             if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
@@ -815,7 +831,7 @@ export function useAudioPlayer(options: {
                 if (cur >= seg.start - 0.05 && cur < seg.end - 0.2) {
                   skippedSegmentsRef.current.add(segKey);
                   const target = seg.end + 0.2;
-                  seek(target);
+                  seekRef.current(target);
                   onSponsorBlockSkippedRef.current?.(seg.category);
                   break;
                 }
@@ -849,50 +865,30 @@ export function useAudioPlayer(options: {
     };
   }, [isPlaying, streamUrl]);
 
-  // Maintain background / screen-off playback when mobile screen turns off
+  // Maintain uninterrupted playback across tab switches and app foreground/background
   useEffect(() => {
     if (typeof document === "undefined") return;
     const onVisibilityChange = () => {
-      if (document.hidden && wantPlayRef.current) {
-        if (activeEngineRef.current === "youtube") {
-          // In mobile browsers (Chrome / Safari on Vercel), YouTube iframes get frozen on screen-off / background.
-          // Smoothly switch audioRef to the stream URL so music plays through HTML5 audio with REAL SOUND!
-          const curId = currentTrackIdRef.current;
-          const curTime = (ytPlayerRef.current?.getCurrentTime?.() ?? 0) || position;
-          if (curId && audioRef.current) {
-            try {
-              ytPlayerRef.current?.pauseVideo?.();
-            } catch {}
-            audioRef.current.src = streamUrl(curId);
-            audioRef.current.currentTime = Math.max(0, curTime);
-            audioRef.current.volume = 1;
-            audioRef.current.loop = false;
-            audioRef.current.play().catch((err) => {
-              console.warn("[BackgroundPlayback] Audio take-over notice:", err);
-            });
-          }
+      // Never pause, swap engines, or re-seek when tabs are switched or app is hidden.
+      // Audio must continue playing seamlessly in the background.
+      if (!document.hidden && wantPlayRef.current) {
+        // App returned to foreground: ensure AudioContext is active if suspended
+        if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+          audioCtxRef.current.resume().catch(() => {});
         }
-      } else if (!document.hidden && wantPlayRef.current) {
-        if (
-          activeEngineRef.current === "youtube" &&
-          audioRef.current &&
-          audioRef.current.src &&
-          !audioRef.current.src.startsWith("data:audio")
-        ) {
-          // Screen turned back on / app returned to foreground:
-          // Sync position back to YouTube player
-          const curTime = audioRef.current.currentTime || 0;
-          try {
-            audioRef.current.pause();
-            audioRef.current.src = SILENT_AUDIO_URI;
-            audioRef.current.volume = 0.001;
-            audioRef.current.loop = true;
-            audioRef.current.play().catch(() => {});
-          } catch {}
-          try {
-            ytPlayerRef.current?.seekTo?.(curTime, true);
-            ytPlayerRef.current?.playVideo?.();
-          } catch {}
+        // If native browser paused playback while in background, resume it
+        if (activeEngineRef.current === "youtube") {
+          const p = ytPlayerRef.current;
+          if (p && ytReadyRef.current && typeof p.getPlayerState === "function" && p.getPlayerState() === 2) {
+            try {
+              p.playVideo();
+            } catch {}
+          }
+        } else if (activeEngineRef.current === "html5") {
+          const audio = audioRef.current;
+          if (audio && audio.paused && audio.src && !audio.src.startsWith("data:audio")) {
+            audio.play().catch(() => {});
+          }
         }
       }
     };
@@ -900,13 +896,14 @@ export function useAudioPlayer(options: {
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [position, streamUrl]);
+  }, []);
 
   /** Direct YouTube IFrame API play */
   const playViaYouTube = useCallback(
     (id: string, startAt = 0, autoPlay = true) => {
       activeEngineRef.current = "youtube";
       setIsLoading(true);
+      lastValidPositionRef.current = startAt;
       setPosition(startAt);
       setDuration(0);
       // Play silent background audio loop to keep Android system audio focus and lockscreen controls active
@@ -934,14 +931,18 @@ export function useAudioPlayer(options: {
           p.cueVideoById(id, startAt);
         }
         try {
-          p.setPlaybackRate(playbackSpeed);
+          const validSpeed =
+            Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0
+              ? playbackSpeedRef.current
+              : 1;
+          p.setPlaybackRate(validSpeed);
           p.setPlaybackQuality?.("small");
         } catch {}
       } else {
         pendingYtActionRef.current = { id, startAt, autoPlay };
       }
     },
-    [playbackSpeed],
+    [],
   );
 
   /** Cleanup on unmount */
@@ -999,6 +1000,7 @@ export function useAudioPlayer(options: {
     async (id: string, directUrl?: string, startAt = 0) => {
       wantPlayRef.current = true;
       currentTrackIdRef.current = id;
+      lastValidPositionRef.current = startAt;
       setPosition(startAt);
       setDuration(0);
       qualityFallbackStepRef.current = 0;
@@ -1038,6 +1040,7 @@ export function useAudioPlayer(options: {
     async (id: string, startSeconds = 0, directUrl?: string) => {
       wantPlayRef.current = false;
       currentTrackIdRef.current = id;
+      lastValidPositionRef.current = startSeconds;
       setPosition(startSeconds);
       setDuration(0);
       qualityFallbackStepRef.current = 0;
@@ -1093,7 +1096,7 @@ export function useAudioPlayer(options: {
           p.playVideo();
         } catch {}
       } else if (curId) {
-        playViaYouTube(curId, position, true);
+        playViaYouTube(curId, lastValidPositionRef.current, true);
       }
       return;
     }
@@ -1113,7 +1116,7 @@ export function useAudioPlayer(options: {
         });
       }
     }
-  }, [initWebAudio]);
+  }, [initWebAudio, playViaYouTube]);
 
   const pause = useCallback(() => {
     wantPlayRef.current = false;
@@ -1133,6 +1136,7 @@ export function useAudioPlayer(options: {
 
   const seek = useCallback((seconds: number) => {
     const target = Math.max(0, seconds);
+    lastValidPositionRef.current = target;
     setPosition(target);
 
     if (activeEngineRef.current === "youtube") {
@@ -1168,16 +1172,17 @@ export function useAudioPlayer(options: {
       audio.play().catch(() => {});
     }
   }, []);
+  seekRef.current = seek;
 
   const skipForward = useCallback((seconds = SKIP_FORWARD_SECONDS) => {
-    const current = position;
-    seek(current + seconds);
-  }, [position, seek]);
+    const cur = lastValidPositionRef.current;
+    seek(cur + seconds);
+  }, [seek]);
 
   const skipBackward = useCallback((seconds = SKIP_BACKWARD_SECONDS) => {
-    const current = position;
-    seek(Math.max(0, current - seconds));
-  }, [position, seek]);
+    const cur = lastValidPositionRef.current;
+    seek(Math.max(0, cur - seconds));
+  }, [seek]);
 
   const setSpeed = useCallback((speed: number) => {
     const clamped = Number.isFinite(speed) ? Math.min(3, Math.max(0.25, speed)) : 1;

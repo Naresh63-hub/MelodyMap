@@ -1942,6 +1942,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       return;
     }
 
+    // Tab navigation safety: If audio is actively playing, never reload, re-cue, or interrupt
+    if (player.isPlaying) {
+      return;
+    }
+
     const audioEl =
       typeof document !== "undefined"
         ? (document.getElementById("melodymap-core-audio") as HTMLAudioElement | null)
@@ -1956,7 +1961,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
 
     void load(track.id, track.previewUrl);
-  }, [current?.id, player.ready, load, cue]);
+  }, [current?.id, player.ready, player.isPlaying, load, cue]);
 
   const isPlayingRef = useRef(player.isPlaying);
   isPlayingRef.current = player.isPlaying;
@@ -1999,14 +2004,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   // Cross-tab playback coordination: pause if another tab begins playback
   const channelRef = useRef<BroadcastChannel | null>(null);
+  const tabInstanceIdRef = useRef<string>(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `tab_${Math.random().toString(36).slice(2)}`
+  );
+
   useEffect(() => {
     if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;
     try {
       const channel = new BroadcastChannel("melodymap_playback_sync");
       channelRef.current = channel;
       channel.onmessage = (event) => {
-        if (event?.data?.type === "PLAYING") {
-          // If another tab started playing, pause this tab so they don't fight or play over each other
+        // Only pause if the message came from a different tab instance, never self
+        if (
+          event?.data?.type === "PLAYING" &&
+          event.data.instanceId &&
+          event.data.instanceId !== tabInstanceIdRef.current
+        ) {
           if (isPlayingRef.current) {
             pause();
           }
@@ -2026,7 +2041,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   useEffect(() => {
     if (player.isPlaying && channelRef.current) {
       try {
-        channelRef.current.postMessage({ type: "PLAYING", trackId: current?.id });
+        channelRef.current.postMessage({
+          type: "PLAYING",
+          trackId: current?.id,
+          instanceId: tabInstanceIdRef.current,
+        });
       } catch {}
     }
   }, [player.isPlaying, current?.id]);

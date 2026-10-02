@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export type KeyboardShortcutHandlers = {
   onTogglePlay?: () => void;
@@ -21,6 +21,9 @@ export function useKeyboardShortcuts(
   handlers: KeyboardShortcutHandlers,
   enabled: boolean = true
 ) {
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
+
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
 
@@ -48,64 +51,64 @@ export function useKeyboardShortcuts(
         case "k":
         case "K":
           e.preventDefault();
-          handlers.onTogglePlay?.();
+          handlersRef.current.onTogglePlay?.();
           break;
 
         case "ArrowRight":
           e.preventDefault();
-          handlers.onSeekForward?.();
+          handlersRef.current.onSeekForward?.();
           break;
 
         case "ArrowLeft":
           e.preventDefault();
-          handlers.onSeekBackward?.();
+          handlersRef.current.onSeekBackward?.();
           break;
 
         case "ArrowUp":
           e.preventDefault();
-          handlers.onVolumeUp?.();
+          handlersRef.current.onVolumeUp?.();
           break;
 
         case "ArrowDown":
           e.preventDefault();
-          handlers.onVolumeDown?.();
+          handlersRef.current.onVolumeDown?.();
           break;
 
         case "n":
         case "N":
           e.preventDefault();
-          handlers.onNext?.();
+          handlersRef.current.onNext?.();
           break;
 
         case "p":
         case "P":
           e.preventDefault();
-          handlers.onPrev?.();
+          handlersRef.current.onPrev?.();
           break;
 
         case "m":
         case "M":
           e.preventDefault();
-          handlers.onToggleMute?.();
+          handlersRef.current.onToggleMute?.();
           break;
 
         case "f":
         case "F":
           e.preventDefault();
-          handlers.onToggleFullScreen?.();
+          handlersRef.current.onToggleFullScreen?.();
           break;
 
         case "e":
         case "E":
           e.preventDefault();
-          handlers.onToggleEqualizer?.();
+          handlersRef.current.onToggleEqualizer?.();
           break;
 
         case "s":
         case "S":
           if (!e.ctrlKey && !e.metaKey) {
             e.preventDefault();
-            handlers.onToggleShuffle?.();
+            handlersRef.current.onToggleShuffle?.();
           }
           break;
 
@@ -113,18 +116,18 @@ export function useKeyboardShortcuts(
         case "R":
           if (!e.ctrlKey && !e.metaKey) {
             e.preventDefault();
-            handlers.onToggleRepeat?.();
+            handlersRef.current.onToggleRepeat?.();
           }
           break;
 
         case "/":
           e.preventDefault();
-          handlers.onFocusSearch?.();
+          handlersRef.current.onFocusSearch?.();
           break;
 
         case "?":
           e.preventDefault();
-          handlers.onToggleShortcutsModal?.();
+          handlersRef.current.onToggleShortcutsModal?.();
           break;
 
         default:
@@ -134,5 +137,5 @@ export function useKeyboardShortcuts(
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handlers, enabled]);
+  }, [enabled]);
 }
