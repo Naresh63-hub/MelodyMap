@@ -39,6 +39,10 @@ const BROWSER_UA =
 // ─── Serverless Binary Auto-Resolution (Vercel / Linux) ──────────────
 
 const YT_DLP_RELEASE_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download";
+const ALLOWED_BINARIES = new Set(["yt-dlp", "yt-dlp.exe"]);
+const MAX_BINARY_SIZE = 100 * 1024 * 1024; // 100 MB max to prevent memory exhaustion
+const MAX_SUMS_SIZE = 512 * 1024; // 512 KB max for checksum file
+const SHA256_HEX_REGEX = /^[a-f0-9]{64}$/;
 
 let resolvedYtDlpInstance: any = null;
 let downloadPromise: Promise<void> | null = null;
@@ -59,6 +63,22 @@ if (typeof process !== "undefined" && process.once) {
 }
 
 /**
+ * Validates that the download URL strictly targets the official yt-dlp GitHub release repository.
+ */
+export function isTrustedDownloadUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    return (
+      parsed.protocol === "https:" &&
+      parsed.hostname === "github.com" &&
+      parsed.pathname.startsWith("/yt-dlp/yt-dlp/releases/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Download the standalone yt-dlp binary and verify it against the SHA2-256SUMS
  * asset published with the same release. A binary that cannot be verified is
  * refused (fail closed) — the app then falls back to the InnerTube resolver.
@@ -71,14 +91,51 @@ export async function downloadVerifiedYtDlpBinary(
   binaryName: string,
   isWindows: boolean,
 ): Promise<string | null> {
+  // 1. Strict binary name whitelist prevents arbitrary files or path traversal
+  if (!ALLOWED_BINARIES.has(binaryName)) {
+    return null;
+  }
+
+  // 2. Safe path validation: target path must stay strictly inside targetDir
+  const resolvedTargetDir = path.resolve(targetDir);
+  const targetPath = path.resolve(resolvedTargetDir, binaryName);
+  if (!targetPath.startsWith(resolvedTargetDir + path.sep)) {
+    return null;
+  }
+
+  // 3. Trusted download source validation
+  const binaryUrl = `${YT_DLP_RELEASE_BASE}/${binaryName}`;
+  const sumsUrl = `${YT_DLP_RELEASE_BASE}/SHA2-256SUMS`;
+  if (!isTrustedDownloadUrl(binaryUrl) || !isTrustedDownloadUrl(sumsUrl)) {
+    return null;
+  }
+
   const [binRes, sumsRes] = await Promise.all([
-    fetch(`${YT_DLP_RELEASE_BASE}/${binaryName}`),
-    fetch(`${YT_DLP_RELEASE_BASE}/SHA2-256SUMS`),
+    fetch(binaryUrl),
+    fetch(sumsUrl),
   ]);
   if (!binRes.ok || !sumsRes.ok) return null;
 
+  // 4. Header-level payload size verification
+  const binLenHeader = Number(binRes.headers.get("content-length"));
+  if (binLenHeader && (binLenHeader > MAX_BINARY_SIZE || binLenHeader <= 0)) {
+    return null;
+  }
+  const sumsLenHeader = Number(sumsRes.headers.get("content-length"));
+  if (sumsLenHeader && sumsLenHeader > MAX_SUMS_SIZE) {
+    return null;
+  }
+
   const buffer = Buffer.from(await binRes.arrayBuffer());
+  if (buffer.byteLength === 0 || buffer.byteLength > MAX_BINARY_SIZE) {
+    return null;
+  }
+
   const sums = await sumsRes.text();
+  if (sums.length === 0 || sums.length > MAX_SUMS_SIZE) {
+    return null;
+  }
+
   // GNU-style lines: "<sha256>  <filename>"
   const expectedSha = sums
     .split("\n")
@@ -87,20 +144,26 @@ export async function downloadVerifiedYtDlpBinary(
     .find((parts) => parts.slice(1).join(" ") === binaryName)?.[0]
     ?.toLowerCase();
 
-  if (!expectedSha) return null;
+  // 5. Strict SHA-256 format validation and cryptographic match
+  if (!expectedSha || !SHA256_HEX_REGEX.test(expectedSha)) return null;
+
   const actualSha = createHash("sha256").update(buffer).digest("hex");
   if (actualSha !== expectedSha) return null;
 
-  const targetPath = path.join(targetDir, binaryName);
-  // Exclusive creation flag 'wx' prevents symlink exploitation and TOCTOU races
-  fs.writeFileSync(targetPath, buffer, {
-    mode: isWindows ? 0o600 : 0o700,
-    flag: "wx",
-  });
-  if (!isWindows) {
-    fs.chmodSync(targetPath, 0o700);
+  // 6. Safe exclusive file creation with restricted permissions
+  try {
+    fs.writeFileSync(targetPath, buffer, {
+      mode: isWindows ? 0o600 : 0o700,
+      flag: "wx",
+    });
+    if (!isWindows) {
+      fs.chmodSync(targetPath, 0o700);
+    }
+    return targetPath;
+  } catch (err) {
+    console.warn(`[stream] Failed to safely write binary to ${targetPath}:`, err);
+    return null;
   }
-  return targetPath;
 }
 
 async function getYtDlpInstance() {
