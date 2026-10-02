@@ -32,5 +32,12 @@ export function resolveAiModelId(): string {
   const explicit = process.env["AI_MODEL"]?.trim();
   if (explicit) return explicit;
   const baseURL = process.env["AI_API_BASE_URL"] || "https://api.openai.com/v1";
-  return baseURL.includes("openai.com") ? "gpt-4o-mini" : "google/gemini-3.6-flash";
+  try {
+    const parsed = new URL(baseURL);
+    const host = parsed.hostname.toLowerCase();
+    const isOpenAiHost = host === "api.openai.com" || host.endsWith(".openai.com");
+    return isOpenAiHost ? "gpt-4o-mini" : "google/gemini-3.6-flash";
+  } catch {
+    return "gpt-4o-mini";
+  }
 }

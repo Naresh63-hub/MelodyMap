@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 describe("Tab Playback Continuity & Invariant Guarding", () => {
   describe("Active Playback Tab Navigation Invariants", () => {
     it("never reloads or restarts an actively playing track when tab changes", () => {
-      let loadedTrackId: string | null = "song_123";
+      const loadedTrackId: string | null = "song_123";
       const isPlaying = true;
       const currentTrack = { id: "song_123", previewUrl: "https://example.com/audio.mp3" };
       const loadFn = vi.fn();

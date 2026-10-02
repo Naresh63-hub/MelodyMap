@@ -42,22 +42,40 @@ const YT_DLP_RELEASE_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/do
 
 let resolvedYtDlpInstance: any = null;
 let downloadPromise: Promise<void> | null = null;
+let secureTmpDir: string | null = null;
+
+function cleanupSecureTmpDir() {
+  if (secureTmpDir && fs.existsSync(secureTmpDir)) {
+    try {
+      fs.rmSync(secureTmpDir, { recursive: true, force: true });
+      secureTmpDir = null;
+    } catch {}
+  }
+}
+
+// Register process exit cleanup handler
+if (typeof process !== "undefined" && process.once) {
+  process.once("exit", cleanupSecureTmpDir);
+}
 
 /**
  * Download the standalone yt-dlp binary and verify it against the SHA2-256SUMS
  * asset published with the same release. A binary that cannot be verified is
  * refused (fail closed) — the app then falls back to the InnerTube resolver.
+ *
+ * Writes to a caller-provided private directory using exclusive file creation ('wx')
+ * and restrictive permissions (0o700).
  */
-async function downloadVerifiedYtDlpBinary(
-  tmpPath: string,
+export async function downloadVerifiedYtDlpBinary(
+  targetDir: string,
   binaryName: string,
   isWindows: boolean,
-): Promise<boolean> {
+): Promise<string | null> {
   const [binRes, sumsRes] = await Promise.all([
     fetch(`${YT_DLP_RELEASE_BASE}/${binaryName}`),
     fetch(`${YT_DLP_RELEASE_BASE}/SHA2-256SUMS`),
   ]);
-  if (!binRes.ok || !sumsRes.ok) return false;
+  if (!binRes.ok || !sumsRes.ok) return null;
 
   const buffer = Buffer.from(await binRes.arrayBuffer());
   const sums = await sumsRes.text();
@@ -69,15 +87,20 @@ async function downloadVerifiedYtDlpBinary(
     .find((parts) => parts.slice(1).join(" ") === binaryName)?.[0]
     ?.toLowerCase();
 
-  if (!expectedSha) return false;
+  if (!expectedSha) return null;
   const actualSha = createHash("sha256").update(buffer).digest("hex");
-  if (actualSha !== expectedSha) return false;
+  if (actualSha !== expectedSha) return null;
 
-  fs.writeFileSync(tmpPath, buffer);
+  const targetPath = path.join(targetDir, binaryName);
+  // Exclusive creation flag 'wx' prevents symlink exploitation and TOCTOU races
+  fs.writeFileSync(targetPath, buffer, {
+    mode: isWindows ? 0o600 : 0o700,
+    flag: "wx",
+  });
   if (!isWindows) {
-    fs.chmodSync(tmpPath, 0o755);
+    fs.chmodSync(targetPath, 0o700);
   }
-  return true;
+  return targetPath;
 }
 
 async function getYtDlpInstance() {
@@ -91,42 +114,54 @@ async function getYtDlpInstance() {
     return resolvedYtDlpInstance;
   }
 
-  // 2. Check if cached binary in /tmp already exists
+  // 2. Check if cached binary in secure private directory already exists
   const isWindows = process.platform === "win32";
   const binaryName = isWindows ? "yt-dlp.exe" : "yt-dlp";
-  const tmpPath = path.join(os.tmpdir(), binaryName);
 
-  if (fs.existsSync(tmpPath)) {
+  if (secureTmpDir && fs.existsSync(path.join(secureTmpDir, binaryName))) {
+    const existingPath = path.join(secureTmpDir, binaryName);
     try {
       if (!isWindows) {
-        fs.chmodSync(tmpPath, 0o755);
+        fs.chmodSync(existingPath, 0o700);
       }
-      resolvedYtDlpInstance = create(tmpPath);
+      resolvedYtDlpInstance = create(existingPath);
       return resolvedYtDlpInstance;
     } catch {}
   }
 
-  // 3. Download standalone binary to /tmp if running on serverless Linux (e.g. Vercel)
+  // 3. Download standalone binary to private secure directory if running on serverless Linux (e.g. Vercel)
   if (!downloadPromise) {
     downloadPromise = (async () => {
+      let createdDir: string | null = null;
       try {
-        console.info(`[stream] yt-dlp binary missing from bundle, downloading to ${tmpPath}...`);
-        const installed = await downloadVerifiedYtDlpBinary(tmpPath, binaryName, isWindows);
+        createdDir = fs.mkdtempSync(path.join(os.tmpdir(), "melodymap-ytdlp-"));
+        if (!isWindows) {
+          fs.chmodSync(createdDir, 0o700);
+        }
+        secureTmpDir = createdDir;
+        console.info(`[stream] Downloading verified yt-dlp binary to private dir ${createdDir}...`);
+        const installedPath = await downloadVerifiedYtDlpBinary(createdDir, binaryName, isWindows);
         console.info(
-          installed
-            ? `[stream] Installed checksum-verified yt-dlp to ${tmpPath}`
+          installedPath
+            ? `[stream] Installed checksum-verified yt-dlp to ${installedPath}`
             : `[stream] yt-dlp install refused (release unavailable or checksum verification failed)`,
         );
       } catch (err) {
-        console.warn(`[stream] Failed to download yt-dlp binary to /tmp:`, err);
+        console.warn(`[stream] Failed to download yt-dlp binary:`, err);
+        if (createdDir && fs.existsSync(createdDir)) {
+          try {
+            fs.rmSync(createdDir, { recursive: true, force: true });
+          } catch {}
+          if (secureTmpDir === createdDir) secureTmpDir = null;
+        }
       }
     })();
   }
 
   await downloadPromise;
 
-  if (fs.existsSync(tmpPath)) {
-    resolvedYtDlpInstance = create(tmpPath);
+  if (secureTmpDir && fs.existsSync(path.join(secureTmpDir, binaryName))) {
+    resolvedYtDlpInstance = create(path.join(secureTmpDir, binaryName));
     return resolvedYtDlpInstance;
   }
 

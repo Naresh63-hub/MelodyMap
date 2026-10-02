@@ -218,7 +218,7 @@ export class TelemetryManager {
   logEvent(event: Omit<PlaybackTelemetryEvent, "id">): PlaybackTelemetryEvent {
     const fullEvent: PlaybackTelemetryEvent = {
       ...event,
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `${Date.now()}-${crypto.randomUUID()}`,
     };
 
     this.buffer.push(fullEvent);

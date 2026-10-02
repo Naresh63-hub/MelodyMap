@@ -239,8 +239,8 @@ function write(key: string, value: unknown) {
   }
 }
 
-function uid() {
-  return Math.random().toString(36).slice(2, 10);
+function uid(): string {
+  return crypto.randomUUID();
 }
 
 const PLAYBACK_KEY = "melodymap.playback.v1";

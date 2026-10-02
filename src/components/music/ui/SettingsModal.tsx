@@ -43,6 +43,7 @@ import {
 } from "@/lib/sponsorblock";
 import type { Profile } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { isSafeAvatarUrl } from "@/lib/avatar-url";
 
 const PRESET_AVATARS = [
   { id: "cyber-dj", label: "Cyber DJ", url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=160&auto=format&fit=crop&q=80" },
@@ -141,6 +142,11 @@ export function SettingsModal({
     setProfileFeedback(null);
     try {
       const trimmedAvatar = avatarUrl.trim();
+      if (trimmedAvatar && !isSafeAvatarUrl(trimmedAvatar)) {
+        setProfileSaving(false);
+        setProfileFeedback({ type: "error", msg: "Invalid avatar URL. Must start with http://, https://, or /" });
+        return;
+      }
       const res = await onUpdateProfile?.({
         display_name: displayName.trim(),
         ...(trimmedAvatar ? { avatar_url: trimmedAvatar } : {}),
@@ -338,7 +344,7 @@ export function SettingsModal({
                   {/* Glowing Avatar with Edit Overlay */}
                   <div className="relative group shrink-0">
                     <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 text-2xl font-bold text-white shadow-xl shadow-purple-500/25 ring-4 ring-white/10 overflow-hidden">
-                      {avatarUrl ? (
+                      {isSafeAvatarUrl(avatarUrl) ? (
                         <img
                           src={avatarUrl}
                           alt="Avatar"

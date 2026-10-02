@@ -7,7 +7,7 @@ import tseslint from "typescript-eslint";
 export default tseslint.config(
   // Formatting is enforced by the separate `prettier` script — running prettier
   // as an eslint rule (eslint-plugin-prettier) made lint runs take minutes.
-  { ignores: ["dist", ".output", ".vinxi", ".tanstack", ".wrangler", ".vercel", "src/routeTree.gen.ts"] },
+  { ignores: ["dist", ".output", ".vinxi", ".tanstack", ".wrangler", ".vercel", "android/**", "src/routeTree.gen.ts"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

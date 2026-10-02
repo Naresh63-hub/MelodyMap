@@ -1012,7 +1012,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks) {
-          let pureMusic = res.tracks as Track[];
+          const pureMusic = res.tracks as Track[];
           // Freshness: exclude displayed/liked/recent/overlong tracks; fetch MORE rather than reuse.
           let fresh = applyFeedFilters(pureMusic);
           if (fresh.length < 6) {
@@ -1060,7 +1060,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         },
       });
       if (res.tracks) {
-        let pureMusic = res.tracks as Track[];
+        const pureMusic = res.tracks as Track[];
         // Freshness: fetch MORE candidates instead of re-serving displayed songs.
         let fresh = applyFeedFilters(pureMusic);
         if (fresh.length < 8) {
@@ -1127,7 +1127,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks) {
-          let pureMusic = res.tracks as Track[];
+          const pureMusic = res.tracks as Track[];
           // Freshness: fetch MORE candidates instead of re-serving displayed songs.
           let fresh = applyFeedFilters(pureMusic);
           if (fresh.length < 8) {
@@ -1165,7 +1165,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const loadRecommendations = useCallback(
     async (mood?: string) => {
       setRecLoading(true);
-      const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const nonce = `${Date.now()}-${crypto.randomUUID()}`;
       const clientHour = new Date().getHours();
       const affinity = contextEngine.getAffinityWeights(stats);
 
@@ -1405,7 +1405,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       // 2. Fallback to recommendation engine with circadian, affinity, and discovery context
       if (candidateTracks.length === 0) {
-        const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const nonce = `${Date.now()}-${crypto.randomUUID()}`;
         const clientHour = new Date().getHours();
         const affinity = contextEngine.getAffinityWeights(stats);
         const res = await runRecommend({
@@ -2036,11 +2036,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   // Cross-tab playback coordination: pause if another tab begins playback
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const tabInstanceIdRef = useRef<string>(
-    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `tab_${Math.random().toString(36).slice(2)}`
-  );
+  const tabInstanceIdRef = useRef<string>(crypto.randomUUID());
 
   useEffect(() => {
     if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;

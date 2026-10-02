@@ -76,7 +76,20 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Allow the page to trigger an immediate update check.
+// Allow same-origin pages to trigger an immediate update check securely.
 self.addEventListener("message", (event) => {
-  if (event.data === "skipWaiting") self.skipWaiting();
+  // Validate origin to prevent unauthorized cross-origin / cross-window activations
+  if (event.origin && event.origin !== self.location.origin) return;
+  if (event.source && typeof event.source === "object" && "url" in event.source) {
+    try {
+      const sourceOrigin = new URL(event.source.url).origin;
+      if (sourceOrigin !== self.location.origin) return;
+    } catch {
+      return;
+    }
+  }
+
+  if (event.data === "skipWaiting") {
+    self.skipWaiting();
+  }
 });

@@ -173,7 +173,7 @@ function AuthPage() {
         localStorage.setItem(
           "melodymap.local_user",
           JSON.stringify({
-            id: "local-" + Math.random().toString(36).substring(2, 9),
+            id: "local-" + crypto.randomUUID(),
             name: displayName,
             email: email.trim(),
           }),
@@ -277,7 +277,7 @@ function AuthPage() {
               localStorage.setItem(
                 "melodymap.local_user",
                 JSON.stringify({
-                  id: "local-" + Math.random().toString(36).substring(2, 9),
+                  id: "local-" + crypto.randomUUID(),
                   name: displayName,
                   email: email.trim(),
                 }),
@@ -320,7 +320,7 @@ function AuthPage() {
           localStorage.setItem(
             "melodymap.local_user",
             JSON.stringify({
-              id: "local-" + Math.random().toString(36).substring(2, 9),
+              id: "local-" + crypto.randomUUID(),
               name: displayName,
               email: email.trim(),
             }),
@@ -347,7 +347,7 @@ function AuthPage() {
             localStorage.setItem(
               "melodymap.local_user",
               JSON.stringify({
-                id: "local-" + Math.random().toString(36).substring(2, 9),
+                id: "local-" + crypto.randomUUID(),
                 name: displayName,
                 email: email.trim(),
               }),
@@ -386,7 +386,7 @@ function AuthPage() {
         localStorage.setItem(
           "melodymap.local_user",
           JSON.stringify({
-            id: "local-" + Math.random().toString(36).substring(2, 9),
+            id: "local-" + crypto.randomUUID(),
             name: displayName,
             email: email.trim(),
           }),
@@ -406,7 +406,7 @@ function AuthPage() {
         localStorage.setItem(
           "melodymap.local_user",
           JSON.stringify({
-            id: "local-google-" + Math.random().toString(36).substring(2, 9),
+            id: "local-google-" + crypto.randomUUID(),
             name: "Listener",
             email: "listener@local.dev",
           }),

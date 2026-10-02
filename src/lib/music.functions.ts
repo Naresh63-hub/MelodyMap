@@ -7,16 +7,14 @@ import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext } from "./context-engine";
 import { isLanguageConsistent, isOldEraTrack } from "./library";
 
-/** Sanitizes user-provided strings to prevent AI prompt injection while preserving real song/artist names */
-function sanitizePromptInput(str: string | undefined): string {
+/** Normalizes user-provided strings for AI context inclusion while preserving real song/artist names */
+export function sanitizePromptInput(str: string | undefined): string {
   if (!str) return "";
   return str
-    // eslint-disable-next-line no-control-regex -- stripping control characters is the purpose
+    // eslint-disable-next-line no-control-regex -- stripping control characters is intentional
     .replace(/[\x00-\x1F\x7F]/g, "") // control characters
-    .replace(/```[\s\S]*?```/g, "") // markdown code blocks
-    .replace(/<!--[\s\S]*?-->/g, "") // html comments
-    .replace(/[\\{}[\]^~`|]/g, " ") // template/code injection delimiters
-    .replace(/\s+/g, " ")
+    .replace(/<!--|-->|```|`|\${|[\\{}[\]^~|<>]/g, " ") // disarm comment tags, fences, and template delimiters
+    .replace(/\s+/g, " ") // collapse whitespace
     .slice(0, 150)
     .trim();
 }
@@ -701,7 +699,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
     const exploreRatio = Math.round(discovery);
     const familiarRatio = 100 - exploreRatio;
 
-    const seedNonce = `${data.refreshNonce ?? Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const seedNonce = `${data.refreshNonce ?? Date.now()}-${crypto.randomUUID()}`;
 
     const prompt = [
       "You map the sonic DNA of a listener's taste — tempo, pitch, instrumentation, vocal texture and energy — and read their behaviour sequentially: the order they play, replay and skip tracks.",
