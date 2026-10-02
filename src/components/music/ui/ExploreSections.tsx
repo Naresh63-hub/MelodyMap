@@ -229,21 +229,7 @@ export function ExploreSections({
 
   return (
     <div className="space-y-6 pt-1 animate-fade-in">
-      {/* 1. Trending Hits */}
-      {trending.length > 0 && (
-        <section>
-          <SectionHeader title="Trending Now" icon={TrendingUp} subtitle="Top charts in your language" />
-          <VerticalSongList
-            tracks={trending.slice(0, 8)}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onOpenOptions={onOpenOptions}
-          />
-        </section>
-      )}
-
-      {/* 2. New Releases */}
+      {/* 1. New Releases (Square cards on up side) */}
       {newReleases.length > 0 && (
         <section>
           <SectionHeader title="New Releases" icon={Flame} subtitle="Fresh drops" />
@@ -256,15 +242,29 @@ export function ExploreSections({
         </section>
       )}
 
-      {/* 3. Old Classics & Evergreens */}
+      {/* 2. Old Songs / Golden Era (Square cards on up side) */}
       {oldSongs && oldSongs.length > 0 && (
         <section>
-          <SectionHeader title="Old Classics" icon={Disc3} subtitle="Golden Era & Retro hits" />
+          <SectionHeader title="Old Songs" icon={Disc3} subtitle="Golden Era & Retro hits" />
           <HorizontalScrollRow
             tracks={oldSongs}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
+          />
+        </section>
+      )}
+
+      {/* 3. Trending Songs (List queue format) */}
+      {trending.length > 0 && (
+        <section>
+          <SectionHeader title="Trending Songs" icon={TrendingUp} subtitle="Top charts in your language" />
+          <VerticalSongList
+            tracks={trending.slice(0, 12)}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+            onOpenOptions={onOpenOptions}
           />
         </section>
       )}

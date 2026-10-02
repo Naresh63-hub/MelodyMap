@@ -95,6 +95,7 @@ import {
   sequenceBrief,
   isMusicTrack,
   isPodcastTrack,
+  isOldEraTrack,
   parseDurationSeconds,
   MOODS,
   type Track,
@@ -267,7 +268,7 @@ function MusicApp() {
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [recs, setRecs] = useState<Track[]>(() => cachedFeed.recs || []);
   const [trendingList, setTrendingList] = useState<Track[]>(() => cachedFeed.trendingList || []);
-  const [oldSongsList, setOldSongsList] = useState<Track[]>(() => cachedFeed.oldSongsList || []);
+  const [oldSongsList, setOldSongsList] = useState<Track[]>(() => (cachedFeed.oldSongsList || []).filter(isOldEraTrack));
   const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -1099,7 +1100,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks) {
-          const pureMusic = res.tracks as Track[];
+          const pureMusic = (res.tracks as Track[]).filter(isOldEraTrack);
           const fresh = applyFeedFilters(pureMusic);
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           setOldSongsList(ranked);
@@ -1286,7 +1287,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               },
             });
             if (res.tracks) {
-              const pureMusic = res.tracks as Track[];
+              const pureMusic = (res.tracks as Track[]).filter(isOldEraTrack);
               const fresh = applyFeedFilters(pureMusic);
               const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
               setOldSongsList(ranked);
@@ -2165,7 +2166,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     markFeedDisplayed([
       ...(cachedFeed.recs || []),
       ...(cachedFeed.trendingList || []),
-      ...(cachedFeed.oldSongsList || []),
+      ...((cachedFeed.oldSongsList || []).filter(isOldEraTrack)),
       ...(cachedFeed.dailyMixTracks || []),
       ...Object.values(cachedFeed.mixTracks || {}).flat(),
     ]);
@@ -2189,6 +2190,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       void loadRecommendations();
     }
   }, [hydrated, settings.languages, loadRecommendations]);
+
+  // Auto-populate explore feeds (new releases, old songs, trending) when switching to Explore tab if empty
+  useEffect(() => {
+    if (!hydrated || tab !== "explore") return;
+    const hasEmptyExploreFeeds =
+      oldSongsList.length === 0 ||
+      trendingList.length === 0 ||
+      !mixTracks.newrelease ||
+      mixTracks.newrelease.length === 0;
+    if (hasEmptyExploreFeeds && !recLoading) {
+      void loadRecommendations();
+    }
+  }, [hydrated, tab, oldSongsList.length, trendingList.length, mixTracks.newrelease, recLoading, loadRecommendations]);
 
   useEffect(() => {
     const term = query.trim();
@@ -2511,11 +2525,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       Top charts, fresh releases & golden classics
                     </p>
                   </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full bg-white/[0.06] text-white/80 hover:bg-white/10 hover:text-white border-white/10 text-xs font-semibold"
+                      onClick={() => void loadRecommendations()}
+                      disabled={recLoading}
+                    >
+                      {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-white/60" /> : null}
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
 
                 <ExploreSections
                   trending={trendingList}
-                  oldSongs={oldSongsList}
+                  oldSongs={oldSongsList.filter(isOldEraTrack)}
                   newReleases={mixTracks.newrelease.slice(0, 12)}
                   onPlayTrack={(track, sectionTracks, i) => {
                     if (current?.id === track.id && player.isPlaying) {
@@ -2527,7 +2554,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   onOpenOptions={(t) => setOptionsTrack(t)}
                   currentId={current?.id ?? null}
                   isPlaying={player.isPlaying}
-                  loading={trendingList.length === 0 && oldSongsList.length === 0}
+                  loading={recLoading && trendingList.length === 0 && oldSongsList.length === 0}
                 />
               </div>
             )}

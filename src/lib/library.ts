@@ -962,4 +962,182 @@ export function isLanguageConsistent(
   return true;
 }
 
+/**
+ * Known modern artists and producers who debuted in the modern streaming era (2005+)
+ * to strictly exclude from the Old Songs / Golden Era / Retro feed.
+ */
+const MODERN_BLOCKED_ARTISTS = [
+  // South Indian Modern
+  "sid sriram",
+  "anirudh",
+  "anirudh ravichander",
+  "devi sri prasad",
+  "thaman",
+  "santhosh narayanan",
+  "anurag kulkarni",
+  "ram miriyala",
+  "mangli",
+  "hesham abdul",
+  "sam c.s",
+  "g.v. prakash",
+  "hiphop tamizha",
+  "sushin shyam",
+  "dhee",
+  "armaan malik",
+  "jonita gandhi",
+  "leon james",
+  "vivek-mervin",
+  // Hindi / Bollywood / Desi Modern
+  "arijit singh",
+  "neha kakkar",
+  "badshah",
+  "guru randhawa",
+  "honey singh",
+  "yo yo honey singh",
+  "mc stan",
+  "king",
+  "raftaar",
+  "divine",
+  "jubin nautiyal",
+  "darshan raval",
+  "prateek kuhad",
+  "jasleen royal",
+  "tony kakkar",
+  "dhvani bhanushali",
+  "b praak",
+  "jaani",
+  "harrdy sandhu",
+  "mika singh",
+  "meet bros",
+  "amal mallik",
+  // Punjabi Modern
+  "ap dhillon",
+  "sidhu moose",
+  "shubh",
+  "karan aujla",
+  "diljit dosanjh",
+  "amrit maan",
+  "jordan sandhu",
+  // Western / International Modern
+  "taylor swift",
+  "justin bieber",
+  "drake",
+  "billie eilish",
+  "olivia rodrigo",
+  "dua lipa",
+  "ariana grande",
+  "the weeknd",
+  "post malone",
+  "bruno mars",
+  "ed sheeran",
+  "harry styles",
+  "bts",
+  "blackpink",
+  "travis scott",
+  "kendrick lamar",
+  "imagine dragons",
+  "shawn mendes",
+  "selena gomez",
+  "camila cabello",
+  "doja cat",
+  "charlie puth",
+  "lil nas x",
+  "miley cyrus",
+  "alan walker",
+  "marshmello",
+  "chainsmokers",
+  "david guetta",
+  "calvin harris",
+  "martin garrix",
+];
+
+const MODERN_TAGS = [
+  "phonk",
+  "speed up",
+  "sped up",
+  "slowed",
+  "reverb",
+  "drill",
+  "trap mix",
+  "edm",
+  "club mix",
+  "bass boosted",
+  "lofi flip",
+  "reels",
+  "tiktok",
+  "shorts",
+  "dj remix",
+];
+
+/**
+ * Validates that a track strictly belongs to the Golden Era / Vintage Retro Classics catalog.
+ * Guarantees that contemporary songs, modern remixes, and post-2005 hits are filtered out.
+ */
+export function isOldEraTrack(track: {
+  title?: string | undefined;
+  artist?: string | undefined;
+  album?: string | undefined;
+  year?: string | number | undefined;
+}): boolean {
+  if (!track) return false;
+
+  const title = (track.title || "").toLowerCase();
+  const artist = (track.artist || "").toLowerCase();
+  const text = `${title} ${artist}`;
+
+  // 1. Strict Year validation
+  if (track.year !== undefined && track.year !== null) {
+    const parsed = parseInt(String(track.year).trim(), 10);
+    if (!isNaN(parsed) && parsed >= 2005) {
+      return false;
+    }
+  }
+
+  // 2. Block modern artists
+  for (const modern of MODERN_BLOCKED_ARTISTS) {
+    if (artist.includes(modern) || title.includes(modern)) {
+      return false;
+    }
+  }
+
+  // 3. Block modern electronic / viral tags
+  for (const tag of MODERN_TAGS) {
+    if (title.includes(tag)) {
+      return false;
+    }
+  }
+
+  // 4. Reject explicit modern 4-digit years in title (2005-2029) unless qualified by vintage indicators
+  const modernYearMatch = text.match(/\b20(0[5-9]|[12][0-9])\b/);
+  if (modernYearMatch) {
+    const vintageIndicators = [
+      "remaster",
+      "remastered",
+      "restored",
+      "50s",
+      "60s",
+      "70s",
+      "80s",
+      "90s",
+      "195",
+      "196",
+      "197",
+      "198",
+      "199",
+      "golden",
+      "retro",
+      "classic",
+      "evergreen",
+      "old",
+    ];
+    const hasVintageContext = vintageIndicators.some((kw) => text.includes(kw));
+    if (!hasVintageContext) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
 

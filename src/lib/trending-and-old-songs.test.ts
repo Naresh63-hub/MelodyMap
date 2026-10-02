@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isLanguageConsistent } from "./library";
+import { isLanguageConsistent, isOldEraTrack } from "./library";
 
 describe("Trending & Old Songs - Language Filtering and Section Isolation", () => {
   describe("isLanguageConsistent filter", () => {
@@ -41,6 +41,106 @@ describe("Trending & Old Songs - Language Filtering and Section Isolation", () =
       expect(isLanguageConsistent(teluguTrack, userLangs)).toBe(true);
       expect(isLanguageConsistent(hindiTrack, userLangs)).toBe(true);
       expect(isLanguageConsistent(punjabiTrack, userLangs)).toBe(false);
+    });
+  });
+
+  describe("isOldEraTrack filter", () => {
+    it("allows authentic golden era classics", () => {
+      expect(
+        isOldEraTrack({
+          title: "Keeravani",
+          artist: "S.P. Balasubrahmanyam, S. Janaki",
+          year: "1985",
+        }),
+      ).toBe(true);
+
+      expect(
+        isOldEraTrack({
+          title: "Roop Tera Mastana",
+          artist: "Kishore Kumar",
+          year: "1971",
+        }),
+      ).toBe(true);
+
+      expect(
+        isOldEraTrack({
+          title: "Bohemian Rhapsody",
+          artist: "Queen",
+          year: "1975",
+        }),
+      ).toBe(true);
+
+      expect(
+        isOldEraTrack({
+          title: "Ilaiyaraaja 80s Evergreens (2024 Remastered)",
+          artist: "Ilaiyaraaja",
+        }),
+      ).toBe(true);
+    });
+
+    it("rejects contemporary artists from modern streaming era", () => {
+      expect(
+        isOldEraTrack({
+          title: "Samajavaragamana",
+          artist: "Sid Sriram",
+        }),
+      ).toBe(false);
+
+      expect(
+        isOldEraTrack({
+          title: "Tum Hi Ho",
+          artist: "Arijit Singh",
+          year: "2013",
+        }),
+      ).toBe(false);
+
+      expect(
+        isOldEraTrack({
+          title: "Arabic Kuthu",
+          artist: "Anirudh Ravichander",
+        }),
+      ).toBe(false);
+
+      expect(
+        isOldEraTrack({
+          title: "Cruel Summer",
+          artist: "Taylor Swift",
+        }),
+      ).toBe(false);
+    });
+
+    it("rejects tracks with modern post-2005 release years", () => {
+      expect(
+        isOldEraTrack({
+          title: "Random Song",
+          artist: "Some Singer",
+          year: "2021",
+        }),
+      ).toBe(false);
+
+      expect(
+        isOldEraTrack({
+          title: "Hit Song",
+          artist: "Singer",
+          year: 2018,
+        }),
+      ).toBe(false);
+    });
+
+    it("rejects tracks with modern tags like EDM, phonk, speed up, trap mix", () => {
+      expect(
+        isOldEraTrack({
+          title: "Retro Vibe (Phonk Remix)",
+          artist: "Unknown",
+        }),
+      ).toBe(false);
+
+      expect(
+        isOldEraTrack({
+          title: "Old Melody - Speed Up Version",
+          artist: "Unknown",
+        }),
+      ).toBe(false);
     });
   });
 });

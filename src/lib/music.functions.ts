@@ -5,7 +5,7 @@ import type { Track } from "./types";
 import { norm, areSameTrack } from "./track-dedup";
 import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext } from "./context-engine";
-import { isLanguageConsistent } from "./library";
+import { isLanguageConsistent, isOldEraTrack } from "./library";
 
 /** Sanitizes user-provided strings to prevent AI prompt injection while preserving real song/artist names */
 function sanitizePromptInput(str: string | undefined): string {
@@ -597,45 +597,53 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
         queries.push("Telugu golden evergreen melodies SPB Chitra");
         queries.push("Telugu 90s all time classic hit songs");
         queries.push("Best of Ghantasala SP Balasubrahmanyam Telugu");
+        queries.push("Telugu 70s 80s retro classics Ilaiyaraaja Janaki");
       } else if (lower === "hindi") {
         queries.push("Hindi retro classic hit songs 70s 80s 90s");
         queries.push("Kishore Kumar Lata Mangeshkar evergreen hits");
         queries.push("Bollywood 90s golden era evergreen classics");
         queries.push("Best of Mohammed Rafi Mukesh RD Burman");
+        queries.push("Old Hindi golden melodies 60s 70s Asha Bhosle");
       } else if (lower === "tamil") {
         queries.push("Tamil 80s 90s classic evergreen hits Ilaiyaraaja");
         queries.push("Tamil golden retro songs SPB Janaki");
         queries.push("Tamil all time classic old melody songs");
+        queries.push("Best of TMS MSV old Tamil classic songs");
       } else if (lower === "malayalam") {
         queries.push("Malayalam old classic hit songs KJ Yesudas");
         queries.push("Malayalam golden retro melodies 80s 90s");
+        queries.push("Johnson Master Raveendran old Malayalam classics");
       } else if (lower === "kannada") {
         queries.push("Kannada old classic evergreen hit songs Rajkumar");
-        queries.push("Kannada 80s 90s retro melodies SPB");
+        queries.push("Kannada 80s 90s retro melodies SPB Janaki");
       } else if (lower === "punjabi") {
         queries.push("Punjabi old classic folk songs vintage retro");
-        queries.push("Punjabi evergreen golden oldies");
+        queries.push("Punjabi evergreen golden oldies Kuldeep Manak Chamkila");
       } else if (lower === "english") {
         queries.push("70s 80s 90s classic rock pop evergreen hits");
-        queries.push("Best retro golden oldies classics 80s 90s");
-        queries.push("Timeless classic songs 70s 80s acoustic");
+        queries.push("Best retro golden oldies classics Beatles Queen ABBA");
+        queries.push("Timeless classic songs 70s 80s Eagles Fleetwood Mac");
       } else {
         queries.push(`${lang} old classic songs retro 80s 90s`);
         queries.push(`${lang} golden evergreen classic melodies`);
       }
     }
 
+    // Only query artists if they are verified vintage/retro artists (never modern contemporary artists)
     if (data.artists && data.artists.length > 0) {
       for (const artist of data.artists.slice(0, 3)) {
-        queries.push(`${artist} evergreen classic hit songs`);
+        if (isOldEraTrack({ artist })) {
+          queries.push(`${artist} evergreen classic hit songs`);
+        }
       }
     }
 
     const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache);
-    const filteredTracks = langs.length > 0
-      ? tracks.filter((t) => isLanguageConsistent(t, langs))
-      : tracks;
-    const finalTracks = filteredTracks.length > 0 ? filteredTracks : tracks;
+    const filteredTracks = tracks.filter((t) => {
+      const langOk = langs.length > 0 ? isLanguageConsistent(t, langs) : true;
+      return langOk && isOldEraTrack(t);
+    });
+    const finalTracks = filteredTracks.length > 0 ? filteredTracks : tracks.filter(isOldEraTrack);
     return { tracks: shuffleArray(finalTracks).slice(0, count), error: null };
   });
 
