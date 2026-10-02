@@ -56,6 +56,9 @@ test-ytdlp.cjs
 android/local.properties
 android/.gradle
 *.apk
+*.keystore
+*.jks
+key.properties
 test.m4a
 
 # Playwright Test Output
