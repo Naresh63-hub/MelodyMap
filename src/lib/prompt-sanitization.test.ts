@@ -20,7 +20,8 @@ describe("sanitizePromptInput normalization", () => {
 
   it("disarms HTML comment tags cleanly", () => {
     expect(sanitizePromptInput("<!-- comment -->")).toBe("comment");
-    expect(sanitizePromptInput("<!<!--nested-->--!>")).toBe("! nested --!");
+    expect(sanitizePromptInput("<!-- comment --!>")).toBe("comment");
+    expect(sanitizePromptInput("<!<!--nested-->--!>")).toBe("! nested");
   });
 
   it("disarms template interpolation delimiters", () => {

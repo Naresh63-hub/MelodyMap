@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSafeAvatarUrl } from "./avatar-url";
+import { isSafeAvatarUrl, getSafeAvatarUrl } from "./avatar-url";
 
 describe("isSafeAvatarUrl", () => {
   it("allows standard HTTPS image URLs", () => {
@@ -43,5 +43,22 @@ describe("isSafeAvatarUrl", () => {
     expect(isSafeAvatarUrl(undefined)).toBe(false);
     expect(isSafeAvatarUrl("")).toBe(false);
     expect(isSafeAvatarUrl("   ")).toBe(false);
+  });
+});
+
+describe("getSafeAvatarUrl", () => {
+  it("encodes and returns valid HTTPS and HTTP URLs", () => {
+    expect(getSafeAvatarUrl("https://example.com/photo.png")).toBe("https://example.com/photo.png");
+    expect(getSafeAvatarUrl("https://example.com/my avatar.png")).toBe("https://example.com/my%20avatar.png");
+    expect(getSafeAvatarUrl("/icons/my avatar.png")).toBe("/icons/my%20avatar.png");
+  });
+
+  it("returns null for malicious or invalid URLs", () => {
+    expect(getSafeAvatarUrl("javascript:alert(1)")).toBeNull();
+    expect(getSafeAvatarUrl("data:text/html,<script>")).toBeNull();
+    expect(getSafeAvatarUrl("//attacker.com/x.png")).toBeNull();
+    expect(getSafeAvatarUrl(null)).toBeNull();
+    expect(getSafeAvatarUrl(undefined)).toBeNull();
+    expect(getSafeAvatarUrl("")).toBeNull();
   });
 });

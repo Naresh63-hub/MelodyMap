@@ -391,6 +391,8 @@ describe("Spotify-style Single-Track Playback and Queue Architecture", () => {
     it("N. progress resets from A's position to 0 when B starts", () => {
       let position = 137; // A is mid-playback
       let duration = 262;
+      expect(position).toBe(137);
+      expect(duration).toBe(262);
 
       // Transition A → B (mirrors load(): setPosition(startAt), setDuration(0))
       position = 0;

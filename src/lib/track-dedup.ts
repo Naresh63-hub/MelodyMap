@@ -29,7 +29,7 @@ export interface TrackLike {
 export function norm(s: string): string {
   return s
     .toLowerCase()
-    .replace(/[''`]/g, "'") // normalize smart quotes
+    .replace(/[‘'’`]/g, "'") // normalize smart quotes
     .replace(/[()[\]{}]/g, " ")
     .replace(/\s+/g, " ")
     .replace(

@@ -8,6 +8,12 @@ describe("norm", () => {
     expect(norm("  HELLO   World  ")).toBe("hello world");
     expect(norm("Don't Stop [HD]")).toBe("don't stop");
   });
+
+  it("normalizes smart quotes and backticks to standard apostrophe", () => {
+    expect(norm("Don‘t Stop")).toBe("don't stop");
+    expect(norm("Don’t Stop")).toBe("don't stop");
+    expect(norm("Don`t Stop")).toBe("don't stop");
+  });
 });
 
 describe("stringSimilarity", () => {

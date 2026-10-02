@@ -87,7 +87,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
     (e: React.KeyboardEvent) => {
       if (duration <= 0) return;
       const step = e.shiftKey ? 15 : 5;
-      let next = position;
+      let next: number;
       switch (e.key) {
         case "ArrowRight":
         case "ArrowUp":

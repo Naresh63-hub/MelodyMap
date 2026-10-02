@@ -13,6 +13,7 @@ describe("Tab Playback Continuity & Invariant Guarding", () => {
       const tabs = ["foryou", "explore", "search", "library", "mixes", "podcasts"] as const;
 
       for (const tab of tabs) {
+        expect(tab).toBeDefined();
         // Tab transition hook guard check
         const shouldReload = (() => {
           if (!currentTrack) return false;

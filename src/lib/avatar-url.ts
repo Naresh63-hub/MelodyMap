@@ -24,3 +24,13 @@ export function isSafeAvatarUrl(url: string | null | undefined): boolean {
     return false;
   }
 }
+
+/**
+ * Returns a sanitized and encoded avatar URL safe for use in DOM sinks (e.g. img src).
+ * Returns null if the URL is invalid or uses an unapproved/dangerous scheme.
+ */
+export function getSafeAvatarUrl(url: string | null | undefined): string | null {
+  if (!isSafeAvatarUrl(url)) return null;
+  const trimmed = url!.trim();
+  return encodeURI(trimmed);
+}

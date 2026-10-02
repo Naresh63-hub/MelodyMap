@@ -203,13 +203,13 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     const hour = context.hourOfDay ?? new Date().getHours();
     const tempCtx = getTemporalContext(hour);
     const candidateEnergy = detectTrackEnergy(candidate);
-    let circadianScore = 0.5;
+    let circadianScore: number;
     if (tempCtx.energy === "gentle" || tempCtx.energy === "low") {
       circadianScore = candidateEnergy === "chill" ? 1.0 : candidateEnergy === "medium" ? 0.6 : 0.2;
     } else if (tempCtx.energy === "high") {
       circadianScore = candidateEnergy === "high" ? 1.0 : candidateEnergy === "medium" ? 0.7 : 0.3;
     } else {
-      circadianScore = candidateEnergy === "medium" ? 0.9 : candidateEnergy === "chill" ? 0.6 : 0.6;
+      circadianScore = candidateEnergy === "medium" ? 0.9 : 0.6;
     }
     x[1] = Math.max(0.0, Math.min(1.0, circadianScore));
 

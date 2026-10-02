@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Moon, RotateCcw, X, Clock, Check, Sliders } from "lucide-react";
+import { Moon, RotateCcw, X, Clock, Sliders } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSleepTimer } from "@/hooks/useSleepTimer";
 import { SLEEP_TIMER_PRESETS } from "@/lib/sleep-timer";
