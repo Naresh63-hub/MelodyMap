@@ -112,7 +112,7 @@ export function SleepTimerModal({
               <Moon className="h-4 w-4" />
             </div>
             <div className="text-left">
-              <h2 className="text-sm font-semibold text-[#F5F5F5] leading-tight">Sleep Timer</h2>
+              <h2 className="text-sm font-bold text-[#F5F5F5] leading-tight">Sleep Timer</h2>
               <p className="text-[11px] text-[#737373] leading-none mt-0.5">
                 {isActive
                   ? "Active • Automatically stops playback"
@@ -169,14 +169,14 @@ export function SleepTimerModal({
         {/* Preset Chips */}
         <div className="space-y-2 mb-5">
           <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-medium text-[#737373] uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-[#737373] uppercase tracking-wider">
               {isActive ? "Change Duration" : "Select Duration"}
             </span>
             <button
               type="button"
               onClick={() => setIsCustomMode(!isCustomMode)}
               className={cn(
-                "text-[11px] font-medium transition-colors flex items-center gap-1",
+                "text-[11px] font-semibold transition-colors flex items-center gap-1",
                 isCustomMode ? "text-[#1DB954]" : "text-[#737373] hover:text-[#F5F5F5]"
               )}
             >
@@ -195,7 +195,7 @@ export function SleepTimerModal({
                     type="button"
                     onClick={() => handlePresetSelect(p.minutes)}
                     className={cn(
-                      "rounded-xl border py-2 px-1 text-xs font-medium transition-all text-center",
+                      "rounded-xl border py-2 px-1 text-xs font-semibold transition-all text-center",
                       isSelected
                         ? "border-[#1DB954] bg-[#1DB954]/15 text-[#1DB954] shadow-sm"
                         : "border-white/[0.06] bg-white/[0.03] text-[#A1A1A1] hover:bg-white/[0.06] hover:text-[#F5F5F5]"
@@ -209,8 +209,8 @@ export function SleepTimerModal({
           ) : (
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 text-left">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-[#A1A1A1]">Minutes:</span>
-                <span className="text-sm font-semibold text-[#1DB954] tabular-nums">
+                <span className="text-xs font-medium text-[#A1A1A1]">Minutes:</span>
+                <span className="text-sm font-bold text-[#1DB954] tabular-nums">
                   {customInput} min
                 </span>
               </div>
@@ -226,7 +226,7 @@ export function SleepTimerModal({
                 }}
                 className="w-full accent-[#1DB954] cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-[#737373] mt-1">
+              <div className="flex justify-between text-[10px] font-medium text-[#737373] mt-1">
                 <span>5m</span>
                 <span>60m (1h)</span>
                 <span>120m (2h)</span>
@@ -243,7 +243,7 @@ export function SleepTimerModal({
               <button
                 type="button"
                 onClick={cancelTimer}
-                className="flex-1 rounded-2xl bg-red-500/15 border border-red-500/30 py-3 text-sm font-medium text-red-300 hover:bg-red-500/25 active:scale-[0.99] transition-all"
+                className="flex-1 rounded-2xl bg-red-500/15 border border-red-500/30 py-3 text-sm font-semibold text-red-300 hover:bg-red-500/25 active:scale-[0.99] transition-all"
               >
                 Cancel Timer
               </button>
@@ -280,7 +280,7 @@ export function SleepTimerModal({
                   resetExpired();
                   handleStart(isCustomMode ? customInput : selectedMinutes);
                 }}
-                className="rounded-2xl border border-white/10 bg-white/[0.05] py-3 px-4 text-xs font-medium text-white hover:bg-white/10 transition-all"
+                className="rounded-2xl border border-white/10 bg-white/[0.05] py-3 px-4 text-xs font-semibold text-white hover:bg-white/10 transition-all"
               >
                 New
               </button>
