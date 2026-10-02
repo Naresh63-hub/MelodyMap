@@ -203,5 +203,57 @@ describe("Secure yt-dlp binary download and verification", () => {
       expect(fs.existsSync(res!)).toBe(true);
       expect(fs.readFileSync(res!)).toEqual(validContent);
     });
+
+    it("fails closed when file already exists to prevent TOCTOU symlink overwrites (flag wx)", async () => {
+      const validContent = Buffer.from("valid content");
+      const sha256 = crypto.createHash("sha256").update(validContent).digest("hex");
+      const validSums = `${sha256}  yt-dlp\n`;
+
+      const testDir = fs.mkdtempSync(path.join(os.tmpdir(), "test-ytdlp-collision-"));
+      createdDirs.push(testDir);
+
+      // Pre-create file to trigger EEXIST error on 'wx' flag
+      fs.writeFileSync(path.join(testDir, "yt-dlp"), "existing file content");
+
+      vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce({
+          ok: true,
+          headers: new Headers(),
+          arrayBuffer: async () => Uint8Array.from(validContent).buffer,
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          headers: new Headers(),
+          text: async () => validSums,
+        } as unknown as Response);
+
+      const res = await downloadVerifiedYtDlpBinary(testDir, "yt-dlp", true);
+      expect(res).toBeNull();
+      // Ensure existing file was not overwritten
+      expect(fs.readFileSync(path.join(testDir, "yt-dlp"), "utf-8")).toBe("existing file content");
+    });
+  });
+
+  describe("probeStream health check", () => {
+    it("returns true on 200 or 206 partial content stream", async () => {
+      const { probeStream } = await import("./stream.server");
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+        ok: true,
+        status: 206,
+        arrayBuffer: async () => new Uint8Array(1024).buffer,
+      } as unknown as Response);
+
+      expect(await probeStream("https://rr1---sn.googlevideo.com/videoplayback")).toBe(true);
+    });
+
+    it("returns false on 403 throttled or failed stream", async () => {
+      const { probeStream } = await import("./stream.server");
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+      } as unknown as Response);
+
+      expect(await probeStream("https://rr1---sn.googlevideo.com/videoplayback")).toBe(false);
+    });
   });
 });
