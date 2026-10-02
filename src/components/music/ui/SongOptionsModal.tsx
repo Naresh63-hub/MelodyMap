@@ -52,7 +52,7 @@ export function SongOptionsModal({
       />
 
       {/* Modal Sheet */}
-      <div className="relative w-full max-w-lg rounded-t-3xl bg-[#140f24] border-t border-purple-500/20 p-5 shadow-2xl z-10 animate-slide-up">
+      <div className="relative w-full max-w-lg rounded-t-3xl bg-[#101010] border-t border-white/[0.06] p-5 shadow-2xl z-10 animate-slide-up">
         {/* Grab bar */}
         <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-white/20" />
 
@@ -61,11 +61,11 @@ export function SongOptionsModal({
           <img
             src={track.thumbnail}
             alt=""
-            className="h-14 w-14 rounded-xl object-cover shadow-lg shadow-purple-950/40"
+            className="h-14 w-14 rounded-xl object-cover shadow-lg shadow-black/60"
           />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-bold text-white">{track.title}</h3>
-            <p className="truncate text-xs text-purple-300/60 mt-0.5">{track.artist}</p>
+            <h3 className="truncate text-base font-semibold text-[#F5F5F5]">{track.title}</h3>
+            <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{track.artist}</p>
           </div>
           <button
             type="button"
@@ -85,7 +85,7 @@ export function SongOptionsModal({
               onToggleLike(track);
               onClose();
             }}
-            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-white/90 hover:bg-purple-500/10 active:bg-purple-500/20 transition-colors"
+            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-[#F5F5F5] hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors"
           >
             <span className="font-medium">
               {isLiked ? "Remove from Liked Songs" : "Add to Liked Songs"}
@@ -93,7 +93,7 @@ export function SongOptionsModal({
             <Heart
               className={cn(
                 "h-5 w-5",
-                isLiked ? "fill-purple-400 text-purple-400" : "text-white/40"
+                isLiked ? "fill-[#1DB954] text-[#1DB954]" : "text-white/40"
               )}
             />
           </button>
@@ -105,7 +105,7 @@ export function SongOptionsModal({
               onAddToPlaylist(track);
               onClose();
             }}
-            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-white/90 hover:bg-purple-500/10 active:bg-purple-500/20 transition-colors"
+            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-[#F5F5F5] hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors"
           >
             <span className="font-medium">Add to Playlist</span>
             <ListMusic className="h-5 w-5 text-white/40" />
@@ -118,7 +118,7 @@ export function SongOptionsModal({
               onDownload(track);
               onClose();
             }}
-            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-white/90 hover:bg-purple-500/10 active:bg-purple-500/20 transition-colors"
+            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-[#F5F5F5] hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors"
           >
             <span className="font-medium">
               {isDownloaded ? "Remove Download" : "Download"}
@@ -126,7 +126,7 @@ export function SongOptionsModal({
             <Download
               className={cn(
                 "h-5 w-5",
-                isDownloaded ? "text-purple-400" : "text-white/40"
+                isDownloaded ? "text-[#1DB954]" : "text-white/40"
               )}
             />
           </button>
@@ -138,7 +138,7 @@ export function SongOptionsModal({
               onAddToQueue(track);
               onClose();
             }}
-            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-white/90 hover:bg-purple-500/10 active:bg-purple-500/20 transition-colors"
+            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-[#F5F5F5] hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors"
           >
             <span className="font-medium">Add to Queue</span>
             <ListPlus className="h-5 w-5 text-white/40" />
@@ -152,7 +152,7 @@ export function SongOptionsModal({
                 onGoToArtist(track.artist);
                 onClose();
               }}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-white/90 hover:bg-purple-500/10 active:bg-purple-500/20 transition-colors"
+              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-[#F5F5F5] hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors"
             >
               <span className="font-medium">Go to Artist</span>
               <User className="h-5 w-5 text-white/40" />
@@ -167,7 +167,7 @@ export function SongOptionsModal({
                 onShare(track);
                 onClose();
               }}
-              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-white/90 hover:bg-purple-500/10 active:bg-purple-500/20 transition-colors"
+              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-[#F5F5F5] hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors"
             >
               <span className="font-medium">Share</span>
               <Share2 className="h-5 w-5 text-white/40" />

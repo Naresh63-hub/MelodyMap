@@ -422,6 +422,14 @@ export function useAudioPlayer(options: {
         audio.pause();
       } catch {}
 
+      // For external direct audio (e.g. podcast MP3 CDNs), remove crossorigin so the browser
+      // does not block cross-origin audio streaming without CORS headers.
+      if (typeof window !== "undefined" && url.startsWith("http") && !url.includes(window.location.host) && !url.includes("/api/stream/")) {
+        audio.removeAttribute("crossorigin");
+      } else {
+        audio.crossOrigin = "anonymous";
+      }
+
       audio.loop = false;
       audio.volume = 1;
       audio.muted = false;
@@ -620,14 +628,24 @@ export function useAudioPlayer(options: {
 
         // Instant Fallback to Client YouTube Player on Vercel / server proxy block
         const activeId = currentTrackIdRef.current;
-        if (activeId && !activeId.startsWith("deezer:")) {
+        const isExternalNonYt =
+          Boolean(activeId) &&
+          (activeId!.startsWith("podcast:") ||
+            activeId!.startsWith("deezer:") ||
+            activeId!.startsWith("audius:") ||
+            activeId!.startsWith("jamendo:") ||
+            activeId!.startsWith("archive:"));
+
+        if (activeId && !isExternalNonYt) {
           console.info(`[MelodyMap] Falling back to direct client YouTube streaming for track: ${activeId}`);
           const resumePos = audio.currentTime || 0;
           playViaYouTube(activeId, resumePos, wantPlayRef.current);
           return;
         }
 
-        const message = "Could not load audio stream. Tap play to retry.";
+        const message = activeId?.startsWith("podcast:")
+          ? "Couldn't play this episode. The podcast host may be temporarily unavailable."
+          : "Could not load audio stream. Tap play to retry.";
         onErrorRef.current?.(message);
       }
     };

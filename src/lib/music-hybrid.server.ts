@@ -45,51 +45,28 @@ export async function searchHybrid(
     }
   }
 
-  // If continuation was empty or pagination requested with offset / page > 1:
-  if (page && page > 1) {
-    try {
-      const { searchYouTubePaginated } = await import("./music.server");
-      const pageVariations = ["all songs", "popular hits", "music tracks", "best songs"];
-      const variation = pageVariations[(page - 1) % pageVariations.length];
-      const res = await searchYouTubePaginated(`${query} ${variation}`, filter, undefined, limit);
-      if (res.tracks.length > 0) {
-        return res;
-      }
-    } catch (err) {
-      console.warn("[MelodyMap] Page search variation failed:", err);
+  // Multi-Provider First Strategy:
+  // Query Audius, Jamendo, Deezer, and Internet Archive concurrently,
+  // falling back to YouTube only when needed.
+  try {
+    const { searchMultiProvider } = await import("./providers/multi-search");
+    const multiRes = await searchMultiProvider(query, { limit });
+    if (multiRes.tracks.length > 0) {
+      return { tracks: multiRes.tracks as HybridTrack[] };
     }
-
-    try {
-      const { searchDeezer } = await import("./deezer.server");
-      const dzTracks = await searchDeezer(query, limit);
-      if (dzTracks.length > 0) {
-        return { tracks: dzTracks };
-      }
-    } catch {}
+  } catch (err) {
+    console.warn("[MelodyMap] Multi-provider search notice:", err);
   }
 
-  // Try YouTube first
+  // Direct YouTube fallback
   try {
     const { searchYouTubePaginated } = await import("./music.server");
     const ytRes = await searchYouTubePaginated(query, filter, undefined, limit);
-    if (ytRes.tracks.length >= Math.min(limit, 5)) {
+    if (ytRes.tracks.length > 0) {
       return ytRes;
     }
   } catch (err) {
-    console.warn("[MelodyMap] YouTube search failed, falling back to Deezer:", err);
-  }
-
-  // Fallback to Deezer (only when applicable)
-  if (filter === "all" || filter === "songs" || filter === "albums") {
-    try {
-      const { searchDeezer } = await import("./deezer.server");
-      const dzTracks = await searchDeezer(query, limit);
-      if (dzTracks.length > 0) {
-        return { tracks: dzTracks };
-      }
-    } catch (err) {
-      console.warn("[MelodyMap] Deezer search also failed:", err);
-    }
+    console.warn("[MelodyMap] Direct YouTube fallback failed:", err);
   }
 
   return { tracks: [] };

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { PlaybackSource } from "@/lib/providers/types";
 
 export type Track = {
   id: string;
@@ -7,12 +8,23 @@ export type Track = {
   duration: string;
   thumbnail: string;
   reason?: string | undefined;
-  /** Direct audio URL (e.g. Deezer preview or direct podcast audio stream) — bypasses the YouTube stream proxy. */
+  /** Direct audio URL (e.g. Audius stream, Jamendo MP3, Deezer preview, Archive, podcast) — bypasses stream proxy. */
   previewUrl?: string | undefined;
-  /** Source provider: "youtube" (default), "deezer", or "podcast". */
-  source?: "youtube" | "deezer" | "podcast" | undefined;
+  /** Source provider */
+  source?: "youtube" | "deezer" | "audius" | "jamendo" | "archive" | "podcast" | "multi" | undefined;
   album?: string | undefined;
   year?: string | undefined;
+  canonicalTrackId?: string | undefined;
+  provider?: string | undefined;
+  providerTrackId?: string | undefined;
+  playable?: boolean | undefined;
+  playbackSource?: PlaybackSource | undefined;
+  availableAlternatives?: PlaybackSource[] | undefined;
+  recordingId?: string | undefined;
+  isrc?: string | undefined;
+  isExplicit?: boolean | undefined;
+  durationSeconds?: number | undefined;
+  languageCode?: string | undefined;
 };
 
 export type Playlist = {
@@ -889,4 +901,65 @@ export function importLibraryData(jsonString: string): { success: boolean; error
     return { success: false, error: err?.message || "Invalid JSON syntax" };
   }
 }
+
+/**
+ * Checks whether a track is consistent with the specified selected languages.
+ * If a track explicitly advertises a different language (e.g. "(Hindi Version)" when only Telugu is selected),
+ * this returns false to prevent language cross-contamination.
+ */
+export function isLanguageConsistent(
+  track: { title?: string | undefined; artist?: string | undefined; languageCode?: string | undefined },
+  selectedLanguages: string[],
+): boolean {
+  if (!selectedLanguages || selectedLanguages.length === 0) return true;
+
+  const selectedSet = new Set(selectedLanguages.map((l) => l.trim().toLowerCase()));
+
+  // If track has an explicit languageCode that is not among the selected languages
+  if (track.languageCode) {
+    const code = track.languageCode.trim().toLowerCase();
+    const matchesAny = selectedLanguages.some(
+      (l) => l.toLowerCase().startsWith(code) || code.startsWith(l.toLowerCase().slice(0, 2)),
+    );
+    if (!matchesAny && code !== "und" && code !== "zxx") {
+      return false;
+    }
+  }
+
+  const text = `${track.title || ""} ${track.artist || ""}`.toLowerCase();
+
+  // Major regional language names that may appear as tags in titles/artists
+  const allKnownLanguages = [
+    "hindi",
+    "telugu",
+    "tamil",
+    "malayalam",
+    "kannada",
+    "punjabi",
+    "bengali",
+    "marathi",
+    "gujarati",
+    "bhojpuri",
+    "korean",
+    "spanish",
+    "arabic",
+  ];
+
+  const conflictingLanguages = allKnownLanguages.filter((l) => !selectedSet.has(l));
+
+  for (const conflict of conflictingLanguages) {
+    // Check for explicit language tags like "(Hindi)", "[Tamil]", or phrases like "Hindi Song", "Punjabi Version"
+    const bracketPattern = new RegExp(`[\\(\\[]\\s*${conflict}\\s*[\\)\\]]`, "i");
+    const phrasePattern = new RegExp(
+      `\\b${conflict}\\s+(song|songs|hits|version|dub|audio|video|jukebox|remix|mashup)\\b`,
+      "i",
+    );
+    if (bracketPattern.test(text) || phrasePattern.test(text)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 

@@ -5,6 +5,7 @@ import type { Track } from "./types";
 import { norm, areSameTrack } from "./track-dedup";
 import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext } from "./context-engine";
+import { isLanguageConsistent } from "./library";
 
 /** Sanitizes user-provided strings to prevent AI prompt injection while preserving real song/artist names */
 function sanitizePromptInput(str: string | undefined): string {
@@ -516,33 +517,126 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
     const bypassCache = !!data.refreshNonce;
 
-    const userLangs = langs.length > 0 ? langs : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
     const queries: string[] = [];
 
-    // 1. Add circadian temporal keywords if clientHour provided
-    if (typeof data.clientHour === "number") {
-      const { getTemporalContext } = await import("./context-engine");
-      const ctx = getTemporalContext(data.clientHour);
-      for (const lang of userLangs.slice(0, 2)) {
-        queries.push(`${lang} ${ctx.queryThemes[0] || "top trending songs"}`);
+    if (langs.length > 0) {
+      // 1. Circadian temporal keywords strictly in user's selected languages
+      if (typeof data.clientHour === "number") {
+        const { getTemporalContext } = await import("./context-engine");
+        const ctx = getTemporalContext(data.clientHour);
+        for (const lang of langs) {
+          queries.push(`${lang} ${ctx.queryThemes[0] || "top trending songs"}`);
+        }
+      }
+
+      // 2. Language-specific trending chart queries for all selected languages
+      for (const lang of langs) {
+        queries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
+        queries.push(`${lang} Official Music Hits Chart ${CURRENT_YEAR}`);
+        queries.push(`${lang} Most Popular Viral Songs ${CURRENT_YEAR}`);
+        queries.push(`Top ${lang} Songs This Week`);
+        queries.push(`Latest ${lang} Trending Songs`);
+      }
+      // Note: Generic global queries are STRICTLY omitted so the trending section displays ONLY songs related to the user's selected languages.
+    } else {
+      // Default fallback when user has not chosen languages yet
+      const fallbackLangs = ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
+      if (typeof data.clientHour === "number") {
+        const { getTemporalContext } = await import("./context-engine");
+        const ctx = getTemporalContext(data.clientHour);
+        for (const lang of fallbackLangs.slice(0, 2)) {
+          queries.push(`${lang} ${ctx.queryThemes[0] || "top trending songs"}`);
+        }
+      }
+
+      for (const lang of fallbackLangs.slice(0, 3)) {
+        queries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
+        queries.push(`${lang} Official Music Hits Chart`);
+        queries.push(`${lang} Most Popular Viral Songs`);
+      }
+
+      const categories = Object.values(CATEGORIZED_TRENDING_QUERIES);
+      for (const cat of categories) {
+        queries.push(...shuffleArray(cat).slice(0, 2));
       }
     }
 
-    // 2. Add language-specific trending chart queries
-    for (const lang of userLangs.slice(0, 3)) {
-      queries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
-      queries.push(`${lang} Official Music Hits Chart`);
-      queries.push(`${lang} Most Popular Viral Songs`);
+    const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache);
+    const filteredTracks = langs.length > 0
+      ? tracks.filter((t) => isLanguageConsistent(t, langs))
+      : tracks;
+    const finalTracks = filteredTracks.length > 0 ? filteredTracks : tracks;
+    return { tracks: shuffleArray(finalTracks).slice(0, count), error: null };
+  });
+
+const OldSongsInput = z.object({
+  languages: z.array(z.string()).max(10).default([]),
+  count: z.number().min(1).max(50).optional(),
+  refreshNonce: z.union([z.string(), z.number()]).optional(),
+  artists: z.array(z.string()).max(20).optional(),
+});
+
+/**
+ * Dedicated Old Songs / Golden Era / Retro Classics feed.
+ * Language-aware curation of timeless classic hits, vintage gems, and evergreen melodies.
+ */
+export const getOldSongsTracks = createServerFn({ method: "POST" })
+  .validator((input: unknown) => OldSongsInput.parse(input))
+  .handler(async ({ data }) => {
+    const count = data.count ?? 20;
+    const langs = data.languages.map((l) => l.trim()).filter(Boolean);
+    const bypassCache = !!data.refreshNonce;
+
+    const userLangs = langs.length > 0 ? langs : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
+    const queries: string[] = [];
+
+    for (const lang of userLangs) {
+      const lower = lang.toLowerCase();
+      if (lower === "telugu") {
+        queries.push("Telugu old hit songs 80s 90s classics");
+        queries.push("Telugu golden evergreen melodies SPB Chitra");
+        queries.push("Telugu 90s all time classic hit songs");
+        queries.push("Best of Ghantasala SP Balasubrahmanyam Telugu");
+      } else if (lower === "hindi") {
+        queries.push("Hindi retro classic hit songs 70s 80s 90s");
+        queries.push("Kishore Kumar Lata Mangeshkar evergreen hits");
+        queries.push("Bollywood 90s golden era evergreen classics");
+        queries.push("Best of Mohammed Rafi Mukesh RD Burman");
+      } else if (lower === "tamil") {
+        queries.push("Tamil 80s 90s classic evergreen hits Ilaiyaraaja");
+        queries.push("Tamil golden retro songs SPB Janaki");
+        queries.push("Tamil all time classic old melody songs");
+      } else if (lower === "malayalam") {
+        queries.push("Malayalam old classic hit songs KJ Yesudas");
+        queries.push("Malayalam golden retro melodies 80s 90s");
+      } else if (lower === "kannada") {
+        queries.push("Kannada old classic evergreen hit songs Rajkumar");
+        queries.push("Kannada 80s 90s retro melodies SPB");
+      } else if (lower === "punjabi") {
+        queries.push("Punjabi old classic folk songs vintage retro");
+        queries.push("Punjabi evergreen golden oldies");
+      } else if (lower === "english") {
+        queries.push("70s 80s 90s classic rock pop evergreen hits");
+        queries.push("Best retro golden oldies classics 80s 90s");
+        queries.push("Timeless classic songs 70s 80s acoustic");
+      } else {
+        queries.push(`${lang} old classic songs retro 80s 90s`);
+        queries.push(`${lang} golden evergreen classic melodies`);
+      }
     }
 
-    // 3. Add global categorized queries
-    const categories = Object.values(CATEGORIZED_TRENDING_QUERIES);
-    for (const cat of categories) {
-      queries.push(...shuffleArray(cat).slice(0, 2));
+    if (data.artists && data.artists.length > 0) {
+      for (const artist of data.artists.slice(0, 3)) {
+        queries.push(`${artist} evergreen classic hit songs`);
+      }
     }
 
     const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache);
-    return { tracks: shuffleArray(tracks).slice(0, count), error: null };
+    const filteredTracks = langs.length > 0
+      ? tracks.filter((t) => isLanguageConsistent(t, langs))
+      : tracks;
+    const finalTracks = filteredTracks.length > 0 ? filteredTracks : tracks;
+    return { tracks: shuffleArray(finalTracks).slice(0, count), error: null };
   });
 
 /**
@@ -1299,14 +1393,28 @@ export const podcastPicks = createServerFn({ method: "POST" })
     const out: Track[] = [];
     const seen = new Set<string>();
 
+    const primaryLang = langs[0] || "";
+
     // 1. Primary Strategy: Direct podcast episodes with official MP3 CDN streams
     try {
       const { searchPodcastEpisodes } = await import("./podcast.server");
-      const podcastSearchQueries: string[] = hasTopics
-        ? topics.map((t) => `${t} podcast`)
-        : hasLang
-          ? langs.map((l) => `${l} podcast`)
-          : ["top podcasts", "tech podcast", "science podcast", "motivation podcast", "comedy podcast"];
+      const podcastSearchQueries: string[] = [];
+
+      if (hasLang && hasTopics) {
+        for (const t of topics) {
+          podcastSearchQueries.push(`${primaryLang} ${t} podcast`);
+        }
+      } else if (hasLang) {
+        for (const l of langs) {
+          podcastSearchQueries.push(`${l} podcast`);
+        }
+      } else if (hasTopics) {
+        for (const t of topics) {
+          podcastSearchQueries.push(`${t} podcast`);
+        }
+      } else {
+        podcastSearchQueries.push("top podcasts", "science podcast", "motivation podcast", "technology podcast");
+      }
 
       for (const query of podcastSearchQueries) {
         if (out.length >= count) break;
@@ -1328,7 +1436,7 @@ export const podcastPicks = createServerFn({ method: "POST" })
       return { tracks: out.slice(0, count), error: null };
     }
 
-    // 2. Supplementary Strategy: YouTube podcasts
+    // 2. Supplementary Strategy: YouTube podcasts with strict language adherence
     const { searchYouTube } = await import("./music.server");
     const artists = data.artists.map((a) => a.trim()).filter(Boolean).slice(0, 4);
 
@@ -1356,34 +1464,82 @@ export const podcastPicks = createServerFn({ method: "POST" })
       }
     };
 
-    const freshQueries = hasTopics
-      ? topics.map((t) => `${t} podcast latest episodes`)
-      : hasLang
-        ? langs.map((l) => `new ${l} podcast episodes`)
-        : ["new podcast episodes this week", "popular podcast"];
-    const topQueries = hasTopics
-      ? topics.flatMap((t) => [`top ${t} podcast`, `best ${t} podcast`])
-      : hasLang
-        ? langs.map((l) => `top ${l} podcasts`)
-        : ["trending podcasts", "best podcasts to listen to"];
-    const topicQueries = hasTopics
-      ? topics.flatMap((t) => [`${t} podcast conversation`, `${t} show`])
-      : hasLang
-        ? langs.map((l) => `best ${l} podcasts`)
-        : ["the ranveer show", "huberman lab", "joe rogan podcast"];
+    const freshQueries: string[] = [];
+    const topQueries: string[] = [];
+    const topicQueries: string[] = [];
+
+    if (hasLang && hasTopics) {
+      for (const t of topics) {
+        freshQueries.push(`${primaryLang} ${t} podcast latest episodes`);
+        topQueries.push(`top ${primaryLang} ${t} podcast`);
+        topicQueries.push(`${primaryLang} ${t} podcast conversation`);
+      }
+    } else if (hasLang) {
+      for (const l of langs) {
+        freshQueries.push(`new ${l} podcast episodes`);
+        topQueries.push(`top ${l} podcasts`);
+        topicQueries.push(`best ${l} podcasts`);
+      }
+    } else if (hasTopics) {
+      for (const t of topics) {
+        freshQueries.push(`${t} podcast latest episodes`);
+        topQueries.push(`top ${t} podcast`);
+        topicQueries.push(`${t} podcast conversation`);
+      }
+    } else {
+      freshQueries.push("new podcast episodes this week");
+      topQueries.push("trending podcasts", "best podcasts to listen to");
+      topicQueries.push("popular podcast interview");
+    }
 
     await add(freshQueries, Math.floor(count * 0.4), "week");
     await add(topQueries, Math.floor(count * 0.35));
-    for (const artist of artists) {
-      await add([`${artist} podcast`], Math.ceil(count / 8));
+    if (artists.length > 0 && !hasLang) {
+      for (const artist of artists) {
+        await add([`${artist} podcast`], Math.ceil(count / 8));
+      }
     }
     await add(topicQueries, count);
 
-    if (out.length < 6) {
-      await add(["top podcasts", `best podcast episodes ${CURRENT_YEAR}`, "the ranveer show podcast"], count - out.length);
+    // Only add generic fallback if NO language was specified
+    if (out.length < 6 && !hasLang) {
+      await add(["top podcasts", `best podcast episodes ${CURRENT_YEAR}`], count - out.length);
     }
 
     return { tracks: out.slice(0, count), error: null };
+  });
+
+const DiscoverPodcastsInput = z.object({
+  language: z.string().optional(),
+  topic: z.string().optional(),
+  query: z.string().optional(),
+  limit: z.number().min(1).max(50).optional(),
+});
+
+export const discoverPodcastsServerFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => DiscoverPodcastsInput.parse(input))
+  .handler(async ({ data }) => {
+    const { searchPodcasts } = await import("./podcast.server");
+    const podcasts = await searchPodcasts({
+      language: data.language,
+      topic: data.topic,
+      query: data.query,
+      limit: data.limit,
+    });
+    return { podcasts, error: null };
+  });
+
+const GetPodcastEpisodesInput = z.object({
+  podcastId: z.string(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+export const getPodcastEpisodesServerFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => GetPodcastEpisodesInput.parse(input))
+  .handler(async ({ data }) => {
+    const { getPodcastEpisodes } = await import("./podcast.server");
+    const episodes = await getPodcastEpisodes(data.podcastId, data.limit ?? 50);
+    return { episodes, error: null };
   });
 
 

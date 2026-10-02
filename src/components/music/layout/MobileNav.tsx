@@ -1,13 +1,13 @@
-import { Home, Globe2, Mic, ListMusic, Library as LibraryIcon, Search } from "lucide-react";
+import { Compass, Home, Globe2, Mic, ListMusic, Library as LibraryIcon, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavTab } from "./Sidebar";
 
-/** Mobile bottom navigation tabs matching Violet/Brinjal design. */
+/** Mobile bottom navigation tabs. */
 export const MOBILE_TABS: Array<{ id: NavTab; label: string; icon: typeof Home }> = [
   { id: "foryou", label: "Home", icon: Home },
+  { id: "explore", label: "Explore", icon: Compass },
   { id: "search", label: "Search", icon: Search },
   { id: "podcasts", label: "Podcasts", icon: Mic },
-  { id: "playlists", label: "Playlists", icon: ListMusic },
   { id: "library", label: "Library", icon: LibraryIcon },
 ];
 
@@ -20,7 +20,7 @@ type Props = {
 export function MobileNav({ activeTab, onNavigate, hasTrack }: Props) {
   return (
     <nav
-      className="fixed z-40 flex items-stretch justify-around border-t border-white/[0.08] bg-[#121212]/95 backdrop-blur-2xl safe-bottom max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 bottom-0"
+      className="fixed z-40 flex items-stretch justify-around border-t border-white/[0.06] bg-[#080808]/95 backdrop-blur-xl safe-bottom max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 bottom-0"
       style={{ height: "var(--mobile-nav-height, 56px)" }}
       aria-label="Mobile navigation"
     >
@@ -32,8 +32,8 @@ export function MobileNav({ activeTab, onNavigate, hasTrack }: Props) {
             type="button"
             onClick={() => onNavigate(id)}
             className={cn(
-              "relative flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-medium transition-colors active:scale-95",
-              active ? "text-white font-semibold" : "text-white/50 hover:text-white/80"
+              "relative flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-normal transition-colors active:scale-95",
+              active ? "text-[#F5F5F5] font-medium" : "text-[#737373] hover:text-[#A1A1A1]"
             )}
             aria-label={label}
             aria-current={active ? "page" : undefined}
@@ -41,14 +41,14 @@ export function MobileNav({ activeTab, onNavigate, hasTrack }: Props) {
             <Icon
               className={cn(
                 "h-5 w-5 transition-transform",
-                active ? "text-white scale-105" : "text-white/50"
+                active ? "text-[#1DB954]" : "text-[#737373]"
               )}
-              strokeWidth={active ? 2.4 : 1.8}
+              strokeWidth={active ? 2.2 : 1.7}
             />
             <span
               className={cn(
                 "truncate max-w-[64px]",
-                active ? "font-semibold text-white" : ""
+                active ? "font-medium text-[#F5F5F5]" : ""
               )}
             >
               {label}

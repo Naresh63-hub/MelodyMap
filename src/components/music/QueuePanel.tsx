@@ -37,13 +37,13 @@ export function QueuePanel({
   const upcoming = tracks.length - index - 1;
 
   return (
-    <div className="mx-auto w-full border-b border-white/5 bg-white/[0.02] px-4 pb-3 pt-3 sm:px-8 glass-panel animate-slide-up">
+    <div className="mx-auto w-full border-b border-white/[0.06] bg-[#101010] px-4 pb-3 pt-3 sm:px-8 shadow-xl animate-slide-up">
       <div className="mb-3 flex items-center gap-2">
         <div className="flex items-center gap-2">
           <Music2 className="h-4 w-4 text-[#1DB954]" />
-          <p className="text-sm font-semibold text-white">Queue</p>
+          <p className="text-sm font-semibold text-[#F5F5F5]">Queue</p>
         </div>
-        <span className="text-xs text-white/40">
+        <span className="text-xs text-[#737373]">
           {tracks.length === 0
             ? "queue is empty"
             : `${upcoming > 0 ? upcoming : 0} song${upcoming === 1 ? "" : "s"} left`}
@@ -54,13 +54,13 @@ export function QueuePanel({
           className={cn(
             "ml-auto inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all duration-200 button-press",
             continuous
-              ? "border-[#1DB954]/50 bg-[#1DB954]/20 text-white"
-              : "border-white/10 bg-white/[0.04] text-white/50 hover:text-white/70 hover:border-white/20",
+              ? "border-[#1DB954]/40 bg-[#1DB954]/15 text-[#F5F5F5]"
+              : "border-white/[0.06] bg-transparent text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.04]",
           )}
           aria-pressed={continuous}
         >
           {loadingMore ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-white/60" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1DB954]" />
           ) : (
             <InfinityIcon className="h-3.5 w-3.5" />
           )}
@@ -71,7 +71,7 @@ export function QueuePanel({
           size="sm" 
           onClick={onClear} 
           disabled={tracks.length === 0}
-          className="text-white/50 hover:text-white hover:bg-white/5 button-press"
+          className="text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.04] button-press"
         >
           Clear
         </Button>
@@ -80,7 +80,7 @@ export function QueuePanel({
           size="icon" 
           aria-label="Close queue" 
           onClick={onClose}
-          className="text-white/50 hover:text-white hover:bg-white/5 button-press"
+          className="text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.04] button-press"
         >
           <X className="h-4 w-4" />
         </Button>
@@ -124,18 +124,18 @@ export function QueuePanel({
                 className={cn(
                   "group flex items-center gap-3 rounded-lg px-3 py-2 transition-colors",
                   active 
-                    ? "bg-white/[0.08]" 
+                    ? "bg-[#1D1D1D]" 
                     : isPast 
                       ? "opacity-40" 
-                      : "hover:bg-white/[0.04]",
+                      : "hover:bg-white/[0.03]",
                   isDragging && "opacity-30 scale-95",
-                  isOver && dragIndex !== null && dragIndex !== i && "ring-1 ring-white/30 bg-white/10",
+                  isOver && dragIndex !== null && dragIndex !== i && "ring-1 ring-white/20 bg-white/[0.06]",
                 )}
               >
-                <span className="cursor-grab active:cursor-grabbing p-1 text-white/30 hover:text-white transition-colors">
+                <span className="cursor-grab active:cursor-grabbing p-1 text-[#737373] hover:text-[#F5F5F5] transition-colors">
                   <GripVertical className="h-4 w-4" />
                 </span>
-                <span className="w-6 shrink-0 text-center text-xs tabular-nums text-white/30">
+                <span className="w-6 shrink-0 text-center text-xs tabular-nums text-[#737373]">
                   {active ? (
                     isPlaying ? (
                       <div className="flex items-center justify-center">
@@ -156,21 +156,21 @@ export function QueuePanel({
                   <p
                     className={cn(
                       "truncate text-sm transition-colors",
-                      active ? "font-semibold text-[#1DB954]" : "text-white/80 group-hover:text-white",
+                      active ? "font-medium text-[#1DB954]" : "font-normal text-[#F5F5F5]",
                     )}
                   >
                     {track.title}
                   </p>
-                  <p className="truncate text-xs text-white/40 group-hover:text-white/60 transition-colors mt-0.5">{track.artist}</p>
+                  <p className="truncate text-xs text-[#A1A1A1] transition-colors mt-0.5">{track.artist}</p>
                 </button>
-                <span className="hidden text-xs tabular-nums text-white/30 group-hover:text-white/50 transition-colors sm:block">
+                <span className="hidden text-xs tabular-nums text-[#737373] transition-colors sm:block">
                   {track.duration}
                 </span>
                 <button
                   type="button"
                   onClick={() => onRemove(i)}
                   aria-label={`Remove ${track.title} from queue`}
-                  className="rounded-full p-1.5 text-white/30 transition-colors hover:text-destructive button-press opacity-0 group-hover:opacity-100"
+                  className="rounded-full p-1.5 text-[#737373] transition-colors hover:text-destructive button-press opacity-0 group-hover:opacity-100"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>

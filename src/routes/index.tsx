@@ -69,6 +69,10 @@ const FloatingMiniPlayer = lazy(() =>
 );
 import { MixesPanel, type MixId } from "@/components/music/MixesPanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
+import { PodcastsPanel } from "@/components/music/ui/PodcastsPanel";
+import { AddToPlaylistModal } from "@/components/music/ui/AddToPlaylistModal";
+import { ExploreSections } from "@/components/music/ui/ExploreSections";
+import { episodeToTrack, type PodcastEpisode } from "@/lib/podcast.types";
 import { QueuePanel } from "@/components/music/QueuePanel";
 import { ScrubBar } from "@/components/music/ScrubBar";
 import { SleepTimer } from "@/components/music/SleepTimer";
@@ -97,9 +101,9 @@ import {
 import {
   buildMix,
   getRealTrendingTracks,
+  getOldSongsTracks,
   getSongRadio,
   newSongs,
-  podcastPicks,
   prewarmStreams,
   recommendTracks,
   searchTracks,
@@ -151,6 +155,7 @@ export const Route = createFileRoute("/")({
 interface HomeCacheData {
   recs: Track[];
   trendingList: Track[];
+  oldSongsList?: Track[] | undefined;
   dailyMixTracks: Track[];
   mixTracks: Record<"discover" | "newrelease" | "explore", Track[]>;
   timestamp: number;
@@ -186,9 +191,9 @@ function MusicApp() {
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
   const runTrending = useServerFn(getRealTrendingTracks);
+  const runOldSongs = useServerFn(getOldSongsTracks);
   const runMix = useServerFn(buildMix);
   const runNewSongs = useServerFn(newSongs);
-  const runPodcastPicks = useServerFn(podcastPicks);
   const runSuggest = useServerFn(suggestSearch);
   const runPrewarm = useServerFn(prewarmStreams);
   const runDailyMix = useServerFn(getDailyMix);
@@ -261,6 +266,7 @@ function MusicApp() {
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [recs, setRecs] = useState<Track[]>(() => cachedFeed.recs || []);
   const [trendingList, setTrendingList] = useState<Track[]>(() => cachedFeed.trendingList || []);
+  const [oldSongsList, setOldSongsList] = useState<Track[]>(() => cachedFeed.oldSongsList || []);
   const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -288,13 +294,7 @@ function MusicApp() {
   const [mixLoading, setMixLoading] = useState(false);
   const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>(() => cachedFeed.dailyMixTracks || []);
   const [dailyMixLoading, setDailyMixLoading] = useState(false);
-  const [podcastTracks, setPodcastTracks] = useState<Track[]>([]);
 
-  const [podcastLoading, setPodcastLoading] = useState(false);
-  const [selectedPodcastTopic, setSelectedPodcastTopic] = useState<string>("All");
-  const [podcastQuery, setPodcastQuery] = useState("");
-  const [podcastSearching, setPodcastSearching] = useState(false);
-  const [podcastSearchResults, setPodcastSearchResults] = useState<Track[] | null>(null);
   const [loadingMoreRecs, setLoadingMoreRecs] = useState(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
@@ -469,6 +469,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   recsRef.current = recs;
   const trendingRef = useRef<Track[]>([]);
   trendingRef.current = trendingList;
+  const oldSongsRef = useRef<Track[]>([]);
+  oldSongsRef.current = oldSongsList;
   const mixTracksRef = useRef<Record<"discover" | "newrelease" | "explore", Track[]>>(mixTracks);
   mixTracksRef.current = mixTracks;
   const dailyMixTracksRef = useRef<Track[]>(dailyMixTracks);
@@ -539,7 +541,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const dislikedIdsRef = useRef(dislikedIds);
   dislikedIdsRef.current = dislikedIds;
   const canPrev = queue.length > 0;
-  const canNext = queue.length > 0 || recs.length > 0 || trendingList.length > 0;
+  const canNext = queue.length > 0 || recs.length > 0 || trendingList.length > 0 || oldSongsList.length > 0;
   const indexRef = useRef(index);
   indexRef.current = index;
   const continuousRef = useRef(continuous);
@@ -611,6 +613,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const consecutiveErrorsRef = useRef<number>(0);
   const lastErrorTimeRef = useRef<number>(0);
+  const triedAlternativesRef = useRef<Map<string, number>>(new Map());
 
   const progressTrackerRef = useRef(new TrackProgressTracker());
   const sessionCompletionsRef = useRef<number>(0);
@@ -658,39 +661,43 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const track = currentRef.current;
       if (track) {
         logComplete(track);
-        contextEngine.recordCompletion(track, previousTrackRef.current);
-        previousTrackRef.current = track;
-        sessionCompletionsRef.current += 1;
-        const ctx = getSessionContext();
-        const event = telemetry.logEvent({
-          trackId: track.id,
-          artist: track.artist,
-          title: track.title,
-          eventType: "COMPLETED",
-          positionSeconds: player.duration || player.position,
-          durationSeconds: player.duration || player.position,
-          fractionPlayed: 1.0,
-          timestamp: Date.now(),
-          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
-        });
-        thompsonSamplingPolicy.recordFeedback(event, ctx);
+        if (!isPodcastTrack(track)) {
+          contextEngine.recordCompletion(track, previousTrackRef.current);
+          previousTrackRef.current = track;
+          sessionCompletionsRef.current += 1;
+          const ctx = getSessionContext();
+          const event = telemetry.logEvent({
+            trackId: track.id,
+            artist: track.artist,
+            title: track.title,
+            eventType: "COMPLETED",
+            positionSeconds: player.duration || player.position,
+            durationSeconds: player.duration || player.position,
+            fractionPlayed: 1.0,
+            timestamp: Date.now(),
+            context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+          });
+          thompsonSamplingPolicy.recordFeedback(event, ctx);
+        }
       }
 
       // Repeat One Mode: replay current song
       if (repeatModeRef.current === "one" && track) {
-        const ctx = getSessionContext();
-        const replayEv = telemetry.logEvent({
-          trackId: track.id,
-          artist: track.artist,
-          title: track.title,
-          eventType: "REPLAYED",
-          positionSeconds: 0,
-          durationSeconds: player.duration,
-          fractionPlayed: 0,
-          timestamp: Date.now(),
-          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
-        });
-        thompsonSamplingPolicy.recordFeedback(replayEv, ctx);
+        if (!isPodcastTrack(track)) {
+          const ctx = getSessionContext();
+          const replayEv = telemetry.logEvent({
+            trackId: track.id,
+            artist: track.artist,
+            title: track.title,
+            eventType: "REPLAYED",
+            positionSeconds: 0,
+            durationSeconds: player.duration,
+            fractionPlayed: 0,
+            timestamp: Date.now(),
+            context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+          });
+          thompsonSamplingPolicy.recordFeedback(replayEv, ctx);
+        }
         player.seek(0);
         player.play();
         return;
@@ -761,6 +768,25 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     },
     onError: (msg) => {
       console.warn("[Player] Stream notice:", msg);
+      const track = currentRef.current;
+
+      // Multi-Provider Fallback:
+      // If the current provider audio source fails, try an available alternative source
+      // for the SAME logical song before skipping to a different track.
+      if (track && track.availableAlternatives && track.availableAlternatives.length > 0) {
+        const triedCount = triedAlternativesRef.current.get(track.id) || 0;
+        if (triedCount < track.availableAlternatives.length) {
+          const altSource = track.availableAlternatives[triedCount];
+          triedAlternativesRef.current.set(track.id, triedCount + 1);
+          if (altSource && altSource.url) {
+            setMessage(`Switching source (${altSource.provider})...`);
+            setTimeout(() => setMessage(null), 2500);
+            void load(track.id, altSource.url, player.position || 0);
+            return;
+          }
+        }
+      }
+
       const now = Date.now();
       if (now - lastErrorTimeRef.current < 60_000) {
         consecutiveErrorsRef.current += 1;
@@ -793,7 +819,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (!track || !player.isPlaying) return;
 
     const milestones = progressTrackerRef.current.checkProgress(track, player.position, player.duration);
-    if (milestones.length > 0) {
+    if (milestones.length > 0 && !isPodcastTrack(track)) {
       const ctx = getSessionContext();
       for (const milestone of milestones) {
         const frac = player.duration > 0 ? player.position / player.duration : 0;
@@ -1030,6 +1056,30 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } catch {}
   }, [runTrending, settings.languages, getSessionContext, applyFeedFilters, markFeedDisplayed]);
 
+  const loadOldSongs = useCallback(
+    async (refreshNonce?: number | string) => {
+      try {
+        const res = await runOldSongs({
+          data: {
+            languages: settings.languages,
+            count: 24,
+            refreshNonce: refreshNonce ?? Date.now(),
+            artists: topArtists(stats, likes),
+          },
+        });
+        if (res.tracks) {
+          const pureMusic = res.tracks as Track[];
+          const fresh = applyFeedFilters(pureMusic);
+          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+          setOldSongsList(ranked);
+          markFeedDisplayed(ranked);
+          writeHomeCache({ oldSongsList: ranked });
+        }
+      } catch {}
+    },
+    [runOldSongs, settings.languages, stats, likes, getSessionContext, applyFeedFilters, markFeedDisplayed],
+  );
+
   const loadDailyMix = useCallback(
     async (refreshNonce?: number | string) => {
       setDailyMixLoading(true);
@@ -1196,6 +1246,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           })(),
           (async () => {
+            const res = await runOldSongs({
+              data: {
+                languages: settings.languages,
+                count: 24,
+                refreshNonce: nonce,
+                artists: topArtists(stats, likes),
+              },
+            });
+            if (res.tracks) {
+              const pureMusic = res.tracks as Track[];
+              const fresh = applyFeedFilters(pureMusic);
+              const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+              setOldSongsList(ranked);
+              markFeedDisplayed(ranked);
+              writeHomeCache({ oldSongsList: ranked });
+            }
+          })(),
+          (async () => {
             await loadDailyMix(nonce);
           })(),
         ]);
@@ -1203,7 +1271,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setRecLoading(false);
       }
     },
-    [runRecommend, runTrending, runMix, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
+    [runRecommend, runTrending, runOldSongs, runMix, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
   const loadMoreRecommendations = useCallback(
@@ -1340,6 +1408,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         const pool = applyFeedFilters([
           ...recsRef.current,
           ...trendingRef.current,
+          ...oldSongsRef.current,
           ...(mixTracksRef.current?.discover || []),
           ...(mixTracksRef.current?.newrelease || []),
         ]);
@@ -1491,7 +1560,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const goNext = useCallback(() => {
     const currentTrack = currentRef.current;
-    if (currentTrack) {
+    if (currentTrack && !isPodcastTrack(currentTrack)) {
       if (player.position > 0 && player.position < 25) {
         logSkip(currentTrack);
         contextEngine.recordSkip(currentTrack);
@@ -1539,6 +1608,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     const pool = applyFeedFilters([
       ...recsRef.current,
       ...trendingRef.current,
+      ...oldSongsRef.current,
       ...(mixTracksRef.current?.discover || []),
       ...(mixTracksRef.current?.newrelease || []),
     ]);
@@ -1600,6 +1670,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, [extendQueue, findNextValidTrackIndex, logSkip, player, load, getSessionContext, applyFeedFilters]);
 
   const goPrev = useCallback(() => {
+    // Spotify-style previous behavior:
+    // If current track has played beyond restart threshold (3 seconds), restart it to 00:00
+    if (player.position > 3) {
+      player.seek(0);
+      return;
+    }
+
     const q = queueRef.current;
     const i = indexRef.current;
     let targetIdx = -1;
@@ -1624,22 +1701,26 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const dislikeCurrent = useCallback(() => {
     const track = currentRef.current;
     if (!track) return;
-    logSkip(track);
-    contextEngine.recordSkip(track);
+    if (!isPodcastTrack(track)) {
+      logSkip(track);
+      contextEngine.recordSkip(track);
+    }
     toggleDislike(track);
-    const ctx = getSessionContext();
-    const event = telemetry.logEvent({
-      trackId: track.id,
-      artist: track.artist,
-      title: track.title,
-      eventType: "DISLIKED",
-      positionSeconds: player.position,
-      durationSeconds: player.duration,
-      fractionPlayed: player.duration > 0 ? player.position / player.duration : 0,
-      timestamp: Date.now(),
-      context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
-    });
-    thompsonSamplingPolicy.recordFeedback(event, ctx);
+    if (!isPodcastTrack(track)) {
+      const ctx = getSessionContext();
+      const event = telemetry.logEvent({
+        trackId: track.id,
+        artist: track.artist,
+        title: track.title,
+        eventType: "DISLIKED",
+        positionSeconds: player.position,
+        durationSeconds: player.duration,
+        fractionPlayed: player.duration > 0 ? player.position / player.duration : 0,
+        timestamp: Date.now(),
+        context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+      });
+      thompsonSamplingPolicy.recordFeedback(event, ctx);
+    }
     setRecs((prev) => prev.filter((t) => t.id !== track.id));
     goNext();
   }, [toggleDislike, logSkip, goNext, getSessionContext, player.position, player.duration]);
@@ -1648,7 +1729,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     (track: Track) => {
       const wasLiked = likedIds.has(track.id);
       toggleLike(track);
-      if (!wasLiked) {
+      if (!wasLiked && !isPodcastTrack(track)) {
         const ctx = getSessionContext();
         const event = telemetry.logEvent({
           trackId: track.id,
@@ -1671,19 +1752,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const handleAddToPlaylist = useCallback(
     (playlistId: string, track: Track) => {
       addToPlaylist(playlistId, track);
-      const ctx = getSessionContext();
-      const event = telemetry.logEvent({
-        trackId: track.id,
-        artist: track.artist,
-        title: track.title,
-        eventType: "ADDED_TO_LIBRARY",
-        positionSeconds: 0,
-        durationSeconds: 0,
-        fractionPlayed: 0,
-        timestamp: Date.now(),
-        context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
-      });
-      thompsonSamplingPolicy.recordFeedback(event, ctx);
+      if (!isPodcastTrack(track)) {
+        const ctx = getSessionContext();
+        const event = telemetry.logEvent({
+          trackId: track.id,
+          artist: track.artist,
+          title: track.title,
+          eventType: "ADDED_TO_LIBRARY",
+          positionSeconds: 0,
+          durationSeconds: 0,
+          fractionPlayed: 0,
+          timestamp: Date.now(),
+          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+        });
+        thompsonSamplingPolicy.recordFeedback(event, ctx);
+      }
     },
     [addToPlaylist, getSessionContext],
   );
@@ -1785,72 +1868,23 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     void loadMix(mix);
   }, [tab, mix, loadMix]);
 
-  const loadPodcasts = useCallback(
-    async (topic?: string) => {
-      setPodcastLoading(true);
-      setPodcastSearchResults(null);
-      setPodcastQuery("");
-      const chosenTopic = topic !== undefined ? topic : selectedPodcastTopic;
-      if (topic !== undefined) setSelectedPodcastTopic(topic);
-      try {
-        const topicsList =
-          chosenTopic === "All"
-            ? (settings.podcastTopics.length > 0 ? settings.podcastTopics : ["Tech", "Motivation", "Science", "Comedy"])
-            : [chosenTopic];
-        const res = await runPodcastPicks({
-          data: {
-            topics: topicsList,
-            languages: settings.languages,
-            artists: topArtists(stats, likes),
-            count: 16,
-          },
-        });
-        if (res.tracks) setPodcastTracks(res.tracks as Track[]);
-      } finally {
-        setPodcastLoading(false);
-      }
+
+
+  const handlePlayPodcastEpisode = useCallback(
+    (ep: PodcastEpisode, allEpisodes: PodcastEpisode[], idx: number) => {
+      const tracks = allEpisodes.map(episodeToTrack);
+      const target = tracks[idx] || episodeToTrack(ep);
+      playSong(target, tracks);
     },
-    [runPodcastPicks, selectedPodcastTopic, settings, stats, likes],
+    [playSong],
   );
 
-  const handlePodcastSearch = useCallback(
-    async (e?: React.FormEvent) => {
-      if (e) e.preventDefault();
-      const term = podcastQuery.trim();
-      if (!term) return;
-      setPodcastSearching(true);
-      try {
-        const q = term.toLowerCase().includes("podcast") ? term : `${term} podcast`;
-        const res = await runSearch({
-          data: {
-            query: q,
-            limit: 30,
-            type: "podcasts",
-            filter: "all",
-          },
-        });
-        if (res.tracks) {
-          setPodcastSearchResults(res.tracks as Track[]);
-        }
-      } catch {
-        // ignore
-      } finally {
-        setPodcastSearching(false);
-      }
+  const handlePlayPodcastHistory = useCallback(
+    (track: Track, allHistory: Track[], idx: number) => {
+      playSong(track, allHistory);
     },
-    [podcastQuery, runSearch],
+    [playSong],
   );
-
-  const clearPodcastSearch = useCallback(() => {
-    setPodcastQuery("");
-    setPodcastSearchResults(null);
-  }, []);
-
-  useEffect(() => {
-    if (tab !== "podcasts") return;
-    if (podcastTracks.length > 0) return; // already loaded
-    void loadPodcasts();
-  }, [tab, podcastTracks.length, loadPodcasts]);
 
   const restored = useRef(false);
   const resumeRef = useRef<number | null>(null);
@@ -2074,12 +2108,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     // If the user already has cached picks, show them instantly without network delay or flashing.
     const hasCachedFeed =
       (cachedFeed.recs && cachedFeed.recs.length > 0) ||
-      (cachedFeed.trendingList && cachedFeed.trendingList.length > 0);
+      (cachedFeed.trendingList && cachedFeed.trendingList.length > 0) ||
+      (cachedFeed.oldSongsList && cachedFeed.oldSongsList.length > 0);
     // Cached feeds restored for instant paint count as "previously displayed" for
     // this session, so a refresh never re-serves them.
     markFeedDisplayed([
       ...(cachedFeed.recs || []),
       ...(cachedFeed.trendingList || []),
+      ...(cachedFeed.oldSongsList || []),
       ...(cachedFeed.dailyMixTracks || []),
       ...Object.values(cachedFeed.mixTracks || {}).flat(),
     ]);
@@ -2163,7 +2199,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, []);
 
   return (
-    <div className="flex flex-col h-dvh bg-[#0a0a10] text-foreground selection:bg-pink-500/30 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-white/[0.04]">
+    <div className="flex flex-col h-dvh bg-[#080808] text-foreground selection:bg-[#1DB954]/20 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-white/[0.04]">
       {/* Slide-out Mobile Sidebar Drawer */}
       <MobileDrawer
         open={drawerOpen}
@@ -2193,7 +2229,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       />
 
       {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#0a0a10]">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#080808]">
         {/* Mobile header — on all non-search tabs */}
         {tab !== "search" && (
           <MobileHeader
@@ -2204,7 +2240,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
         {/* Mobile search bar — on search tab */}
         {tab === "search" && (
-          <div className="sticky top-0 z-20 bg-[#0a0a10]/95 backdrop-blur-lg border-b border-white/[0.04]">
+          <div className="sticky top-0 z-20 bg-[#080808]/95 backdrop-blur-lg border-b border-white/[0.04]">
             <div className="flex items-center gap-2 px-4 py-3">
               <button
                 type="button"
@@ -2226,12 +2262,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       setShowSuggestions(true);
                     }}
                     placeholder="Search songs, artists, podcasts..."
-                    className="h-10 w-full rounded-full border border-white/10 bg-white/[0.04] pl-10 pr-9 text-sm text-white placeholder:text-white/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 focus:outline-none"
+                    className="h-10 w-full rounded-full border border-white/10 bg-white/[0.04] pl-10 pr-9 text-sm text-white placeholder:text-white/30 focus:border-white/20 focus:ring-1 focus:ring-white/10 focus:outline-none"
                     autoComplete="off"
                   />
                   {searching ? (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                      <Loader2 className="h-4 w-4 animate-spin text-[#1DB954]" />
                     </div>
                   ) : query ? (
                     <button
@@ -2261,7 +2297,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   className="flex h-10 px-3.5 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-semibold text-white/90 active:scale-95 transition-all"
                 >
                   {searching ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-400" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1DB954]" />
                   ) : (
                     <Search className="h-3.5 w-3.5 text-white/70" />
                   )}
@@ -2279,16 +2315,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             </div>
             {/* Quick filter chips */}
             <div className="flex gap-1.5 overflow-x-auto px-4 pb-2.5 scrollbar-hide">
-              {["foryou", "mixes", "podcasts", "languages", "likes", "history"].map((id) => (
+              {["foryou", "explore", "mixes", "podcasts", "languages", "likes", "history"].map((id) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setTab(id as NavTab)}
                   className={cn(
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all",
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all",
                     tab === id
-                      ? "bg-white text-black font-semibold border-white shadow-sm"
-                      : "border-white/10 bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08]",
+                      ? "bg-[#F5F5F5] text-black font-medium border-transparent shadow-sm"
+                      : "border-white/[0.06] bg-transparent text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.04]",
                   )}
                 >
                   {NAV_ITEMS.find((n) => n.id === id)?.label ?? id}
@@ -2365,8 +2401,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   <MobileHomeSections
                     recentlyPlayed={history.filter(isMusicTrack).slice(0, 12)}
                     dailyMix={dailyMixTracks}
-                    trending={trendingList.length > 0 ? trendingList : recs.slice(0, 12)}
-                    newReleases={mixTracks.newrelease.slice(0, 12)}
+                    trending={[]}
+                    oldSongs={[]}
+                    newReleases={[]}
                     recommended={recs}
                     onPlayTrack={(track, sectionTracks, i) => {
                       if (current?.id === track.id && player.isPlaying) {
@@ -2383,7 +2420,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     loading={recLoading && recs.length === 0}
                   />
 
-
                 {/* Explore More Songs for low-bandwidth incremental discovery */}
                 {recs.length > 0 && (
                   <div className="flex justify-center pt-2 pb-6">
@@ -2394,11 +2430,44 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       disabled={loadingMoreRecs}
                       className="rounded-full border-white/15 bg-white/[0.04] px-5 py-2 text-xs text-white/70 hover:bg-white/10 hover:text-white transition-all shadow-md"
                     >
-                      {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-purple-400" /> : null}
+                      {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-[#1DB954]" /> : null}
                       Explore more songs
                     </Button>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* EXPLORE TAB */}
+            {tab === "explore" && (
+              <div className="space-y-4 pt-1 animate-fade-in">
+                <div className="flex items-center justify-between pb-1">
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+                      Explore & Discover
+                    </h1>
+                    <p className="text-xs text-[#737373] mt-0.5">
+                      Top charts, fresh releases & golden classics
+                    </p>
+                  </div>
+                </div>
+
+                <ExploreSections
+                  trending={trendingList}
+                  oldSongs={oldSongsList}
+                  newReleases={mixTracks.newrelease.slice(0, 12)}
+                  onPlayTrack={(track, sectionTracks, i) => {
+                    if (current?.id === track.id && player.isPlaying) {
+                      pause();
+                      return;
+                    }
+                    startQueue(sectionTracks, i);
+                  }}
+                  onOpenOptions={(t) => setOptionsTrack(t)}
+                  currentId={current?.id ?? null}
+                  isPlaying={player.isPlaying}
+                  loading={trendingList.length === 0 && oldSongsList.length === 0}
+                />
               </div>
             )}
 
@@ -2491,252 +2560,18 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
             {/* PODCASTS TAB */}
             {tab === "podcasts" && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-white">Podcasts</h2>
-                    <p className="text-xs text-white/40 mt-0.5">Discover shows based on your interests</p>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="rounded-full bg-white/[0.06] text-white/70 hover:bg-white/10 hover:text-white border-white/10"
-                    onClick={() => void loadPodcasts()}
-                    disabled={podcastLoading || podcastSearching}
-                  >
-                    {podcastLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                    Refresh
-                  </Button>
-                </div>
-
-                {/* Podcast In-Tab Search */}
-                <form onSubmit={handlePodcastSearch} className="relative flex items-center w-full">
-                  <Search className="absolute left-3.5 h-4 w-4 text-white/40 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={podcastQuery}
-                    onChange={(e) => {
-                      setPodcastQuery(e.target.value);
-                      if (!e.target.value.trim() && podcastSearchResults !== null) {
-                        setPodcastSearchResults(null);
-                      }
-                    }}
-                    placeholder="Search podcast shows, episodes, creators..."
-                    className="w-full rounded-xl bg-white/[0.06] border border-white/10 pl-10 pr-24 py-2 text-sm text-white placeholder-white/40 focus:border-purple-500/60 focus:bg-white/[0.08] focus:outline-none transition-all"
-                  />
-                  <div className="absolute right-1.5 flex items-center gap-1">
-                    {podcastQuery && (
-                      <button
-                        type="button"
-                        onClick={clearPodcastSearch}
-                        className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
-                        title="Clear search"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={podcastSearching || !podcastQuery.trim()}
-                      className="h-7 px-3 text-xs font-medium rounded-lg bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-40"
-                    >
-                      {podcastSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Search"}
-                    </Button>
-                  </div>
-                </form>
-
-                {podcastSearchResults !== null ? (
-                  /* Podcast Search Results View */
-                  <div className="space-y-3 pt-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-white">Results for &ldquo;{podcastQuery}&rdquo;</h3>
-                        <span className="text-xs text-purple-300/60 font-medium">({podcastSearchResults.length} episodes)</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={clearPodcastSearch}
-                        className="text-xs text-purple-400 hover:text-purple-300 underline font-medium"
-                      >
-                        Show Recommended
-                      </button>
-                    </div>
-                    {podcastSearchResults.length === 0 ? (
-                      <div className="flex flex-col items-center gap-2 py-12 text-center">
-                        <MessageSquare className="h-10 w-10 text-white/20" />
-                        <p className="text-sm text-white/60">No podcast episodes found for &ldquo;{podcastQuery}&rdquo;</p>
-                        <Button variant="secondary" size="sm" onClick={clearPodcastSearch} className="mt-2">
-                          Clear Search
-                        </Button>
-                      </div>
-                    ) : (
-                      <TrackList
-                        tracks={podcastSearchResults}
-                        currentId={current?.id}
-                        isPlaying={player.isPlaying}
-                        likedIds={likedIds}
-                        dislikedIds={dislikedIds}
-                        onPlay={(track, i) => {
-                          if (current?.id === track.id) {
-                            if (player.isPlaying) {
-                              pause();
-                            } else {
-                              play();
-                            }
-                            return;
-                          }
-                          startQueue(podcastSearchResults, i);
-                        }}
-                        onToggleLike={toggleLike}
-                        onToggleDislike={(track) => {
-                          toggleDislike(track);
-                          setRecs((prev) => prev.filter((t) => t.id !== track.id));
-                        }}
-                        onArtistClick={openArtist}
-                        playlists={playlists}
-                        onAddToPlaylist={addToPlaylist}
-                        onAddToQueue={(track) => enqueue([track])}
-                        onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
-                        emptyMessage="No podcasts found."
-                      />
-                    )}
-                  </div>
-                ) : (
-                  /* Default Recommendations & Topics View */
-                  <>
-                    {/* Podcast Topic Filter Chips */}
-                    <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
-                      {["All", "Tech", "Motivation", "Science", "Comedy", "Business", "True Crime", "News", "History", "Health", "Finance"].map((topic) => {
-                        const active = selectedPodcastTopic === topic;
-                        return (
-                          <button
-                            key={topic}
-                            type="button"
-                            onClick={() => void loadPodcasts(topic)}
-                            disabled={podcastLoading}
-                            className={cn(
-                              "shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition-all",
-                              active
-                                ? "border-purple-500/50 bg-purple-500/20 text-white font-medium shadow-sm shadow-purple-500/20"
-                                : "border-white/10 bg-white/[0.03] text-white/50 hover:border-purple-500/30 hover:bg-purple-500/10 hover:text-white/80"
-                            )}
-                          >
-                            {topic}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Recently Listened Podcasts */}
-                    {podcastHistory.length > 0 && (
-                      <div className="space-y-2 pt-1 pb-2">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-xs font-semibold uppercase tracking-wider text-purple-300/70">
-                            Continue Listening
-                          </h3>
-                          <button
-                            type="button"
-                            onClick={clearPodcastHistory}
-                            className="text-[11px] text-white/40 hover:text-white/70"
-                          >
-                            Clear
-                          </button>
-                        </div>
-                        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x">
-                          {podcastHistory.slice(0, 10).map((ep, i) => (
-                            <button
-                              key={ep.id}
-                              type="button"
-                              onClick={() => {
-                                if (current?.id === ep.id) {
-                                  if (player.isPlaying) {
-                                    pause();
-                                  } else {
-                                    play();
-                                  }
-                                  return;
-                                }
-                                startQueue(podcastHistory, i);
-                              }}
-                              className="w-[140px] shrink-0 snap-start text-left group"
-                            >
-                              <div className="relative mb-1.5 aspect-video w-full overflow-hidden rounded-xl bg-purple-950/40 border border-purple-500/20">
-                                {ep.thumbnail ? (
-                                  <img src={ep.thumbnail} alt="" className="h-full w-full object-cover group-hover:scale-105 transition-transform" />
-                                ) : (
-                                  <div className="flex h-full items-center justify-center">
-                                    <MessageSquare className="h-6 w-6 text-purple-400/40" />
-                                  </div>
-                                )}
-                                {current?.id === ep.id && player.isPlaying && (
-                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                    <div className="flex items-end gap-0.5 h-4">
-                                      <div className="w-1 bg-purple-400 animate-bar" />
-                                      <div className="w-1 bg-purple-400 animate-bar" style={{ animationDelay: "0.2s" }} />
-                                      <div className="w-1 bg-purple-400 animate-bar" style={{ animationDelay: "0.4s" }} />
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              <p className="truncate text-xs font-semibold text-white/90 leading-tight">{ep.title}</p>
-                              <p className="truncate text-[11px] text-purple-300/50 mt-0.5">{ep.artist}</p>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {podcastLoading && podcastTracks.length === 0 ? (
-                      <div className="flex flex-col items-center gap-3 py-16 text-white/30">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        <p className="text-sm">Finding podcast picks…</p>
-                      </div>
-                    ) : podcastTracks.length === 0 ? (
-                      <div className="flex flex-col items-center gap-3 py-16 text-center">
-                        <MessageSquare className="h-12 w-12 text-white/20" />
-                        <h3 className="text-lg font-semibold text-white/60">No podcasts yet</h3>
-                        <p className="text-sm text-white/40 max-w-xs">
-                          Configure your podcast topics in Settings to get personalized picks.
-                        </p>
-                        <Button variant="secondary" size="sm" className="mt-2" onClick={() => setShowSettings(true)}>
-                          Open Settings
-                        </Button>
-                      </div>
-                    ) : (
-                      <TrackList
-                        tracks={podcastTracks}
-                        currentId={current?.id}
-                        isPlaying={player.isPlaying}
-                        likedIds={likedIds}
-                        dislikedIds={dislikedIds}
-                        onPlay={(track, i) => {
-                          if (current?.id === track.id) {
-                            if (player.isPlaying) {
-                              pause();
-                            } else {
-                              play();
-                            }
-                            return;
-                          }
-                          startQueue(podcastTracks, i);
-                        }}
-                        onToggleLike={handleToggleLike}
-                        onToggleDislike={(track) => {
-                          toggleDislike(track);
-                          setRecs((prev) => prev.filter((t) => t.id !== track.id));
-                        }}
-                        onArtistClick={openArtist}
-                        playlists={playlists}
-                        onAddToPlaylist={handleAddToPlaylist}
-                        onAddToQueue={(track) => enqueue([track])}
-                        onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
-                        emptyMessage="Pick topics in Settings to get podcast recommendations."
-                      />
-                    )}
-                  </>
-                )}
-              </div>
+              <PodcastsPanel
+                currentTrackId={current?.id}
+                isPlaying={player.isPlaying}
+                onPlayEpisode={handlePlayPodcastEpisode}
+                onPause={pause}
+                onResume={play}
+                podcastHistory={podcastHistory}
+                onClearPodcastHistory={clearPodcastHistory}
+                onPlayHistoryTrack={handlePlayPodcastHistory}
+                userLanguages={settings.languages}
+                onOpenSettings={() => setShowSettings(true)}
+              />
             )}
 
             {/* PLAYLISTS TAB */}
@@ -2838,7 +2673,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       value={historyQuery}
                       onChange={(e) => setHistoryQuery(e.target.value)}
                       placeholder="Search listening history..."
-                      className="w-full rounded-xl bg-white/[0.06] border border-white/10 pl-10 pr-9 py-2 text-sm text-white placeholder-white/40 focus:border-purple-500/60 focus:bg-white/[0.08] focus:outline-none transition-all"
+                      className="w-full rounded-xl bg-white/[0.06] border border-white/10 pl-10 pr-9 py-2 text-sm text-white placeholder-white/40 focus:border-white/20 focus:ring-1 focus:ring-white/10 focus:bg-white/[0.08] focus:outline-none transition-all"
                     />
                     {historyQuery && (
                       <button
@@ -3065,6 +2900,25 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           open={!!shareTrack}
           track={shareTrack}
           onClose={() => setShareTrack(null)}
+        />
+
+        {/* ADD TO PLAYLIST MODAL */}
+        <AddToPlaylistModal
+          open={!!createPlaylistTrack}
+          track={createPlaylistTrack}
+          playlists={playlists}
+          onClose={() => setCreatePlaylistTrack(null)}
+          onCreatePlaylist={(name, tracks) => {
+            createPlaylist(name, tracks ?? (createPlaylistTrack ? [createPlaylistTrack] : []));
+            setMessage(`Created playlist "${name}"`);
+            setTimeout(() => setMessage(null), 3000);
+          }}
+          onAddToPlaylist={(playlistId, track) => {
+            handleAddToPlaylist(playlistId, track);
+            const pl = playlists.find((p) => p.id === playlistId);
+            setMessage(`Added to "${pl?.name ?? "playlist"}"`);
+            setTimeout(() => setMessage(null), 3000);
+          }}
         />
 
         {/* LYRICS PANEL */}

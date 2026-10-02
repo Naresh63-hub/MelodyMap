@@ -54,10 +54,10 @@ export function MiniPlayer({
 
   return (
     <div
-      className="fixed z-40 border-t border-white/[0.08] bg-[#121212]/95 backdrop-blur-md shadow-2xl max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between"
+      className="fixed z-40 border-t border-white/[0.06] bg-[#101010]/95 backdrop-blur-xl shadow-xl max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
-      {/* 1.5px Hairline Progress Indicator at Top */}
+      {/* 2px Hairline Progress Indicator at Top */}
       <div
         ref={barRef}
         role="progressbar"
@@ -66,7 +66,7 @@ export function MiniPlayer({
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         onClick={handleBarClick}
-        className="relative w-full h-[2px] bg-white/[0.08] cursor-pointer"
+        className="relative w-full h-[2px] bg-white/[0.06] cursor-pointer"
       >
         <div
           className="h-full bg-[#1DB954] transition-all duration-150 ease-linear"
@@ -83,7 +83,7 @@ export function MiniPlayer({
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
           aria-label={`Open now playing view for ${track?.title ?? "current track"}`}
         >
-          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-[#181818] border border-white/[0.08]">
+          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-[#181818] border border-white/[0.06]">
             {track?.thumbnail ? (
               <img
                 src={track.thumbnail}
@@ -91,15 +91,15 @@ export function MiniPlayer({
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[#1c1c1c]" />
+              <div className="flex h-full w-full items-center justify-center bg-[#181818]" />
             )}
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs sm:text-[13px] font-semibold text-white/95 leading-tight">
+            <p className="truncate text-xs sm:text-[13px] font-medium text-[#F5F5F5] leading-tight">
               {track?.title ?? "No track"}
             </p>
-            <p className="truncate text-[11px] text-neutral-400 leading-tight mt-0.5">
+            <p className="truncate text-[11px] text-[#A1A1A1] leading-tight mt-0.5">
               {track?.artist ?? "—"}
             </p>
           </div>
@@ -114,7 +114,7 @@ export function MiniPlayer({
                 e.stopPropagation();
                 onToggleLike();
               }}
-              className="p-2 text-neutral-400 hover:text-white transition-colors"
+              className="p-2 text-[#737373] hover:text-[#F5F5F5] transition-colors"
               aria-label={liked ? "Remove from favourites" : "Save to favourites"}
             >
               <Heart
@@ -130,7 +130,7 @@ export function MiniPlayer({
             <button
               type="button"
               onClick={onPrevious}
-              className="p-1.5 text-neutral-400 hover:text-white transition-colors"
+              className="p-1.5 text-[#737373] hover:text-[#F5F5F5] transition-colors"
               aria-label="Previous track"
             >
               <SkipBack className="h-4 w-4" />
@@ -142,7 +142,7 @@ export function MiniPlayer({
             type="button"
             onClick={onTogglePlay}
             disabled={isLoading}
-            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
+            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-[#F5F5F5] text-black hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isLoading ? (
@@ -157,7 +157,7 @@ export function MiniPlayer({
           <button
             type="button"
             onClick={onNext}
-            className="p-1.5 text-neutral-400 hover:text-white transition-colors"
+            className="p-1.5 text-[#737373] hover:text-[#F5F5F5] transition-colors"
             aria-label="Next track"
           >
             <SkipForward className="h-4 w-4" />

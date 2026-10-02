@@ -83,9 +83,9 @@ export function SearchResults({
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 p-2 rounded-lg bg-[#141414] border border-white/[0.04] animate-pulse"
+            className="flex items-center gap-3 p-2 rounded-lg bg-[#161616] border border-white/[0.04] animate-pulse"
           >
-            <div className="h-12 w-12 rounded-md bg-white/[0.06]" />
+            <div className="h-11 w-11 rounded-md bg-white/[0.06]" />
             <div className="flex-1 space-y-2">
               <div className="h-3.5 w-3/4 rounded bg-white/[0.06]" />
               <div className="h-3 w-1/2 rounded bg-white/[0.04]" />
@@ -103,8 +103,8 @@ export function SearchResults({
         {/* Trending Searches */}
         <section className="space-y-3">
           <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-white/60" />
-            <h2 className="text-sm font-semibold text-white">Trending Searches</h2>
+            <TrendingUp className="h-4 w-4 text-[#737373]" />
+            <h2 className="text-sm font-semibold text-[#F5F5F5]">Trending Searches</h2>
           </div>
           <div className="flex flex-wrap gap-2">
             {TRENDING_SEARCH_SEEDS.map((term) => (
@@ -112,7 +112,7 @@ export function SearchResults({
                 key={term}
                 type="button"
                 onClick={() => onSearch?.(term, "songs")}
-                className="rounded-full bg-[#181818] border border-white/10 px-3.5 py-1.5 text-xs font-medium text-white/80 hover:bg-[#242424] hover:text-white active:scale-95 transition-all"
+                className="rounded-full bg-[#161616] border border-white/[0.06] px-3.5 py-1.5 text-xs font-medium text-[#A1A1A1] hover:bg-[#1D1D1D] hover:text-[#F5F5F5] active:scale-95 transition-all"
               >
                 {term}
               </button>
@@ -122,7 +122,7 @@ export function SearchResults({
 
         {/* Browse By Category Cards */}
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-white">Browse Categories</h2>
+          <h2 className="text-sm font-semibold text-[#F5F5F5]">Browse Categories</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
               {
@@ -131,7 +131,6 @@ export function SearchResults({
                 icon: Music2,
                 query: "top trending songs",
                 type: "songs" as const,
-                accent: "from-blue-900/40 to-[#121212] border-blue-500/20",
               },
               {
                 title: "Podcasts & Shows",
@@ -139,7 +138,6 @@ export function SearchResults({
                 icon: Mic,
                 query: "best podcast episodes",
                 type: "podcasts" as const,
-                accent: "from-emerald-900/40 to-[#121212] border-emerald-500/20",
               },
               {
                 title: "Languages",
@@ -147,7 +145,6 @@ export function SearchResults({
                 icon: Globe2,
                 query: "top hindi hits songs",
                 type: "songs" as const,
-                accent: "from-amber-900/40 to-[#121212] border-amber-500/20",
               },
               {
                 title: "Chill Mixes",
@@ -155,7 +152,6 @@ export function SearchResults({
                 icon: ListMusic,
                 query: "chill relaxing songs",
                 type: "songs" as const,
-                accent: "from-purple-900/40 to-[#121212] border-purple-500/20",
               },
             ].map((cat) => {
               const Icon = cat.icon;
@@ -164,17 +160,14 @@ export function SearchResults({
                   key={cat.title}
                   type="button"
                   onClick={() => onSearch?.(cat.query, cat.type)}
-                  className={cn(
-                    "flex flex-col justify-between p-4 rounded-xl bg-gradient-to-br border text-left transition-all hover:brightness-110 active:scale-[0.98] h-28",
-                    cat.accent
-                  )}
+                  className="flex flex-col justify-between p-4 rounded-xl bg-[#161616] hover:bg-[#1D1D1D] border border-white/[0.06] text-left transition-all active:scale-[0.98] h-28 group"
                 >
-                  <Icon className="h-6 w-6 text-white/80" />
+                  <Icon className="h-5 w-5 text-[#A1A1A1] group-hover:text-[#1DB954] transition-colors" />
                   <div>
-                    <p className="text-xs font-bold text-white leading-tight">
+                    <p className="text-xs font-medium text-[#F5F5F5] leading-tight">
                       {cat.title}
                     </p>
-                    <p className="text-[10px] text-white/50 leading-tight mt-0.5">
+                    <p className="text-[10px] text-[#A1A1A1] leading-tight mt-0.5">
                       {cat.subtitle}
                     </p>
                   </div>
@@ -202,10 +195,10 @@ export function SearchResults({
                 onFilterChange?.(opt.value);
               }}
               className={cn(
-                "rounded-full px-3.5 py-1 text-xs font-semibold transition-all",
+                "rounded-full px-3.5 py-1 text-xs transition-all",
                 active
-                  ? "bg-white text-black"
-                  : "bg-white/[0.06] text-white/70 hover:text-white hover:bg-white/10 border border-white/10"
+                  ? "bg-[#F5F5F5] text-black font-medium"
+                  : "bg-white/[0.04] text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.08] border border-white/[0.06] font-normal"
               )}
             >
               {opt.label}
@@ -224,15 +217,15 @@ export function SearchResults({
               className={cn(
                 "group flex items-center gap-3 rounded-lg p-2 transition-colors",
                 active
-                  ? "bg-white/[0.08]"
-                  : "hover:bg-white/[0.04]"
+                  ? "bg-[#1D1D1D]"
+                  : "hover:bg-white/[0.03]"
               )}
             >
               {/* Thumbnail + Play */}
               <button
                 type="button"
                 onClick={() => onPlayTrack(track, i)}
-                className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#181818]"
+                className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616]"
               >
                 <img
                   src={track.thumbnail}
@@ -254,13 +247,13 @@ export function SearchResults({
               >
                 <p
                   className={cn(
-                    "truncate text-sm font-semibold leading-tight",
-                    active ? "text-[#1DB954]" : "text-white"
+                    "truncate text-sm font-medium leading-tight",
+                    active ? "text-[#1DB954]" : "text-[#F5F5F5]"
                   )}
                 >
                   {track.title}
                 </p>
-                <p className="truncate text-xs text-white/60 leading-tight mt-1 font-normal">
+                <p className="truncate text-xs text-[#A1A1A1] leading-tight mt-1 font-normal">
                   {track.artist}
                 </p>
               </button>
@@ -271,7 +264,7 @@ export function SearchResults({
                   type="button"
                   onClick={() => onOpenOptions(track)}
                   aria-label="Options"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-white/40 hover:text-white hover:bg-white/[0.08] active:scale-90 transition-all"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.06] active:scale-90 transition-all"
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>
@@ -288,9 +281,9 @@ export function SearchResults({
             type="button"
             onClick={onLoadMore}
             disabled={loadingMore}
-            className="flex items-center gap-2 rounded-full border border-white/10 bg-[#181818] px-5 py-2 text-xs font-semibold text-white/90 hover:bg-[#242424] hover:text-white active:scale-95 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#161616] px-5 py-2 text-xs font-medium text-[#F5F5F5] hover:bg-[#1D1D1D] active:scale-95 transition-all disabled:opacity-50"
           >
-            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin text-white/60" /> : null}
+            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin text-[#1DB954]" /> : null}
             {loadingMore ? "Loading more..." : "Load more results"}
           </button>
         </div>

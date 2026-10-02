@@ -51,7 +51,7 @@ export function ShareModal({ open, track, onClose }: Props) {
     {
       name: "Messages",
       icon: Send,
-      bg: "bg-purple-600/20 text-purple-400 border-purple-500/30",
+      bg: "bg-blue-600/20 text-blue-400 border-blue-500/30",
       action: () =>
         window.open(
           `sms:?&body=${encodeURIComponent(`${shareText} ${shareUrl}`)}`,
@@ -69,12 +69,12 @@ export function ShareModal({ open, track, onClose }: Props) {
       />
 
       {/* Sheet Panel */}
-      <div className="relative w-full max-w-lg rounded-t-3xl bg-[#140f24] border-t border-purple-500/20 p-5 shadow-2xl z-10 animate-slide-up">
+      <div className="relative w-full max-w-lg rounded-t-3xl bg-[#101010] border-t border-white/[0.06] p-5 shadow-2xl z-10 animate-slide-up">
         {/* Grab bar */}
         <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-white/20" />
 
         <div className="flex items-center justify-between pb-3">
-          <h2 className="text-base font-bold text-white">Share Song</h2>
+          <h2 className="text-base font-semibold text-[#F5F5F5]">Share Song</h2>
           <button
             type="button"
             onClick={onClose}
@@ -85,15 +85,15 @@ export function ShareModal({ open, track, onClose }: Props) {
         </div>
 
         {/* Track Preview Card */}
-        <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-white/[0.03] border border-white/[0.06] mb-5">
+        <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-[#161616] border border-white/[0.06] mb-5">
           <img
             src={track.thumbnail}
             alt=""
             className="h-12 w-12 rounded-xl object-cover shadow-md"
           />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-bold text-white">{track.title}</h3>
-            <p className="truncate text-xs text-purple-300/60 mt-0.5">{track.artist}</p>
+            <h3 className="truncate text-sm font-medium text-[#F5F5F5]">{track.title}</h3>
+            <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{track.artist}</p>
           </div>
         </div>
 
@@ -126,16 +126,16 @@ export function ShareModal({ open, track, onClose }: Props) {
         <button
           type="button"
           onClick={handleCopy}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-purple-600/20 border border-purple-500/30 py-3.5 text-sm font-bold text-purple-300 hover:bg-purple-600/30 transition-all active:scale-[0.99] mb-2"
+          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-white/[0.06] border border-white/10 py-3.5 text-sm font-medium text-[#F5F5F5] hover:bg-white/10 transition-all active:scale-[0.99] mb-2"
         >
           {copied ? (
             <>
-              <Check className="h-4 w-4 text-emerald-400" />
-              <span className="text-emerald-400">Link Copied!</span>
+              <Check className="h-4 w-4 text-[#1DB954]" />
+              <span className="text-[#1DB954]">Link Copied!</span>
             </>
           ) : (
             <>
-              <Copy className="h-4 w-4" />
+              <Copy className="h-4 w-4 text-[#A1A1A1]" />
               <span>Copy Link</span>
             </>
           )}

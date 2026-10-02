@@ -78,18 +78,18 @@ export function SearchHeader({
               onFocus={() => onShowSuggestions(true)}
               onBlur={() => window.setTimeout(() => onShowSuggestions(false), 180)}
               placeholder="Search songs, artists, albums, playlists... (/ to focus)"
-              className="h-10 rounded-full border-white/10 bg-white/[0.06] pl-10 pr-16 text-sm text-white placeholder:text-white/40 focus:border-white/30 focus:ring-1 focus:ring-white/20"
+              className="h-10 rounded-full border border-white/[0.06] bg-[#161616] pl-10 pr-16 text-sm text-[#F5F5F5] placeholder:text-[#737373] focus:border-white/20 focus:ring-1 focus:ring-white/10"
               autoComplete="off"
             />
             {searching && (
               <div className="absolute right-10 top-1/2 -translate-y-1/2 pointer-events-none">
-                <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+                <Loader2 className="h-4 w-4 animate-spin text-[#1DB954]" />
               </div>
             )}
             <button
               type="button"
               aria-label="Voice search"
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-[#737373] transition-colors hover:bg-white/10 hover:text-[#F5F5F5]"
               onClick={() => {
                 const w = window as unknown as Record<string, unknown>;
                 if ("webkitSpeechRecognition" in w || "SpeechRecognition" in (w as Record<string, unknown>)) {
@@ -111,10 +111,10 @@ export function SearchHeader({
             </button>
 
             {showSuggestions && (suggestions.length > 0 || recentSearches.length > 0) && (
-              <ul className="absolute inset-x-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-xl border border-white/10 bg-[#181818]/95 shadow-2xl backdrop-blur-xl animate-scale-in">
+              <ul className="absolute inset-x-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-xl border border-white/[0.06] bg-[#161616] shadow-2xl backdrop-blur-xl animate-scale-in">
                 {recentSearches.length > 0 && query.trim().length < 2 && (
                   <>
-                    <li className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                    <li className="px-4 py-2 text-[10px] font-medium uppercase tracking-wider text-[#737373]">
                       Recent searches
                     </li>
                     {recentSearches.map((s) => (
@@ -123,7 +123,7 @@ export function SearchHeader({
                           type="button"
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => onSuggestionClick(s)}
-                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[#A1A1A1] transition-colors hover:bg-white/[0.04] hover:text-[#F5F5F5]"
                         >
                           <Search className="h-3.5 w-3.5 shrink-0 opacity-50" />
                           <span className="truncate">{s}</span>
@@ -138,9 +138,9 @@ export function SearchHeader({
                       type="button"
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => onSuggestionClick(s)}
-                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-[#A1A1A1] transition-colors hover:bg-white/[0.04] hover:text-[#F5F5F5]"
                     >
-                      <Search className="h-3.5 w-3.5 shrink-0 text-white/50" />
+                      <Search className="h-3.5 w-3.5 shrink-0 text-[#737373]" />
                       <span className="truncate">{s}</span>
                     </button>
                   </li>
@@ -151,7 +151,7 @@ export function SearchHeader({
           <Button
             type="submit"
             size="lg"
-            className="hidden h-10 shrink-0 rounded-full bg-white hover:bg-white/90 text-black px-5 font-semibold transition-colors sm:flex"
+            className="hidden h-10 shrink-0 rounded-full bg-[#F5F5F5] hover:bg-white text-black px-5 font-medium transition-colors sm:flex"
           >
             {searching ? <Loader2 className="h-4 w-4 animate-spin text-black" /> : "Search"}
           </Button>
@@ -202,10 +202,10 @@ export function SearchHeader({
             type="button"
             onClick={() => onNavigate(id)}
             className={cn(
-              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+              "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs transition-colors",
               activeTab === id
-                ? "bg-white text-black font-semibold border-white shadow-sm"
-                : "border-white/10 bg-white/[0.04] text-white/60 hover:text-white hover:bg-white/[0.08]",
+                ? "bg-[#F5F5F5] text-black font-medium border-transparent shadow-sm"
+                : "border-white/[0.06] bg-transparent text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.04]",
             )}
           >
             <Icon className="h-3.5 w-3.5" />

@@ -48,43 +48,51 @@
   --radius: 0.5rem;
   --mobile-nav-height: 56px;
 
-  /* Background: pure OLED black */
-  --background: #000000;
-  --foreground: #ffffff;
+  /* Palette: refined streaming dark theme */
+  --bg-main: #080808;
+  --bg-secondary: #101010;
+  --bg-card: #161616;
+  --bg-elevated: #1d1d1d;
+
+  --text-primary: #f5f5f5;
+  --text-secondary: #a1a1a1;
+  --text-muted: #737373;
+
+  --background: #080808;
+  --foreground: #f5f5f5;
 
   /* Surfaces: neutral streaming darks */
-  --card: #121212;
-  --card-foreground: #ffffff;
-  --surface: #181818;
-  --surface-foreground: #ffffff;
-  --popover: #181818;
-  --popover-foreground: #ffffff;
+  --card: #161616;
+  --card-foreground: #f5f5f5;
+  --surface: #101010;
+  --surface-foreground: #f5f5f5;
+  --surface-elevated: #1d1d1d;
+  --popover: #1d1d1d;
+  --popover-foreground: #f5f5f5;
 
-  /* Primary: clean streaming emerald */
+  /* Primary & Accent: clean streaming emerald */
   --primary: #1db954;
   --primary-foreground: #000000;
-
-  /* Secondary: dark neutral surface for chips, hover, controls */
-  --secondary: #242424;
-  --secondary-foreground: #e5e5e5;
-
-  /* Muted: secondary and tertiary gray text */
-  --muted: #1c1c1c;
-  --muted-foreground: #a3a3a3;
-
-  /* Accent: vibrant emerald for interactive elements */
-  --accent: #1ed760;
+  --accent: #1db954;
   --accent-foreground: #000000;
 
-  /* Destructive: soft red */
-  --destructive: #ef4444;
+  /* Secondary: dark neutral surface for chips, hover, controls */
+  --secondary: #161616;
+  --secondary-foreground: #a1a1a1;
+
+  /* Muted: secondary and tertiary gray text */
+  --muted: #101010;
+  --muted-foreground: #737373;
+
+  /* Destructive: soft restrained red */
+  --destructive: #e05252;
   --destructive-foreground: #ffffff;
 
-  /* Borders: subtle neutral hairlines */
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.1);
+  /* Borders: subtle white transparency */
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.08);
   --ring: #1db954;
-  --ring-soft: rgba(29, 185, 84, 0.25);
+  --ring-soft: rgba(29, 185, 84, 0.2);
 }
 
 @layer base {
@@ -96,6 +104,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    font-weight: 400;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
   }
@@ -103,13 +112,13 @@
   h1,
   h2,
   h3 {
-    font-family: var(--font-display);
-    letter-spacing: -0.02em;
+    font-family: var(--font-sans);
+    letter-spacing: -0.015em;
   }
 
   ::selection {
-    background-color: rgba(29, 185, 84, 0.3);
-    color: var(--color-foreground);
+    background-color: rgba(29, 185, 84, 0.2);
+    color: #f5f5f5;
   }
 
   /* Slim, theme-aware scrollbars */
@@ -134,12 +143,12 @@
   }
 }
 
-/* Glass surface effect */
+/* Restrained surface utilities */
 @utility glass {
-  background: rgba(18, 18, 18, 0.85);
+  background: rgba(16, 16, 16, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Playing equalizer bars */
@@ -157,12 +166,12 @@
   animation: bar-pulse 0.9s ease-in-out infinite;
 }
 
-/* Subtle clean glass panel */
+/* Subtle clean panel */
 @utility glass-panel {
-  background: rgba(18, 18, 18, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 16, 16, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Hide scrollbar but keep scroll */
@@ -175,46 +184,46 @@
 }
 
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @utility animate-fade-in-up {
-  animation: fade-in-up 0.25s ease-out forwards;
+  animation: fade-in-up 0.2s ease-out forwards;
 }
 
-/* Clean glass morphism */
+/* Clean restrained surface */
 @utility glass-premium {
-  background: rgba(18, 18, 18, 0.88);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(16, 16, 16, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Clean card hover */
 @utility card-hover-premium {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
+  transition: transform 0.15s ease-out, background-color 0.15s ease;
   &:hover {
-    transform: translateY(-2px) scale(1.015);
+    transform: translateY(-1px) scale(1.01);
   }
 }
 
 /* Button press feedback */
 @utility button-press {
-  transition: transform 0.1s ease-out;
+  transition: transform 0.08s ease-out;
   &:active {
-    transform: scale(0.96);
+    transform: scale(0.97);
   }
 }
 
 /* Smooth page transitions */
 @keyframes page-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 @utility animate-page-in {
-  animation: page-fade-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: page-fade-in 0.2s ease-out forwards;
 }
 
 /* Neutral skeleton shimmer wave */
@@ -224,7 +233,7 @@
 }
 
 @utility skeleton-shimmer {
-  background: linear-gradient(90deg, #181818 25%, #242424 50%, #181818 75%);
+  background: linear-gradient(90deg, #161616 25%, #1d1d1d 50%, #161616 75%);
   background-size: 200% 100%;
   animation: neutral-shimmer 1.8s ease-in-out infinite;
 }

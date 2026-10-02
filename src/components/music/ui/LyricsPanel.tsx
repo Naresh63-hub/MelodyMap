@@ -174,7 +174,7 @@ export function LyricsPanel({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search lyrics..."
-            className="pl-9 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus:border-purple-500/50"
+            className="pl-9 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus:border-white/20 focus:ring-1 focus:ring-white/10"
           />
         </div>
       </div>
@@ -190,7 +190,7 @@ export function LyricsPanel({
       >
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
-            <Loader2 className="h-8 w-8 text-purple-400 animate-spin" />
+            <Loader2 className="h-8 w-8 text-[#1DB954] animate-spin" />
             <p className="text-xs text-white/50">Fetching synchronized lyrics...</p>
           </div>
         ) : filteredLyrics.length === 0 ? (
@@ -218,8 +218,8 @@ export function LyricsPanel({
                   className={cn(
                     "w-full text-center transition-all duration-300 py-2.5 px-4 rounded-xl cursor-pointer select-none",
                     isActive
-                      ? "text-white font-bold text-lg scale-105 bg-gradient-to-r from-pink-500/15 via-purple-500/20 to-cyan-500/10 border border-purple-500/30 shadow-[0_0_25px_rgba(168,85,247,0.25)]"
-                      : "text-white/40 text-sm hover:text-white/80 hover:bg-white/[0.04]",
+                      ? "text-[#F5F5F5] font-semibold text-lg scale-105 bg-white/[0.08] border border-white/[0.08]"
+                      : "text-white/40 text-sm hover:text-white/80 hover:bg-white/[0.03]",
                   )}
                 >
                   {line.text}

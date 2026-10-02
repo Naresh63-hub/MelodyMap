@@ -84,16 +84,16 @@ export function TrackList({
           <li
             key={track.id}
             className={cn(
-              "group flex items-center gap-3 rounded-lg px-2 py-2 transition-colors sm:px-3",
+              "group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors sm:px-3",
               active
-                ? "bg-white/[0.08]"
-                : "hover:bg-white/[0.04]",
+                ? "bg-[#1D1D1D]"
+                : "hover:bg-white/[0.03]",
             )}
           >
             <button
               type="button"
               onClick={() => onPlay(track, index)}
-              className="relative h-11 w-16 sm:w-20 shrink-0 overflow-hidden rounded-md bg-white/5 transition-transform duration-200 group-hover:scale-102"
+              className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-[#181818] border border-white/[0.06] transition-transform duration-150 active:scale-95"
               aria-label={`Play ${track.title}`}
             >
               <img
@@ -106,15 +106,15 @@ export function TrackList({
               <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                 {active && isPlaying ? (
                   <div className="flex items-center gap-0.5">
-                    <Equalizer active className="h-4 w-4 text-[#1DB954]" />
+                    <Equalizer active className="h-3.5 w-3.5 text-[#1DB954]" />
                   </div>
                 ) : (
-                  <Play className="h-4 w-4 text-white fill-current" />
+                  <Play className="h-3.5 w-3.5 text-white fill-current ml-0.5" />
                 )}
               </span>
               {active && (
-                <div className="absolute left-2 top-2">
-                  <Equalizer active className="h-3 w-3 text-[#1DB954]" />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:hidden">
+                  <Equalizer active className="h-3.5 w-3.5 text-[#1DB954]" />
                 </div>
               )}
             </button>
@@ -127,15 +127,14 @@ export function TrackList({
               >
                 <p
                   className={cn(
-                    "truncate text-sm font-semibold transition-colors duration-200",
-                    active ? "text-[#1DB954]" : "text-white/90 group-hover:text-white",
+                    "truncate text-sm font-medium transition-colors duration-150",
+                    active ? "text-[#1DB954]" : "text-[#F5F5F5] group-hover:text-white",
                   )}
                 >
-                  {active && isPlaying && <Music2 className="inline mr-1 h-3 w-3 text-[#1DB954]" />}
                   {track.title}
                 </p>
               </button>
-              <p className="truncate text-xs text-white/50 group-hover:text-white/70 transition-colors duration-200 mt-0.5">
+              <p className="truncate text-xs text-[#A1A1A1] group-hover:text-[#F5F5F5] transition-colors duration-150 mt-0.5">
                 {onArtistClick ? (
                   <button
                     type="button"
@@ -151,7 +150,7 @@ export function TrackList({
               </p>
             </div>
 
-            <span className="hidden text-xs tabular-nums text-white/40 group-hover:text-white/60 transition-colors sm:block">
+            <span className="hidden text-xs tabular-nums text-[#737373] group-hover:text-[#A1A1A1] transition-colors sm:block">
               {track.duration}
             </span>
 

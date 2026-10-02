@@ -28,7 +28,7 @@ export function Waveform({ active = false, barCount = 40, className, variant = "
           className={cn(
             "w-[3px] origin-bottom rounded-full",
             active
-              ? "bg-gradient-to-t from-pink-500 via-purple-500 to-cyan-400 animate-waveform"
+              ? "bg-[#1DB954] animate-waveform"
               : "bg-white/10",
           )}
           style={{

@@ -2,6 +2,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Compass,
   Disc3,
   Globe2,
   Heart,
@@ -20,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 export type NavTab =
   | "foryou"
+  | "explore"
   | "mixes"
   | "podcasts"
   | "languages"
@@ -39,18 +41,19 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Discover",
     items: [
       { id: "foryou", label: "For you", icon: Sparkles, shortcut: "1" },
-      { id: "mixes", label: "Mixes", icon: Layers, shortcut: "2" },
-      { id: "podcasts", label: "Podcasts", icon: Mic, shortcut: "3" },
-      { id: "languages", label: "Languages", icon: Globe2, shortcut: "4" },
+      { id: "explore", label: "Explore", icon: Compass, shortcut: "2" },
+      { id: "mixes", label: "Mixes", icon: Layers, shortcut: "3" },
+      { id: "podcasts", label: "Podcasts", icon: Mic, shortcut: "4" },
+      { id: "languages", label: "Languages", icon: Globe2, shortcut: "5" },
       { id: "search", label: "Search", icon: Search, shortcut: "/" },
     ],
   },
   {
     label: "Your Library",
     items: [
-      { id: "likes", label: "Favourites", icon: Heart, shortcut: "5" },
-      { id: "playlists", label: "Playlists", icon: ListMusic, shortcut: "6" },
-      { id: "history", label: "Recent", icon: Clock, shortcut: "7" },
+      { id: "likes", label: "Favourites", icon: Heart, shortcut: "6" },
+      { id: "playlists", label: "Playlists", icon: ListMusic, shortcut: "7" },
+      { id: "history", label: "Recent", icon: Clock, shortcut: "8" },
     ],
   },
 ];
@@ -95,10 +98,10 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex shrink-0 flex-col border-r border-white/[0.06] glass-premium sidebar-transition",
-        collapsed ? "w-[72px]" : "w-[272px]",
+        "flex shrink-0 flex-col border-r border-white/[0.06] bg-[#101010] sidebar-transition",
+        collapsed ? "w-[72px]" : "w-[260px]",
       )}
-      style={{ minWidth: collapsed ? 72 : 272 }}
+      style={{ minWidth: collapsed ? 72 : 260 }}
     >
       {/* Brand */}
       <div
@@ -111,16 +114,16 @@ export function Sidebar({
           <img
             src="/brand/app-icon.png"
             alt="MelodyMap"
-            className="h-9 w-9 rounded-lg object-cover shadow-sm"
+            className="h-8 w-8 rounded-lg object-cover shadow-sm"
           />
         </div>
         {!collapsed && (
           <div className="min-w-0 animate-fade-in-up">
-            <p className="truncate font-display text-lg font-bold tracking-tight">
-              <span className="text-white">Melody</span>
+            <p className="truncate text-base font-semibold tracking-tight">
+              <span className="text-[#F5F5F5]">Melody</span>
               <span className="text-[#1DB954]">Map</span>
             </p>
-            <p className="text-[10px] uppercase tracking-[0.14em] text-white/30 font-medium">
+            <p className="text-[10px] uppercase tracking-[0.12em] text-[#737373] font-normal">
               Music player
             </p>
           </div>
@@ -128,11 +131,11 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-premium">
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-hide">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             {!collapsed && (
-              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/30">
+              <p className="mb-1.5 px-3 text-[11px] font-medium uppercase tracking-[0.12em] text-[#737373]">
                 {section.label}
               </p>
             )}
@@ -146,31 +149,31 @@ export function Sidebar({
                     onClick={() => onNavigate(id)}
                     title={collapsed ? label : undefined}
                     className={cn(
-                      "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
+                      "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors",
                       collapsed && "justify-center px-2",
                       active
-                        ? "bg-white/[0.08] text-white font-semibold"
-                        : "text-white/60 hover:bg-white/[0.04] hover:text-white",
+                        ? "bg-white/[0.06] text-[#F5F5F5] font-medium"
+                        : "text-[#A1A1A1] font-normal hover:bg-white/[0.03] hover:text-[#F5F5F5]",
                     )}
                   >
                     {/* Active indicator bar */}
                     {active && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-[#1DB954]" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2.5px] rounded-full bg-[#1DB954]" />
                     )}
 
                     <Icon
                       className={cn(
                         "h-[18px] w-[18px] shrink-0 transition-colors",
                         active
-                          ? "text-white"
-                          : "text-white/40 group-hover:text-white/70",
+                          ? "text-[#1DB954]"
+                          : "text-[#737373] group-hover:text-[#A1A1A1]",
                       )}
                     />
                     {!collapsed && (
                       <>
                         <span className="flex-1 text-left truncate">{label}</span>
                         {shortcut && (
-                          <span className="hidden group-hover:inline text-[10px] tabular-nums text-white/20 font-mono">
+                          <span className="hidden group-hover:inline text-[10px] tabular-nums text-[#737373] font-mono">
                             {shortcut}
                           </span>
                         )}
@@ -197,8 +200,8 @@ export function Sidebar({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-pink-500/30 to-purple-500/30">
-                  <Disc3 className="h-5 w-5 text-white/50" />
+                <div className="flex h-full w-full items-center justify-center bg-[#181818] border border-white/[0.06]">
+                  <Disc3 className="h-5 w-5 text-[#737373]" />
                 </div>
               )}
               {/* Playing indicator overlay */}

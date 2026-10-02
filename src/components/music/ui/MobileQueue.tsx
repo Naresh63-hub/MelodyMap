@@ -41,7 +41,7 @@ export function MobileQueue({
     <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       {/* Sheet */}
       <div
-        className="relative max-h-[80vh] flex flex-col rounded-t-3xl bg-[#12121f] border-t border-white/[0.08] shadow-2xl animate-slide-up"
+        className="relative max-h-[80vh] flex flex-col rounded-t-3xl bg-[#101010] border-t border-white/[0.06] shadow-2xl animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle */}
@@ -51,9 +51,9 @@ export function MobileQueue({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-2 border-b border-white/[0.06]">
-          <h3 className="text-base font-bold text-white">Queue</h3>
+          <h3 className="text-base font-semibold text-[#F5F5F5]">Queue</h3>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-white/30">
+            <span className="text-xs text-[#737373]">
               {tracks.length} track{tracks.length === 1 ? "" : "s"}
             </span>
             <Button
@@ -61,7 +61,7 @@ export function MobileQueue({
               size="sm"
               onClick={onClear}
               disabled={tracks.length === 0}
-              className="text-white/40 hover:text-white text-xs"
+              className="text-[#737373] hover:text-[#F5F5F5] text-xs"
             >
               <Trash2 className="h-3.5 w-3.5 mr-1" />
               Clear
@@ -69,7 +69,7 @@ export function MobileQueue({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-white/40 active:bg-white/[0.06]"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-[#737373] active:bg-white/[0.06]"
               aria-label="Close queue"
             >
               <X className="h-4 w-4" />
@@ -82,11 +82,11 @@ export function MobileQueue({
           {/* Now Playing */}
           {current && (
             <div className="mb-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-pink-400/70 mb-2 px-1">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-[#737373] mb-2 px-1">
                 Now Playing
               </p>
-              <div className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-cyan-500/5 border border-purple-500/20 p-3">
-                <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg">
+              <div className="flex items-center gap-3 rounded-xl bg-[#1D1D1D] border border-white/[0.06] p-3">
+                <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[#161616]">
                   {current.thumbnail ? (
                     <img src={current.thumbnail} alt="" className="h-full w-full object-cover" />
                   ) : (
@@ -95,12 +95,12 @@ export function MobileQueue({
                     </div>
                   )}
                   {isPlaying && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                       <div className="flex items-end gap-[2px] h-3">
                         {[0, 1, 2].map((j) => (
                           <div
                             key={j}
-                            className="w-[2px] rounded-full bg-white animate-bar"
+                            className="w-[2px] rounded-full bg-[#1DB954] animate-bar"
                             style={{ animationDelay: `${j * 0.15}s`, height: "100%" }}
                           />
                         ))}
@@ -109,10 +109,10 @@ export function MobileQueue({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-white">{current.title}</p>
-                  <p className="truncate text-xs text-white/40">{current.artist}</p>
+                  <p className="truncate text-sm font-medium text-[#F5F5F5]">{current.title}</p>
+                  <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{current.artist}</p>
                 </div>
-                <Equalizer active={isPlaying} className="h-4 w-4 text-pink-400 shrink-0" />
+                <Equalizer active={isPlaying} className="h-4 w-4 text-[#1DB954] shrink-0" />
               </div>
             </div>
           )}
@@ -120,7 +120,7 @@ export function MobileQueue({
           {/* Upcoming */}
           {upcoming.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-2 px-1">
+              <p className="text-[10px] font-medium uppercase tracking-wider text-[#737373] mb-2 px-1">
                 Next Up
               </p>
               <div className="space-y-1">
@@ -151,13 +151,13 @@ export function MobileQueue({
                       }}
                       className={cn(
                         "flex items-center gap-3 rounded-xl p-2.5 transition-all",
-                        isDragging ? "opacity-40 scale-95 bg-purple-500/10" : "active:bg-white/[0.04]",
+                        isDragging ? "opacity-40 scale-95 bg-white/[0.06]" : "active:bg-white/[0.04]",
                         isOver && dragIndex !== null && dragIndex !== realIndex
-                          ? "ring-2 ring-purple-500 bg-purple-500/20"
+                          ? "ring-1 ring-white/20 bg-white/[0.08]"
                           : "",
                       )}
                     >
-                      <span className="cursor-grab active:cursor-grabbing p-1 text-white/30 hover:text-white transition-colors">
+                      <span className="cursor-grab active:cursor-grabbing p-1 text-[#737373] hover:text-[#F5F5F5] transition-colors">
                         <GripVertical className="h-4 w-4 shrink-0" />
                       </span>
                       <button
@@ -165,10 +165,10 @@ export function MobileQueue({
                         onClick={() => onJump(realIndex)}
                         className="flex min-w-0 flex-1 items-center gap-3"
                       >
-                        <span className="w-5 text-center text-[10px] text-white/25 tabular-nums shrink-0">
+                        <span className="w-5 text-center text-[10px] text-[#737373] tabular-nums shrink-0">
                           {realIndex + 1}
                         </span>
-                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md">
+                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md bg-[#161616]">
                           {track.thumbnail ? (
                             <img src={track.thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" />
                           ) : (
@@ -178,14 +178,14 @@ export function MobileQueue({
                           )}
                         </div>
                         <div className="min-w-0 flex-1 text-left">
-                          <p className="truncate text-[13px] font-medium text-white/80">{track.title}</p>
-                          <p className="truncate text-[11px] text-white/35">{track.artist}</p>
+                          <p className="truncate text-[13px] font-medium text-[#F5F5F5]">{track.title}</p>
+                          <p className="truncate text-[11px] text-[#A1A1A1] mt-0.5">{track.artist}</p>
                         </div>
                       </button>
                       <button
                         type="button"
                         onClick={() => onRemove(realIndex)}
-                        className="h-11 w-11 shrink-0 flex items-center justify-center rounded-full text-white/20 active:text-red-400"
+                        className="h-11 w-11 shrink-0 flex items-center justify-center rounded-full text-[#737373] active:text-destructive"
                         aria-label={`Remove ${track.title} from queue`}
                       >
                         <X className="h-3.5 w-3.5" />
@@ -201,8 +201,8 @@ export function MobileQueue({
           {tracks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Music2 className="h-10 w-10 text-white/15 mb-3" />
-              <p className="text-sm text-white/30">Queue is empty</p>
-              <p className="text-xs text-white/20 mt-1">Add songs to build your queue</p>
+              <p className="text-sm text-[#737373]">Queue is empty</p>
+              <p className="text-xs text-[#737373]/60 mt-1">Add songs to build your queue</p>
             </div>
           )}
         </div>

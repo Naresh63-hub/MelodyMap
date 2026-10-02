@@ -159,7 +159,7 @@ export function FloatingMiniPlayer({
           : undefined
       }
       className={cn(
-        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl bg-[#121212]/95 backdrop-blur-2xl border border-white/10 text-white shadow-2xl shadow-black/80 overflow-hidden transition-shadow select-none",
+        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl bg-[#101010]/95 backdrop-blur-2xl border border-white/[0.06] text-white shadow-2xl shadow-black/80 overflow-hidden transition-shadow select-none",
         isDragging && "cursor-grabbing ring-1 ring-white/30"
       )}
     >
@@ -227,7 +227,7 @@ export function FloatingMiniPlayer({
 
         {/* Track Thumbnail & Info */}
         <div className="flex items-center gap-3">
-          <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-white/10 bg-[#181818]">
+          <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-white/[0.06] bg-[#161616]">
             <img src={track.thumbnail} alt={track.title} className="h-full w-full object-cover" />
             {isPlaying && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -245,11 +245,11 @@ export function FloatingMiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <h4 className="text-xs font-semibold text-white truncate leading-tight">{track.title}</h4>
-            <p className="text-[11px] text-white/60 truncate mt-0.5 leading-tight">
+            <h4 className="text-xs font-medium text-[#F5F5F5] truncate leading-tight">{track.title}</h4>
+            <p className="text-[11px] text-[#A1A1A1] truncate mt-0.5 leading-tight">
               {track.artist}
             </p>
-            <div className="flex items-center justify-between text-[10px] text-white/40 mt-1 tabular-nums font-mono">
+            <div className="flex items-center justify-between text-[10px] text-[#737373] mt-1 tabular-nums font-mono">
               <span>{formatTime(position)}</span>
               <span>{formatTime(duration)}</span>
             </div>
@@ -263,7 +263,7 @@ export function FloatingMiniPlayer({
               <button
                 type="button"
                 onClick={onToggleLike}
-                className="p-1.5 rounded-full active:scale-90 transition-all text-white/60 hover:text-white hover:bg-white/5"
+                className="p-1.5 rounded-full active:scale-90 transition-all text-[#737373] hover:text-[#F5F5F5] hover:bg-white/5"
                 aria-label={liked ? "Remove from favourites" : "Add to favourites"}
                 title={liked ? "In your favourites" : "Save to favourites"}
               >
@@ -279,7 +279,7 @@ export function FloatingMiniPlayer({
             <button
               type="button"
               onClick={onPrevious}
-              className="p-1.5 rounded-full text-white/60 hover:text-white active:scale-95 transition-all"
+              className="p-1.5 rounded-full text-[#A1A1A1] hover:text-[#F5F5F5] active:scale-95 transition-all"
               aria-label="Previous track"
             >
               <SkipBack className="h-4 w-4 fill-current" />
@@ -289,7 +289,7 @@ export function FloatingMiniPlayer({
               type="button"
               onClick={onTogglePlay}
               disabled={isLoading}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-black shadow-md hover:scale-105 active:scale-95 transition-transform"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F5F5F5] text-black shadow-md hover:scale-105 active:scale-95 transition-transform"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (

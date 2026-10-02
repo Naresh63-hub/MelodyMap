@@ -6,6 +6,7 @@ import type { Track } from "@/lib/library";
 type Props = {
   recentlyPlayed: Track[];
   trending: Track[];
+  oldSongs?: Track[] | undefined;
   newReleases: Track[];
   recommended: Track[];
   onPlayTrack: (track: Track, index: number) => void;
@@ -20,6 +21,7 @@ type Props = {
 export function HomeSections({
   recentlyPlayed,
   trending,
+  oldSongs,
   newReleases,
   recommended,
   onPlayTrack,
@@ -58,7 +60,11 @@ export function HomeSections({
   }
 
   const hasAnyContent =
-    recentlyPlayed.length > 0 || trending.length > 0 || newReleases.length > 0 || recommended.length > 0;
+    recentlyPlayed.length > 0 ||
+    trending.length > 0 ||
+    (oldSongs && oldSongs.length > 0) ||
+    newReleases.length > 0 ||
+    recommended.length > 0;
 
   const Section = ({
     title,
@@ -74,9 +80,9 @@ export function HomeSections({
     return (
       <section className="mb-8 animate-page-in">
         <div className="mb-3.5 flex items-center justify-between px-1">
-          <h2 className="text-lg font-semibold tracking-tight text-white/95">{title}</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-[#F5F5F5]">{title}</h2>
           {showMore && (
-            <button className="text-xs font-medium text-neutral-400 hover:text-white transition-colors">
+            <button className="text-xs font-medium text-[#737373] hover:text-[#F5F5F5] transition-colors">
               See all
             </button>
           )}
@@ -126,6 +132,13 @@ export function HomeSections({
         <Section
           title="Trending Now"
           tracks={trending}
+        />
+      )}
+
+      {oldSongs && oldSongs.length > 0 && (
+        <Section
+          title="Old Classics"
+          tracks={oldSongs}
         />
       )}
 

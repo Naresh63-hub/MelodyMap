@@ -88,12 +88,12 @@ export function SleepTimerModal({
       />
 
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-sm rounded-3xl bg-[#140f24] border border-purple-500/30 p-6 shadow-2xl shadow-purple-950/60 z-10 animate-scale-in text-center">
+      <div className="relative w-full max-w-sm rounded-3xl bg-[#101010] border border-white/[0.06] p-6 shadow-2xl z-10 animate-scale-in text-center">
         {/* Header */}
         <div className="flex items-center justify-between pb-4">
           <div className="flex items-center gap-2">
-            <Moon className="h-5 w-5 text-purple-400" />
-            <h2 className="text-lg font-bold text-white">Sleep Timer</h2>
+            <Moon className="h-5 w-5 text-[#1DB954]" />
+            <h2 className="text-base font-semibold text-[#F5F5F5]">Sleep Timer</h2>
           </div>
           <button
             type="button"
@@ -106,16 +106,15 @@ export function SleepTimerModal({
 
         {/* Circular Timer Dial */}
         <div className="my-6 relative flex flex-col items-center justify-center">
-          <div className="relative flex h-48 w-48 items-center justify-center rounded-full border-4 border-purple-900/40 bg-purple-950/20 shadow-[0_0_30px_rgba(139,92,246,0.2)]">
-            <div className="absolute inset-2 rounded-full border-2 border-dashed border-purple-500/30 animate-spin-slow" />
+          <div className="relative flex h-48 w-48 items-center justify-center rounded-full border-2 border-white/[0.08] bg-[#161616]">
             <div className="flex flex-col items-center">
-              <span className="font-display text-3xl font-bold tracking-tight text-white tabular-nums">
+              <span className="font-display text-3xl font-semibold tracking-tight text-[#F5F5F5] tabular-nums">
                 {formatTimerDisplay()}
               </span>
-              <span className="text-xs text-purple-300/60 mt-0.5">min</span>
+              <span className="text-xs text-[#737373] mt-0.5">min</span>
             </div>
           </div>
-          <p className="mt-4 text-xs text-white/50">
+          <p className="mt-4 text-xs text-[#737373]">
             {activeEndTime
               ? "Playback will automatically stop when timer reaches 0"
               : "When timer ends: Playback will stop"}
@@ -133,10 +132,10 @@ export function SleepTimerModal({
                   type="button"
                   onClick={() => setSelectedMinutes(p.minutes)}
                   className={cn(
-                    "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-all",
+                    "rounded-full border px-3.5 py-1.5 text-xs transition-all",
                     active
-                      ? "border-purple-500 bg-purple-600/30 text-white shadow-sm shadow-purple-500/20"
-                      : "border-white/10 bg-white/[0.04] text-white/60 hover:bg-white/10 hover:text-white"
+                      ? "border-transparent bg-[#F5F5F5] text-black font-medium shadow-sm"
+                      : "border-white/[0.06] bg-transparent text-[#A1A1A1] hover:bg-white/[0.04] hover:text-[#F5F5F5]"
                   )}
                 >
                   {p.label}
@@ -151,7 +150,7 @@ export function SleepTimerModal({
           <button
             type="button"
             onClick={cancelTimer}
-            className="w-full rounded-2xl bg-red-500/20 border border-red-500/30 py-3.5 text-sm font-bold text-red-300 hover:bg-red-500/30 transition-all"
+            className="w-full rounded-2xl bg-red-500/15 border border-red-500/30 py-3 text-sm font-medium text-red-300 hover:bg-red-500/25 transition-all"
           >
             Stop Timer
           </button>
@@ -162,7 +161,7 @@ export function SleepTimerModal({
               startTimer();
               onClose();
             }}
-            className="w-full rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-purple-600/30 hover:shadow-purple-600/50 active:scale-[0.99] transition-all"
+            className="w-full rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-sm font-semibold text-black shadow-lg shadow-black/40 active:scale-[0.99] transition-all"
           >
             Start Timer
           </button>

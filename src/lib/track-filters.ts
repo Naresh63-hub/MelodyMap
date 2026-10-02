@@ -126,7 +126,7 @@ export function parseDurationSeconds(dur: string | number | undefined | null): n
 export const MAX_TRACK_DURATION_SECONDS = 600;
 
 export function isMusicTrack(
-  track: { title?: string; artist?: string; duration?: string | number | undefined } | null | undefined,
+  track: { title?: string | undefined; artist?: string | undefined; duration?: string | number | undefined } | null | undefined,
   allowLong?: boolean | unknown,
 ): boolean {
   if (!track || !track.title) return false;
@@ -151,10 +151,11 @@ export function isMusicTrack(
  * Strict validator to guarantee a track is a genuine podcast episode.
  */
 export function isPodcastTrack(
-  track: { title?: string; artist?: string; duration?: string | number | undefined } | null | undefined,
+  track: { id?: string | undefined; source?: string | undefined; title?: string | undefined; artist?: string | undefined; duration?: string | number | undefined } | null | undefined,
   _ignored?: unknown,
 ): boolean {
   if (!track || !track.title) return false;
+  if (track.source === "podcast" || track.id?.startsWith("podcast:")) return true;
   const title = track.title.toLowerCase();
   const artist = (track.artist || "").toLowerCase();
 

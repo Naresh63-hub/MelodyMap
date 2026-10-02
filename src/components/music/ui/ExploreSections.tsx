@@ -1,20 +1,15 @@
-import { Clock, Flame, MoreVertical, Music2, TrendingUp, Sparkles, ChevronRight, Disc3 } from "lucide-react";
+import { Disc3, Flame, MoreVertical, Music2, TrendingUp } from "lucide-react";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 
 type Props = {
-  recentlyPlayed: Track[];
   trending: Track[];
   oldSongs?: Track[] | undefined;
   newReleases: Track[];
-  recommended: Track[];
-  dailyMix?: Track[] | undefined;
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
-  onToggleLike: (track: Track) => void;
   onOpenOptions?: ((track: Track) => void) | undefined;
-  likedIds: Set<string>;
   currentId?: string | null | undefined;
   isPlaying: boolean;
   loading?: boolean | undefined;
@@ -96,7 +91,7 @@ function HorizontalScrollRow({
   );
 }
 
-/** Vertical song list row for Trending / Made For You */
+/** Vertical song list row for Trending */
 function VerticalSongList({
   tracks,
   currentId,
@@ -119,9 +114,7 @@ function VerticalSongList({
             key={track.id}
             className={cn(
               "flex items-center gap-3 rounded-lg p-2 transition-colors",
-              active
-                ? "bg-[#1D1D1D]"
-                : "hover:bg-white/[0.03]",
+              active ? "bg-[#1D1D1D]" : "hover:bg-white/[0.03]",
             )}
           >
             {/* Thumbnail + Play Action */}
@@ -182,9 +175,11 @@ function VerticalSongList({
 function SectionHeader({
   title,
   icon: Icon,
+  subtitle,
 }: {
   title: string;
-  icon?: typeof Music2 | typeof TrendingUp | typeof Clock | typeof Flame | typeof Disc3;
+  icon?: typeof TrendingUp | typeof Flame | typeof Disc3;
+  subtitle?: string;
 }) {
   return (
     <div className="flex items-center justify-between mb-2.5 px-0.5">
@@ -192,37 +187,37 @@ function SectionHeader({
         {Icon && <Icon className="h-4 w-4 text-[#737373]" />}
         <h2 className="text-sm font-semibold tracking-tight text-[#F5F5F5]">{title}</h2>
       </div>
+      {subtitle && (
+        <span className="text-[11px] font-normal text-[#737373]">
+          {subtitle}
+        </span>
+      )}
     </div>
   );
 }
 
-export function MobileHomeSections({
-  recentlyPlayed,
+export function ExploreSections({
   trending,
   oldSongs,
   newReleases,
-  recommended,
-  dailyMix,
   onPlayTrack,
-  onToggleLike: _onToggleLike,
   onOpenOptions,
-  likedIds: _likedIds,
   currentId,
   isPlaying,
   loading = false,
 }: Props) {
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 pt-2">
         {[1, 2].map((s) => (
           <div key={s} className="space-y-3">
             <div className="h-4 w-28 rounded bg-[#1c1c1c] animate-pulse" />
             <div className="flex gap-3 overflow-hidden">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="w-[132px] shrink-0 space-y-2">
-                  <div className="aspect-square w-full rounded-lg bg-[#181818] border border-white/[0.04] animate-pulse" />
+                  <div className="aspect-square w-full rounded-lg bg-[#161616] border border-white/[0.04] animate-pulse" />
                   <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
-                  <div className="h-2.5 w-1/2 rounded bg-[#181818] animate-pulse" />
+                  <div className="h-2.5 w-1/2 rounded bg-[#161616] animate-pulse" />
                 </div>
               ))}
             </div>
@@ -232,76 +227,12 @@ export function MobileHomeSections({
     );
   }
 
-  const hasAny =
-    recentlyPlayed.length > 0 ||
-    trending.length > 0 ||
-    (oldSongs && oldSongs.length > 0) ||
-    newReleases.length > 0 ||
-    recommended.length > 0;
-
-  if (!hasAny) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
-        <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
-        <h3 className="text-sm font-semibold text-white/80 mb-1">Nothing here yet</h3>
-        <p className="text-xs text-neutral-400 max-w-xs px-4">
-          Search for your favorite songs or artists to start listening.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      {/* 1. Daily Mix */}
-      {dailyMix && dailyMix.length > 0 && (
-        <section className="animate-fade-in">
-          <div className="flex items-center justify-between mb-2.5 px-0.5">
-            <h2 className="text-sm font-semibold tracking-tight text-[#F5F5F5]">Daily Mix</h2>
-            <span className="text-[11px] font-normal text-[#737373]">
-              Updated today
-            </span>
-          </div>
-          <HorizontalScrollRow
-            tracks={dailyMix}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-          />
-        </section>
-      )}
-
-      {/* 2. Recently Played (Jump Back In) */}
-      {recentlyPlayed.length > 0 && (
-        <section className="animate-fade-in">
-          <SectionHeader title="Recently Played" icon={Clock} />
-          <HorizontalScrollRow
-            tracks={recentlyPlayed}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-          />
-        </section>
-      )}
-
-      {/* 3. Made For You (AI / Bandit Recommendations) */}
-      {recommended.length > 0 && (
-        <section className="animate-fade-in">
-          <SectionHeader title="Made For You" />
-          <VerticalSongList
-            tracks={recommended}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onOpenOptions={onOpenOptions}
-          />
-        </section>
-      )}
-
-      {/* 4. Trending Now (Optional if rendered in Home) */}
-      {trending && trending.length > 0 && (
-        <section className="animate-fade-in">
-          <SectionHeader title="Trending Now" icon={TrendingUp} />
+    <div className="space-y-6 pt-1 animate-fade-in">
+      {/* 1. Trending Hits */}
+      {trending.length > 0 && (
+        <section>
+          <SectionHeader title="Trending Now" icon={TrendingUp} subtitle="Top charts in your language" />
           <VerticalSongList
             tracks={trending.slice(0, 8)}
             currentId={currentId}
@@ -312,20 +243,12 @@ export function MobileHomeSections({
         </section>
       )}
 
-      {/* 5. Old Classics (Optional if rendered in Home) */}
-      {oldSongs && oldSongs.length > 0 && (
-        <section className="animate-fade-in">
-          <div className="flex items-center justify-between mb-2.5 px-0.5">
-            <div className="flex items-center gap-2">
-              <Disc3 className="h-4 w-4 text-amber-400/80" />
-              <h2 className="text-sm font-semibold tracking-tight text-[#F5F5F5]">Old Classics</h2>
-            </div>
-            <span className="text-[11px] font-normal text-[#737373]">
-              Golden Era & Retro
-            </span>
-          </div>
+      {/* 2. New Releases */}
+      {newReleases.length > 0 && (
+        <section>
+          <SectionHeader title="New Releases" icon={Flame} subtitle="Fresh drops" />
           <HorizontalScrollRow
-            tracks={oldSongs}
+            tracks={newReleases}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
@@ -333,12 +256,12 @@ export function MobileHomeSections({
         </section>
       )}
 
-      {/* 6. New Releases (Optional if rendered in Home) */}
-      {newReleases && newReleases.length > 0 && (
-        <section className="animate-fade-in">
-          <SectionHeader title="New Releases" icon={Flame} />
+      {/* 3. Old Classics & Evergreens */}
+      {oldSongs && oldSongs.length > 0 && (
+        <section>
+          <SectionHeader title="Old Classics" icon={Disc3} subtitle="Golden Era & Retro hits" />
           <HorizontalScrollRow
-            tracks={newReleases}
+            tracks={oldSongs}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
