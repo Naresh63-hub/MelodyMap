@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 
 type Props = {
   tracks: Track[];
@@ -96,7 +97,7 @@ export function TrackList({
               aria-label={`Play ${track.title}`}
             >
               <img
-                src={track.thumbnail}
+                src={getOptimizedThumbnailUrl(track.thumbnail)}
                 alt=""
                 loading="lazy"
                 className="h-full w-full object-cover"

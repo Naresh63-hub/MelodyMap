@@ -276,14 +276,15 @@ function getDynamicQueries(
 
   // 1. High-priority queries for user's affinity + favorited artists
   const priorityArtists = [...new Set([...filteredAffinityArtists, ...filteredUserArtists])];
+  const langQualifier = primaryLang ? ` ${primaryLang}` : "";
   if (priorityArtists.length > 0) {
     for (const art of priorityArtists.slice(0, 6)) {
-      userNewQ.push(`${art} latest songs ${CURRENT_YEAR}`);
-      userNewQ.push(`${art} top hit songs`);
-      userNewQ.push(`${art} popular tracks`);
-      userOldQ.push(`${art} best melody hits`);
-      userOldQ.push(`${art} all time classics`);
-      userOldQ.push(`${art} evergreen songs`);
+      userNewQ.push(`${art}${langQualifier} latest songs ${CURRENT_YEAR}`);
+      userNewQ.push(`${art}${langQualifier} top hit songs`);
+      userNewQ.push(`${art}${langQualifier} popular tracks`);
+      userOldQ.push(`${art}${langQualifier} best melody hits`);
+      userOldQ.push(`${art}${langQualifier} all time classics`);
+      userOldQ.push(`${art}${langQualifier} evergreen songs`);
     }
   }
 
@@ -291,9 +292,9 @@ function getDynamicQueries(
   const discovery = options?.discovery ?? 40;
   if (discovery > 30 && filteredRelatedArtists.length > 0) {
     for (const art of filteredRelatedArtists.slice(0, 4)) {
-      generalNewQ.push(`${art} top songs ${CURRENT_YEAR}`);
-      generalNewQ.push(`${art} viral hit songs`);
-      generalOldQ.push(`${art} best hits`);
+      generalNewQ.push(`${art}${langQualifier} top songs ${CURRENT_YEAR}`);
+      generalNewQ.push(`${art}${langQualifier} viral hit songs`);
+      generalOldQ.push(`${art}${langQualifier} best hits`);
     }
   }
 
@@ -437,13 +438,14 @@ async function getLocalPicks(data: {
   const newQuota = Math.ceil(count / 2);
   const oldQuota = count - newQuota;
 
-  // Filter out any excluded / recently played / penalized tracks
+  // Filter out any excluded / recently played / penalized / cross-language tracks
   const isCandidateValid = (t: Track) => {
     const key = norm(`${t.artist} - ${t.title}`);
     const titleKey = norm(t.title);
     const artKey = norm(t.artist);
     if (excludeSet.has(key) || excludeSet.has(titleKey)) return false;
     if (penalizedSet.has(artKey)) return false;
+    if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
     return true;
   };
 
@@ -451,12 +453,12 @@ async function getLocalPicks(data: {
   const filteredOld = oldCandidates.filter(isCandidateValid);
 
   // Draw 50% new releases
-  const selectedNew = shuffleArray(filteredNew.length >= newQuota ? filteredNew : newCandidates.filter(isCandidateValid)).slice(0, newQuota);
+  const selectedNew = shuffleArray(filteredNew).slice(0, newQuota);
   const chosenKeys = new Set<string>(selectedNew.map((t) => getTrackDedupeKey(t.title, t.artist)));
   const chosenIds = new Set<string>(selectedNew.map((t) => t.id));
 
   // Draw 50% golden classics, avoiding cross-bucket duplicates
-  const distinctOldCandidates = shuffleArray(filteredOld.length >= oldQuota ? filteredOld : oldCandidates.filter(isCandidateValid)).filter(
+  const distinctOldCandidates = shuffleArray(filteredOld).filter(
     (t) => !chosenIds.has(t.id) && !chosenKeys.has(getTrackDedupeKey(t.title, t.artist)),
   );
   const selectedOld = distinctOldCandidates.slice(0, oldQuota);
@@ -563,8 +565,7 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
     const filteredTracks = langs.length > 0
       ? tracks.filter((t) => isLanguageConsistent(t, langs))
       : tracks;
-    const finalTracks = filteredTracks.length > 0 ? filteredTracks : tracks;
-    return { tracks: shuffleArray(finalTracks).slice(0, count), error: null };
+    return { tracks: shuffleArray(filteredTracks).slice(0, count), error: null };
   });
 
 const OldSongsInput = z.object({
@@ -641,8 +642,7 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
       const langOk = langs.length > 0 ? isLanguageConsistent(t, langs) : true;
       return langOk && isOldEraTrack(t);
     });
-    const finalTracks = filteredTracks.length > 0 ? filteredTracks : tracks.filter(isOldEraTrack);
-    return { tracks: shuffleArray(finalTracks).slice(0, count), error: null };
+    return { tracks: shuffleArray(filteredTracks).slice(0, count), error: null };
   });
 
 /**
@@ -796,7 +796,9 @@ export const recommendTracks = createServerFn({ method: "POST" })
         }),
       );
       for (const t of batch) {
-        if (t) resolved.push(t);
+        if (t && (data.languages.length === 0 || isLanguageConsistent(t, data.languages))) {
+          resolved.push(t);
+        }
       }
     }
 
@@ -881,8 +883,11 @@ export const buildMix = createServerFn({ method: "POST" })
 
       const pickedQueries = shuffleArray(freshReleaseQueries).slice(0, 5);
       const candidates = await runQueryBatch(pickedQueries, 10, true, !!data.refreshNonce);
+      const filtered = data.languages.length > 0
+        ? candidates.filter((t) => isLanguageConsistent(t, data.languages))
+        : candidates;
 
-      return { tracks: shuffleArray(candidates).slice(0, count), error: null };
+      return { tracks: shuffleArray(filtered).slice(0, count), error: null };
     }
 
     const key = process.env["AI_API_KEY"];
@@ -921,6 +926,7 @@ export const buildMix = createServerFn({ method: "POST" })
           for (const t of tracks) {
             if (out.length >= count) break;
             if (seen.has(t.id) || data.artists.some((a) => t.artist.toLowerCase().includes(a.toLowerCase()))) continue;
+            if (data.languages.length > 0 && !isLanguageConsistent(t, data.languages)) continue;
             seen.add(t.id);
             out.push(t);
           }

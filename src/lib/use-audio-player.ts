@@ -13,6 +13,7 @@ import {
   getSponsorBlockEnabled,
   type SponsorBlockSegment,
 } from "@/lib/sponsorblock";
+import { isLowNetworkModeEnabled } from "@/lib/network-mode";
 
 export type NextTrackInfo = {
   id: string;
@@ -84,7 +85,8 @@ export function useAudioPlayer(options: {
   equalizerSettingsRef.current = equalizerSettings;
 
   const streamUrl = useCallback((id: string, quality?: string) => {
-    const q = quality || equalizerSettingsRef.current.quality || "high";
+    const isLowNet = isLowNetworkModeEnabled();
+    const q = isLowNet ? "saver" : (quality || equalizerSettingsRef.current.quality || "high");
     return `/api/stream/${encodeURIComponent(id)}?quality=${encodeURIComponent(q)}`;
   }, []);
 
@@ -184,6 +186,7 @@ export function useAudioPlayer(options: {
   const [ready] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
@@ -206,6 +209,11 @@ export function useAudioPlayer(options: {
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef<number>(0);
+  const stalledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playViaYouTubeRef = useRef<(id: string, startAt?: number, autoPlay?: boolean) => void>(() => {});
 
   /** Calculate equal-power trigonometric curve for smooth crossfading without volume drop */
   const createEqualPowerCurve = (type: "in" | "out", length = 32): Float32Array => {
@@ -494,6 +502,79 @@ export function useAudioPlayer(options: {
     [equalizerSettings, applyEqualizerGains, streamUrl, setStream],
   );
 
+  const triggerReconnect = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    const trackId = currentTrackIdRef.current;
+    if (!trackId || !wantPlayRef.current) return;
+
+    const attempts = reconnectAttemptsRef.current;
+    if (attempts >= 4) {
+      setIsReconnecting(false);
+      const isExternalNonYt =
+        trackId.startsWith("podcast:") ||
+        trackId.startsWith("deezer:") ||
+        trackId.startsWith("audius:") ||
+        trackId.startsWith("jamendo:") ||
+        trackId.startsWith("archive:");
+      if (!isExternalNonYt) {
+        console.info(`[MelodyMap] Reconnection threshold reached. Switching to YouTube playback engine for: ${trackId}`);
+        const resumePos = lastValidPositionRef.current || 0;
+        playViaYouTubeRef.current(trackId, resumePos, true);
+        return;
+      }
+      onErrorRef.current?.("Audio connection interrupted. Tap play to retry.");
+      return;
+    }
+
+    reconnectAttemptsRef.current = attempts + 1;
+    setIsReconnecting(true);
+    setIsLoading(true);
+
+    // Exponential backoff with random jitter: ~500ms, ~1200ms, ~2500ms...
+    const baseDelay = Math.min(500 * Math.pow(1.8, attempts), 5000);
+    const jitter = Math.random() * 350;
+    const delay = Math.round(baseDelay + jitter);
+
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      if (!wantPlayRef.current || currentTrackIdRef.current !== trackId) {
+        setIsReconnecting(false);
+        return;
+      }
+
+      const audio = audioRef.current;
+      if (!audio) {
+        setIsReconnecting(false);
+        return;
+      }
+
+      const resumePos = lastValidPositionRef.current || 0;
+      pendingSeekRef.current = resumePos;
+
+      const freshUrl = `${streamUrl(trackId)}&_reconnect=${Date.now()}`;
+      audio.src = freshUrl;
+      audio.load();
+      audio.currentTime = resumePos;
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            reconnectAttemptsRef.current = 0;
+            setIsReconnecting(false);
+            setIsPlaying(true);
+            setIsLoading(false);
+          })
+          .catch((err) => {
+            console.warn("[MelodyMap] Mid-song reconnection attempt failed:", err);
+            triggerReconnect();
+          });
+      }
+    }, delay);
+  }, [streamUrl]);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -525,13 +606,44 @@ export function useAudioPlayer(options: {
       if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
         audioCtxRef.current.resume().catch(() => {});
       }
+      if (stalledTimerRef.current) {
+        clearTimeout(stalledTimerRef.current);
+        stalledTimerRef.current = null;
+      }
+      reconnectAttemptsRef.current = 0;
+      setIsReconnecting(false);
       setIsPlaying(true);
       setIsLoading(false);
       applyPendingSeek();
     };
     const onWaiting = () => {
       if (activeEngineRef.current !== "html5") return;
-      if (wantPlayRef.current) setIsLoading(true);
+      if (wantPlayRef.current) {
+        setIsLoading(true);
+        if (!stalledTimerRef.current) {
+          stalledTimerRef.current = setTimeout(() => {
+            stalledTimerRef.current = null;
+            if (wantPlayRef.current && (!audio.currentTime || audio.paused)) {
+              console.warn("[MelodyMap] Stream waiting timeout. Attempting reconnect.");
+              triggerReconnect();
+            }
+          }, 6000);
+        }
+      }
+    };
+    const onStalled = () => {
+      if (activeEngineRef.current !== "html5") return;
+      if (wantPlayRef.current && currentTrackIdRef.current) {
+        if (!stalledTimerRef.current) {
+          stalledTimerRef.current = setTimeout(() => {
+            stalledTimerRef.current = null;
+            if (wantPlayRef.current && audio.paused) {
+              console.warn("[MelodyMap] Audio stream stalled. Triggering mid-song reconnect.");
+              triggerReconnect();
+            }
+          }, 4500);
+        }
+      }
     };
     const onCanPlay = () => {
       if (activeEngineRef.current !== "html5") return;
@@ -574,7 +686,8 @@ export function useAudioPlayer(options: {
       }
 
       // Gapless Pre-buffering: when current song has <= 25s left, pre-buffer upcoming track
-      if (dur > 0 && dur - cur <= 25 && prebufferAudioRef.current) {
+      // Disabled in Low Network Mode to minimize cellular data usage
+      if (!isLowNetworkModeEnabled() && dur > 0 && dur - cur <= 25 && prebufferAudioRef.current) {
         const nextTrack = getNextTrackRef.current?.();
         if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
           prebufferedTrackIdRef.current = nextTrack.id;
@@ -633,6 +746,13 @@ export function useAudioPlayer(options: {
       ) {
         console.warn("[MelodyMap] Audio stream proxy error:", audio.error.code, audio.error.message);
 
+        // Network error (code 2 = MEDIA_ERR_NETWORK) or decode error mid-stream: trigger prompt reconnection
+        if (wantPlayRef.current && (audio.error.code === 2 || audio.error.code === 4)) {
+          console.warn("[MelodyMap] Audio network error detected, attempting mid-song stream reconnection.");
+          triggerReconnect();
+          return;
+        }
+
         // Instant Fallback to Client YouTube Player on Vercel / server proxy block
         const activeId = currentTrackIdRef.current;
         const isExternalNonYt =
@@ -646,7 +766,7 @@ export function useAudioPlayer(options: {
         if (activeId && !isExternalNonYt) {
           console.info(`[MelodyMap] Falling back to direct client YouTube streaming for track: ${activeId}`);
           const resumePos = audio.currentTime || 0;
-          playViaYouTube(activeId, resumePos, wantPlayRef.current);
+          playViaYouTubeRef.current(activeId, resumePos, wantPlayRef.current);
           return;
         }
 
@@ -657,9 +777,27 @@ export function useAudioPlayer(options: {
       }
     };
 
+    const handleOnline = () => {
+      console.info("[MelodyMap] Device reconnected to internet. Resuming active audio session.");
+      if (wantPlayRef.current && currentTrackIdRef.current) {
+        reconnectAttemptsRef.current = 0;
+        triggerReconnect();
+      }
+    };
+
+    const handleOffline = () => {
+      console.warn("[MelodyMap] Device disconnected from internet.");
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      setIsReconnecting(true);
+    };
+
     audio.addEventListener("play", onPlay);
     audio.addEventListener("playing", onPlaying);
     audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("stalled", onStalled);
     audio.addEventListener("canplay", onCanPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("timeupdate", onTime);
@@ -668,10 +806,14 @@ export function useAudioPlayer(options: {
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onError);
 
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
     return () => {
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("stalled", onStalled);
       audio.removeEventListener("canplay", onCanPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("timeupdate", onTime);
@@ -679,8 +821,20 @@ export function useAudioPlayer(options: {
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onError);
+
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (stalledTimerRef.current) {
+        clearTimeout(stalledTimerRef.current);
+        stalledTimerRef.current = null;
+      }
     };
-  }, [initWebAudio, streamUrl]);
+  }, [initWebAudio, streamUrl, triggerReconnect]);
 
   // Initialize YouTube IFrame Player API on mount
   useEffect(() => {
@@ -1210,10 +1364,13 @@ export function useAudioPlayer(options: {
     } catch {}
   }, []);
 
+  playViaYouTubeRef.current = playViaYouTube;
+
   return {
     ready,
     isPlaying,
     isLoading,
+    isReconnecting,
     position,
     duration,
     playbackSpeed,

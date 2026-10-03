@@ -20,7 +20,10 @@ import {
   Loader2,
   HardDrive,
   Activity,
+  Wifi,
 } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { isLowNetworkModeEnabled, setLowNetworkMode } from "@/lib/network-mode";
 import { ListeningInsightsPanel } from "./ListeningInsightsPanel";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -96,8 +99,10 @@ export function SettingsModal({
   onSignOut,
   onLibraryRestored,
 }: Props) {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "insights">("account");
   const [sponsorBlockOn, setSponsorBlockOn] = useState<boolean>(getSponsorBlockEnabled);
+  const [lowNetworkOn, setLowNetworkOn] = useState<boolean>(isLowNetworkModeEnabled);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -646,9 +651,7 @@ export function SettingsModal({
                     size="sm"
                     onClick={() => {
                       onOpenChange(false);
-                      if (typeof window !== "undefined") {
-                        window.location.href = "/auth";
-                      }
+                      void navigate({ to: "/auth" });
                     }}
                     className="rounded-full bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-xs font-semibold text-white shadow-lg shadow-purple-500/20 hover:brightness-110 cursor-pointer"
                   >
@@ -736,6 +739,29 @@ export function SettingsModal({
                     </p>
                   </div>
                   <Switch checked={continuous} onCheckedChange={onContinuousChange} />
+                </div>
+
+                <div className="h-px bg-white/[0.06]" />
+
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-white">Low Network Mode (Data Saver)</h3>
+                      <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-300 border border-cyan-500/30">
+                        Saver
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/40 mt-0.5">
+                      Stream in data-saver quality, optimize thumbnails, and reduce cellular data usage
+                    </p>
+                  </div>
+                  <Switch
+                    checked={lowNetworkOn}
+                    onCheckedChange={(val) => {
+                      setLowNetworkOn(val);
+                      setLowNetworkMode(val);
+                    }}
+                  />
                 </div>
 
                 <div className="h-px bg-white/[0.06]" />

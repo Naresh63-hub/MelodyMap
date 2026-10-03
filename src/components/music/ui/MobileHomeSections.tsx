@@ -1,6 +1,7 @@
 import { Clock, Flame, MoreVertical, Music2, TrendingUp, Disc3 } from "lucide-react";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
+import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 
@@ -51,7 +52,7 @@ function HorizontalScrollRow({
             <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#161616] border border-white/[0.06]">
               {track.thumbnail ? (
                 <img
-                  src={track.thumbnail}
+                  src={getOptimizedThumbnailUrl(track.thumbnail)}
                   alt=""
                   className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
                   loading="lazy"
@@ -131,7 +132,7 @@ function VerticalSongList({
               className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616] border border-white/[0.06]"
             >
               <img
-                src={track.thumbnail}
+                src={getOptimizedThumbnailUrl(track.thumbnail)}
                 alt=""
                 className="h-full w-full object-cover"
               />

@@ -21,6 +21,8 @@ import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchRe
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { sleepTimerService } from "@/lib/sleep-timer";
+import { App } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 
 // Code-split heavy modals and overlays for optimal initial load performance
 const FullScreenPlayer = lazy(() =>
@@ -76,8 +78,10 @@ import {
   isMusicTrack,
   isPodcastTrack,
   isOldEraTrack,
+  isLanguageConsistent,
   parseDurationSeconds,
   MOODS,
+  LANGUAGES,
   type Track,
 } from "@/lib/library";
 import {
@@ -470,7 +474,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       for (const h of history) {
         if (h?.id) recentIds.add(h.id);
       }
-      return filterFeedCandidates(pool, {
+      const filtered = filterFeedCandidates(pool, {
         previouslyDisplayedIds: previouslyDisplayedIdsRef.current,
         likedIds,
         recentlyPlayedIds: recentIds,
@@ -480,8 +484,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         recentlyPlayed: history,
         current: currentRef.current ?? null,
       });
+      if (settings.languages && settings.languages.length > 0) {
+        return filtered.filter((t) => isLanguageConsistent(t, settings.languages));
+      }
+      return filtered;
     },
-    [likedIds, likes, history],
+    [likedIds, likes, history, settings.languages],
   );
 
   // Record initially visible tracks into session displayed-tracks tracking on mount
@@ -1401,7 +1409,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (res.error) setMessage(res.error);
         if (res.tracks) {
           const raw = res.tracks as Track[];
-          const filtered = t === "songs" ? raw : raw.filter(isPodcastTrack);
+          let filtered = t === "songs" ? raw : raw.filter(isPodcastTrack);
+          if (t === "songs" && settings.languages && settings.languages.length > 0) {
+            const queryLower = q.toLowerCase();
+            const queryHasExplicitLang = LANGUAGES.some((l) => queryLower.includes(l.toLowerCase()));
+            if (!queryHasExplicitLang) {
+              const consistent = filtered.filter((track) => isLanguageConsistent(track, settings.languages));
+              if (consistent.length > 0) {
+                filtered = consistent;
+              }
+            }
+          }
           setResults(dedupeTracks(filtered));
           setSearchContinuation(res.continuation);
         }
@@ -1414,7 +1432,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       }
     },
-    [runSearch, searchFilter],
+    [runSearch, searchFilter, settings.languages],
   );
 
   // Automatic debounced search as user types (~450ms debounce)
@@ -1464,7 +1482,18 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       if (res.tracks && res.tracks.length > 0) {
         searchPageRef.current = nextPage;
         const raw = res.tracks as Track[];
-        setResults((prev) => dedupeTracks([...prev, ...raw]));
+        let incoming = raw;
+        if (settings.languages && settings.languages.length > 0) {
+          const queryLower = query.toLowerCase();
+          const queryHasExplicitLang = LANGUAGES.some((l) => queryLower.includes(l.toLowerCase()));
+          if (!queryHasExplicitLang) {
+            const consistent = incoming.filter((track) => isLanguageConsistent(track, settings.languages));
+            if (consistent.length > 0) {
+              incoming = consistent;
+            }
+          }
+        }
+        setResults((prev) => dedupeTracks([...prev, ...incoming]));
       }
       setSearchContinuation(res.continuation);
     } catch {
@@ -1473,7 +1502,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } finally {
       setLoadingMoreSearch(false);
     }
-  }, [searchContinuation, loadingMoreSearch, query, searchFilter, runSearch, results.length]);
+  }, [searchContinuation, loadingMoreSearch, query, searchFilter, runSearch, results.length, settings.languages]);
 
   const openArtist = useCallback(
     (artist: string) => {
@@ -1701,6 +1730,97 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
     },
   });
+
+  // Android hardware back button & in-app back navigation
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let backListenerHandle: { remove: () => void } | null = null;
+
+    if (Capacitor.isNativePlatform()) {
+      App.addListener("backButton", ({ canGoBack }) => {
+        if (showFullScreen) {
+          setShowFullScreen(false);
+          return;
+        }
+        if (showSettings) {
+          setShowSettings(false);
+          return;
+        }
+        if (showQueue) {
+          setShowQueue(false);
+          return;
+        }
+        if (showLyrics) {
+          setShowLyrics(false);
+          return;
+        }
+        if (showEqualizer) {
+          setShowEqualizer(false);
+          return;
+        }
+        if (showSleepTimer) {
+          setShowSleepTimer(false);
+          return;
+        }
+        if (showShortcuts) {
+          setShowShortcuts(false);
+          return;
+        }
+        if (showOnboarding) {
+          setShowOnboarding(false);
+          return;
+        }
+        if (optionsTrack) {
+          setOptionsTrack(null);
+          return;
+        }
+        if (shareTrack) {
+          setShareTrack(null);
+          return;
+        }
+        if (createPlaylistTrack) {
+          setCreatePlaylistTrack(null);
+          return;
+        }
+        if (drawerOpen) {
+          setDrawerOpen(false);
+          return;
+        }
+        if (tab !== "foryou") {
+          setTab("foryou");
+          return;
+        }
+        if (canGoBack) {
+          window.history.back();
+        } else {
+          void App.exitApp();
+        }
+      })
+        .then((handle) => {
+          backListenerHandle = handle;
+        })
+        .catch(() => {});
+    }
+
+    return () => {
+      backListenerHandle?.remove();
+    };
+  }, [
+    showFullScreen,
+    showSettings,
+    showQueue,
+    showLyrics,
+    showEqualizer,
+    showSleepTimer,
+    showShortcuts,
+    showOnboarding,
+    optionsTrack,
+    shareTrack,
+    createPlaylistTrack,
+    drawerOpen,
+    tab,
+  ]);
 
   const onSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -2049,6 +2169,29 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
     if (prevLanguagesRef.current !== currentLangs) {
       prevLanguagesRef.current = currentLangs;
+      // Invalidate in-memory feed pools and history trackers
+      recsRef.current = [];
+      trendingRef.current = [];
+      oldSongsRef.current = [];
+      mixTracksRef.current = { explore: [], discover: [], newrelease: [] };
+      setRecs([]);
+      setTrendingList([]);
+      setOldSongsList([]);
+      setMixTracks({ explore: [], discover: [], newrelease: [] });
+      displayedTracksRef.current = [];
+      previouslyDisplayedIdsRef.current.clear();
+
+      // Filter upcoming unplayed tracks in queue to eliminate cross-language contamination
+      if (settings.languages.length > 0) {
+        setQueue((prev) => {
+          const currentIndex = indexRef.current;
+          const played = prev.slice(0, currentIndex + 1);
+          const upcoming = prev.slice(currentIndex + 1);
+          const filteredUpcoming = upcoming.filter((t) => isLanguageConsistent(t, settings.languages));
+          return [...played, ...filteredUpcoming];
+        });
+      }
+
       void loadRecommendations();
     }
   }, [hydrated, settings.languages, loadRecommendations]);
@@ -2882,7 +3025,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onUpdateProfile={auth.updateProfile}
           onUpdatePassword={auth.updatePassword}
           onSignOut={auth.signOut}
-          onLibraryRestored={() => window.location.reload()}
+          onLibraryRestored={() => {
+            setShowSettings(false);
+            void loadRecommendations();
+          }}
         />
 
 

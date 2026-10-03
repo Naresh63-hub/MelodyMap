@@ -9,6 +9,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 
@@ -224,7 +225,7 @@ export function SearchResults({
                 className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616]"
               >
                 <img
-                  src={track.thumbnail}
+                  src={getOptimizedThumbnailUrl(track.thumbnail)}
                   alt=""
                   className="h-full w-full object-cover"
                 />

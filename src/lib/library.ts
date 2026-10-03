@@ -903,8 +903,58 @@ export function importLibraryData(jsonString: string): { success: boolean; error
 }
 
 /**
+ * Language metadata for cross-script detection and regional music industry keywords.
+ */
+const LANGUAGE_PROFILES: Record<
+  string,
+  {
+    script?: RegExp;
+    industries?: string[];
+  }
+> = {
+  telugu: {
+    script: /[\u0C00-\u0C7F]/,
+    industries: ["tollywood"],
+  },
+  tamil: {
+    script: /[\u0B80-\u0BFF]/,
+    industries: ["kollywood"],
+  },
+  hindi: {
+    script: /[\u0900-\u097F]/,
+    industries: ["bollywood"],
+  },
+  malayalam: {
+    script: /[\u0D00-\u0D7F]/,
+    industries: ["mollywood"],
+  },
+  kannada: {
+    script: /[\u0C80-\u0CFF]/,
+    industries: ["sandalwood"],
+  },
+  punjabi: {
+    script: /[\u0A00-\u0A7F]/,
+    industries: ["pollywood"],
+  },
+  bengali: {
+    script: /[\u0980-\u09FF]/,
+  },
+  korean: {
+    script: /[\uAC00-\uD7AF\u1100-\u11FF]/,
+    industries: ["kpop", "k-pop"],
+  },
+  arabic: {
+    script: /[\u0600-\u06FF]/,
+  },
+  marathi: {
+    script: /[\u0900-\u097F]/,
+  },
+};
+
+/**
  * Checks whether a track is consistent with the specified selected languages.
- * If a track explicitly advertises a different language (e.g. "(Hindi Version)" when only Telugu is selected),
+ * If a track explicitly advertises a different language (e.g. "(Hindi Version)",
+ * conflicting regional film industry, or foreign script when that language is not selected),
  * this returns false to prevent language cross-contamination.
  */
 export function isLanguageConsistent(
@@ -915,7 +965,7 @@ export function isLanguageConsistent(
 
   const selectedSet = new Set(selectedLanguages.map((l) => l.trim().toLowerCase()));
 
-  // If track has an explicit languageCode that is not among the selected languages
+  // 1. Explicit languageCode check
   if (track.languageCode) {
     const code = track.languageCode.trim().toLowerCase();
     const matchesAny = selectedLanguages.some(
@@ -926,9 +976,30 @@ export function isLanguageConsistent(
     }
   }
 
-  const text = `${track.title || ""} ${track.artist || ""}`.toLowerCase();
+  const rawTitle = track.title || "";
+  const rawArtist = track.artist || "";
+  const rawCombined = `${rawTitle} ${rawArtist}`;
+  const text = rawCombined.toLowerCase();
 
-  // Major regional language names that may appear as tags in titles/artists
+  // 2. Unicode script conflict checking
+  // If text contains characters from a script corresponding to a language that is NOT selected,
+  // reject the candidate.
+  for (const [langName, profile] of Object.entries(LANGUAGE_PROFILES)) {
+    if (profile.script && profile.script.test(rawCombined)) {
+      if (!selectedSet.has(langName)) {
+        // Special case: Hindi and Marathi share Devanagari script.
+        if (langName === "marathi" && selectedSet.has("hindi")) {
+          continue;
+        }
+        if (langName === "hindi" && selectedSet.has("marathi")) {
+          continue;
+        }
+        return false;
+      }
+    }
+  }
+
+  // 3. Known regional language names and industry conflict checking
   const allKnownLanguages = [
     "hindi",
     "telugu",
@@ -948,14 +1019,36 @@ export function isLanguageConsistent(
   const conflictingLanguages = allKnownLanguages.filter((l) => !selectedSet.has(l));
 
   for (const conflict of conflictingLanguages) {
-    // Check for explicit language tags like "(Hindi)", "[Tamil]", or phrases like "Hindi Song", "Punjabi Version"
-    const bracketPattern = new RegExp(`[\\(\\[]\\s*${conflict}\\s*[\\)\\]]`, "i");
+    // Check bracket tags: e.g. "(Hindi)", "[Tamil]", "(Hindi Version)"
+    const bracketPattern = new RegExp(`[\\(\\[][^\\)\\]]*\\b${conflict}\\b[^\\)\\]]*[\\)\\]]`, "i");
+    if (bracketPattern.test(text)) {
+      return false;
+    }
+
+    // Check delimited tags: e.g. "| Hindi |", "- Hindi -", "/ Tamil /"
+    const delimiterPattern = new RegExp(`[\\|\\-\\/\u2013\u2014]\\s*${conflict}\\s*[\\|\\-\\/\u2013\u2014]`, "i");
+    if (delimiterPattern.test(text)) {
+      return false;
+    }
+
+    // Check phrases like "Hindi Song", "Punjabi Songs", "in Hindi", "Telugu Lyrical"
     const phrasePattern = new RegExp(
-      `\\b${conflict}\\s+(song|songs|hits|version|dub|audio|video|jukebox|remix|mashup)\\b`,
+      `\\b(${conflict}\\s+(song|songs|hits|version|dub|audio|video|jukebox|remix|mashup|lyric|lyrics|lyrical|mp3|movie|cinema)|in\\s+${conflict})\\b`,
       "i",
     );
-    if (bracketPattern.test(text) || phrasePattern.test(text)) {
+    if (phrasePattern.test(text)) {
       return false;
+    }
+
+    // Check conflicting industry tags (e.g. "Bollywood" when Hindi is not selected)
+    const profile = LANGUAGE_PROFILES[conflict];
+    if (profile?.industries) {
+      for (const industry of profile.industries) {
+        const indPattern = new RegExp(`\\b${industry}\\b`, "i");
+        if (indPattern.test(text)) {
+          return false;
+        }
+      }
     }
   }
 
