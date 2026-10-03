@@ -48,18 +48,25 @@ export function getOptimizedThumbnailUrl(originalUrl: string | undefined, isLowN
   const lowNet = isLowNetwork ?? isLowNetworkModeEnabled();
   if (!lowNet) return originalUrl;
 
-  // YouTube thumbnail optimization:
-  // Replace maxresdefault, sddefault, hqdefault with mqdefault (320x180, ~8KB instead of ~150KB)
-  if (originalUrl.includes("ytimg.com") || originalUrl.includes("ggpht.com")) {
-    return originalUrl
-      .replace(/\/maxresdefault(\.jpg|\.webp)?/i, "/mqdefault.jpg")
-      .replace(/\/sddefault(\.jpg|\.webp)?/i, "/mqdefault.jpg")
-      .replace(/\/hqdefault(\.jpg|\.webp)?/i, "/mqdefault.jpg");
-  }
+  try {
+    const parsed = new URL(originalUrl);
+    const host = parsed.hostname.toLowerCase();
 
-  // Deezer / Audius thumbnail optimization
-  if (originalUrl.includes("dzcdn.net") && originalUrl.includes("1000x1000")) {
-    return originalUrl.replace("1000x1000", "250x250");
+    // YouTube thumbnail optimization:
+    // Replace maxresdefault, sddefault, hqdefault with mqdefault (320x180, ~8KB instead of ~150KB)
+    if (host === "ytimg.com" || host.endsWith(".ytimg.com") || host === "ggpht.com" || host.endsWith(".ggpht.com")) {
+      return originalUrl
+        .replace(/\/maxresdefault(\.jpg|\.webp)?/i, "/mqdefault.jpg")
+        .replace(/\/sddefault(\.jpg|\.webp)?/i, "/mqdefault.jpg")
+        .replace(/\/hqdefault(\.jpg|\.webp)?/i, "/mqdefault.jpg");
+    }
+
+    // Deezer / Audius thumbnail optimization
+    if ((host === "dzcdn.net" || host.endsWith(".dzcdn.net")) && originalUrl.includes("1000x1000")) {
+      return originalUrl.replace("1000x1000", "250x250");
+    }
+  } catch {
+    return originalUrl;
   }
 
   return originalUrl;

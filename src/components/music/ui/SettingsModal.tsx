@@ -20,7 +20,6 @@ import {
   Loader2,
   HardDrive,
   Activity,
-  Wifi,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { isLowNetworkModeEnabled, setLowNetworkMode } from "@/lib/network-mode";
