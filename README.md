@@ -304,7 +304,9 @@ apksigner verify --verbose --print-certs release\MelodyMap-v1.0.1.apk
 
 ### Verified Release Artifact
 
-- **Location**: `release/MelodyMap-v1.0.1.apk`
+- **GitHub Release Page**: [MelodyMap v1.0.1 Release](https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.1)
+- **Direct APK Download**: [Download MelodyMap-v1.0.1.apk](https://github.com/Naresh63-hub/MelodyMap/releases/download/v1.0.1/MelodyMap-v1.0.1.apk)
+- **Local Location**: `release/MelodyMap-v1.0.1.apk`
 - **File Size**: `11,094,679 bytes` (~10.58 MB)
 - **Application ID**: `com.melodymap.music`
 - **Version Code**: `2`
