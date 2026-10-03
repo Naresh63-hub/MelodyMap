@@ -34,7 +34,7 @@ export function MobileHeader({ tab = "foryou", onOpenMenu, onOpenSettings }: Pro
   };
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-[#121212]/95 backdrop-blur-xl border-b border-white/[0.06]">
+    <header className="sticky top-0 z-20 flex items-center justify-between px-4 pb-3 header-safe-top bg-[#121212]/95 backdrop-blur-xl border-b border-white/[0.06]">
       <div className="flex items-center gap-3 min-w-0">
         {onOpenMenu && (
           <button

@@ -1,5 +1,7 @@
 package com.melodymap.music;
 
+import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.webkit.WebSettings;
@@ -39,6 +41,28 @@ public class MainActivity extends BridgeActivity {
                 wakeLock.acquire();
             }
         } catch (Exception ignored) {}
+
+        startMediaPlaybackService();
+    }
+
+    public void startMediaPlaybackService() {
+        try {
+            Intent serviceIntent = new Intent(this, MediaPlaybackService.class);
+            serviceIntent.setAction(MediaPlaybackService.ACTION_START);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent);
+            } else {
+                startService(serviceIntent);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    public void stopMediaPlaybackService() {
+        try {
+            Intent serviceIntent = new Intent(this, MediaPlaybackService.class);
+            serviceIntent.setAction(MediaPlaybackService.ACTION_STOP);
+            startService(serviceIntent);
+        } catch (Exception ignored) {}
     }
 
     public void releaseAudioWakeLock() {
@@ -50,8 +74,9 @@ public class MainActivity extends BridgeActivity {
     }
 
     public void handleSleepTimerExpired() {
-        // Release wake lock when sleep timer fires so device can enter deep sleep
+        // Release wake lock and stop foreground service when sleep timer fires so device can sleep
         releaseAudioWakeLock();
+        stopMediaPlaybackService();
 
         // Dispatch stop event into WebView javascript engine on UI thread
         runOnUiThread(() -> {
@@ -80,7 +105,20 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onStop() {
+        super.onStop();
+        // Prevent WebView from freezing audio processing and JS timers when app is minimized
+        try {
+            WebView webView = getBridge().getWebView();
+            if (webView != null) {
+                webView.resumeTimers();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
     public void onDestroy() {
+        stopMediaPlaybackService();
         releaseAudioWakeLock();
         if (instance == this) {
             instance = null;

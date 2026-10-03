@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getSupabaseEnv, supabase } from "@/integrations/supabase/client";
+import { startGoogleOAuth } from "@/lib/auth-deep-link";
 
 function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -140,8 +141,23 @@ function AuthPage() {
       }
     });
 
+    const onAuthError = (event: Event) => {
+      const custom = event as CustomEvent<{ error: string }>;
+      setGoogleBusy(false);
+      setOauthLoading(false);
+      if (custom.detail?.error) {
+        setErrorNote(custom.detail.error);
+      }
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("melodymap:auth-error", onAuthError);
+    }
+
     return () => {
       authListener.subscription.unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("melodymap:auth-error", onAuthError);
+      }
     };
   }, [navigate, isConfigured, mode]);
 
@@ -417,19 +433,10 @@ function AuthPage() {
 
     setGoogleBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth`,
-          queryParams: {
-            access_type: "offline",
-            prompt: "consent",
-          },
-        },
-      });
-      if (error) {
+      const res = await startGoogleOAuth(supabase);
+      if (!res.success) {
         setGoogleBusy(false);
-        setErrorNote(error.message || "Google sign-in failed. Please try again.");
+        setErrorNote(res.error || "Google sign-in failed. Please try again.");
       }
     } catch (err: any) {
       setGoogleBusy(false);

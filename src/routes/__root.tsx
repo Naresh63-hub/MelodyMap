@@ -13,6 +13,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
+import { supabase } from "@/integrations/supabase/client";
+import { setupNativeAuthListeners } from "@/lib/auth-deep-link";
 
 function NotFoundComponent() {
   return (
@@ -142,6 +144,15 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+
+  // Set up native deep-link auth listener for Android OAuth return
+  useEffect(() => {
+    const cleanup = setupNativeAuthListeners(supabase, () => {
+      void router.navigate({ to: "/", replace: true });
+    });
+    return cleanup;
+  }, [router]);
 
   // Register the service worker for PWA / offline support, purge stale caches, and auto-update
   useEffect(() => {

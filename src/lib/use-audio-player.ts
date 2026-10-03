@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { getBlob } from "@/lib/offline";
 import {
   EQUALIZER_FREQUENCIES,
@@ -62,10 +63,15 @@ export function useAudioPlayer(options: {
   const filterNodesRef = useRef<BiquadFilterNode[]>([]);
 
   // Dual-engine playback state ("html5" or "youtube")
-  // In deployed production environments (e.g. Vercel), default directly to client-side YouTube engine
-  // for instant 0ms startup without proxy latency or serverless timeouts
+  // In deployed web production environments (e.g. Vercel), default to client-side YouTube engine
+  // for instant 0ms startup without proxy latency or serverless timeouts.
+  // CRITICAL FOR NATIVE ANDROID: Native mobile platforms MUST use "html5" engine because
+  // mobile WebViews disallow background video iframe playback, whereas <audio> elements
+  // stream seamlessly in the background and with screen locked.
+  const isNative = typeof window !== "undefined" && Capacitor.isNativePlatform();
   const activeEngineRef = useRef<"html5" | "youtube">(
-    typeof window !== "undefined" &&
+    !isNative &&
+      typeof window !== "undefined" &&
       window.location.hostname !== "localhost" &&
       window.location.hostname !== "127.0.0.1"
       ? "youtube"
@@ -519,7 +525,7 @@ export function useAudioPlayer(options: {
         trackId.startsWith("audius:") ||
         trackId.startsWith("jamendo:") ||
         trackId.startsWith("archive:");
-      if (!isExternalNonYt) {
+      if (!isExternalNonYt && !Capacitor.isNativePlatform()) {
         console.info(`[MelodyMap] Reconnection threshold reached. Switching to YouTube playback engine for: ${trackId}`);
         const resumePos = lastValidPositionRef.current || 0;
         playViaYouTubeRef.current(trackId, resumePos, true);
@@ -763,7 +769,7 @@ export function useAudioPlayer(options: {
             activeId!.startsWith("jamendo:") ||
             activeId!.startsWith("archive:"));
 
-        if (activeId && !isExternalNonYt) {
+        if (activeId && !isExternalNonYt && !Capacitor.isNativePlatform()) {
           console.info(`[MelodyMap] Falling back to direct client YouTube streaming for track: ${activeId}`);
           const resumePos = audio.currentTime || 0;
           playViaYouTubeRef.current(activeId, resumePos, wantPlayRef.current);

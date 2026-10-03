@@ -25,6 +25,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Supabase OAuth Deep Link Callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="com.melodymap.music"
+                    android:host="auth"
+                    android:pathPrefix="/callback" />
+                <data
+                    android:scheme="com.melodymap.music"
+                    android:host="auth" />
+                <data
+                    android:scheme="com.melodymap.music"
+                    android:host="auth-callback" />
+            </intent-filter>
+
         </activity>
 
         <provider
@@ -44,6 +61,10 @@
                 <action android:name="com.melodymap.music.SLEEP_TIMER_EXPIRED" />
             </intent-filter>
         </receiver>
+        <service
+            android:name=".MediaPlaybackService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
@@ -52,5 +73,6 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 </manifest>

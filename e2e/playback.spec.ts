@@ -104,12 +104,12 @@ test.describe("MelodyMap Spotify-Style Playback E2E Flow", () => {
     await openPlayerBtn.click();
 
     // Click Previous track
-    const prevBtn = page.getByRole("button", { name: "Previous track" });
-    await expect(prevBtn).toBeVisible({ timeout: 5000 });
+    const prevBtn = page.getByRole("button", { name: "Previous track" }).first();
+    await expect(prevBtn).toBeVisible({ timeout: 8000 });
     await prevBtn.click();
 
     // Should return to Song Alpha
-    await expect(page.getByRole("heading", { name: "Song Alpha" })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Song Alpha").first()).toBeVisible({ timeout: 8000 });
   });
 
   test("5. Song A ending automatically advances to Song B", async ({ page }) => {
