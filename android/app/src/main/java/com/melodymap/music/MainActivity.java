@@ -27,6 +27,10 @@ public class MainActivity extends BridgeActivity {
             if (webView != null) {
                 WebSettings settings = webView.getSettings();
                 settings.setMediaPlaybackRequiresUserGesture(false);
+                String currentUa = settings.getUserAgentString();
+                if (currentUa != null && !currentUa.contains("MelodyMapApp")) {
+                    settings.setUserAgentString(currentUa + " MelodyMapApp");
+                }
 
                 // Register SleepTimer JavaScript interface bridge
                 webView.addJavascriptInterface(new SleepTimerBridge(this), "AndroidSleepTimer");
@@ -114,6 +118,32 @@ public class MainActivity extends BridgeActivity {
                 webView.resumeTimers();
             }
         } catch (Exception ignored) {}
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleDeepLink(intent);
+    }
+
+    private void handleDeepLink(Intent intent) {
+        if (intent != null && intent.getData() != null) {
+            String url = intent.getData().toString();
+            if (url.startsWith("com.melodymap.music") || url.contains("callback")) {
+                runOnUiThread(() -> {
+                    try {
+                        WebView webView = getBridge().getWebView();
+                        if (webView != null) {
+                            webView.evaluateJavascript(
+                                "if (window.__melodymap_handle_auth_callback) { window.__melodymap_handle_auth_callback('" + url.replace("'", "\\'") + "'); }",
+                                null
+                            );
+                        }
+                    } catch (Exception ignored) {}
+                });
+            }
+        }
     }
 
     @Override

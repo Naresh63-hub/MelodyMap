@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getSupabaseEnv, supabase } from "@/integrations/supabase/client";
-import { startGoogleOAuth } from "@/lib/auth-deep-link";
+import { isNativeApp, startGoogleOAuth } from "@/lib/auth-deep-link";
 
 function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -108,6 +108,22 @@ function AuthPage() {
       setSuccessNote("Password recovery link verified. Enter your new password below.");
     }
 
+    const isNative = isNativeApp();
+    const isMobileBrowser = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const hasAuthParams = typeof window !== "undefined" && (
+      window.location.search.includes("code=") ||
+      window.location.hash.includes("access_token=") ||
+      window.location.search.includes("native_return")
+    );
+    const isReturningToApp = !isNative && isMobileBrowser && hasAuthParams;
+
+    if (isReturningToApp && typeof window !== "undefined") {
+      const returnDeepLink = `com.melodymap.music://auth/callback${window.location.search}${window.location.hash}`;
+      try {
+        window.location.href = returnDeepLink;
+      } catch {}
+    }
+
     // Listen for auth state change (Google OAuth exchange, email confirmation, recovery, etc.)
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY" || isRecoveryUrl()) {
@@ -121,7 +137,9 @@ function AuthPage() {
         if (typeof window !== "undefined") {
           localStorage.removeItem("melodymap.guest_mode");
         }
-        void navigate({ to: "/", replace: true });
+        if (!isReturningToApp) {
+          void navigate({ to: "/", replace: true });
+        }
       }
     });
 
@@ -137,7 +155,9 @@ function AuthPage() {
         if (typeof window !== "undefined") {
           localStorage.removeItem("melodymap.guest_mode");
         }
-        void navigate({ to: "/", replace: true });
+        if (!isReturningToApp) {
+          void navigate({ to: "/", replace: true });
+        }
       }
     });
 
@@ -443,6 +463,45 @@ function AuthPage() {
       setErrorNote(err?.message || "Could not initiate Google authentication.");
     }
   };
+
+  const isNative = isNativeApp();
+  const isMobileBrowser = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const hasAuthParams = typeof window !== "undefined" && (
+    window.location.search.includes("code=") ||
+    window.location.hash.includes("access_token=") ||
+    window.location.search.includes("native_return")
+  );
+  const isReturningToApp = !isNative && isMobileBrowser && hasAuthParams;
+
+  if (isReturningToApp) {
+    const returnDeepLink = `com.melodymap.music://auth/callback${typeof window !== "undefined" ? window.location.search + window.location.hash : ""}`;
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-8 text-foreground text-center">
+        <div className="flex flex-col items-center gap-5 max-w-sm w-full bg-[#121212] p-8 rounded-3xl border border-white/10 shadow-2xl animate-fade-in">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl p-0.5 shadow-xl bg-[#1DB954]/20 text-[#1DB954]">
+            <CheckCircle2 className="h-9 w-9 text-[#1DB954]" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-white mb-1">Authenticated!</h2>
+            <p className="text-xs text-neutral-400">Opening the MelodyMap app...</p>
+          </div>
+          <a
+            href={returnDeepLink}
+            className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-full bg-[#1DB954] text-black font-bold text-sm hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[#1DB954]/20"
+          >
+            Open MelodyMap App
+          </a>
+          <button
+            type="button"
+            onClick={() => void navigate({ to: "/", replace: true })}
+            className="text-xs text-neutral-500 hover:text-neutral-400 underline pt-2"
+          >
+            Continue in browser instead
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (oauthLoading) {
     return (

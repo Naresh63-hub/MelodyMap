@@ -41,6 +41,12 @@
                     android:scheme="com.melodymap.music"
                     android:host="auth-callback" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.melodymap.music" />
+            </intent-filter>
 
         </activity>
 

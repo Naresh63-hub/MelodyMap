@@ -8,12 +8,27 @@ import { App } from "@capacitor/app";
 export const NATIVE_AUTH_CALLBACK_URL = "com.melodymap.music://auth/callback";
 
 /**
+ * Checks if the current execution context is within the MelodyMap native mobile app.
+ */
+export function isNativeApp(): boolean {
+  if (typeof window === "undefined") return false;
+  if (Capacitor.isNativePlatform()) return true;
+  if (Boolean((window as any).androidBridge)) return true;
+  if (Boolean((window as any).Capacitor?.isNativePlatform?.())) return true;
+  const ua = navigator.userAgent || "";
+  if (ua.includes("MelodyMapApp")) return true;
+  return false;
+}
+
+/**
  * Returns the appropriate OAuth redirect URL:
- * - Native Android/iOS: Custom scheme deep link "com.melodymap.music://auth/callback"
- * - Web (Vercel / Localhost): Web origin URL (e.g. "https://melodymap-pi.vercel.app/auth")
+ * - Native Android: "https://melodymap-pi.vercel.app/auth?native_return=1"
+ *   Guaranteed to be accepted by Supabase as it matches the primary Site URL.
+ *   The auth page automatically transfers the credentials to "com.melodymap.music://auth/callback".
+ * - Web: Web origin URL (e.g. "https://melodymap-pi.vercel.app/auth")
  */
 export function getOAuthRedirectUrl(): string {
-  if (Capacitor.isNativePlatform()) {
+  if (Capacitor.isNativePlatform() || isNativeApp()) {
     return NATIVE_AUTH_CALLBACK_URL;
   }
   if (typeof window !== "undefined") {
@@ -222,6 +237,19 @@ export function setupNativeAuthListeners(
   supabaseClient: any,
   onNavigateHome: () => void,
 ): () => void {
+  if (typeof window !== "undefined") {
+    (window as any).__melodymap_handle_auth_callback = (url: string) => {
+      if (isAuthCallbackUrl(url)) {
+        console.info("[AuthDeepLink] Direct Android bridge callback received:", url);
+        void handleAuthCallback(url, supabaseClient, {
+          onSuccess: () => {
+            onNavigateHome();
+          },
+        });
+      }
+    };
+  }
+
   if (!Capacitor.isNativePlatform()) {
     return () => {};
   }
