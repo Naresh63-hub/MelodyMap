@@ -147,6 +147,30 @@ export function useAudioPlayer(options: {
     // Attach hidden YouTube iframe placeholder offscreen with real dimensions
     // Modern browsers throttle video decoders when dimensions are <= 4px or opacity is near zero.
     // Placing it at -9999px with standard dimensions ensures uninterrupted playback during tab transitions.
+    // Prevent YouTube iframe from pausing when device screen is turned off or app is minimized
+    try {
+      if (typeof document !== "undefined") {
+        Object.defineProperty(document, "visibilityState", {
+          get: () => "visible",
+          configurable: true,
+        });
+        Object.defineProperty(document, "hidden", {
+          get: () => false,
+          configurable: true,
+        });
+      }
+    } catch {}
+
+    const stopVisibility = (e: Event) => {
+      e.stopImmediatePropagation();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("visibilitychange", stopVisibility, true);
+    }
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", stopVisibility, true);
+    }
+
     if (!document.getElementById("melodymap-yt-wrapper")) {
       const holder = document.createElement("div");
       holder.id = "melodymap-yt-wrapper";
@@ -893,18 +917,21 @@ export function useAudioPlayer(options: {
                 } catch {}
               } else if (event.data === 2) {
                 // 2 = Paused
-                if (!isSeekingRef.current && !wantPlayRef.current) {
-                  setIsPlaying(false);
-                  setIsLoading(false);
-                } else if (!isSeekingRef.current && wantPlayRef.current) {
+                if (wantPlayRef.current && !isSeekingRef.current) {
                   // Screen locked / app backgrounded: immediately resume playback!
+                  try {
+                    event.target.playVideo();
+                  } catch {}
                   setTimeout(() => {
                     if (wantPlayRef.current && ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === "function") {
                       try {
                         ytPlayerRef.current.playVideo();
                       } catch {}
                     }
-                  }, 60);
+                  }, 40);
+                } else {
+                  setIsPlaying(false);
+                  setIsLoading(false);
                 }
               } else if (event.data === 3) {
                 // 3 = Buffering

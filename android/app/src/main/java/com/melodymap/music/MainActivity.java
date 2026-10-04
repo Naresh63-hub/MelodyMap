@@ -51,6 +51,15 @@ public class MainActivity extends BridgeActivity {
             }
         } catch (Exception ignored) {}
 
+        // Request POST_NOTIFICATIONS runtime permission on Android 13+ (API 33+) for foreground media notification
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1002);
+                }
+            }
+        } catch (Exception ignored) {}
+
         startMediaPlaybackService();
     }
 
@@ -108,6 +117,7 @@ public class MainActivity extends BridgeActivity {
         try {
             WebView webView = getBridge().getWebView();
             if (webView != null) {
+                webView.onResume();
                 webView.resumeTimers();
             }
         } catch (Exception ignored) {}
@@ -120,6 +130,7 @@ public class MainActivity extends BridgeActivity {
         try {
             WebView webView = getBridge().getWebView();
             if (webView != null) {
+                webView.onResume();
                 webView.resumeTimers();
             }
         } catch (Exception ignored) {}

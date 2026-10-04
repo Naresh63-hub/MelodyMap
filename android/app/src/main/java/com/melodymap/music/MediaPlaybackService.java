@@ -12,13 +12,16 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
+import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.media.app.NotificationCompat.MediaStyle;
 
 /**
  * Foreground Service for continuous background audio playback on Android.
- * Keeps CPU and network streaming alive with PARTIAL_WAKE_LOCK and WifiLock
- * when the app is in the background or the screen is turned off.
+ * Keeps CPU and network streaming alive with PARTIAL_WAKE_LOCK, WifiLock,
+ * and an active MediaSessionCompat to guarantee high-priority playback status on Android 13/14+.
  */
 public class MediaPlaybackService extends Service {
     public static final String ACTION_START = "com.melodymap.music.action.START";
@@ -28,6 +31,7 @@ public class MediaPlaybackService extends Service {
 
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
+    private MediaSessionCompat mediaSession;
     private static boolean isRunning = false;
 
     public static boolean isServiceRunning() {
@@ -39,6 +43,20 @@ public class MediaPlaybackService extends Service {
         super.onCreate();
         createNotificationChannel();
         acquireLocks();
+        initMediaSession();
+    }
+
+    private void initMediaSession() {
+        try {
+            mediaSession = new MediaSessionCompat(this, "MelodyMapMediaSession");
+            PlaybackStateCompat state = new PlaybackStateCompat.Builder()
+                .setActions(PlaybackStateCompat.ACTION_PLAY | PlaybackStateCompat.ACTION_PAUSE |
+                            PlaybackStateCompat.ACTION_SKIP_TO_NEXT | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS)
+                .setState(PlaybackStateCompat.STATE_PLAYING, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+                .build();
+            mediaSession.setPlaybackState(state);
+            mediaSession.setActive(true);
+        } catch (Exception ignored) {}
     }
 
     @Override
@@ -80,15 +98,20 @@ public class MediaPlaybackService extends Service {
         }
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, launchIntent, pendingIntentFlags);
 
-        Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("MelodyMap")
-            .setContentText("Playing in background")
+            .setContentText("Playing music")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build();
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+
+        if (mediaSession != null) {
+            builder.setStyle(new MediaStyle().setMediaSession(mediaSession.getSessionToken()));
+        }
+
+        Notification notification = builder.build();
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
@@ -136,6 +159,13 @@ public class MediaPlaybackService extends Service {
     private void stopForegroundService() {
         isRunning = false;
         releaseLocks();
+        if (mediaSession != null) {
+            try {
+                mediaSession.setActive(false);
+                mediaSession.release();
+            } catch (Exception ignored) {}
+            mediaSession = null;
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE);
         } else {
