@@ -304,16 +304,16 @@ export function AuthModal({
           }
 
           if (data.user) {
+            const meta = data.user.user_metadata as Record<string, any> | undefined;
             const userName =
-              data.user.user_metadata?.display_name ||
-              data.user.user_metadata?.name ||
+              (meta && (meta["display_name"] || meta["name"])) ||
               trimmedEmail.split("@")[0] ||
               "Listener";
             saveLocalUser({
               id: data.user.id,
               name: userName,
               email: trimmedEmail,
-              avatar_url: data.user.user_metadata?.avatar_url,
+              avatar_url: meta ? meta["avatar_url"] : null,
             });
             setSuccessMsg(`Signed in! Welcome back, ${userName}.`);
             setTimeout(() => {

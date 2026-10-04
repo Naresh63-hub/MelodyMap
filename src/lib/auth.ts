@@ -234,7 +234,7 @@ export function useAuth() {
   return { ready, userId, email, profile, updateProfile, updatePassword, signOut };
 }
 
-export function saveLocalUser(user: { id?: string; name: string; email?: string | null; avatar_url?: string | null }) {
+export function saveLocalUser(user: { id?: string | undefined; name: string; email?: string | null | undefined; avatar_url?: string | null | undefined }) {
   if (typeof window === "undefined") return;
   const id = user.id || "user-" + (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now());
   localStorage.setItem(

@@ -417,7 +417,7 @@ export function useLibrary(userId?: string | null) {
         if (data?.data) {
           const doc = data.data as Partial<LibraryDoc>;
           setLikes((prev) => {
-            const next = mergeById((doc.likes ?? []).filter(isMusicTrack), prev, 200);
+            const next = mergeById((doc.likes ?? []).filter((t) => isMusicTrack(t, true, true)), prev, 200);
             write(LIKES_KEY, next);
             return next;
           });
@@ -427,7 +427,7 @@ export function useLibrary(userId?: string | null) {
             return next;
           });
           setHistory((prev) => {
-            const next = mergeById(prev, (doc.history ?? []).filter(isMusicTrack), 200);
+            const next = mergeById(prev, (doc.history ?? []).filter((t) => isMusicTrack(t, true, true)), 200);
             write(HISTORY_KEY, next);
             return next;
           });

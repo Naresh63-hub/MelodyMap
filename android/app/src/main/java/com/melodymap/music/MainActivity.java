@@ -31,6 +31,13 @@ public class MainActivity extends BridgeActivity {
             if (webView != null) {
                 WebSettings settings = webView.getSettings();
                 settings.setMediaPlaybackRequiresUserGesture(false);
+
+                // Native app feel: disable browser-style pinch/zoom controls.
+                // The layout already fits the viewport; zooming only breaks it.
+                settings.setSupportZoom(false);
+                settings.setBuiltInZoomControls(false);
+                settings.setDisplayZoomControls(false);
+
                 String currentUa = settings.getUserAgentString();
                 if (currentUa != null && !currentUa.contains("MelodyMapApp")) {
                     settings.setUserAgentString(currentUa + " MelodyMapApp");

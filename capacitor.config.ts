@@ -13,6 +13,10 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: isDev,
     backgroundColor: '#0a0a0f',
+    // targetSdk 36 → Android 15+ enforces edge-to-edge: the WebView draws
+    // under the status/navigation bars. 'auto' adjusts WebView margins at
+    // runtime (API 35+ only) so content sits between the system bars.
+    adjustMarginsForEdgeToEdge: 'auto',
   },
 };
 

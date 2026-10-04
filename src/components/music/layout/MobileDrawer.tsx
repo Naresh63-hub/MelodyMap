@@ -23,11 +23,11 @@ type Props = {
   onNavigate: (tab: NavTab) => void;
   onOpenSettings: () => void;
   isSynced: boolean;
-  userName?: string;
-  userInitial?: string;
-  userAvatar?: string | null;
-  onSignIn?: () => void;
-  onSignOut?: () => Promise<void> | void;
+  userName?: string | undefined;
+  userInitial?: string | undefined;
+  userAvatar?: string | null | undefined;
+  onSignIn?: (() => void) | undefined;
+  onSignOut?: (() => Promise<void> | void) | undefined;
 };
 
 export function MobileDrawer({
