@@ -11,8 +11,8 @@
   </p>
 
   <p>
-    <a href="https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.1">
-      <img src="https://img.shields.io/badge/Release-v1.0.1-1DB954?style=flat-square&logo=android" alt="Release v1.0.1" />
+    <a href="https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.2">
+      <img src="https://img.shields.io/badge/Release-v1.0.2-1DB954?style=flat-square&logo=android" alt="Release v1.0.2" />
     </a>
     <img src="https://img.shields.io/badge/CI-Passing-brightgreen?style=flat-square&logo=githubactions" alt="CI Passing" />
     <img src="https://img.shields.io/badge/Unit_Tests-218_Passed-brightgreen?style=flat-square&logo=vitest" alt="Vitest 218 Passed" />
@@ -304,15 +304,16 @@ apksigner verify --verbose --print-certs release\MelodyMap-v1.0.1.apk
 
 ### Verified Release Artifact
 
-- **GitHub Release Page**: [MelodyMap v1.0.1 Release](https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.1)
-- **Direct APK Download**: [Download MelodyMap-v1.0.1.apk](https://github.com/Naresh63-hub/MelodyMap/releases/download/v1.0.1/MelodyMap-v1.0.1.apk)
-- **Local Location**: `release/MelodyMap-v1.0.1.apk`
-- **File Size**: `11,094,679 bytes` (~10.58 MB)
+- **GitHub Release Page**: [MelodyMap v1.0.2 Release](https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.2)
+- **Direct APK Download**: [Download MelodyMap-v1.0.2.apk](https://github.com/Naresh63-hub/MelodyMap/releases/download/v1.0.2/MelodyMap-v1.0.2.apk)
+- **Local Location**: `release/MelodyMap-v1.0.2.apk`
+- **File Size**: `11,122,194 bytes` (~10.61 MB)
 - **Application ID**: `com.melodymap.music`
-- **Version Code**: `2`
-- **Version Name**: `1.0.1`
+- **Version Code**: `3`
+- **Version Name**: `1.0.2`
 - **Target SDK**: `36` (Android 16) | **Min SDK**: `24` (Android 7.0 Nougat+)
 - **Signature Scheme**: APK Signature Scheme v2 (Verified)
+- **SHA-256**: `BED88686F00C43C6A865D4A0B0D7E0FADCC802D2E7F74CB7A3A37448D6F20351`
 - **Certificate Digest (SHA-256)**: `1e16d14e27191bba677c29b39b4f7772152547a795841aa74cd06613f54bb085`
 
 ---
