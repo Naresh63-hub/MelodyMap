@@ -416,5 +416,63 @@ describe("Spotify-style Single-Track Playback and Queue Architecture", () => {
       expect(isMusicTrack({ title: "Long Mix", artist: "DJ", duration: "15:00" })).toBe(false);
       expect(isMusicTrack({ title: "Unknown Length Song", artist: "X", duration: "" })).toBe(false);
     });
+
+    it("Q. stops double-load race when a track ends: autoAdvanced flag bypasses redundant load and seek", () => {
+      let loadCount = 0;
+      let seekCount = 0;
+
+      const mockLoad = (id: string) => {
+        loadCount++;
+      };
+      const mockSeek = (pos: number) => {
+        seekCount++;
+      };
+
+      const handleEnded = (autoAdvanced = false) => {
+        if (!autoAdvanced) {
+          mockSeek(0);
+          mockLoad(trackB.id);
+        }
+      };
+
+      // When gapless auto-advance handled it synchronously:
+      handleEnded(true);
+      expect(loadCount).toBe(0);
+      expect(seekCount).toBe(0);
+
+      // When gapless auto-advance did NOT handle it (e.g. YouTube engine or manual track change):
+      handleEnded(false);
+      expect(loadCount).toBe(1);
+      expect(seekCount).toBe(1);
+    });
+
+    it("R. guards load() against restarting audio if stream is already actively playing at 0:00", () => {
+      let currentTrackId = trackB.id;
+      let isPlaying = true;
+      let startAt = 0;
+      let restartAttempted = false;
+
+      const executeLoad = (id: string, requestedStart: number) => {
+        // Guard matching use-audio-player
+        if (currentTrackId === id && requestedStart === 0 && isPlaying) {
+          return false; // suppressed redundant restart
+        }
+        currentTrackId = id;
+        startAt = requestedStart;
+        restartAttempted = true;
+        return true;
+      };
+
+      // Calling load with the already playing track at 0 should be suppressed
+      const result = executeLoad(trackB.id, 0);
+      expect(result).toBe(false);
+      expect(restartAttempted).toBe(false);
+
+      // Calling load with a new track or non-zero seek position should proceed
+      const resultNew = executeLoad("yt_track_3", 0);
+      expect(resultNew).toBe(true);
+      expect(restartAttempted).toBe(true);
+    });
   });
 });
+

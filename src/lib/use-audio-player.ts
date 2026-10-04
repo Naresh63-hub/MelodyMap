@@ -48,7 +48,7 @@ const SILENT_AUDIO_URI =
  * with client-side YouTube IFrame fallback for zero-failure playback across all hosts (including Vercel).
  */
 export function useAudioPlayer(options: {
-  onEnded: () => void;
+  onEnded: (autoAdvanced?: boolean) => void;
   onError?: (message: string) => void;
   getNextTrack?: () => NextTrackInfo | undefined;
   onSponsorBlockSkipped?: (category: string) => void;
@@ -727,9 +727,7 @@ export function useAudioPlayer(options: {
 
       // Synchronously grab next track BEFORE index is mutated in endedRef callback
       const nextTrack = getNextTrackRef.current?.();
-
-      // Notify parent component
-      endedRef.current();
+      let didAutoAdvance = false;
 
       // Synchronous background advance for continuous playback with screen locked
       if (nextTrack && wantPlayRef.current) {
@@ -748,7 +746,11 @@ export function useAudioPlayer(options: {
             console.warn("[BackgroundPlayback] Synchronous next auto-play notice:", err);
           });
         }
+        didAutoAdvance = true;
       }
+
+      // Notify parent component with autoAdvance status so it doesn't trigger a duplicate load race
+      endedRef.current(didAutoAdvance);
     };
 
     const onError = () => {
@@ -937,7 +939,7 @@ export function useAudioPlayer(options: {
                 isSeekingRef.current = false;
                 setIsPlaying(false);
                 setIsLoading(false);
-                endedRef.current();
+                endedRef.current(false);
               }
             },
             onError: (event: any) => {
@@ -1208,7 +1210,10 @@ export function useAudioPlayer(options: {
       if (
         currentTrackIdRef.current === id &&
         startAt === 0 &&
-        ((activeEngineRef.current === "html5" && audio && audio.src === expectedUrl && (!audio.paused || audio.readyState >= 2)) ||
+        ((activeEngineRef.current === "html5" &&
+          audio &&
+          (audio.src === expectedUrl || audio.src.includes(encodeURIComponent(id))) &&
+          (!audio.paused || audio.readyState >= 1)) ||
          (activeEngineRef.current === "youtube" && isPlaying))
       ) {
         return;

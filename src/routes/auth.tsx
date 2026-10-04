@@ -23,7 +23,7 @@ import {
   signInWithNativeGoogle,
 } from "@/lib/native-google-auth";
 
-function formatAuthError(msg: string): string {
+export function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
   if (lower.includes("invalid login credentials") || lower.includes("invalid_grant")) {
     return "Incorrect email or password. Please check your details and try again.";
@@ -39,6 +39,12 @@ function formatAuthError(msg: string): string {
   }
   if (lower.includes("rate limit") || lower.includes("too many requests")) {
     return "Too many attempts. Please wait a moment and try again.";
+  }
+  if (lower.includes("failed to fetch") || lower.includes("network") || lower.includes("connection")) {
+    return "Network connection issue. Please check your internet connection or continue as guest.";
+  }
+  if (lower.includes("not configured") || lower.includes("missing supabase")) {
+    return "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.";
   }
   return msg;
 }
@@ -211,27 +217,10 @@ function AuthPage() {
     setSuccessNote(null);
 
     if (!isConfigured) {
-      if (mode === "reset_password" || mode === "forgot") {
-        setBusy(false);
-        setErrorNote("Password reset requires a cloud account. You can sign in directly or continue as guest.");
-        return;
-      }
-
-      // Free flow of login: immediately log in locally
-      const displayName = name.trim() || email.split("@")[0] || "Listener";
-      if (typeof window !== "undefined") {
-        localStorage.setItem("melodymap.guest_mode", "true");
-        localStorage.setItem(
-          "melodymap.local_user",
-          JSON.stringify({
-            id: "local-" + crypto.randomUUID(),
-            name: displayName,
-            email: email.trim(),
-          }),
-        );
-      }
       setBusy(false);
-      void navigate({ to: "/", replace: true });
+      setErrorNote(
+        "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest."
+      );
       return;
     }
 

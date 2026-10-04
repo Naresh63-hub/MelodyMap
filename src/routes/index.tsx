@@ -648,7 +648,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
       return undefined;
     },
-    onEnded: () => {
+    onEnded: (autoAdvanced = false) => {
       if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
         player.pause();
         return;
@@ -694,8 +694,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           });
           thompsonSamplingPolicy.recordFeedback(replayEv, ctx);
         }
-        player.seek(0);
-        player.play();
+        if (!autoAdvanced) {
+          player.seek(0);
+          player.play();
+        }
         return;
       }
 
@@ -709,10 +711,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setIndex(nextIdx);
         const nextTrack = q[nextIdx];
         if (nextTrack) {
-          player.seek(0);
           progressTrackerRef.current.reset(nextTrack.id);
           loadedTrackIdRef.current = nextTrack.id;
-          void load(nextTrack.id, nextTrack.previewUrl, 0);
+          if (!autoAdvanced) {
+            player.seek(0);
+            void load(nextTrack.id, nextTrack.previewUrl, 0);
+          }
         }
         // Proactively extend upcoming songs before reaching the end
         if (continuousRef.current && nextIdx + 3 >= q.length) {
@@ -731,7 +735,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 if (targetIdx !== -1) {
                   indexRef.current = targetIdx;
                   setIndex(targetIdx);
-                  player.seek(0);
                   progressTrackerRef.current.reset(firstTrack.id);
                   loadedTrackIdRef.current = firstTrack.id;
                   void load(firstTrack.id, firstTrack.previewUrl, 0);
