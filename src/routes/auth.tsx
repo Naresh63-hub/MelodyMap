@@ -178,7 +178,18 @@ function AuthPage() {
       window.addEventListener("melodymap:auth-error", onAuthError);
     }
 
+    const watchdogTimer = setTimeout(() => {
+      setOauthLoading((current) => {
+        if (current) {
+          setErrorNote("Sign-in verification timed out or code expired. Please try signing in again.");
+          return false;
+        }
+        return false;
+      });
+    }, 6000);
+
     return () => {
+      clearTimeout(watchdogTimer);
       authListener.subscription.unsubscribe();
       if (typeof window !== "undefined") {
         window.removeEventListener("melodymap:auth-error", onAuthError);
@@ -330,19 +341,7 @@ function AuthPage() {
           }
 
           if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("connection")) {
-            const displayName = name.trim() || email.split("@")[0] || "Listener";
-            if (typeof window !== "undefined") {
-              localStorage.removeItem("melodymap.guest_mode");
-              localStorage.setItem(
-                "melodymap.local_user",
-                JSON.stringify({
-                  id: "local-" + crypto.randomUUID(),
-                  name: displayName,
-                  email: email.trim(),
-                }),
-              );
-            }
-            void navigate({ to: "/", replace: true });
+            setErrorNote("Network connection issue. Please check your internet connection or continue as guest.");
             return;
           }
 
@@ -489,21 +488,9 @@ function AuthPage() {
       }
 
       void navigate({ to: "/", replace: true });
-    } catch {
+    } catch (err: any) {
       setBusy(false);
-      const displayName = email.split("@")[0] || "Listener";
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("melodymap.guest_mode");
-        localStorage.setItem(
-          "melodymap.local_user",
-          JSON.stringify({
-            id: "local-" + crypto.randomUUID(),
-            name: displayName,
-            email: email.trim(),
-          }),
-        );
-      }
-      void navigate({ to: "/", replace: true });
+      setErrorNote(err?.message || "Sign-in failed. Please verify your credentials or continue as guest.");
     }
   };
 
@@ -513,7 +500,6 @@ function AuthPage() {
     setGoogleBusy(true);
 
     if (isNativeApp()) {
-      // In native Android app: instant 1-tap sign-in without opening Chrome or showing developer errors!
       const clientId = getGoogleWebClientId();
       if (clientId && isNativeGoogleAuthSupported()) {
         try {
@@ -523,40 +509,18 @@ function AuthPage() {
             void navigate({ to: "/", replace: true });
             return;
           }
-        } catch {}
-      }
-
-      // Clean account initialization in native Android app
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("melodymap.guest_mode");
-        const existingRaw = localStorage.getItem("melodymap.local_user");
-        let currentName = "Listener";
-        if (existingRaw) {
-          try {
-            const p = JSON.parse(existingRaw);
-            if (p?.name && p.name !== "Google Listener") currentName = p.name;
-          } catch {}
+        } catch (err) {
+          console.warn("[Auth] Native Google Sign-In failed, falling back to browser OAuth:", err);
         }
-        localStorage.setItem(
-          "melodymap.local_user",
-          JSON.stringify({
-            id: "user-" + (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now()),
-            name: currentName,
-            email: currentName !== "Listener" ? `${currentName.toLowerCase().replace(/\s+/g, "")}@melodymap.app` : null,
-          }),
-        );
       }
-      setGoogleBusy(false);
-      void navigate({ to: "/", replace: true });
-      return;
     }
 
-    // Standard web browser OAuth redirect
+    // Standard OAuth redirect flow
     try {
       const res = await startGoogleOAuth(supabase);
       if (!res.success) {
         setGoogleBusy(false);
-        setErrorNote(res.error || "Google sign-in failed. Please try again.");
+        setErrorNote(res.error || "Google sign-in failed. Please try again or sign in with email.");
       }
     } catch (err: any) {
       setGoogleBusy(false);

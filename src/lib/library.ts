@@ -366,9 +366,9 @@ export function useLibrary(userId?: string | null) {
   const pullingRef = useRef(false);
 
   useEffect(() => {
-    // 1. Sanitize likes: keep only pure music tracks
+    // 1. Sanitize likes: keep only pure music tracks without deleting unformatted tracks
     const rawLikes = read<Track[]>(LIKES_KEY, []);
-    const musicLikes = rawLikes.filter(isMusicTrack);
+    const musicLikes = rawLikes.filter((t) => isMusicTrack(t, true, true));
     setLikes(musicLikes);
     if (musicLikes.length !== rawLikes.length) {
       write(LIKES_KEY, musicLikes);
@@ -378,7 +378,7 @@ export function useLibrary(userId?: string | null) {
 
     // 2. Sanitize history: split into music vs podcast history
     const rawHistory = read<Track[]>(HISTORY_KEY, []);
-    const musicHistory = rawHistory.filter(isMusicTrack);
+    const musicHistory = rawHistory.filter((t) => isMusicTrack(t, true, true));
     const extractedPodcasts = rawHistory.filter(isPodcastTrack);
 
     const rawPodcastHistory = read<Track[]>(PODCAST_HISTORY_KEY, []);

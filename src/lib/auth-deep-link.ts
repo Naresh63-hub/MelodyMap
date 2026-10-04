@@ -13,8 +13,8 @@ export const NATIVE_AUTH_CALLBACK_URL = "com.melodymap.music://auth/callback";
 export function isNativeApp(): boolean {
   if (typeof window === "undefined") return false;
   if (Capacitor.isNativePlatform()) return true;
-  if (Boolean((window as any).androidBridge)) return true;
-  if (Boolean((window as any).Capacitor?.isNativePlatform?.())) return true;
+  if ((window as any).androidBridge) return true;
+  if ((window as any).Capacitor?.isNativePlatform?.()) return true;
   const ua = navigator.userAgent || "";
   if (ua.includes("MelodyMapApp")) return true;
   return false;
@@ -22,9 +22,7 @@ export function isNativeApp(): boolean {
 
 /**
  * Returns the appropriate OAuth redirect URL:
- * - Native Android: "https://melodymap-pi.vercel.app/auth?native_return=1"
- *   Guaranteed to be accepted by Supabase as it matches the primary Site URL.
- *   The auth page automatically transfers the credentials to "com.melodymap.music://auth/callback".
+ * - Native Android: "com.melodymap.music://auth/callback" (custom scheme registered with Android intent-filter).
  * - Web: Web origin URL (e.g. "https://melodymap-pi.vercel.app/auth")
  */
 export function getOAuthRedirectUrl(): string {
@@ -255,6 +253,7 @@ export function setupNativeAuthListeners(
   }
 
   let cleanupListener: { remove: () => void } | null = null;
+  let isDisposed = false;
 
   // 1. Listen for warm resume intent URLs
   App.addListener("appUrlOpen", async (event) => {
@@ -271,7 +270,11 @@ export function setupNativeAuthListeners(
     }
   })
     .then((handle) => {
-      cleanupListener = handle;
+      if (isDisposed) {
+        handle.remove();
+      } else {
+        cleanupListener = handle;
+      }
     })
     .catch((err) => {
       console.warn("[AuthDeepLink] Failed to attach appUrlOpen listener:", err);
@@ -280,7 +283,7 @@ export function setupNativeAuthListeners(
   // 2. Check for cold launch deep link intent
   App.getLaunchUrl()
     .then(async (launchUrl) => {
-      if (launchUrl?.url && isAuthCallbackUrl(launchUrl.url)) {
+      if (!isDisposed && launchUrl?.url && isAuthCallbackUrl(launchUrl.url)) {
         console.info("[AuthDeepLink] App launched with deep link:", launchUrl.url);
         await handleAuthCallback(launchUrl.url, supabaseClient, {
           onSuccess: () => {
@@ -294,6 +297,7 @@ export function setupNativeAuthListeners(
     });
 
   return () => {
+    isDisposed = true;
     cleanupListener?.remove();
   };
 }

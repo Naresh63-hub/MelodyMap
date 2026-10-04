@@ -15,6 +15,7 @@ import {
   type SponsorBlockSegment,
 } from "@/lib/sponsorblock";
 import { isLowNetworkModeEnabled } from "@/lib/network-mode";
+import { isNativePlaybackEnv, resolvePlaybackEngine } from "@/lib/native-playback";
 
 export type NextTrackInfo = {
   id: string;
@@ -62,15 +63,19 @@ export function useAudioPlayer(options: {
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const filterNodesRef = useRef<BiquadFilterNode[]>([]);
 
-  // Dual-engine playback state ("html5" or "youtube")
-  // In deployed production environments (e.g. Vercel), default directly to client-side YouTube engine
-  // for instant 0ms startup without proxy latency or serverless timeouts
+  // Dual-engine playback state ("html5" or "youtube").
+  // NATIVE APP (APK): ALWAYS the HTML5 proxy engine. The YouTube IFrame player
+  // pauses itself whenever the WebView becomes invisible (screen off / app
+  // switch) and its cross-origin document cannot be patched from the parent
+  // page, so it can never deliver Spotify-like background playback inside the
+  // APK. The HTML5 <audio> element streams through our own /api/stream proxy
+  // and keeps playing behind the foreground media service.
+  // Deployed web keeps the YouTube engine for fast start; localhost keeps proxy.
   const activeEngineRef = useRef<"html5" | "youtube">(
-    typeof window !== "undefined" &&
-      window.location.hostname !== "localhost" &&
-      window.location.hostname !== "127.0.0.1"
-      ? "youtube"
-      : "html5",
+    resolvePlaybackEngine({
+      isNative: isNativePlaybackEnv(),
+      hostname: typeof window !== "undefined" ? window.location.hostname : "localhost",
+    }),
   );
   const ytPlayerRef = useRef<any>(null);
   const ytReadyRef = useRef<boolean>(false);
@@ -142,33 +147,6 @@ export function useAudioPlayer(options: {
         } catch {}
       }
       prebufferAudioRef.current = pEl;
-    }
-
-    // Attach hidden YouTube iframe placeholder offscreen with real dimensions
-    // Modern browsers throttle video decoders when dimensions are <= 4px or opacity is near zero.
-    // Placing it at -9999px with standard dimensions ensures uninterrupted playback during tab transitions.
-    // Prevent YouTube iframe from pausing when device screen is turned off or app is minimized
-    try {
-      if (typeof document !== "undefined") {
-        Object.defineProperty(document, "visibilityState", {
-          get: () => "visible",
-          configurable: true,
-        });
-        Object.defineProperty(document, "hidden", {
-          get: () => false,
-          configurable: true,
-        });
-      }
-    } catch {}
-
-    const stopVisibility = (e: Event) => {
-      e.stopImmediatePropagation();
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("visibilitychange", stopVisibility, true);
-    }
-    if (typeof document !== "undefined") {
-      document.addEventListener("visibilitychange", stopVisibility, true);
     }
 
     if (!document.getElementById("melodymap-yt-wrapper")) {
@@ -438,6 +416,21 @@ export function useAudioPlayer(options: {
       const audio = audioRef.current;
       if (!audio || !url || url.includes("/api/stream/undefined") || url.endsWith("/api/stream/")) return;
 
+      // If the engine already synchronously transitioned to this exact URL, avoid tearing it down
+      if (
+        audio.src === url &&
+        activeEngineRef.current === "html5" &&
+        (!audio.paused || wantPlayRef.current) &&
+        Math.abs((audio.currentTime || 0) - startAt) < 2
+      ) {
+        setIsLoading(false);
+        setIsPlaying(true);
+        if (audio.paused && wantPlayRef.current) {
+          audio.play().catch(() => {});
+        }
+        return;
+      }
+
       initWebAudio();
       setIsLoading(true);
 
@@ -544,7 +537,9 @@ export function useAudioPlayer(options: {
         trackId.startsWith("audius:") ||
         trackId.startsWith("jamendo:") ||
         trackId.startsWith("archive:");
-      if (!isExternalNonYt) {
+      // The YouTube IFrame fallback cannot play in the background inside the
+      // native app (it pauses on invisibility) — stay on the proxy engine.
+      if (!isExternalNonYt && !isNativePlaybackEnv()) {
         console.info(`[MelodyMap] Reconnection threshold reached. Switching to YouTube playback engine for: ${trackId}`);
         const resumePos = lastValidPositionRef.current || 0;
         playViaYouTubeRef.current(trackId, resumePos, true);
@@ -788,7 +783,9 @@ export function useAudioPlayer(options: {
             activeId!.startsWith("jamendo:") ||
             activeId!.startsWith("archive:"));
 
-        if (activeId && !isExternalNonYt) {
+        // Native app: never fall back to the YouTube IFrame engine — it cannot
+        // survive screen-off/app-switch. Keep the proxy engine and surface the error.
+        if (activeId && !isExternalNonYt && !isNativePlaybackEnv()) {
           console.info(`[MelodyMap] Falling back to direct client YouTube streaming for track: ${activeId}`);
           const resumePos = audio.currentTime || 0;
           playViaYouTubeRef.current(activeId, resumePos, wantPlayRef.current);
@@ -1447,8 +1444,12 @@ export function useAudioPlayer(options: {
 
 export function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds <= 0) return "0:00";
-  const m = Math.floor(seconds / 60);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  }
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 

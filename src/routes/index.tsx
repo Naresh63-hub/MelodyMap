@@ -102,6 +102,13 @@ import { cn } from "@/lib/utils";
 import { trackExistsIn, dedupeTracks, type TrackLike } from "@/lib/track-dedup";
 import { resolveRestorablePlayback } from "@/lib/playback-restore";
 import {
+  installMediaCommandHandler,
+  isNativePlaybackEnv,
+  notifyPlaybackPosition,
+  notifyPlaybackState,
+  requestBatteryOptimizationExemption,
+} from "@/lib/native-playback";
+import {
   filterFeedCandidates,
   hasPlayableDuration,
   sameSong,
@@ -160,6 +167,13 @@ function writeHomeCache(patch: Partial<HomeCacheData>) {
   } catch {
     // quota exceeded — ignore
   }
+}
+
+function safeUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 function MusicApp() {
@@ -878,8 +892,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       sleepTimerHaltedRef.current = false;
       sleepTimerService.resetExpired();
       // Hard rule: music tracks need a known duration <= 600s to enter playback.
-      // Podcasts are exempt (long-form by design, never in the music recommendation pool).
-      if (!isPodcastTrack(track) && !hasPlayableDuration(track)) return;
+      if (!isPodcastTrack(track) && !hasPlayableDuration(track)) {
+        setMessage("Track duration exceeds 10 minutes or is unplayable");
+        setTimeout(() => setMessage(null), 3000);
+        return;
+      }
 
       // 1. Reset progress and seek position for clean single-track start
       player.seek(0);
@@ -1069,7 +1086,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const loadRecommendations = useCallback(
     async (mood?: string) => {
       setRecLoading(true);
-      const nonce = `${Date.now()}-${crypto.randomUUID()}`;
+      const nonce = `${Date.now()}-${safeUUID()}`;
       const clientHour = new Date().getHours();
       const affinity = contextEngine.getAffinityWeights(stats);
 
@@ -1309,7 +1326,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       // 2. Fallback to recommendation engine with circadian, affinity, and discovery context
       if (candidateTracks.length === 0) {
-        const nonce = `${Date.now()}-${crypto.randomUUID()}`;
+        const nonce = `${Date.now()}-${safeUUID()}`;
         const clientHour = new Date().getHours();
         const affinity = contextEngine.getAffinityWeights(stats);
         const res = await runRecommend({
@@ -1738,9 +1755,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (typeof window === "undefined") return;
 
     let backListenerHandle: { remove: () => void } | null = null;
+    let isDisposed = false;
 
     if (Capacitor.isNativePlatform()) {
       App.addListener("backButton", ({ canGoBack }) => {
+        if (showAuthModal) {
+          setShowAuthModal(false);
+          return;
+        }
         if (showFullScreen) {
           setShowFullScreen(false);
           return;
@@ -1800,15 +1822,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       })
         .then((handle) => {
-          backListenerHandle = handle;
+          if (isDisposed) {
+            handle.remove();
+          } else {
+            backListenerHandle = handle;
+          }
         })
         .catch(() => {});
     }
 
     return () => {
+      isDisposed = true;
       backListenerHandle?.remove();
     };
   }, [
+    showAuthModal,
     showFullScreen,
     showSettings,
     showQueue,
@@ -1988,6 +2016,58 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const playerPositionRef = useRef(player.position);
   playerPositionRef.current = player.position;
 
+  // ─── Native Android background playback (Spotify-style) ───
+  // Keeps the foreground media service, lockscreen notification, and headset
+  // buttons in sync with the player. Every call no-ops outside the APK.
+  const nativeHandlersRef = useRef({ togglePlay, goNext, goPrev, seek: player.seek });
+  nativeHandlersRef.current = { togglePlay, goNext, goPrev, seek: player.seek };
+
+  // Media commands arriving from the lockscreen, notification action buttons,
+  // and headset/hardware media keys (installed once, dispatches via refs).
+  useEffect(() => {
+    if (!isNativePlaybackEnv()) return;
+    return installMediaCommandHandler({
+      play: () => {
+        if (!isPlayingRef.current) nativeHandlersRef.current.togglePlay();
+      },
+      pause: () => {
+        if (isPlayingRef.current) nativeHandlersRef.current.togglePlay();
+      },
+      next: () => nativeHandlersRef.current.goNext(),
+      prev: () => nativeHandlersRef.current.goPrev(),
+      seek: (seconds) => nativeHandlersRef.current.seek(seconds),
+    });
+  }, []);
+
+  // Playback state → foreground notification + MediaSession. Also fires the
+  // one-per-install battery-optimization prompt on the first real play.
+  useEffect(() => {
+    if (!isNativePlaybackEnv() || !current) return;
+    notifyPlaybackState(player.isPlaying ? "playing" : "paused", {
+      id: current.id,
+      title: current.title,
+      artist: current.artist,
+      duration: player.duration || parseDurationSeconds(current.duration),
+      // Position is intentionally read from a ref: the periodic interval below
+      // keeps the lockscreen progress bar fresh without spamming the bridge.
+      position: playerPositionRef.current,
+    });
+    if (player.isPlaying) {
+      requestBatteryOptimizationExemption();
+    }
+  }, [current, player.isPlaying, player.duration]);
+
+  // Lightweight periodic position sync for the lockscreen progress bar.
+  useEffect(() => {
+    if (!isNativePlaybackEnv()) return;
+    const iv = window.setInterval(() => {
+      if (isPlayingRef.current) {
+        notifyPlaybackPosition(playerPositionRef.current);
+      }
+    }, 5000);
+    return () => window.clearInterval(iv);
+  }, []);
+
   // Track play count after 5 cumulative seconds of active playback without misfiring on pause or seeks
   const logPlayRef = useRef(logPlay);
   logPlayRef.current = logPlay;
@@ -2024,7 +2104,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   // Cross-tab playback coordination: pause if another tab begins playback
   const channelRef = useRef<BroadcastChannel | null>(null);
-  const tabInstanceIdRef = useRef<string>(crypto.randomUUID());
+  const tabInstanceIdRef = useRef<string>(safeUUID());
 
   useEffect(() => {
     if (typeof window === "undefined" || !("BroadcastChannel" in window)) return;

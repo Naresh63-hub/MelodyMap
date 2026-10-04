@@ -16,7 +16,9 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, "id");
   const videoId = decodeURIComponent(id || "").trim();
   const query = getQuery(event);
-  const quality = (query.quality as "saver" | "standard" | "high") || "high";
+  const rawQuality = String(query.quality || "").toLowerCase();
+  const quality: "saver" | "standard" | "high" =
+    rawQuality === "saver" ? "saver" : rawQuality === "standard" ? "standard" : "high";
 
   if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
     throw createError({ statusCode: 400, statusMessage: "Invalid video id" });

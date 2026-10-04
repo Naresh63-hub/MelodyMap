@@ -3,14 +3,12 @@ package com.melodymap.music;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static MainActivity instance;
-    private PowerManager.WakeLock wakeLock;
     private GoogleAuthBridge googleAuthBridge;
 
     public static MainActivity getInstance() {
@@ -44,17 +42,18 @@ public class MainActivity extends BridgeActivity {
                 // Register Native Google Play Services Authentication bridge
                 googleAuthBridge = new GoogleAuthBridge(this);
                 webView.addJavascriptInterface(googleAuthBridge, "AndroidGoogleAuth");
+
+                // Register Spotify-style background playback bridge
+                webView.addJavascriptInterface(new PlaybackBridge(this), "AndroidPlayback");
             }
         } catch (Exception ignored) {}
 
-        // Keep CPU awake while screen is turned off so continuous audio does not suspend
-        try {
-            PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-            if (powerManager != null) {
-                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MelodyMap::AudioWakeLock");
-                wakeLock.acquire();
-            }
-        } catch (Exception ignored) {}
+        // NOTE: no unconditional Activity-owned wake lock and no unconditional
+        // startForegroundService here. Locks and the foreground notification are
+        // now owned by MediaPlaybackService and only held while audio is playing
+        // (via PlaybackBridge.onPlay/onPause). A service that shows a
+        // notification without active playback gets killed by modern Android,
+        // and an always-on wake lock drains the battery.
 
         // Request POST_NOTIFICATIONS runtime permission on Android 13+ (API 33+) for foreground media notification
         try {
@@ -64,8 +63,6 @@ public class MainActivity extends BridgeActivity {
                 }
             }
         } catch (Exception ignored) {}
-
-        startMediaPlaybackService();
     }
 
     public void startMediaPlaybackService() {
@@ -88,20 +85,32 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception ignored) {}
     }
 
-    public void releaseAudioWakeLock() {
-        try {
-            if (wakeLock != null && wakeLock.isHeld()) {
-                wakeLock.release();
-            }
-        } catch (Exception ignored) {}
+    /**
+     * Forward a media button command (play/pause/next/prev/seek) from the
+     * MediaSession / notification / headset into the web player.
+     */
+    public void dispatchMediaCommand(String command) {
+        if (command == null || command.isEmpty()) return;
+        runOnUiThread(() -> {
+            try {
+                WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+                if (webView != null) {
+                    String escaped = command
+                            .replace("\\", "\\\\")
+                            .replace("'", "\\'");
+                    webView.evaluateJavascript(
+                            "if (window.__melodymap_media_command) { window.__melodymap_media_command('" + escaped + "'); }",
+                            null);
+                }
+            } catch (Exception ignored) {}
+        });
     }
 
     public void handleSleepTimerExpired() {
-        // Release wake lock and stop foreground service when sleep timer fires so device can sleep
-        releaseAudioWakeLock();
+        // Sleep timer fired: stop playback and tear down the media session so
+        // the device can actually sleep (dispatches the stop into the WebView).
         stopMediaPlaybackService();
 
-        // Dispatch stop event into WebView javascript engine on UI thread
         runOnUiThread(() -> {
             try {
                 WebView webView = getBridge().getWebView();
@@ -191,7 +200,6 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onDestroy() {
         stopMediaPlaybackService();
-        releaseAudioWakeLock();
         if (instance == this) {
             instance = null;
         }

@@ -137,7 +137,13 @@ export function useAuth() {
     async (patch: { display_name?: string; avatar_url?: string }): Promise<{ success: boolean; error?: string }> => {
       if (!userId) return { success: false, error: "Not signed in" };
 
-      if (userId.startsWith("local-")) {
+      const isLocal =
+        userId.startsWith("local-") ||
+        userId.startsWith("user-") ||
+        userId.startsWith("google-") ||
+        userId === "local-listener";
+
+      if (isLocal) {
         const updated = {
           id: userId,
           display_name: patch.display_name ?? profile?.display_name ?? "Listener",
@@ -145,9 +151,13 @@ export function useAuth() {
         };
         setProfile(updated);
         if (typeof window !== "undefined") {
-          const raw = localStorage.getItem("melodymap.local_user");
-          const existing = raw ? JSON.parse(raw) : {};
+          let existing: Record<string, unknown> = {};
+          try {
+            const raw = localStorage.getItem("melodymap.local_user");
+            if (raw) existing = JSON.parse(raw);
+          } catch {}
           localStorage.setItem("melodymap.local_user", JSON.stringify({ ...existing, ...updated }));
+          window.dispatchEvent(new CustomEvent("melodymap:auth-changed"));
         }
         return { success: true };
       }

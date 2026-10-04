@@ -116,7 +116,7 @@ export function useMediaSession(
     } catch (err) {
       console.warn("[MediaSession] Could not set metadata:", err);
     }
-  }, [track?.id, track?.title, track?.artist, track?.thumbnail]);
+  }, [track]);
 
   // 3. Update Playback State
   useEffect(() => {

@@ -16,10 +16,10 @@ export type SearchFilter = "all" | "songs" | "artists" | "albums" | "playlists";
 
 export const SEARCH_FILTER_PARAMS: Record<SearchFilter, string | undefined> = {
   all: undefined,
-  songs: "EgIQAQ%253D%253D",
-  artists: "EgIQBA%253D%253D",
-  playlists: "EgIQAw%253D%253D",
-  albums: "EgIQAw%253D%253D",
+  songs: "EgIQAQ==",
+  artists: "EgIQAg==",
+  playlists: "EgIQAw==",
+  albums: "EgQIBBAB",
 };
 
 function collectSearchRenderers(node: unknown, out: AnyRecord[]): void {
@@ -58,8 +58,8 @@ function text(node: unknown): string {
 }
 
 /** YouTube "Music" category filter — keeps results to songs, not vlogs/interviews. */
-const MUSIC_FILTER = "EgWKAQIYAWoKEAoQAxAEEAkQBQ%253D%253D";
-const VIDEO_FILTER = "EgIQAQ%253D%253D";
+const MUSIC_FILTER = "EgWKAQIYAWoKEAoQAxAEEAkQBQ==";
+const VIDEO_FILTER = "EgIQAQ==";
 
 /** Upload-date filters — only videos published today / this week. */
 const UPLOAD_FILTERS = {
@@ -496,7 +496,7 @@ export async function searchYouTubeWithPage(
       if (!data) {
         const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(
           searchQuery,
-        )}${filterParam ? `&sp=${filterParam}` : ""}`;
+        )}${filterParam ? `&sp=${encodeURIComponent(filterParam)}` : ""}`;
 
         const res = await fetch(url, {
           headers: {

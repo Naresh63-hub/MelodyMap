@@ -128,6 +128,7 @@ export const MAX_TRACK_DURATION_SECONDS = 600;
 export function isMusicTrack(
   track: { title?: string | undefined; artist?: string | undefined; duration?: string | number | undefined } | null | undefined,
   allowLong?: boolean | unknown,
+  allowUnknownDuration = false,
 ): boolean {
   if (!track || !track.title) return false;
   const isAllowLong = typeof allowLong === "boolean" ? allowLong : false;
@@ -140,8 +141,8 @@ export function isMusicTrack(
 
   const secs = parseDurationSeconds(track.duration);
   const maxCap = isAllowLong ? 7200 : MAX_TRACK_DURATION_SECONDS;
-  // Unknown duration (secs === 0) must NOT be assumed short: exclude it.
-  if (secs <= 0) return false;
+  // Unknown duration (secs === 0): allow for library hydration if requested, otherwise exclude from fresh search
+  if (secs <= 0) return allowUnknownDuration;
   if (secs < 30 || secs > maxCap) return false;
 
   return true;
