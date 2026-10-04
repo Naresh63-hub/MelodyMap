@@ -203,17 +203,8 @@ export function AuthModal({
               setBusy(false);
               return;
             }
-            // Supabase error: fallback to instant local verified account
-            saveLocalUser({
-              name: trimmedName,
-              email: trimmedEmail,
-            });
-            setSuccessMsg(`Welcome, ${trimmedName}! Account created.`);
-            setTimeout(() => {
-              setBusy(false);
-              onOpenChange(false);
-              onSuccess?.();
-            }, 800);
+            setErrorMsg(error.message || "Failed to create account. Please try again.");
+            setBusy(false);
             return;
           }
 
@@ -231,18 +222,9 @@ export function AuthModal({
             }, 800);
             return;
           }
-        } catch {
-          // Offline fallback
-          saveLocalUser({
-            name: trimmedName,
-            email: trimmedEmail,
-          });
-          setSuccessMsg(`Account created! Welcome, ${trimmedName}.`);
-          setTimeout(() => {
-            setBusy(false);
-            onOpenChange(false);
-            onSuccess?.();
-          }, 800);
+        } catch (err: any) {
+          setBusy(false);
+          setErrorMsg(err?.message || "Sign-up failed. Please check your connection and try again.");
           return;
         }
       } else {
@@ -323,18 +305,9 @@ export function AuthModal({
             }, 800);
             return;
           }
-        } catch {
-          const userName = trimmedEmail.split("@")[0] || "Listener";
-          saveLocalUser({
-            name: userName,
-            email: trimmedEmail,
-          });
-          setSuccessMsg(`Signed in as ${userName}!`);
-          setTimeout(() => {
-            setBusy(false);
-            onOpenChange(false);
-            onSuccess?.();
-          }, 800);
+        } catch (err: any) {
+          setBusy(false);
+          setErrorMsg(err?.message || "Sign-in failed. Please verify your credentials and try again.");
           return;
         }
       } else {

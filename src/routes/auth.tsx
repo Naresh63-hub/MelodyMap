@@ -387,35 +387,13 @@ function AuthPage() {
           return;
         }
 
-        // Seamless local session fallback so user is never locked out by email confirmation
-        const displayName = name.trim() || email.split("@")[0] || "Listener";
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("melodymap.guest_mode");
-          localStorage.setItem(
-            "melodymap.local_user",
-            JSON.stringify({
-              id: data?.user?.id || "local-" + crypto.randomUUID(),
-              name: displayName,
-              email: email.trim(),
-            }),
-          );
-        }
-        void navigate({ to: "/", replace: true });
-      } catch {
+        // Supabase email confirmation is enabled: prompt user to confirm
         setBusy(false);
-        const displayName = name.trim() || email.split("@")[0] || "Listener";
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("melodymap.guest_mode");
-          localStorage.setItem(
-            "melodymap.local_user",
-            JSON.stringify({
-              id: "local-" + crypto.randomUUID(),
-              name: displayName,
-              email: email.trim(),
-            }),
-          );
-        }
-        void navigate({ to: "/", replace: true });
+        setSuccessNote("Account created! Please check your email inbox to confirm your account, then sign in.");
+        setMode("signin");
+      } catch (err: any) {
+        setBusy(false);
+        setErrorNote(err?.message || "Sign-up failed. Please check your credentials or try again.");
       }
       return;
     }
@@ -429,38 +407,13 @@ function AuthPage() {
       setBusy(false);
       if (error) {
         const msg = error.message?.toLowerCase() || "";
-        // If Supabase has email confirmation pending, grant instant access:
         if (msg.includes("email not confirmed")) {
-          const displayName = email.split("@")[0] || "Listener";
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("melodymap.guest_mode");
-            localStorage.setItem(
-              "melodymap.local_user",
-              JSON.stringify({
-                id: "user-" + crypto.randomUUID(),
-                name: displayName,
-                email: email.trim(),
-              }),
-            );
-          }
-          void navigate({ to: "/", replace: true });
+          setErrorNote("Email not confirmed. Please check your inbox for the confirmation link before signing in.");
           return;
         }
 
         if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("connection")) {
-          const displayName = email.split("@")[0] || "Listener";
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("melodymap.guest_mode");
-            localStorage.setItem(
-              "melodymap.local_user",
-              JSON.stringify({
-                id: "local-" + crypto.randomUUID(),
-                name: displayName,
-                email: email.trim(),
-              }),
-            );
-          }
-          void navigate({ to: "/", replace: true });
+          setErrorNote("Network connection issue. Please check your internet connection or continue as guest.");
           return;
         }
         setErrorNote(formatAuthError(error.message));
