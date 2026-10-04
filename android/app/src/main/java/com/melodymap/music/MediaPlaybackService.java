@@ -8,6 +8,9 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.IBinder;
@@ -21,7 +24,8 @@ import androidx.media.app.NotificationCompat.MediaStyle;
 /**
  * Foreground Service for continuous background audio playback on Android.
  * Keeps CPU and network streaming alive with PARTIAL_WAKE_LOCK, WifiLock,
- * and an active MediaSessionCompat to guarantee high-priority playback status on Android 13/14+.
+ * an active MediaSessionCompat, and AUDIOFOCUS_GAIN to guarantee uninterrupted
+ * playback even when the screen is turned off or the app is minimized.
  */
 public class MediaPlaybackService extends Service {
     public static final String ACTION_START = "com.melodymap.music.action.START";
@@ -32,6 +36,8 @@ public class MediaPlaybackService extends Service {
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
     private MediaSessionCompat mediaSession;
+    private AudioManager audioManager;
+    private AudioFocusRequest audioFocusRequest;
     private static boolean isRunning = false;
 
     public static boolean isServiceRunning() {
@@ -43,6 +49,7 @@ public class MediaPlaybackService extends Service {
         super.onCreate();
         createNotificationChannel();
         acquireLocks();
+        requestAudioFocus();
         initMediaSession();
     }
 
@@ -140,6 +147,42 @@ public class MediaPlaybackService extends Service {
         } catch (Exception ignored) {}
     }
 
+    private void requestAudioFocus() {
+        try {
+            audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager == null) return;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioAttributes playbackAttributes = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build();
+                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(playbackAttributes)
+                    .setAcceptsDelayedFocusGain(true)
+                    .setOnAudioFocusChangeListener(focusChange -> {
+                        // Keep holding focus for background playback
+                    })
+                    .build();
+                audioManager.requestAudioFocus(audioFocusRequest);
+            } else {
+                audioManager.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void releaseAudioFocus() {
+        try {
+            if (audioManager != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
+                    audioManager.abandonAudioFocusRequest(audioFocusRequest);
+                } else {
+                    audioManager.abandonAudioFocus(null);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
     private void releaseLocks() {
         try {
             if (wakeLock != null && wakeLock.isHeld()) {
@@ -159,6 +202,7 @@ public class MediaPlaybackService extends Service {
     private void stopForegroundService() {
         isRunning = false;
         releaseLocks();
+        releaseAudioFocus();
         if (mediaSession != null) {
             try {
                 mediaSession.setActive(false);

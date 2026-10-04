@@ -175,13 +175,13 @@ export function useAudioPlayer(options: {
       const holder = document.createElement("div");
       holder.id = "melodymap-yt-wrapper";
       holder.style.position = "fixed";
-      holder.style.left = "-9999px";
-      holder.style.top = "-9999px";
-      holder.style.width = "200px";
-      holder.style.height = "200px";
-      holder.style.opacity = "1";
+      holder.style.bottom = "0px";
+      holder.style.right = "0px";
+      holder.style.width = "1px";
+      holder.style.height = "1px";
+      holder.style.opacity = "0.01";
       holder.style.pointerEvents = "none";
-      holder.style.zIndex = "-9999";
+      holder.style.zIndex = "1";
       holder.style.overflow = "hidden";
       const iframeDiv = document.createElement("div");
       iframeDiv.id = "melodymap-yt-iframe";
@@ -1073,7 +1073,32 @@ export function useAudioPlayer(options: {
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
+
+    // Background playback watchdog: auto-resume audio if paused by Android/browser lock screen
+    const watchdog = setInterval(() => {
+      if (wantPlayRef.current && !isSeekingRef.current) {
+        if (activeEngineRef.current === "youtube") {
+          const p = ytPlayerRef.current;
+          if (p && ytReadyRef.current && typeof p.getPlayerState === "function") {
+            const s = p.getPlayerState();
+            // 2 = paused, 5 = cued
+            if (s === 2 || s === 5) {
+              try {
+                p.playVideo();
+              } catch {}
+            }
+          }
+        } else if (activeEngineRef.current === "html5") {
+          const audio = audioRef.current;
+          if (audio && audio.paused && audio.src && !audio.src.startsWith("data:audio")) {
+            audio.play().catch(() => {});
+          }
+        }
+      }
+    }, 1000);
+
     return () => {
+      clearInterval(watchdog);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);

@@ -22,6 +22,11 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         instance = this;
 
+        // Ensure system status bar and navigation bars do not overlap web content
+        try {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+        } catch (Exception ignored) {}
+
         // Allow media autoplay without requiring immediate user gesture on each track transition
         try {
             WebView webView = getBridge().getWebView();
@@ -127,6 +132,19 @@ public class MainActivity extends BridgeActivity {
     public void onStop() {
         super.onStop();
         // Prevent WebView from freezing audio processing and JS timers when app is minimized
+        try {
+            WebView webView = getBridge().getWebView();
+            if (webView != null) {
+                webView.onResume();
+                webView.resumeTimers();
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        // Prevent WebView from suspending audio decoding when notification shade drops or screen locks
         try {
             WebView webView = getBridge().getWebView();
             if (webView != null) {

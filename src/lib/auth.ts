@@ -92,11 +92,22 @@ export function useAuth() {
       handleSession(session);
     });
 
-    void supabase.auth.getSession().then(({ data }) => {
-      handleSession(data.session);
-    });
+    const onAuthChanged = () => {
+      void supabase.auth.getSession().then(({ data }) => {
+        handleSession(data.session);
+      });
+    };
 
-    return () => sub.subscription.unsubscribe();
+    if (typeof window !== "undefined") {
+      window.addEventListener("melodymap:auth-changed", onAuthChanged);
+    }
+
+    return () => {
+      sub.subscription.unsubscribe();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("melodymap:auth-changed", onAuthChanged);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -211,4 +222,39 @@ export function useAuth() {
   }, []);
 
   return { ready, userId, email, profile, updateProfile, updatePassword, signOut };
+}
+
+export function saveLocalUser(user: { id?: string; name: string; email?: string | null; avatar_url?: string | null }) {
+  if (typeof window === "undefined") return;
+  const id = user.id || "user-" + (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now());
+  localStorage.setItem(
+    "melodymap.local_user",
+    JSON.stringify({
+      id,
+      name: user.name,
+      display_name: user.name,
+      email: user.email || null,
+      avatar_url: user.avatar_url || null,
+    }),
+  );
+  localStorage.removeItem("melodymap.guest_mode");
+  window.dispatchEvent(new CustomEvent("melodymap:auth-changed"));
+}
+
+export function getLocalUser(): { id: string; name: string; email: string | null; avatar_url: string | null } | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("melodymap.local_user");
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      return {
+        id: parsed.id || "user-local",
+        name: parsed.name || parsed.display_name || "Listener",
+        email: parsed.email || null,
+        avatar_url: parsed.avatar_url || null,
+      };
+    }
+  } catch {}
+  return null;
 }

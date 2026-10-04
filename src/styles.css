@@ -327,7 +327,11 @@
 }
 
 @utility header-safe-top {
-  padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.75rem), 2.75rem);
+}
+
+@utility drawer-safe-top {
+  padding-top: max(calc(env(safe-area-inset-top, 0px) + 1rem), 3.25rem);
 }
 
 @utility overscroll-none {

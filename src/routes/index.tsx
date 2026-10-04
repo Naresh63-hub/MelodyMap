@@ -63,6 +63,7 @@ import { ExploreSections } from "@/components/music/ui/ExploreSections";
 import { episodeToTrack, type PodcastEpisode } from "@/lib/podcast.types";
 import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
+import { AuthModal } from "@/components/common/AuthModal";
 
 import { useAuth } from "@/lib/auth";
 import {
@@ -247,6 +248,7 @@ function MusicApp() {
     return saved ? Math.min(100, Math.max(0, Number(saved) || 80)) : 80;
   });
   const [showSettings, setShowSettings] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [continuous, setContinuous] = useState(() => {
@@ -2272,12 +2274,25 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           setShowSettings(true);
         }}
         isSynced={!!auth.userId}
-        userName={auth.profile?.display_name ?? auth.email?.split("@")[0] ?? "Listener"}
-        userInitial={auth.email?.[0]?.toUpperCase() ?? "L"}
+        userName={
+          auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+            ? auth.profile.display_name
+            : auth.email && auth.email !== "listener@google.com"
+              ? auth.email.split("@")[0]
+              : "My Account"
+        }
+        userInitial={
+          (auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+            ? auth.profile.display_name[0]
+            : auth.email && auth.email !== "listener@google.com"
+              ? auth.email[0]
+              : "M"
+          )?.toUpperCase() ?? "M"
+        }
         userAvatar={auth.profile?.avatar_url ?? null}
         onSignIn={() => {
           setDrawerOpen(false);
-          void navigate({ to: "/auth" });
+          setShowAuthModal(true);
         }}
         onSignOut={async () => {
           await auth.signOut();
@@ -3029,6 +3044,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setShowSettings(false);
             void loadRecommendations();
           }}
+        />
+
+        {/* IN-APP MODAL AUTH (LOGIN, SIGN UP & ACCOUNT PROFILE) */}
+        <AuthModal
+          open={showAuthModal}
+          onOpenChange={setShowAuthModal}
+          defaultMode={auth.userId ? "profile" : "signin"}
         />
 
 

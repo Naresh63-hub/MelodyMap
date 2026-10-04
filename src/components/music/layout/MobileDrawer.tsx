@@ -82,8 +82,8 @@ export function MobileDrawer({
 
       {/* Drawer panel */}
       <div className="relative flex w-4/5 max-w-xs flex-1 flex-col bg-[#121212] border-r border-white/10 shadow-2xl z-10 animate-slide-in">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+        {/* Header with guaranteed clearance below Android status bar and camera cutouts */}
+        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-white/10">
           <div className="flex items-center gap-2.5">
             <img
               src="/brand/app-icon.png"
@@ -98,47 +98,60 @@ export function MobileDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/50 hover:bg-white/10 hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* User profile section */}
-        <div className="flex items-center justify-between gap-3 px-5 py-3.5 bg-white/[0.02] border-b border-white/[0.06]">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            {userAvatar ? (
-              <img
-                src={userAvatar}
-                alt=""
-                className="h-9 w-9 rounded-full object-cover border border-white/15"
-              />
-            ) : (
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#242424] text-white font-semibold text-xs border border-white/10">
-                {userInitial}
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-white">{userName}</p>
-              <p className="text-[11px] text-white/40">
-                {isSynced ? "Account synced" : "Local mode"}
-              </p>
-            </div>
-          </div>
-
-          {!isSynced && onSignIn && (
-            <button
-              type="button"
+        {(() => {
+          const displayUserName = userName === "Google Listener" ? "My Account" : userName;
+          const displayInitial = displayUserName.charAt(0).toUpperCase() || "M";
+          return (
+            <div
               onClick={() => {
-                onClose();
-                onSignIn();
+                if (onSignIn) {
+                  onClose();
+                  onSignIn();
+                }
               }}
-              className="shrink-0 rounded-full bg-white/[0.08] border border-white/10 px-3 py-1 text-xs font-semibold text-white/90 hover:bg-white/[0.12] transition-colors"
+              className="flex items-center justify-between gap-3 px-5 py-3.5 bg-white/[0.03] hover:bg-white/[0.07] active:bg-white/[0.1] border-b border-white/[0.06] cursor-pointer transition-colors"
             >
-              Sign In
-            </button>
-          )}
-        </div>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {userAvatar ? (
+                  <img
+                    src={userAvatar}
+                    alt=""
+                    className="h-9 w-9 rounded-full object-cover border border-[#1DB954]/40"
+                  />
+                ) : (
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#1DB954]/25 to-white/10 text-white font-bold text-xs border border-[#1DB954]/30 shadow-sm">
+                    {displayInitial}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{displayUserName}</p>
+                  <p className="text-[11px] text-white/50">
+                    {isSynced ? "Synced Account • Tap to edit" : "Tap to sign in / manage"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                  if (onSignIn) onSignIn();
+                }}
+                className="shrink-0 rounded-full bg-white/[0.08] border border-white/10 px-3 py-1 text-xs font-semibold text-white/90 hover:bg-white/[0.15] transition-colors"
+              >
+                {isSynced ? "Manage" : "Sign In"}
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Nav Links */}
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 scrollbar-hide">

@@ -526,15 +526,23 @@ function AuthPage() {
         } catch {}
       }
 
-      // Smooth instant Google account inside the APK
+      // Clean account initialization in native Android app
       if (typeof window !== "undefined") {
         localStorage.removeItem("melodymap.guest_mode");
+        const existingRaw = localStorage.getItem("melodymap.local_user");
+        let currentName = "Listener";
+        if (existingRaw) {
+          try {
+            const p = JSON.parse(existingRaw);
+            if (p?.name && p.name !== "Google Listener") currentName = p.name;
+          } catch {}
+        }
         localStorage.setItem(
           "melodymap.local_user",
           JSON.stringify({
-            id: "google-" + crypto.randomUUID(),
-            name: "Google Listener",
-            email: "listener@google.com",
+            id: "user-" + (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now()),
+            name: currentName,
+            email: currentName !== "Listener" ? `${currentName.toLowerCase().replace(/\s+/g, "")}@melodymap.app` : null,
           }),
         );
       }
