@@ -11,6 +11,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     private static MainActivity instance;
     private PowerManager.WakeLock wakeLock;
+    private GoogleAuthBridge googleAuthBridge;
 
     public static MainActivity getInstance() {
         return instance;
@@ -34,6 +35,10 @@ public class MainActivity extends BridgeActivity {
 
                 // Register SleepTimer JavaScript interface bridge
                 webView.addJavascriptInterface(new SleepTimerBridge(this), "AndroidSleepTimer");
+
+                // Register Native Google Play Services Authentication bridge
+                googleAuthBridge = new GoogleAuthBridge(this);
+                webView.addJavascriptInterface(googleAuthBridge, "AndroidGoogleAuth");
             }
         } catch (Exception ignored) {}
 
@@ -143,6 +148,14 @@ public class MainActivity extends BridgeActivity {
                     } catch (Exception ignored) {}
                 });
             }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (googleAuthBridge != null && googleAuthBridge.handleActivityResult(requestCode, resultCode, data)) {
+            return;
         }
     }
 
