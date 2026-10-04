@@ -315,6 +315,7 @@ type LibraryDoc = {
   stats?: Stats;
   banditModel?: BanditModelState;
   telemetryEvents?: any[];
+  playback?: SavedPlayback;
 };
 
 function mergeStats(a: Stats, b: Stats): Stats {
@@ -461,6 +462,15 @@ export function useLibrary(userId?: string | null) {
               thompsonSamplingPolicy.setModelState(doc.banditModel);
             } catch {}
           }
+          if (doc.playback && Array.isArray(doc.playback.queue) && doc.playback.queue.length > 0) {
+            const currentPlayback = readPlayback();
+            if (!currentPlayback || currentPlayback.queue.length === 0) {
+              writePlayback(doc.playback);
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("melodymap:playback-synced"));
+              }
+            }
+          }
         }
         // Mark synced only AFTER pull finishes and merges so push won't overwrite cloud data
         setSyncedUser(userId);
@@ -510,6 +520,7 @@ export function useLibrary(userId?: string | null) {
             stats,
             banditModel,
             telemetryEvents: recentTelemetry,
+            playback: readPlayback() ?? undefined,
           } as any,
         });
         if (error) console.warn("[MelodyMap] Library sync failed:", error.message);

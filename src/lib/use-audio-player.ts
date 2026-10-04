@@ -537,9 +537,8 @@ export function useAudioPlayer(options: {
         trackId.startsWith("audius:") ||
         trackId.startsWith("jamendo:") ||
         trackId.startsWith("archive:");
-      // The YouTube IFrame fallback cannot play in the background inside the
-      // native app (it pauses on invisibility) — stay on the proxy engine.
-      if (!isExternalNonYt && !isNativePlaybackEnv()) {
+      // Fallback to client-side YouTube player if proxy stream ever drops/fails
+      if (!isExternalNonYt) {
         console.info(`[MelodyMap] Reconnection threshold reached. Switching to YouTube playback engine for: ${trackId}`);
         const resumePos = lastValidPositionRef.current || 0;
         playViaYouTubeRef.current(trackId, resumePos, true);
@@ -1201,6 +1200,20 @@ export function useAudioPlayer(options: {
   const load = useCallback(
     async (id: string, directUrl?: string, startAt = 0) => {
       wantPlayRef.current = true;
+
+      // Stop the double-load race: if synchronous gapless advance already started
+      // playing this exact track at 0:00, avoid resetting position or restarting audio
+      const audio = audioRef.current;
+      const expectedUrl = directUrl || streamUrl(id);
+      if (
+        currentTrackIdRef.current === id &&
+        startAt === 0 &&
+        ((activeEngineRef.current === "html5" && audio && audio.src === expectedUrl && (!audio.paused || audio.readyState >= 2)) ||
+         (activeEngineRef.current === "youtube" && isPlaying))
+      ) {
+        return;
+      }
+
       currentTrackIdRef.current = id;
       lastValidPositionRef.current = startAt;
       setPosition(startAt);

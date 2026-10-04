@@ -1973,6 +1973,33 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
   }, [player.ready, cue]);
 
+  // Listen for cloud playback synchronization (e.g. queue restored upon sign in from another device/browser)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPlaybackSynced = () => {
+      try {
+        const saved = readPlayback();
+        if (saved && Array.isArray(saved.queue) && saved.queue.length > 0) {
+          const resolved = resolveRestorablePlayback(saved);
+          if (!resolved.empty) {
+            setQueue(resolved.queue);
+            setIndex(resolved.index);
+            indexRef.current = resolved.index;
+            setResumed(true);
+            const targetTrack = resolved.queue[resolved.index];
+            if (targetTrack) {
+              const savedPos = isPodcastTrack(targetTrack) ? resolved.position : 0;
+              loadedTrackIdRef.current = targetTrack.id;
+              cue(targetTrack.id, savedPos, targetTrack.previewUrl);
+            }
+          }
+        }
+      } catch {}
+    };
+    window.addEventListener("melodymap:playback-synced", onPlaybackSynced);
+    return () => window.removeEventListener("melodymap:playback-synced", onPlaybackSynced);
+  }, [cue]);
+
   useEffect(() => {
     const track = current;
     if (!player.ready || !track) return;
