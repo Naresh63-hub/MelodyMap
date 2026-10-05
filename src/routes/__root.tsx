@@ -154,10 +154,25 @@ function RootComponent() {
     return cleanup;
   }, [router]);
 
-  // Register the service worker for PWA / offline support, purge stale caches, and auto-update
+  // Register the service worker for PWA / offline support in production, and unregister in DEV
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      // Purge any lingering legacy caches from previous versions
+      if (import.meta.env.DEV) {
+        // In development mode, unregister any active service worker so it never intercepts Vite HMR or route splitting
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const reg of registrations) {
+            reg.unregister();
+          }
+        });
+        if ("caches" in window) {
+          window.caches.keys().then((keys) => {
+            keys.forEach((key) => window.caches.delete(key));
+          });
+        }
+        return;
+      }
+
+      // Production PWA: Purge any lingering legacy caches from previous versions
       if ("caches" in window) {
         window.caches.keys().then((keys) => {
           keys.forEach((key) => {
@@ -190,9 +205,7 @@ function RootComponent() {
           });
         })
         .catch((err) => {
-          if (import.meta.env.DEV) {
-            console.debug("[MelodyMap] SW registration failed:", err);
-          }
+          console.debug("[MelodyMap] SW registration failed:", err);
         });
 
       let refreshing = false;
