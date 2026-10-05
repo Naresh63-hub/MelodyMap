@@ -48,7 +48,7 @@ export function MobileHeader({ tab = "foryou", onOpenMenu, onOpenSettings }: Pro
         )}
 
         <div className="min-w-0">
-          <h1 className="text-base sm:text-lg font-bold text-white truncate leading-tight">
+          <h1 suppressHydrationWarning className="text-base sm:text-lg font-bold text-white truncate leading-tight">
             {getTitle()}
           </h1>
           {getSubtitle() && (

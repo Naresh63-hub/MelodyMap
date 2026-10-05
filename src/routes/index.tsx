@@ -233,8 +233,8 @@ function MusicApp() {
     resetSettings,
   } = useLibrary(auth.userId);
 
-  // Cached home feed loaded synchronously for instant 0ms startup without flashing
-  const [cachedFeed] = useState(() => readHomeCache());
+  // Cached home feed loaded safely after hydration to avoid SSR mismatch
+  const [cachedFeed, setCachedFeed] = useState<Partial<HomeCacheData>>({});
 
   // --- UI state ---
   const [tab, setTab] = useState<NavTab>("foryou");
@@ -248,36 +248,28 @@ function MusicApp() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
-  const [recs, setRecs] = useState<Track[]>(() => cachedFeed.recs || []);
-  const [trendingList, setTrendingList] = useState<Track[]>(() => cachedFeed.trendingList || []);
-  const [oldSongsList, setOldSongsList] = useState<Track[]>(() => (cachedFeed.oldSongsList || []).filter(isOldEraTrack));
+  const [recs, setRecs] = useState<Track[]>([]);
+  const [trendingList, setTrendingList] = useState<Track[]>([]);
+  const [oldSongsList, setOldSongsList] = useState<Track[]>([]);
   const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [index, setIndex] = useState(0);
-  const [volume, setVolume] = useState(() => {
-    if (typeof window === "undefined") return 80;
-    const saved = localStorage.getItem("melodymap.volume.v1");
-    return saved ? Math.min(100, Math.max(0, Number(saved) || 80)) : 80;
-  });
+  const [volume, setVolume] = useState(80);
   const [showSettings, setShowSettings] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
-  const [continuous, setContinuous] = useState(() => {
-    if (typeof window === "undefined") return true;
-    const saved = localStorage.getItem("melodymap.continuous.v1");
-    return saved !== null ? saved === "true" : true;
-  });
+  const [continuous, setContinuous] = useState(true);
   const [extending, setExtending] = useState(false);
   const [resumed, setResumed] = useState(false);
   const [mix, setMix] = useState<MixId>("discover");
   const [mixTracks, setMixTracks] = useState<
     Record<"discover" | "newrelease" | "explore", Track[]>
-  >(() => cachedFeed.mixTracks || { discover: [], newrelease: [], explore: [] });
+  >({ discover: [], newrelease: [], explore: [] });
   const [mixLoading, setMixLoading] = useState(false);
-  const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>(() => cachedFeed.dailyMixTracks || []);
+  const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>([]);
 
   const [loadingMoreRecs, setLoadingMoreRecs] = useState(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
@@ -2249,25 +2241,52 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     bootstrapped.current = true;
     runStartupMigrations();
 
+    // Read stored volume & continuous play preferences safely after hydration
+    try {
+      const savedVol = localStorage.getItem("melodymap.volume.v1");
+      if (savedVol) {
+        const v = Math.min(100, Math.max(0, Number(savedVol) || 80));
+        setVolume(v);
+        player.setVolume(v);
+      }
+      const savedCont = localStorage.getItem("melodymap.continuous.v1");
+      if (savedCont !== null) setContinuous(savedCont === "true");
+    } catch {}
+
+    const cached = readHomeCache();
+    setCachedFeed(cached);
+    if (cached.recs && cached.recs.length > 0) setRecs(cached.recs);
+    if (cached.trendingList && cached.trendingList.length > 0) setTrendingList(cached.trendingList);
+    if (cached.oldSongsList && cached.oldSongsList.length > 0) {
+      setOldSongsList(cached.oldSongsList.filter(isOldEraTrack));
+    }
+    if (cached.dailyMixTracks && cached.dailyMixTracks.length > 0) {
+      setDailyMixTracks(cached.dailyMixTracks);
+    }
+    if (cached.mixTracks) {
+      setMixTracks(cached.mixTracks);
+    }
+
     // Auto-refresh recommendations on startup ONLY if the local feed cache is empty.
     // If the user already has cached picks, show them instantly without network delay or flashing.
     const hasCachedFeed =
-      (cachedFeed.recs && cachedFeed.recs.length > 0) ||
-      (cachedFeed.trendingList && cachedFeed.trendingList.length > 0) ||
-      (cachedFeed.oldSongsList && cachedFeed.oldSongsList.length > 0);
+      (cached.recs && cached.recs.length > 0) ||
+      (cached.trendingList && cached.trendingList.length > 0) ||
+      (cached.oldSongsList && cached.oldSongsList.length > 0);
     // Cached feeds restored for instant paint count as "previously displayed" for
     // this session, so a refresh never re-serves them.
     markFeedDisplayed([
-      ...(cachedFeed.recs || []),
-      ...(cachedFeed.trendingList || []),
-      ...((cachedFeed.oldSongsList || []).filter(isOldEraTrack)),
-      ...(cachedFeed.dailyMixTracks || []),
-      ...Object.values(cachedFeed.mixTracks || {}).flat(),
+      ...(cached.recs || []),
+      ...(cached.trendingList || []),
+      ...((cached.oldSongsList || []).filter(isOldEraTrack)),
+      ...(cached.dailyMixTracks || []),
+      ...Object.values(cached.mixTracks || {}).flat(),
     ]);
     if (!hasCachedFeed) {
       void loadRecommendations();
     }
-  }, [hydrated, cachedFeed, loadRecommendations, markFeedDisplayed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, loadRecommendations, markFeedDisplayed]);
 
   // Reload recommendations ONLY when language preferences actually change in settings
   const prevLanguagesRef = useRef<string | null>(null);
@@ -2543,7 +2562,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   {/* Greeting & Moods */}
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <h1 className="text-2xl font-bold tracking-tight text-white">
+                      <h1 suppressHydrationWarning className="text-2xl font-bold tracking-tight text-white">
                         Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {auth.profile?.display_name?.split(" ")[0] || "Listener"}
                       </h1>
                       <p className="text-xs text-white/50 mt-0.5">Recommended based on your recent listening</p>
@@ -2945,6 +2964,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           liked={likedIds.has(current?.id ?? "")}
           position={player.position}
           duration={player.duration}
+          isCrossfading={player.isCrossfading}
           onTogglePlay={togglePlay}
           onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
@@ -2965,6 +2985,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           position={player.position}
           duration={player.duration}
           volume={volume}
+          isCrossfading={player.isCrossfading}
           onTogglePlay={togglePlay}
           onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
@@ -3002,6 +3023,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             duration={player.duration}
             volume={volume}
             playbackSpeed={player.playbackSpeed}
+            crossfade={player.equalizerSettings.crossfade}
+            onCrossfadeChange={player.setCrossfadeDuration}
+            isCrossfading={player.isCrossfading}
             playlistName={tab === "podcasts" ? "Podcasts" : tab === "languages" ? "Languages" : "My Favourites"}
             shuffle={shuffle}
             repeatMode={repeatMode}
@@ -3142,6 +3166,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             localStorage.setItem("melodymap.continuous.v1", String(v));
           }}
           onOpenEqualizer={() => setShowEqualizer(true)}
+          crossfade={player.equalizerSettings.crossfade}
+          onCrossfadeChange={player.setCrossfadeDuration}
           onOpenSleepTimer={() => setShowSleepTimer(true)}
           onOpenShortcuts={() => setShowShortcuts(true)}
           userId={auth.userId}

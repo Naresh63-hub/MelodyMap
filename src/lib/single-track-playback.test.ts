@@ -448,7 +448,7 @@ describe("Spotify-style Single-Track Playback and Queue Architecture", () => {
 
     it("R. guards load() against restarting audio if stream is already actively playing at 0:00", () => {
       let currentTrackId = trackB.id;
-      let isPlaying = true;
+      const isPlaying = true;
       let startAt = 0;
       let restartAttempted = false;
 

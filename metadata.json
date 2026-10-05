@@ -1,0 +1,6 @@
+{
+  "name": "MelodyMap",
+  "description": "Clean, editorial streaming music player with discovery, offline support, audio controls, and rich multi-provider search.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

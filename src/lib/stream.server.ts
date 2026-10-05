@@ -372,7 +372,6 @@ export async function resolveStreamUrlWithMeta(
 
       // Strategy 2: InnerTube Player direct API fallback
       if (!entry) {
-        console.info(`[stream] yt-dlp unavailable or failed for ${videoId}, attempting InnerTube fallback...`);
         entry = await resolveWithInnerTubePlayer(videoId, quality);
       }
 

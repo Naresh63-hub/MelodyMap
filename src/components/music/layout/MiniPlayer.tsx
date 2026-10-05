@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Heart, Loader2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { Disc, Heart, Loader2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 
@@ -10,6 +10,7 @@ type Props = {
   liked?: boolean;
   position: number;
   duration: number;
+  isCrossfading?: boolean;
   onTogglePlay: () => void;
   onToggleLike?: () => void;
   onNext: () => void;
@@ -31,6 +32,7 @@ export function MiniPlayer({
   liked = false,
   position,
   duration,
+  isCrossfading = false,
   onTogglePlay,
   onToggleLike,
   onNext,
@@ -96,9 +98,17 @@ export function MiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs sm:text-[13px] font-semibold text-[#F5F5F5] leading-tight">
-              {track?.title ?? "No track"}
-            </p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p className="truncate text-xs sm:text-[13px] font-semibold text-[#F5F5F5] leading-tight">
+                {track?.title ?? "No track"}
+              </p>
+              {isCrossfading && (
+                <span className="shrink-0 inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded-full animate-pulse">
+                  <Disc className="h-2.5 w-2.5 animate-spin text-emerald-400" />
+                  Fade
+                </span>
+              )}
+            </div>
             <p className="truncate text-[11px] text-[#A1A1A1] leading-tight mt-0.5">
               {track?.artist ?? "—"}
             </p>

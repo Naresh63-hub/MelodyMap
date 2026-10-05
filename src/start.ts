@@ -41,7 +41,6 @@ const securityHeadersMiddleware = createMiddleware().server(async ({ request, ne
   );
   if (res instanceof Response) {
     res.headers.set("X-Content-Type-Options", "nosniff");
-    res.headers.set("X-Frame-Options", "SAMEORIGIN");
     res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
     res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
@@ -52,11 +51,10 @@ const securityHeadersMiddleware = createMiddleware().server(async ({ request, ne
     }
 
     // Report-only CSP: surfaces violations in the console without blocking
-    // anything while a strict policy is tuned. frame-ancestors backs up
-    // X-Frame-Options.
+    // anything while a strict policy is tuned.
     res.headers.set(
       "Content-Security-Policy-Report-Only",
-      "default-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
+      "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; object-src 'none'; base-uri 'self'; form-action 'self'",
     );
   }
   return res;

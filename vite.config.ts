@@ -49,17 +49,19 @@ function streamProxyPlugin(): Plugin {
 
 export default defineConfig({
   server: {
+    host: "0.0.0.0",
+    port: 3000,
     headers: {
       "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "SAMEORIGIN",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     },
   },
   preview: {
+    host: "0.0.0.0",
+    port: 3000,
     headers: {
       "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "SAMEORIGIN",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     },

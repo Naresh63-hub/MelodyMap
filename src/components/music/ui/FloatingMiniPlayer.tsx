@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Disc,
   Heart,
   Maximize2,
   Pause,
@@ -20,6 +21,7 @@ type Props = {
   position: number;
   duration: number;
   volume: number;
+  isCrossfading?: boolean;
   onTogglePlay: () => void;
   onToggleLike?: () => void;
   onNext: () => void;
@@ -38,6 +40,7 @@ export function FloatingMiniPlayer({
   position,
   duration,
   volume: _volume,
+  isCrossfading = false,
   onTogglePlay,
   onToggleLike,
   onNext,
@@ -239,7 +242,14 @@ export function FloatingMiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <h4 className="text-xs font-semibold text-[#F5F5F5] truncate leading-tight">{track.title}</h4>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h4 className="text-xs font-semibold text-[#F5F5F5] truncate leading-tight">{track.title}</h4>
+              {isCrossfading && (
+                <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded animate-pulse">
+                  <Disc className="h-2.5 w-2.5 animate-spin" />
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-[#A1A1A1] truncate mt-0.5 leading-tight">
               {track.artist}
             </p>

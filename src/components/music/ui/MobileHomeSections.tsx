@@ -235,25 +235,24 @@ export function MobileHomeSections({
 
   const hasAny =
     recentlyPlayed.length > 0 ||
+    (dailyMix && dailyMix.length > 0) ||
     trending.length > 0 ||
     (oldSongs && oldSongs.length > 0) ||
     newReleases.length > 0 ||
     recommended.length > 0;
 
-  if (!hasAny) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
-        <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
-        <h3 className="text-sm font-semibold text-white/80 mb-1">Nothing here yet</h3>
-        <p className="text-xs text-neutral-400 max-w-xs px-4">
-          Search for your favorite songs or artists to start listening.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" suppressHydrationWarning>
+      {!hasAny && (
+        <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+          <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
+          <h3 className="text-sm font-semibold text-white/80 mb-1">Nothing here yet</h3>
+          <p className="text-xs text-neutral-400 max-w-xs px-4">
+            Search for your favorite songs or artists to start listening.
+          </p>
+        </div>
+      )}
+
       {/* 1. Daily Mix */}
       {dailyMix && dailyMix.length > 0 && (
         <section className="animate-fade-in">
