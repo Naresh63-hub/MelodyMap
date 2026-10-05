@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Disc, Heart, Loader2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { Disc, Heart, Loader2, Moon, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 
@@ -11,18 +11,22 @@ type Props = {
   position: number;
   duration: number;
   isCrossfading?: boolean;
+  isSleepTimerActive?: boolean;
+  sleepTimerRemaining?: string;
+  userInitial?: string;
   onTogglePlay: () => void;
   onToggleLike?: () => void;
   onNext: () => void;
   onPrevious?: () => void;
   onOpenPlayer: () => void;
+  onOpenSleepTimer?: () => void;
   onOpenEqualizer?: () => void;
   onSeek?: (seconds: number) => void;
 };
 
 /**
- * Clean, human-designed music player dock anchored above bottom navigation.
- * Standard streaming architecture: [Artwork] [Song/Artist] [Like] [Prev] [Play/Pause] [Next]
+ * Spotify-styled Mini Player dock anchored above bottom navigation.
+ * Standard streaming architecture: [Rotating User Vinyl Badge + Artwork] [Song/Artist] [Sleep Timer] [Like] [Prev] [Play/Pause] [Next]
  * Very thin progress hairline on top edge.
  */
 export function MiniPlayer({
@@ -33,11 +37,15 @@ export function MiniPlayer({
   position,
   duration,
   isCrossfading = false,
+  isSleepTimerActive = false,
+  sleepTimerRemaining = "",
+  userInitial = "N",
   onTogglePlay,
   onToggleLike,
   onNext,
   onPrevious,
   onOpenPlayer,
+  onOpenSleepTimer,
   onOpenEqualizer: _onOpenEqualizer,
   onSeek,
 }: Props) {
@@ -54,9 +62,11 @@ export function MiniPlayer({
     onSeek(ratio * duration);
   };
 
+  const initial = userInitial.trim().charAt(0).toUpperCase() || "N";
+
   return (
     <div
-      className="fixed z-40 border-t border-white/[0.06] bg-[#101010]/95 backdrop-blur-xl shadow-xl max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between"
+      className="fixed z-40 border-t border-white/[0.08] bg-[#121212]/98 backdrop-blur-2xl shadow-2xl max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between transition-all"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
       {/* 2px Hairline Progress Indicator at Top */}
@@ -68,28 +78,29 @@ export function MiniPlayer({
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         onClick={handleBarClick}
-        className="relative w-full h-[2px] bg-white/[0.06] cursor-pointer"
+        className="relative w-full h-[2.5px] bg-white/[0.08] cursor-pointer group"
       >
         <div
-          className="h-full bg-[#1DB954] transition-all duration-150 ease-linear"
+          className="h-full bg-[#1DB954] transition-all duration-150 ease-linear group-hover:bg-[#1ed760]"
           style={{ width: `${progressPct}%` }}
         />
       </div>
 
       {/* Main Track Row */}
       <div className="flex-1 flex items-center justify-between px-3 gap-2.5">
-        {/* Artwork + Title/Artist -> tap anywhere to expand to Full Player */}
+        {/* Artwork + Rotating Vinyl User Letter Circle + Title/Artist -> tap to expand */}
         <button
           type="button"
           onClick={onOpenPlayer}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left group"
           aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
-          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-[#181818] border border-white/[0.06]">
+          {/* Pristine Album Thumbnail with strict boundaries (ZERO overlapping elements) */}
+          <div className="h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-lg bg-[#181818] border border-white/[0.08] shadow-md">
             {track?.thumbnail ? (
               <img
                 src={track.thumbnail}
-                alt=""
+                alt={track.title}
                 className="h-full w-full object-cover"
               />
             ) : (
@@ -97,9 +108,26 @@ export function MiniPlayer({
             )}
           </div>
 
+          {/* Dedicated Rotating User Vinyl Disc (Standalone, zero overlap, strictly bounded) */}
+          <div
+            className={cn(
+              "relative flex h-8 w-8 sm:h-8.5 sm:w-8.5 shrink-0 items-center justify-center rounded-full bg-[#121212] border border-white/20 shadow-sm select-none transition-transform",
+              isPlaying ? "animate-[spin_4s_linear_infinite]" : "rotate-0"
+            )}
+            title={`Listener: ${initial} • ${isPlaying ? "Playing (Vinyl Spinning)" : "Paused"}`}
+          >
+            {/* Vinyl record groove rings */}
+            <div className="absolute inset-1 rounded-full border border-white/10 pointer-events-none" />
+            <div className="relative flex h-4 w-4 sm:h-4.5 sm:w-4.5 items-center justify-center rounded-full bg-zinc-950 border border-[#1DB954] text-[#1DB954]">
+              <span className="font-black text-[9px] sm:text-[10px] leading-none text-[#1DB954]">
+                {initial}
+              </span>
+            </div>
+          </div>
+
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 min-w-0">
-              <p className="truncate text-xs sm:text-[13px] font-semibold text-[#F5F5F5] leading-tight">
+              <p className="truncate text-xs sm:text-[13px] font-bold text-[#F5F5F5] leading-tight group-hover:text-[#1DB954] transition-colors">
                 {track?.title ?? "No track"}
               </p>
               {isCrossfading && (
@@ -109,7 +137,7 @@ export function MiniPlayer({
                 </span>
               )}
             </div>
-            <p className="truncate text-[11px] text-[#A1A1A1] leading-tight mt-0.5">
+            <p className="truncate text-[11px] text-[#A1A1A1] leading-tight mt-0.5 font-medium">
               {track?.artist ?? "—"}
             </p>
           </div>
@@ -117,6 +145,28 @@ export function MiniPlayer({
 
         {/* Playback Controls */}
         <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+          {/* Sleep Timer Controller Button */}
+          {onOpenSleepTimer && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenSleepTimer();
+              }}
+              className={cn(
+                "p-1.5 sm:p-2 rounded-full transition-all active:scale-95",
+                isSleepTimerActive
+                  ? "text-[#1DB954] bg-[#1DB954]/15 border border-[#1DB954]/30 shadow-sm"
+                  : "text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.05]"
+              )}
+              aria-label="Sleep timer"
+              title={isSleepTimerActive ? `Sleep timer active: ${sleepTimerRemaining}` : "Set sleep timer"}
+            >
+              <Moon className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Like Button */}
           {onToggleLike && (
             <button
               type="button"
@@ -124,7 +174,7 @@ export function MiniPlayer({
                 e.stopPropagation();
                 onToggleLike();
               }}
-              className="p-2 text-[#737373] hover:text-[#F5F5F5] transition-colors"
+              className="p-1.5 sm:p-2 text-[#737373] hover:text-[#F5F5F5] transition-colors active:scale-95"
               aria-label={liked ? "Remove from favourites" : "Save to favourites"}
             >
               <Heart
@@ -136,14 +186,15 @@ export function MiniPlayer({
             </button>
           )}
 
+          {/* Previous Track */}
           {onPrevious && (
             <button
               type="button"
               onClick={onPrevious}
-              className="p-1.5 text-[#737373] hover:text-[#F5F5F5] transition-colors"
+              className="p-1.5 text-[#737373] hover:text-[#F5F5F5] transition-colors active:scale-95"
               aria-label="Previous track"
             >
-              <SkipBack className="h-4 w-4" />
+              <SkipBack className="h-4 w-4 fill-current" />
             </button>
           )}
 
@@ -152,7 +203,7 @@ export function MiniPlayer({
             type="button"
             onClick={onTogglePlay}
             disabled={isLoading}
-            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-[#F5F5F5] text-black hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
+            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-[#F5F5F5] text-black hover:scale-105 active:scale-95 transition-transform disabled:opacity-75 shadow-md shadow-black/40"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isLoading ? (
@@ -164,13 +215,14 @@ export function MiniPlayer({
             )}
           </button>
 
+          {/* Next Track */}
           <button
             type="button"
             onClick={onNext}
-            className="p-1.5 text-[#737373] hover:text-[#F5F5F5] transition-colors"
+            className="p-1.5 text-[#737373] hover:text-[#F5F5F5] transition-colors active:scale-95"
             aria-label="Next track"
           >
-            <SkipForward className="h-4 w-4" />
+            <SkipForward className="h-4 w-4 fill-current" />
           </button>
         </div>
       </div>

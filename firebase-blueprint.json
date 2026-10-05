@@ -1,0 +1,105 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with authentication and listener details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique Firebase Auth user ID" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "displayName": { "type": "string", "description": "Display name of listener" },
+        "photoURL": { "type": "string", "description": "Avatar photo URL" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last profile update timestamp" }
+      },
+      "required": ["id"]
+    },
+    "LikedTrack": {
+      "title": "LikedTrack",
+      "description": "Track saved to user favourites",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Track ID" },
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "title": { "type": "string", "description": "Song title" },
+        "artist": { "type": "string", "description": "Artist name" },
+        "thumbnail": { "type": "string", "description": "Album cover URL" },
+        "duration": { "type": "number", "description": "Duration in seconds" },
+        "previewUrl": { "type": "string", "description": "Audio preview stream URL" },
+        "addedAt": { "type": "string", "format": "date-time", "description": "Timestamp when added" }
+      },
+      "required": ["id", "userId", "title", "artist"]
+    },
+    "PlaylistItem": {
+      "title": "PlaylistItem",
+      "description": "Custom playlist created by user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Playlist ID" },
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "name": { "type": "string", "description": "Playlist name", "maxLength": 100 },
+        "description": { "type": "string", "description": "Optional description", "maxLength": 500 },
+        "tracks": { "type": "array", "description": "List of track objects in playlist" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["id", "userId", "name"]
+    },
+    "HistoryItem": {
+      "title": "HistoryItem",
+      "description": "Listening history entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "History record ID" },
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "trackId": { "type": "string", "description": "Track ID" },
+        "title": { "type": "string", "description": "Track title" },
+        "artist": { "type": "string", "description": "Artist name" },
+        "thumbnail": { "type": "string", "description": "Album cover URL" },
+        "playedAt": { "type": "string", "format": "date-time", "description": "Played timestamp" }
+      },
+      "required": ["id", "userId", "trackId", "title", "artist"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "User player and audio preferences",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "languages": { "type": "array", "description": "Preferred music languages" },
+        "audioQuality": { "type": "string", "description": "Stream quality setting" },
+        "crossfade": { "type": "number", "description": "Crossfade duration in seconds" },
+        "continuous": { "type": "boolean", "description": "Continuous auto-play setting" },
+        "volume": { "type": "number", "description": "Saved volume level" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "User profile documents"
+    },
+    "/users/{userId}/likes/{trackId}": {
+      "schema": { "$ref": "LikedTrack" },
+      "description": "User favorite tracks collection"
+    },
+    "/users/{userId}/playlists/{playlistId}": {
+      "schema": { "$ref": "PlaylistItem" },
+      "description": "User playlists collection"
+    },
+    "/users/{userId}/history/{historyId}": {
+      "schema": { "$ref": "HistoryItem" },
+      "description": "User listening history collection"
+    },
+    "/users/{userId}/settings/preferences": {
+      "schema": { "$ref": "UserSettings" },
+      "description": "User playback and UI preferences"
+    },
+    "/users/{userId}/library/{docId}": {
+      "schema": { "$ref": "UserSettings" },
+      "description": "User library aggregate state sync"
+    }
+  }
+}

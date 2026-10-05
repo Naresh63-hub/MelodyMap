@@ -406,17 +406,39 @@ export function useLibrary(userId?: string | null) {
 
     void (async () => {
       try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { data } = await supabase
-          .from("user_library")
-          .select("data")
-          .eq("user_id", userId)
-          .maybeSingle();
+        let docData: Partial<LibraryDoc> | null = null;
+
+        // 1. Primary: Cloud Firestore
+        try {
+          const { db, doc, getDoc } = await import("@/lib/firebase");
+          const libraryRef = doc(db, "users", userId, "library", "state");
+          const snap = await getDoc(libraryRef);
+          if (snap.exists()) {
+            docData = snap.data() as Partial<LibraryDoc>;
+          }
+        } catch (fsErr) {
+          console.warn("[MelodyMap] Firestore pull notice:", fsErr);
+        }
+
+        // 2. Fallback: Supabase if Firestore document was empty
+        if (!docData) {
+          try {
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { data } = await supabase
+              .from("user_library")
+              .select("data")
+              .eq("user_id", userId)
+              .maybeSingle();
+            if (data?.data) {
+              docData = data.data as Partial<LibraryDoc>;
+            }
+          } catch {}
+        }
 
         if (cancelled) return;
 
-        if (data?.data) {
-          const doc = data.data as Partial<LibraryDoc>;
+        if (docData) {
+          const doc = docData;
           setLikes((prev) => {
             const next = mergeById((doc.likes ?? []).filter((t) => isMusicTrack(t, true, true)), prev, 200);
             write(LIKES_KEY, next);
@@ -500,7 +522,6 @@ export function useLibrary(userId?: string | null) {
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        const { supabase } = await import("@/integrations/supabase/client");
         const { thompsonSamplingPolicy } = await import("@/lib/bandit-policy");
         const { telemetry } = await import("@/lib/telemetry");
         if (cancelled) return;
@@ -508,22 +529,38 @@ export function useLibrary(userId?: string | null) {
         const banditModel = thompsonSamplingPolicy.getModelState();
         const recentTelemetry = telemetry.drainEvents(30);
 
-        const { error } = await supabase.from("user_library").upsert({
-          user_id: userId,
-          data: {
-            likes,
-            dislikes,
-            history: history.slice(0, 100),
-            podcastHistory: podcastHistory.slice(0, 100),
-            playlists,
-            settings,
-            stats,
-            banditModel,
-            telemetryEvents: recentTelemetry,
-            playback: readPlayback() ?? undefined,
-          } as any,
-        });
-        if (error) console.warn("[MelodyMap] Library sync failed:", error.message);
+        const payload = {
+          userId,
+          likes,
+          dislikes,
+          history: history.slice(0, 100),
+          podcastHistory: podcastHistory.slice(0, 100),
+          playlists,
+          settings,
+          stats,
+          banditModel,
+          telemetryEvents: recentTelemetry,
+          playback: readPlayback() ?? undefined,
+          updatedAt: new Date().toISOString(),
+        };
+
+        // 1. Primary: Cloud Firestore
+        try {
+          const { db, doc, setDoc } = await import("@/lib/firebase");
+          const libraryRef = doc(db, "users", userId, "library", "state");
+          await setDoc(libraryRef, payload, { merge: true });
+        } catch (fsErr) {
+          console.warn("[MelodyMap] Firestore sync notice:", fsErr);
+        }
+
+        // 2. Secondary fallback: Supabase
+        try {
+          const { supabase } = await import("@/integrations/supabase/client");
+          await supabase.from("user_library").upsert({
+            user_id: userId,
+            data: payload as any,
+          });
+        } catch {}
       } catch (err) {
         console.warn("[MelodyMap] Library sync error:", err);
       }

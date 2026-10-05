@@ -65,6 +65,7 @@ type Props = {
   onOpenShortcuts?: () => void;
   onOpenOptions?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
+  userInitial?: string;
   canNext: boolean;
   canPrevious: boolean;
 };
@@ -86,6 +87,7 @@ export function FullScreenPlayer({
   playlistName = "My Favourites",
   shuffle = false,
   repeatMode = "off",
+  userInitial = "N",
   onToggleShuffle,
   onToggleRepeat,
   onTogglePlay,
@@ -110,6 +112,7 @@ export function FullScreenPlayer({
   canNext,
   canPrevious,
 }: Props) {
+  const initial = userInitial.trim().charAt(0).toUpperCase() || "N";
   const { isActive: isSleepTimerActive, formattedRemaining: sleepTimerCountdown } = useSleepTimer();
   const [showCrossfadeMenu, setShowCrossfadeMenu] = useState(false);
   const crossfadeMenuRef = useRef<HTMLDivElement | null>(null);
@@ -178,13 +181,29 @@ export function FullScreenPlayer({
         </div>
 
         {/* Center Artwork */}
-        <div className="flex flex-col items-center justify-center my-auto w-full py-4">
-          <div className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-2xl shadow-2xl shadow-black/90 border border-white/[0.06]">
+        <div className="flex flex-col items-center justify-center my-auto w-full py-2 sm:py-4">
+          <div className="relative aspect-square w-60 sm:w-72 overflow-hidden rounded-2xl shadow-2xl shadow-black/90 border border-white/[0.08]">
             <img
               src={track.thumbnail}
               alt={track.title}
               className="h-full w-full object-cover"
             />
+          </div>
+
+          {/* User Letter in Rotating Vinyl Disc Indicator (Strictly bounded, zero overlap) */}
+          <div className="flex items-center gap-2 mt-4 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] shadow-sm select-none">
+            <div
+              className={cn(
+                "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#121212] border border-white/20 select-none transition-transform",
+                isPlaying ? "animate-[spin_4s_linear_infinite]" : "rotate-0"
+              )}
+              title={`Listener: ${initial} • ${isPlaying ? "Playing (Vinyl Spinning)" : "Paused"}`}
+            >
+              <div className="absolute inset-0.5 rounded-full border border-white/10 pointer-events-none" />
+              <span className="font-black text-[9px] leading-none text-[#1DB954]">{initial}</span>
+            </div>
+            <span className="text-xs font-bold text-white/90">Listener {initial}</span>
+            <span className="text-[11px] text-[#1DB954] font-medium">• {isPlaying ? "Vinyl Spinning" : "Paused"}</span>
           </div>
 
           {/* Track Info Row */}

@@ -3,11 +3,16 @@ import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
+import firebaseRulesPlugin from "@firebase/eslint-plugin-security-rules";
 
 export default tseslint.config(
   // Formatting is enforced by the separate `prettier` script — running prettier
   // as an eslint rule (eslint-plugin-prettier) made lint runs take minutes.
   { ignores: ["dist", ".output", ".vinxi", ".tanstack", ".wrangler", ".vercel", "android/**", "src/routeTree.gen.ts"] },
+  {
+    ...firebaseRulesPlugin.configs["flat/recommended"],
+    files: ["firestore.rules"],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

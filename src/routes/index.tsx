@@ -21,6 +21,7 @@ import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchRe
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { sleepTimerService } from "@/lib/sleep-timer";
+import { useSleepTimer } from "@/hooks/useSleepTimer";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
@@ -279,6 +280,18 @@ function MusicApp() {
   const [showFloatingMini, setShowFloatingMini] = useState(false);
   const [optionsTrack, setOptionsTrack] = useState<Track | null>(null);
   const [showSleepTimer, setShowSleepTimer] = useState(false);
+  const {
+    isActive: isSleepTimerActive,
+    formattedRemaining: sleepTimerCountdown,
+  } = useSleepTimer();
+
+  const userInitialLetter = (
+    auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+      ? auth.profile.display_name[0]
+      : auth.email && auth.email !== "listener@google.com"
+        ? auth.email[0]
+        : "M"
+  )?.toUpperCase() ?? "M";
   const [shareTrack, setShareTrack] = useState<Track | null>(null);
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
@@ -2410,14 +2423,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               ? auth.email.split("@")[0]
               : "My Account"
         }
-        userInitial={
-          (auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
-            ? auth.profile.display_name[0]
-            : auth.email && auth.email !== "listener@google.com"
-              ? auth.email[0]
-              : "M"
-          )?.toUpperCase() ?? "M"
-        }
+        userInitial={userInitialLetter}
         userAvatar={auth.profile?.avatar_url ?? null}
         onSignIn={() => {
           setDrawerOpen(false);
@@ -2431,10 +2437,29 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       />
 
       {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#080808]">
+      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[#080808]">
+        {/* Dynamic Spotify Ambient Canvas / Background Music Glow */}
+        {current?.thumbnail && (
+          <div
+            aria-hidden="true"
+            className="fixed inset-0 pointer-events-none -z-0 overflow-hidden transition-opacity duration-1000 select-none"
+            style={{ opacity: player.isPlaying ? 0.12 : 0.05 }}
+          >
+            <div
+              className="absolute -top-[25%] -left-[15%] w-[130%] h-[90%] bg-cover bg-center blur-[130px] scale-125 transition-all duration-1000"
+              style={{ backgroundImage: `url(${current.thumbnail})` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/70 via-[#080808]/85 to-[#080808]" />
+          </div>
+        )}
+
         {/* Mobile header — on all non-search tabs */}
         {tab !== "search" && (
           <MobileHeader
+            tab={tab}
+            userInitial={userInitialLetter}
+            isPlaying={player.isPlaying}
+            onOpenAuth={() => setShowAuthModal(true)}
             onOpenMenu={() => setDrawerOpen(true)}
             onOpenSettings={() => setShowSettings((v) => !v)}
           />
@@ -2965,12 +2990,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           position={player.position}
           duration={player.duration}
           isCrossfading={player.isCrossfading}
+          isSleepTimerActive={isSleepTimerActive}
+          sleepTimerRemaining={sleepTimerCountdown}
+          userInitial={userInitialLetter}
           onTogglePlay={togglePlay}
           onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
           onPrevious={goPrev}
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
+          onOpenSleepTimer={() => setShowSleepTimer(true)}
           onSeek={(s) => player.seek(s)}
         />
       )}
@@ -2986,6 +3015,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           duration={player.duration}
           volume={volume}
           isCrossfading={player.isCrossfading}
+          isSleepTimerActive={isSleepTimerActive}
+          sleepTimerRemaining={sleepTimerCountdown}
+          userInitial={userInitialLetter}
           onTogglePlay={togglePlay}
           onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
@@ -2999,6 +3031,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setShowFloatingMini(false);
             setShowFullScreen(true);
           }}
+          onOpenSleepTimer={() => setShowSleepTimer(true)}
           onClose={() => setShowFloatingMini(false)}
         />
       )}
@@ -3026,6 +3059,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             crossfade={player.equalizerSettings.crossfade}
             onCrossfadeChange={player.setCrossfadeDuration}
             isCrossfading={player.isCrossfading}
+            userInitial={userInitialLetter}
             playlistName={tab === "podcasts" ? "Podcasts" : tab === "languages" ? "Languages" : "My Favourites"}
             shuffle={shuffle}
             repeatMode={repeatMode}
