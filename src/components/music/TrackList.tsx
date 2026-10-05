@@ -1,7 +1,6 @@
 import {
   CheckCircle2,
   Download,
-  Heart,
   Loader2,
   Play,
   Plus,
@@ -10,6 +9,7 @@ import {
 } from "lucide-react";
 import type { Playlist, Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
+import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -179,14 +179,11 @@ export function TrackList({
                 </button>
               )}
 
-              <button
-                type="button"
-                onClick={() => onToggleLike(track)}
-                aria-label={liked ? "Remove from favourites" : "Add to favourites"}
-                className="rounded-full p-2 text-white/40 transition-colors hover:text-white active:scale-95"
-              >
-                <Heart className={cn("h-4 w-4 transition-colors", liked && "fill-[#1DB954] text-[#1DB954]")} />
-              </button>
+              <HeartLikeButton
+                liked={liked}
+                onToggle={() => onToggleLike(track)}
+                size="md"
+              />
 
               {onToggleDislike && (
                 <button

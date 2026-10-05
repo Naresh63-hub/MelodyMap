@@ -1,6 +1,7 @@
 import { useState, memo } from "react";
-import { Heart, MoreHorizontal, Music2, Pause, Play } from "lucide-react";
+import { MoreHorizontal, Music2, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HeartLikeButton } from "./HeartLikeButton";
 
 type Props = {
   title: string;
@@ -112,24 +113,13 @@ export function MediaCard({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/card:opacity-100">
+        <div className={cn("flex shrink-0 items-center gap-0.5 transition-opacity duration-150", liked ? "opacity-100" : "opacity-0 group-hover/card:opacity-100")}>
           {onToggleLike && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleLike();
-              }}
-              aria-label={liked ? "Remove from favourites" : "Add to favourites"}
-              className="rounded-full p-1 text-[#737373] hover:text-[#F5F5F5] transition-colors"
-            >
-              <Heart
-                className={cn(
-                  "h-3.5 w-3.5 transition-colors",
-                  liked && "fill-[#1DB954] text-[#1DB954]",
-                )}
-              />
-            </button>
+            <HeartLikeButton
+              liked={Boolean(liked)}
+              onToggle={() => onToggleLike()}
+              size="sm"
+            />
           )}
           {onMore && (
             <button

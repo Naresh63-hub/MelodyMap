@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   Music2,
-  TrendingUp,
   MoreVertical,
   Globe2,
   Mic,
@@ -16,7 +15,8 @@ import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { useSearchHistory, type RecentSearchItem } from "@/lib/search-history";
-import { TrendingGenresChart } from "@/components/music/ui/TrendingGenresChart";
+import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
+import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
 
 export type SearchFilter = "all" | "songs" | "artists" | "albums" | "playlists";
 
@@ -44,25 +44,14 @@ type Props = {
   userLikes?: Track[];
 };
 
-const TRENDING_SEARCH_SEEDS = [
-  "The Weeknd",
-  "Taylor Swift",
-  "Arijit Singh",
-  "Billie Eilish",
-  "Drake",
-  "Ed Sheeran",
-  "Dua Lipa",
-  "Post Malone",
-];
-
 export function SearchResults({
   results,
   loading,
   query,
   onPlayTrack,
-  onToggleLike: _onToggleLike,
+  onToggleLike,
   onOpenOptions,
-  likedIds: _likedIds,
+  likedIds,
   currentId,
   isPlaying,
   onClear: _onClear,
@@ -75,8 +64,6 @@ export function SearchResults({
   recentSearches: propsRecentSearches,
   onRemoveRecentSearch: propsOnRemoveRecentSearch,
   onClearRecentSearches: propsOnClearRecentSearches,
-  userHistory = [],
-  userLikes = [],
 }: Props) {
   const [internalFilter, setInternalFilter] = useState<SearchFilter>("all");
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -114,101 +101,15 @@ export function SearchResults({
     );
   }
 
-  // When no query or no results, show Recent Searches, Trending Searches & Browse Cards
+  // When no query or no results, show Recent Searches & Browse Cards
   if (!query.trim() && results.length === 0) {
     return (
       <div className="space-y-6 animate-fade-in pt-2">
-        {/* Recent Searches */}
-        {recentSearches.length > 0 && (
-          <section className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-[#737373]" />
-                <h2 className="text-sm font-bold text-[#F5F5F5]">Recent Searches</h2>
-              </div>
-              <button
-                type="button"
-                onClick={handleClearRecentSearches}
-                className="flex items-center gap-1 text-xs text-[#737373] hover:text-[#e05252] active:scale-95 transition-all font-medium py-1 px-1.5 rounded"
-                title="Clear all recent searches"
-              >
-                <Trash2 className="h-3 w-3" />
-                <span>Clear all</span>
-              </button>
-            </div>
-
-            <div className="space-y-1">
-              {(showAllHistory ? recentSearches : recentSearches.slice(0, 6)).map((item) => (
-                <div
-                  key={`${item.query}-${item.timestamp}`}
-                  className="group flex items-center justify-between rounded-lg px-2.5 py-2 hover:bg-white/[0.04] transition-colors"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSearch?.(item.query, "songs")}
-                    className="flex items-center gap-3 min-w-0 flex-1 text-left"
-                  >
-                    <Clock className="h-4 w-4 shrink-0 text-[#737373] group-hover:text-[#1DB954] transition-colors" />
-                    <span className="truncate text-sm text-[#F5F5F5] group-hover:text-[#1DB954] transition-colors font-medium">
-                      {item.query}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveRecentSearch(item.query);
-                    }}
-                    aria-label={`Remove "${item.query}" from recent searches`}
-                    title="Remove from history"
-                    className="flex h-7 w-7 items-center justify-center rounded-full text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.08] active:scale-90 transition-all ml-2 shrink-0 opacity-70 group-hover:opacity-100"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {recentSearches.length > 6 && (
-              <div className="pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => setShowAllHistory((prev) => !prev)}
-                  className="text-xs text-[#1DB954] font-medium hover:underline px-2.5 py-1"
-                >
-                  {showAllHistory ? "Show fewer" : `Show ${recentSearches.length - 6} more`}
-                </button>
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* Trending Genres & Search Volumes Visualization */}
-        <TrendingGenresChart
-          userHistory={userHistory}
-          userLikes={userLikes}
-          onSelectGenre={(g) => onSearch?.(g, "songs")}
+        {/* Recent Searches (stores last 5 searched artist or song terms locally) */}
+        <RecentSearchesSection
+          onSelectQuery={(q) => onSearch?.(q, "songs")}
+          maxItems={5}
         />
-
-        {/* Trending Searches */}
-        <section className="space-y-2.5">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-neutral-400" />
-            <h2 className="text-sm font-semibold text-white/90">Trending Searches</h2>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {TRENDING_SEARCH_SEEDS.map((term) => (
-              <button
-                key={term}
-                type="button"
-                onClick={() => onSearch?.(term, "songs")}
-                className="rounded-full bg-white/[0.04] border border-white/[0.06] px-3.5 py-1.5 text-xs font-normal text-neutral-300 hover:bg-white/[0.08] hover:text-white active:scale-95 transition-all"
-              >
-                {term}
-              </button>
-            ))}
-          </div>
-        </section>
 
         {/* Browse By Category Cards */}
         <section className="space-y-2.5">
@@ -216,10 +117,10 @@ export function SearchResults({
           <div className="grid grid-cols-2 gap-3">
             {[
               {
-                title: "Trending Hits",
-                subtitle: "Top chart songs",
+                title: "Top Hits",
+                subtitle: "Popular chart songs",
                 icon: Music2,
-                query: "top trending songs",
+                query: "top hit songs",
                 type: "songs" as const,
               },
               {
@@ -372,13 +273,20 @@ export function SearchResults({
                 </p>
               </button>
 
+              {/* Heart-shaped like toggle button */}
+              <HeartLikeButton
+                liked={likedIds.has(track.id)}
+                onToggle={() => onToggleLike(track)}
+                size="md"
+              />
+
               {/* 3-dots Menu Button */}
               {onOpenOptions && (
                 <button
                   type="button"
                   onClick={() => onOpenOptions(track)}
                   aria-label="Options"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.06] active:scale-90 transition-all"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-white/[0.06] active:scale-90 transition-all"
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>

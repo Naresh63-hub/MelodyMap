@@ -20,7 +20,9 @@ import {
   Loader2,
   HardDrive,
   Activity,
+  Disc,
 } from "lucide-react";
+import { loadEqualizerSettings, saveEqualizerSettings } from "@/lib/equalizer";
 import { useNavigate } from "@tanstack/react-router";
 import { isLowNetworkModeEnabled, setLowNetworkMode } from "@/lib/network-mode";
 import { ListeningInsightsPanel } from "./ListeningInsightsPanel";
@@ -67,6 +69,8 @@ type Props = {
   onOpenEqualizer?: () => void;
   onOpenSleepTimer?: () => void;
   onOpenShortcuts?: () => void;
+  crossfade?: number;
+  onCrossfadeChange?: (seconds: number) => void;
   userId?: string | null;
   userEmail?: string | null;
   userProfile?: Profile | null;
@@ -90,6 +94,8 @@ export function SettingsModal({
   onOpenEqualizer,
   onOpenSleepTimer,
   onOpenShortcuts,
+  crossfade,
+  onCrossfadeChange,
   userId,
   userEmail,
   userProfile,
@@ -102,6 +108,25 @@ export function SettingsModal({
   const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "insights">("account");
   const [sponsorBlockOn, setSponsorBlockOn] = useState<boolean>(getSponsorBlockEnabled);
   const [lowNetworkOn, setLowNetworkOn] = useState<boolean>(isLowNetworkModeEnabled);
+  const [internalCrossfade, setInternalCrossfade] = useState<number>(() => {
+    return crossfade ?? loadEqualizerSettings().crossfade;
+  });
+
+  useEffect(() => {
+    if (crossfade !== undefined) {
+      setInternalCrossfade(crossfade);
+    }
+  }, [crossfade]);
+
+  const currentCrossfade = crossfade ?? internalCrossfade;
+
+  const handleCrossfadeChange = (val: number) => {
+    const clamped = Math.max(0, Math.min(8, Math.round(val)));
+    setInternalCrossfade(clamped);
+    onCrossfadeChange?.(clamped);
+    const eq = loadEqualizerSettings();
+    saveEqualizerSettings({ ...eq, crossfade: clamped });
+  };
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -778,6 +803,75 @@ export function SettingsModal({
                     </p>
                   </div>
                   <Switch checked={sponsorBlockOn} onCheckedChange={handleToggleSponsorBlock} />
+                </div>
+
+                <div className="h-px bg-white/[0.06]" />
+
+                {/* Gapless Playback & Smart Crossfade */}
+                <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4 space-y-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#1DB954]/10 text-[#1DB954] border border-[#1DB954]/20">
+                        <Disc className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-semibold text-white">Gapless Playback &amp; Smart Crossfade</h3>
+                          <span className="rounded-full bg-[#1DB954]/15 px-2 py-0.5 text-[10px] font-semibold text-[#1DB954] border border-[#1DB954]/25">
+                            Studio
+                          </span>
+                        </div>
+                        <p className="text-xs text-white/40 mt-0.5">
+                          Smoothly blends the end of one track into the beginning of the next
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-mono font-medium text-[#1DB954] bg-[#1DB954]/10 px-2.5 py-1 rounded-full border border-[#1DB954]/20 shrink-0">
+                      {currentCrossfade === 0 ? "Gapless (0s)" : `${currentCrossfade}s Blend`}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 pt-1">
+                    <input
+                      type="range"
+                      min="0"
+                      max="8"
+                      step="1"
+                      value={currentCrossfade}
+                      onChange={(e) => handleCrossfadeChange(Number(e.target.value))}
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#1DB954]"
+                    />
+                    <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                      <span>0s (Gapless)</span>
+                      <span>2s</span>
+                      <span>4s</span>
+                      <span>6s</span>
+                      <span>8s (Club DJ)</span>
+                    </div>
+                  </div>
+
+                  {/* Preset Quick Buttons */}
+                  <div className="grid grid-cols-4 gap-2 pt-0.5">
+                    {[
+                      { seconds: 0, label: "0s (Gapless)" },
+                      { seconds: 3, label: "3s (Standard)" },
+                      { seconds: 5, label: "5s (Smooth)" },
+                      { seconds: 8, label: "8s (Club Mix)" },
+                    ].map((p) => (
+                      <button
+                        key={p.seconds}
+                        type="button"
+                        onClick={() => handleCrossfadeChange(p.seconds)}
+                        className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all text-center border ${
+                          currentCrossfade === p.seconds
+                            ? "bg-[#1DB954]/20 border-[#1DB954]/40 text-[#1DB954]"
+                            : "bg-white/[0.03] border-white/[0.06] text-white/60 hover:text-white hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="h-px bg-white/[0.06]" />

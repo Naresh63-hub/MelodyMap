@@ -19,7 +19,7 @@ import { MobileQueue } from "@/components/music/ui/MobileQueue";
 import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
 import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchResults";
 import { VoiceSearchButton } from "@/components/music/ui/VoiceSearchButton";
-import { TrendingGenresChart } from "@/components/music/ui/TrendingGenresChart";
+import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
 import { saveRecentSearch } from "@/lib/search-history";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -2620,6 +2620,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     ))}
                   </div>
 
+                  {/* Recent Searches section in the main view (stores last 5 searched artist or song terms locally) */}
+                  <RecentSearchesSection
+                    onSelectQuery={(q) => {
+                      setTab("search");
+                      setQuery(q);
+                      setSearchFilter("all");
+                      saveRecentSearch(q);
+                      void searchFor(q, "songs", "all");
+                    }}
+                    maxItems={5}
+                    className="pt-1"
+                  />
+
                   {/* Home Sections — mobile horizontal scroll */}
                   <MobileHomeSections
                     recentlyPlayed={history.filter(isMusicTrack).slice(0, 12)}
@@ -2688,20 +2701,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   </div>
                 </div>
 
-                {/* Trending Music Genres & Search Volume Analytics */}
-                <TrendingGenresChart
-                  userHistory={history}
-                  userLikes={likes}
-                  onSelectGenre={(g) => {
-                    setTab("search");
-                    setQuery(g);
-                    setSearchFilter("all");
-                    saveRecentSearch(g);
-                    void searchFor(g, "songs", "all");
-                  }}
-                  className="my-1"
-                />
-
                 <ExploreSections
                   trending={trendingList}
                   oldSongs={oldSongsList.filter(isOldEraTrack)}
@@ -2714,6 +2713,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     startQueue(sectionTracks, i);
                   }}
                   onOpenOptions={(t) => setOptionsTrack(t)}
+                  onToggleLike={handleToggleLike}
+                  likedIds={likedIds}
                   currentId={current?.id ?? null}
                   isPlaying={player.isPlaying}
                   loading={!hydrated || (recLoading && trendingList.length === 0 && oldSongsList.length === 0)}
@@ -2730,6 +2731,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 selectedFilter={searchFilter}
                 userHistory={history}
                 userLikes={likes}
+                onToggleLike={handleToggleLike}
+                likedIds={likedIds}
                 onFilterChange={(newFilter) => {
                   setSearchFilter(newFilter);
                   if (query.trim()) {
@@ -3203,6 +3206,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onOpenEqualizer={() => setShowEqualizer(true)}
           onOpenSleepTimer={() => setShowSleepTimer(true)}
           onOpenShortcuts={() => setShowShortcuts(true)}
+          crossfade={player.equalizerSettings.crossfade}
+          onCrossfadeChange={player.setCrossfadeDuration}
           userId={auth.userId}
           userEmail={auth.email}
           userProfile={auth.profile}

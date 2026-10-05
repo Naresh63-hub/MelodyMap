@@ -1,7 +1,8 @@
 import { useRef } from "react";
-import { Heart, Loader2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { Loader2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
+import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 
 type Props = {
   track: Track | undefined;
@@ -108,22 +109,11 @@ export function MiniPlayer({
         {/* Playback Controls */}
         <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           {onToggleLike && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggleLike();
-              }}
-              className="p-2 text-[#737373] hover:text-[#F5F5F5] transition-colors"
-              aria-label={liked ? "Remove from favourites" : "Save to favourites"}
-            >
-              <Heart
-                className={cn(
-                  "h-4 w-4 transition-colors",
-                  liked && "fill-[#1DB954] text-[#1DB954]",
-                )}
-              />
-            </button>
+            <HeartLikeButton
+              liked={liked}
+              onToggle={() => onToggleLike()}
+              size="md"
+            />
           )}
 
           {onPrevious && (

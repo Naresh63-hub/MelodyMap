@@ -212,6 +212,7 @@ export function useAudioPlayer(options: {
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const isFadingOutRef = useRef<boolean>(false);
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
@@ -469,6 +470,8 @@ export function useAudioPlayer(options: {
       audio.playbackRate = validSpeed;
       audio.load();
 
+      isFadingOutRef.current = false;
+
       if (wantPlayRef.current) {
         const fadeDur = equalizerSettingsRef.current.crossfade || 0;
         if (fadeDur > 0 && audioCtxRef.current && mainGainRef.current) {
@@ -478,6 +481,11 @@ export function useAudioPlayer(options: {
           try {
             mainGain.gain.cancelScheduledValues(ctx.currentTime);
             mainGain.gain.setValueCurveAtTime(curve, ctx.currentTime, Math.min(fadeDur, 4));
+          } catch {}
+        } else if (audioCtxRef.current && mainGainRef.current) {
+          try {
+            mainGainRef.current.gain.cancelScheduledValues(audioCtxRef.current.currentTime);
+            mainGainRef.current.gain.setValueAtTime(1, audioCtxRef.current.currentTime);
           } catch {}
         }
 
@@ -713,6 +721,29 @@ export function useAudioPlayer(options: {
           const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
           prebufferAudioRef.current.src = nextUrl;
           prebufferAudioRef.current.load();
+        }
+      }
+
+      // Smart Crossfade: smoothly fade out ending track according to crossfade duration
+      const fadeDur = equalizerSettingsRef.current.crossfade || 0;
+      if (
+        fadeDur > 0 &&
+        dur > 0 &&
+        dur - cur <= fadeDur &&
+        dur > fadeDur + 2 &&
+        audioCtxRef.current &&
+        mainGainRef.current
+      ) {
+        if (!isFadingOutRef.current) {
+          isFadingOutRef.current = true;
+          const ctx = audioCtxRef.current;
+          const mainGain = mainGainRef.current;
+          const remaining = Math.max(0.1, dur - cur);
+          const curve = createEqualPowerCurve("out", 32);
+          try {
+            mainGain.gain.cancelScheduledValues(ctx.currentTime);
+            mainGain.gain.setValueCurveAtTime(curve, ctx.currentTime, remaining);
+          } catch {}
         }
       }
     };

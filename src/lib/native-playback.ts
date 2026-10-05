@@ -100,6 +100,15 @@ export function resolvePlaybackEngine(opts: {
 }): PlaybackEngine {
   const host = (opts.hostname || "").toLowerCase();
   if (host === "localhost" || host === "127.0.0.1") return "html5";
+  // In AI Studio and Cloud Run preview environments where YouTube iframe embeds are blocked
+  if (
+    host.includes(".run.app") ||
+    host.includes("ais-") ||
+    host.includes("google") ||
+    host.includes("cloudshell")
+  ) {
+    return "html5";
+  }
   return "youtube";
 }
 

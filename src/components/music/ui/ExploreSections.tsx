@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
+import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 
 type Props = {
   trending: Track[];
@@ -10,6 +11,8 @@ type Props = {
   newReleases: Track[];
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
   onOpenOptions?: ((track: Track) => void) | undefined;
+  onToggleLike?: ((track: Track) => void) | undefined;
+  likedIds?: Set<string> | undefined;
   currentId?: string | null | undefined;
   isPlaying: boolean;
   loading?: boolean | undefined;
@@ -21,11 +24,15 @@ function HorizontalScrollRow({
   currentId,
   isPlaying,
   onPlayTrack,
+  onToggleLike,
+  likedIds,
 }: {
   tracks: Track[];
   currentId?: string | null | undefined;
   isPlaying: boolean;
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
+  onToggleLike?: ((track: Track) => void) | undefined;
+  likedIds?: Set<string> | undefined;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -36,55 +43,78 @@ function HorizontalScrollRow({
     >
       {tracks.map((track, i) => {
         const active = currentId === track.id;
+        const liked = likedIds?.has(track.id) ?? false;
         return (
-          <button
+          <div
             key={track.id}
-            type="button"
-            onClick={() => onPlayTrack(track, tracks, i)}
-            className="group w-[132px] shrink-0 snap-start text-left transition-transform active:scale-[0.98] p-1.5 rounded-xl hover:bg-white/[0.04]"
+            className="group relative w-[132px] shrink-0 snap-start text-left transition-transform p-1.5 rounded-xl hover:bg-white/[0.04]"
           >
             <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#161616] border border-white/[0.06]">
-              {track.thumbnail ? (
-                <img
-                  src={track.thumbnail}
-                  alt=""
-                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-neutral-500">
-                  <Music2 className="h-7 w-7 opacity-40" />
-                </div>
-              )}
-
-              {/* Active playing indicator */}
-              {active && isPlaying && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <div className="flex items-end gap-[2px] h-4">
-                    {[0, 1, 2].map((j) => (
-                      <div
-                        key={j}
-                        className="w-[2.5px] rounded-full bg-[#1DB954] animate-bar"
-                        style={{ animationDelay: `${j * 0.15}s`, height: "100%" }}
-                      />
-                    ))}
+              <button
+                type="button"
+                onClick={() => onPlayTrack(track, tracks, i)}
+                className="h-full w-full block focus:outline-none"
+              >
+                {track.thumbnail ? (
+                  <img
+                    src={track.thumbnail}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-neutral-500">
+                    <Music2 className="h-7 w-7 opacity-40" />
                   </div>
+                )}
+
+                {/* Active playing indicator */}
+                {active && isPlaying && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="flex items-end gap-[2px] h-4">
+                      {[0, 1, 2].map((j) => (
+                        <div
+                          key={j}
+                          className="w-[2.5px] rounded-full bg-[#1DB954] animate-bar"
+                          style={{ animationDelay: `${j * 0.15}s`, height: "100%" }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </button>
+
+              {/* Heart-shaped like button */}
+              {onToggleLike && (
+                <div className="absolute top-1 right-1 z-10">
+                  <HeartLikeButton
+                    liked={liked}
+                    onToggle={() => onToggleLike(track)}
+                    size="sm"
+                    className="bg-black/50 backdrop-blur-md hover:bg-black/70 shadow-sm"
+                  />
                 </div>
               )}
             </div>
 
-            <p
-              className={cn(
-                "truncate text-xs font-semibold leading-tight",
-                active ? "text-[#1DB954]" : "text-[#F5F5F5] group-hover:text-white",
-              )}
+            <button
+              type="button"
+              onClick={() => onPlayTrack(track, tracks, i)}
+              className="text-left w-full focus:outline-none"
             >
-              {track.title}
-            </p>
-            <p className="truncate text-[11px] text-[#A1A1A1] leading-tight mt-0.5">
-              {track.artist}
-            </p>
-          </button>
+              <p
+                className={cn(
+                  "truncate text-xs font-medium leading-tight",
+                  active ? "text-[#1DB954]" : "text-white/90 group-hover:text-white",
+                )}
+              >
+                {track.title}
+              </p>
+              <p className="truncate text-[11px] text-neutral-400 font-normal leading-tight mt-0.5">
+                {track.artist}
+              </p>
+            </button>
+          </div>
         );
       })}
     </div>
@@ -98,30 +128,35 @@ function VerticalSongList({
   isPlaying,
   onPlayTrack,
   onOpenOptions,
+  onToggleLike,
+  likedIds,
 }: {
   tracks: Track[];
   currentId?: string | null | undefined;
   isPlaying: boolean;
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
   onOpenOptions?: ((track: Track) => void) | undefined;
+  onToggleLike?: ((track: Track) => void) | undefined;
+  likedIds?: Set<string> | undefined;
 }) {
   return (
     <div className="space-y-1">
       {tracks.map((track, i) => {
         const active = currentId === track.id;
+        const liked = likedIds?.has(track.id) ?? false;
         return (
           <div
             key={track.id}
             className={cn(
               "flex items-center gap-3 rounded-lg p-2 transition-colors",
-              active ? "bg-[#1D1D1D]" : "hover:bg-white/[0.03]",
+              active ? "bg-white/[0.08]" : "hover:bg-white/[0.03]",
             )}
           >
             {/* Thumbnail + Play Action */}
             <button
               type="button"
               onClick={() => onPlayTrack(track, tracks, i)}
-              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616] border border-white/[0.06]"
+              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616] border border-white/[0.05]"
             >
               <img
                 src={track.thumbnail}
@@ -143,16 +178,25 @@ function VerticalSongList({
             >
               <p
                 className={cn(
-                  "truncate text-[13px] font-semibold leading-tight",
-                  active ? "text-[#1DB954]" : "text-[#F5F5F5]",
+                  "truncate text-[13px] font-medium leading-tight",
+                  active ? "text-[#1DB954]" : "text-white/90",
                 )}
               >
                 {track.title}
               </p>
-              <p className="truncate text-xs text-[#A1A1A1] leading-tight mt-0.5">
+              <p className="truncate text-xs text-neutral-400 font-normal leading-tight mt-0.5">
                 {track.artist}
               </p>
             </button>
+
+            {/* Heart-shaped like toggle button */}
+            {onToggleLike && (
+              <HeartLikeButton
+                liked={liked}
+                onToggle={() => onToggleLike(track)}
+                size="md"
+              />
+            )}
 
             {/* 3-dots Menu Button */}
             {onOpenOptions && (
@@ -160,7 +204,7 @@ function VerticalSongList({
                 type="button"
                 onClick={() => onOpenOptions(track)}
                 aria-label="Track options"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#737373] hover:text-[#F5F5F5] transition-colors"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-white transition-colors"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -184,11 +228,11 @@ function SectionHeader({
   return (
     <div className="flex items-center justify-between mb-2.5 px-0.5">
       <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4 text-[#737373]" />}
-        <h2 className="text-sm font-bold tracking-tight text-[#F5F5F5]">{title}</h2>
+        {Icon && <Icon className="h-4 w-4 text-neutral-400" />}
+        <h2 className="text-sm font-semibold tracking-normal text-white/90">{title}</h2>
       </div>
       {subtitle && (
-        <span className="text-[11px] font-normal text-[#737373]">
+        <span className="text-[11px] font-normal text-neutral-400">
           {subtitle}
         </span>
       )}
@@ -202,6 +246,8 @@ export function ExploreSections({
   newReleases,
   onPlayTrack,
   onOpenOptions,
+  onToggleLike,
+  likedIds,
   currentId,
   isPlaying,
   loading = false,
@@ -229,7 +275,7 @@ export function ExploreSections({
 
   return (
     <div className="space-y-6 pt-1 animate-fade-in">
-      {/* 1. New Releases (Square cards on up side) */}
+      {/* 1. New Releases */}
       {newReleases.length > 0 && (
         <section>
           <SectionHeader title="New Releases" icon={Flame} subtitle="Fresh drops" />
@@ -238,11 +284,13 @@ export function ExploreSections({
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}
 
-      {/* 2. Old Songs / Golden Era (Square cards on up side) */}
+      {/* 2. Old Songs / Golden Era */}
       {oldSongs && oldSongs.length > 0 && (
         <section>
           <SectionHeader title="Old Songs" icon={Disc3} subtitle="Golden Era & Retro hits" />
@@ -251,11 +299,13 @@ export function ExploreSections({
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}
 
-      {/* 3. Trending Songs (List queue format) */}
+      {/* 3. Trending Songs */}
       {trending.length > 0 && (
         <section>
           <SectionHeader title="Trending Songs" icon={TrendingUp} subtitle="Top charts in your language" />
@@ -265,6 +315,8 @@ export function ExploreSections({
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
             onOpenOptions={onOpenOptions}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}

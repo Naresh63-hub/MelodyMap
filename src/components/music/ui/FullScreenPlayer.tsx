@@ -1,6 +1,5 @@
 import {
   ChevronDown,
-  Heart,
   HelpCircle,
   ListMusic,
   Loader2,
@@ -26,6 +25,7 @@ import { ScrubBar } from "@/components/music/ScrubBar";
 import { formatTime } from "@/lib/use-audio-player";
 import { useSleepTimer } from "@/hooks/useSleepTimer";
 import type { Track } from "@/lib/library";
+import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 
 type Props = {
   track: Track | null;
@@ -169,7 +169,7 @@ export function FullScreenPlayer({
           {/* Track Info Row */}
           <div className="flex items-center justify-between w-full mt-6 px-1">
             <div className="min-w-0 flex-1 pr-4">
-              <h2 className="text-lg sm:text-xl font-bold text-[#F5F5F5] truncate tracking-tight">
+              <h2 className="text-lg sm:text-xl font-medium text-[#F5F5F5] truncate tracking-tight">
                 {track.title}
               </h2>
               <p className="text-sm font-normal text-[#A1A1A1] truncate mt-0.5">
@@ -183,21 +183,11 @@ export function FullScreenPlayer({
             </div>
 
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={onToggleLike}
-                aria-label="Favourite"
-                className="flex h-10 w-10 items-center justify-center rounded-full text-[#737373] hover:text-[#F5F5F5] active:scale-90 transition-all"
-              >
-                <Heart
-                  className={cn(
-                    "h-6 w-6 transition-all",
-                    liked
-                      ? "fill-[#1DB954] text-[#1DB954]"
-                      : "text-[#737373]"
-                  )}
-                />
-              </button>
+              <HeartLikeButton
+                liked={liked}
+                onToggle={onToggleLike}
+                size="lg"
+              />
               {onAddToPlaylist && (
                 <button
                   type="button"

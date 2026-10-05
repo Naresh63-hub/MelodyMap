@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
+import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 
 type Props = {
   recentlyPlayed: Track[];
@@ -27,11 +28,15 @@ function HorizontalScrollRow({
   currentId,
   isPlaying,
   onPlayTrack,
+  onToggleLike,
+  likedIds,
 }: {
   tracks: Track[];
   currentId?: string | null | undefined;
   isPlaying: boolean;
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
+  onToggleLike?: ((track: Track) => void) | undefined;
+  likedIds?: Set<string> | undefined;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -42,55 +47,78 @@ function HorizontalScrollRow({
     >
       {tracks.map((track, i) => {
         const active = currentId === track.id;
+        const liked = likedIds?.has(track.id) ?? false;
         return (
-          <button
+          <div
             key={track.id}
-            type="button"
-            onClick={() => onPlayTrack(track, tracks, i)}
-            className="group w-[132px] shrink-0 snap-start text-left transition-transform active:scale-[0.98] p-1.5 rounded-xl hover:bg-white/[0.04]"
+            className="group relative w-[132px] shrink-0 snap-start text-left transition-transform p-1.5 rounded-xl hover:bg-white/[0.04]"
           >
             <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#161616] border border-white/[0.06]">
-              {track.thumbnail ? (
-                <img
-                  src={getOptimizedThumbnailUrl(track.thumbnail)}
-                  alt=""
-                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-neutral-500">
-                  <Music2 className="h-7 w-7 opacity-40" />
-                </div>
-              )}
-
-              {/* Active playing indicator */}
-              {active && isPlaying && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <div className="flex items-end gap-[2px] h-4">
-                    {[0, 1, 2].map((j) => (
-                      <div
-                        key={j}
-                        className="w-[2.5px] rounded-full bg-[#1DB954] animate-bar"
-                        style={{ animationDelay: `${j * 0.15}s`, height: "100%" }}
-                      />
-                    ))}
+              <button
+                type="button"
+                onClick={() => onPlayTrack(track, tracks, i)}
+                className="h-full w-full block focus:outline-none"
+              >
+                {track.thumbnail ? (
+                  <img
+                    src={getOptimizedThumbnailUrl(track.thumbnail)}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-neutral-500">
+                    <Music2 className="h-7 w-7 opacity-40" />
                   </div>
+                )}
+
+                {/* Active playing indicator */}
+                {active && isPlaying && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="flex items-end gap-[2px] h-4">
+                      {[0, 1, 2].map((j) => (
+                        <div
+                          key={j}
+                          className="w-[2.5px] rounded-full bg-[#1DB954] animate-bar"
+                          style={{ animationDelay: `${j * 0.15}s`, height: "100%" }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </button>
+
+              {/* Heart-shaped like button on card corner */}
+              {onToggleLike && (
+                <div className="absolute top-1 right-1 z-10">
+                  <HeartLikeButton
+                    liked={liked}
+                    onToggle={() => onToggleLike(track)}
+                    size="sm"
+                    className="bg-black/50 backdrop-blur-md hover:bg-black/70 shadow-sm"
+                  />
                 </div>
               )}
             </div>
 
-            <p
-              className={cn(
-                "truncate text-xs font-medium leading-tight",
-                active ? "text-[#1DB954]" : "text-white/90 group-hover:text-white",
-              )}
+            <button
+              type="button"
+              onClick={() => onPlayTrack(track, tracks, i)}
+              className="text-left w-full focus:outline-none"
             >
-              {track.title}
-            </p>
-            <p className="truncate text-[11px] text-neutral-400 font-normal leading-tight mt-0.5">
-              {track.artist}
-            </p>
-          </button>
+              <p
+                className={cn(
+                  "truncate text-xs font-medium leading-tight",
+                  active ? "text-[#1DB954]" : "text-white/90 group-hover:text-white",
+                )}
+              >
+                {track.title}
+              </p>
+              <p className="truncate text-[11px] text-neutral-400 font-normal leading-tight mt-0.5">
+                {track.artist}
+              </p>
+            </button>
+          </div>
         );
       })}
     </div>
@@ -104,17 +132,22 @@ function VerticalSongList({
   isPlaying,
   onPlayTrack,
   onOpenOptions,
+  onToggleLike,
+  likedIds,
 }: {
   tracks: Track[];
   currentId?: string | null | undefined;
   isPlaying: boolean;
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
   onOpenOptions?: ((track: Track) => void) | undefined;
+  onToggleLike?: ((track: Track) => void) | undefined;
+  likedIds?: Set<string> | undefined;
 }) {
   return (
     <div className="space-y-1">
       {tracks.map((track, i) => {
         const active = currentId === track.id;
+        const liked = likedIds?.has(track.id) ?? false;
         return (
           <div
             key={track.id}
@@ -162,6 +195,15 @@ function VerticalSongList({
               </p>
             </button>
 
+            {/* Heart-shaped like toggle button */}
+            {onToggleLike && (
+              <HeartLikeButton
+                liked={liked}
+                onToggle={() => onToggleLike(track)}
+                size="md"
+              />
+            )}
+
             {/* 3-dots Menu Button */}
             {onOpenOptions && (
               <button
@@ -205,9 +247,9 @@ export function MobileHomeSections({
   recommended,
   dailyMix,
   onPlayTrack,
-  onToggleLike: _onToggleLike,
+  onToggleLike,
   onOpenOptions,
-  likedIds: _likedIds,
+  likedIds,
   currentId,
   isPlaying,
   loading = false,
@@ -268,6 +310,8 @@ export function MobileHomeSections({
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}
@@ -281,6 +325,8 @@ export function MobileHomeSections({
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}
@@ -295,6 +341,8 @@ export function MobileHomeSections({
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
             onOpenOptions={onOpenOptions}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}
@@ -309,6 +357,8 @@ export function MobileHomeSections({
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
             onOpenOptions={onOpenOptions}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}
@@ -330,6 +380,8 @@ export function MobileHomeSections({
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}
@@ -343,6 +395,8 @@ export function MobileHomeSections({
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
           />
         </section>
       )}
