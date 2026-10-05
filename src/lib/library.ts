@@ -406,66 +406,63 @@ export function useLibrary(userId?: string | null) {
 
     void (async () => {
       try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { data } = await supabase
-          .from("user_library")
-          .select("data")
-          .eq("user_id", userId)
-          .maybeSingle();
+        const { db } = await import("@/lib/firebase");
+        const { doc, getDoc } = await import("firebase/firestore");
+        const snap = await getDoc(doc(db, "users", userId, "preferences", "library"));
 
         if (cancelled) return;
 
-        if (data?.data) {
-          const doc = data.data as Partial<LibraryDoc>;
+        if (snap.exists()) {
+          const docData = snap.data() as Partial<LibraryDoc>;
           setLikes((prev) => {
-            const next = mergeById((doc.likes ?? []).filter((t) => isMusicTrack(t, true, true)), prev, 200);
+            const next = mergeById((docData.likes ?? []).filter((t) => isMusicTrack(t, true, true)), prev, 200);
             write(LIKES_KEY, next);
             return next;
           });
           setDislikes((prev) => {
-            const next = mergeById(doc.dislikes ?? [], prev, 200);
+            const next = mergeById(docData.dislikes ?? [], prev, 200);
             write(DISLIKES_KEY, next);
             return next;
           });
           setHistory((prev) => {
-            const next = mergeById(prev, (doc.history ?? []).filter((t) => isMusicTrack(t, true, true)), 200);
+            const next = mergeById(prev, (docData.history ?? []).filter((t) => isMusicTrack(t, true, true)), 200);
             write(HISTORY_KEY, next);
             return next;
           });
-          if (doc.podcastHistory) {
+          if (docData.podcastHistory) {
             setPodcastHistory((prev) => {
-              const next = mergeById(prev, doc.podcastHistory ?? [], 200);
+              const next = mergeById(prev, docData.podcastHistory ?? [], 200);
               write(PODCAST_HISTORY_KEY, next);
               return next;
             });
           }
           setPlaylists((prev) => {
-            const next = mergeById(doc.playlists ?? [], prev, 200);
+            const next = mergeById(docData.playlists ?? [], prev, 200);
             write(PLAYLISTS_KEY, next);
             return next;
           });
-          if (doc.stats) {
+          if (docData.stats) {
             setStats((prev) => {
-              const next = mergeStats(prev, doc.stats ?? {});
+              const next = mergeStats(prev, docData.stats ?? {});
               write(STATS_KEY, next);
               return next;
             });
           }
-          if (doc.settings) {
-            const next = { ...DEFAULT_SETTINGS, ...doc.settings };
+          if (docData.settings) {
+            const next = { ...DEFAULT_SETTINGS, ...docData.settings };
             setSettings(next);
             write(SETTINGS_KEY, next);
           }
-          if (doc.banditModel) {
+          if (docData.banditModel) {
             try {
               const { thompsonSamplingPolicy } = await import("@/lib/bandit-policy");
-              thompsonSamplingPolicy.setModelState(doc.banditModel);
+              thompsonSamplingPolicy.setModelState(docData.banditModel);
             } catch {}
           }
-          if (doc.playback && Array.isArray(doc.playback.queue) && doc.playback.queue.length > 0) {
+          if (docData.playback && Array.isArray(docData.playback.queue) && docData.playback.queue.length > 0) {
             const currentPlayback = readPlayback();
             if (!currentPlayback || currentPlayback.queue.length === 0) {
-              writePlayback(doc.playback);
+              writePlayback(docData.playback);
               if (typeof window !== "undefined") {
                 window.dispatchEvent(new CustomEvent("melodymap:playback-synced"));
               }
@@ -500,7 +497,8 @@ export function useLibrary(userId?: string | null) {
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        const { supabase } = await import("@/integrations/supabase/client");
+        const { db } = await import("@/lib/firebase");
+        const { doc, setDoc } = await import("firebase/firestore");
         const { thompsonSamplingPolicy } = await import("@/lib/bandit-policy");
         const { telemetry } = await import("@/lib/telemetry");
         if (cancelled) return;
@@ -508,9 +506,9 @@ export function useLibrary(userId?: string | null) {
         const banditModel = thompsonSamplingPolicy.getModelState();
         const recentTelemetry = telemetry.drainEvents(30);
 
-        const { error } = await supabase.from("user_library").upsert({
-          user_id: userId,
-          data: {
+        await setDoc(
+          doc(db, "users", userId, "preferences", "library"),
+          {
             likes,
             dislikes,
             history: history.slice(0, 100),
@@ -520,12 +518,13 @@ export function useLibrary(userId?: string | null) {
             stats,
             banditModel,
             telemetryEvents: recentTelemetry,
-            playback: readPlayback() ?? undefined,
-          } as any,
-        });
-        if (error) console.warn("[MelodyMap] Library sync failed:", error.message);
+            playback: readPlayback() ?? null,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true },
+        );
       } catch (err) {
-        console.warn("[MelodyMap] Library sync error:", err);
+        console.warn("[MelodyMap] Library Firestore sync error:", err);
       }
     }, 1200);
     return () => {

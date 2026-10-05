@@ -7,8 +7,6 @@ import {
   ListMusic,
   Loader2,
   Clock,
-  X,
-  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
@@ -44,35 +42,35 @@ type Props = {
   userLikes?: Track[];
 };
 
-export function SearchResults({
-  results,
-  loading,
-  query,
-  onPlayTrack,
-  onToggleLike,
-  onOpenOptions,
-  likedIds,
-  currentId,
-  isPlaying,
-  onClear: _onClear,
-  onSearch,
-  selectedFilter,
-  onFilterChange,
-  hasMore,
-  loadingMore,
-  onLoadMore,
-  recentSearches: propsRecentSearches,
-  onRemoveRecentSearch: propsOnRemoveRecentSearch,
-  onClearRecentSearches: propsOnClearRecentSearches,
-}: Props) {
+export function SearchResults(props: Props) {
+  const {
+    results,
+    loading,
+    query,
+    onPlayTrack,
+    onToggleLike,
+    onOpenOptions,
+    likedIds,
+    currentId,
+    isPlaying,
+    onSearch,
+    selectedFilter,
+    onFilterChange,
+    hasMore,
+    loadingMore,
+    onLoadMore,
+    recentSearches: propsRecentSearches,
+    onRemoveRecentSearch,
+    onClearRecentSearches,
+  } = props;
+
   const [internalFilter, setInternalFilter] = useState<SearchFilter>("all");
-  const [showAllHistory, setShowAllHistory] = useState(false);
   const filter = selectedFilter ?? internalFilter;
 
   const hookHistory = useSearchHistory();
   const recentSearches = propsRecentSearches ?? hookHistory.recentSearches;
-  const handleRemoveRecentSearch = propsOnRemoveRecentSearch ?? hookHistory.removeSearch;
-  const handleClearRecentSearches = propsOnClearRecentSearches ?? hookHistory.clearHistory;
+  const _handleRemoveRecentSearch = onRemoveRecentSearch ?? hookHistory.removeSearch;
+  const _handleClearRecentSearches = onClearRecentSearches ?? hookHistory.clearHistory;
 
   const filterOptions: Array<{ value: SearchFilter; label: string }> = [
     { value: "all", label: "Top" },

@@ -26,6 +26,25 @@ export class ErrorBoundary extends Component<Props, State> {
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
     console.error("[MelodyMap] Render error:", error, errorInfo);
+
+    const msg = error?.message || "";
+    const isChunkOrImportError =
+      msg.includes("Failed to fetch dynamically imported module") ||
+      msg.includes("error loading dynamically imported module") ||
+      msg.includes("Importing a module script failed");
+
+    if (isChunkOrImportError && typeof window !== "undefined") {
+      try {
+        const lastAttempt = sessionStorage.getItem("melodymap.chunk_recovery");
+        const now = Date.now();
+        if (!lastAttempt || now - Number(lastAttempt) > 8000) {
+          sessionStorage.setItem("melodymap.chunk_recovery", String(now));
+          window.location.reload();
+        }
+      } catch {
+        // storage disabled
+      }
+    }
   }
 
   override render() {

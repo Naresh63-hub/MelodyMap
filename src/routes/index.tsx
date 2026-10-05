@@ -2731,8 +2731,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 selectedFilter={searchFilter}
                 userHistory={history}
                 userLikes={likes}
-                onToggleLike={handleToggleLike}
-                likedIds={likedIds}
                 onFilterChange={(newFilter) => {
                   setSearchFilter(newFilter);
                   if (query.trim()) {

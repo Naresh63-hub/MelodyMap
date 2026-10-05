@@ -155,6 +155,9 @@ export async function handleAuthCallback(
 
   activeExchangePromise = (async () => {
     try {
+      if (!supabaseClient?.auth) {
+        return { success: true };
+      }
       if (parsed.code) {
         // PKCE Authorization Code Exchange
         const { error } = await supabaseClient.auth.exchangeCodeForSession(parsed.code);

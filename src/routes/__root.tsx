@@ -146,6 +146,25 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
 
+  // Listen for Vite preload errors (e.g. dynamically imported chunk updates) and reload safely
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePreloadError = () => {
+      try {
+        const lastAttempt = sessionStorage.getItem("melodymap.chunk_recovery");
+        const now = Date.now();
+        if (!lastAttempt || now - Number(lastAttempt) > 8000) {
+          sessionStorage.setItem("melodymap.chunk_recovery", String(now));
+          window.location.reload();
+        }
+      } catch {}
+    };
+    window.addEventListener("vite:preloadError", handlePreloadError);
+    return () => {
+      window.removeEventListener("vite:preloadError", handlePreloadError);
+    };
+  }, []);
+
   // Set up native deep-link auth listener for Android OAuth return
   useEffect(() => {
     const cleanup = setupNativeAuthListeners(supabase, () => {

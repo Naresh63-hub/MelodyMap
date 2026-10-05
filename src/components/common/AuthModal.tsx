@@ -22,8 +22,7 @@ import {
   LogOut,
   UserCheck,
 } from "lucide-react";
-import { supabase, getSupabaseEnv } from "@/integrations/supabase/client";
-import { saveLocalUser, useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 
 interface AuthModalProps {
   open: boolean;
@@ -60,21 +59,39 @@ export function AuthModal({
       const currentName = auth.profile?.display_name || "";
       const currentEmail = auth.email || "";
 
-      // If user is already signed in and no explicit signin mode forced, show profile mode
-      if (auth.userId && defaultMode !== "signin") {
+      setName(currentName);
+      setEmail(currentEmail);
+
+      if (auth.userId && defaultMode !== "signup") {
         setMode("profile");
       } else {
         setMode(defaultMode);
       }
-
-      if (currentName && currentName !== "Google Listener") {
-        setName(currentName);
-      } else {
-        setName("");
-      }
-      setEmail(currentEmail === "listener@google.com" ? "" : currentEmail);
     }
-  }, [open, auth.userId, auth.profile?.display_name, auth.email, defaultMode]);
+  }, [open, auth.userId, auth.profile, auth.email, defaultMode]);
+
+  const handleGoogleSignIn = async () => {
+    setBusy(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      const res = await auth.signInWithGoogle();
+      if (res.success) {
+        setSuccessMsg("Signed in with Google successfully!");
+        setTimeout(() => {
+          setBusy(false);
+          onOpenChange(false);
+          onSuccess?.();
+        }, 600);
+      } else {
+        setErrorMsg(res.error || "Google Sign-in failed.");
+        setBusy(false);
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Google Sign-in error.");
+      setBusy(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,30 +99,26 @@ export function AuthModal({
     setSuccessMsg(null);
     setBusy(true);
 
-    const { isConfigured } = getSupabaseEnv();
-
     if (mode === "profile") {
-      // Edit Profile
       const trimmedName = name.trim();
       if (!trimmedName) {
         setBusy(false);
-        setErrorMsg("Please enter your display name.");
+        setErrorMsg("Display name cannot be empty.");
         return;
       }
       try {
-        await auth.updateProfile({ display_name: trimmedName });
-        saveLocalUser({
-          id: auth.userId || undefined,
-          name: trimmedName,
-          email: email.trim() || auth.email || null,
-          avatar_url: auth.profile?.avatar_url,
-        });
-        setSuccessMsg("Account profile updated!");
-        setTimeout(() => {
+        const res = await auth.updateProfile({ display_name: trimmedName });
+        if (res.success) {
+          setSuccessMsg("Profile updated successfully!");
+          setTimeout(() => {
+            setBusy(false);
+            onOpenChange(false);
+            onSuccess?.();
+          }, 800);
+        } else {
           setBusy(false);
-          onOpenChange(false);
-          onSuccess?.();
-        }, 800);
+          setErrorMsg(res.error || "Failed to update profile.");
+        }
       } catch (err: any) {
         setBusy(false);
         setErrorMsg(err?.message || "Failed to update profile.");
@@ -120,23 +133,16 @@ export function AuthModal({
         setErrorMsg("Please enter your email address.");
         return;
       }
-      if (isConfigured) {
-        try {
-          const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-            redirectTo: window.location.origin,
-          });
-          if (error) {
-            setErrorMsg(error.message);
-          } else {
-            setSuccessMsg("Password reset link sent to your email!");
-            setTimeout(() => setMode("signin"), 2000);
-          }
-        } catch (err: any) {
-          setErrorMsg(err?.message || "Failed to send reset link.");
+      try {
+        const res = await auth.resetPassword(trimmedEmail);
+        if (res.success) {
+          setSuccessMsg("Password reset email sent! Check your inbox.");
+          setTimeout(() => setMode("signin"), 2000);
+        } else {
+          setErrorMsg(res.error || "Failed to send reset email.");
         }
-      } else {
-        setSuccessMsg("Password reset request logged. You can sign in directly.");
-        setTimeout(() => setMode("signin"), 1500);
+      } catch (err: any) {
+        setErrorMsg(err?.message || "Failed to send reset email.");
       }
       setBusy(false);
       return;
@@ -147,104 +153,9 @@ export function AuthModal({
       const trimmedEmail = email.trim();
       if (!trimmedName) {
         setBusy(false);
-        setErrorMsg("Please enter your full name.");
+        setErrorMsg("Please enter your name.");
         return;
       }
-      if (!trimmedEmail || !trimmedEmail.includes("@")) {
-        setBusy(false);
-        setErrorMsg("Please enter a valid email address.");
-        return;
-      }
-      if (!password || password.length < 6) {
-        setBusy(false);
-        setErrorMsg("Password must be at least 6 characters long.");
-        return;
-      }
-      if (password !== confirmPassword) {
-        setBusy(false);
-        setErrorMsg("Passwords do not match.");
-        return;
-      }
-
-      if (isConfigured) {
-        try {
-          const { data, error } = await supabase.auth.signUp({
-            email: trimmedEmail,
-            password,
-            options: {
-              data: { display_name: trimmedName },
-            },
-          });
-
-          if (error) {
-            const msg = error.message.toLowerCase();
-            if (msg.includes("already registered") || msg.includes("already exists")) {
-              // Try signing in directly
-              const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-                email: trimmedEmail,
-                password,
-              });
-              if (!signInErr && signInData.user) {
-                saveLocalUser({
-                  id: signInData.user.id,
-                  name: trimmedName,
-                  email: trimmedEmail,
-                });
-                setSuccessMsg("Welcome back! Signed in successfully.");
-                setTimeout(() => {
-                  setBusy(false);
-                  onOpenChange(false);
-                  onSuccess?.();
-                }, 800);
-                return;
-              }
-              setErrorMsg("An account with this email already exists. Try signing in.");
-              setMode("signin");
-              setBusy(false);
-              return;
-            }
-            setErrorMsg(error.message || "Failed to create account. Please try again.");
-            setBusy(false);
-            return;
-          }
-
-          if (data.user) {
-            saveLocalUser({
-              id: data.user.id,
-              name: trimmedName,
-              email: trimmedEmail,
-            });
-            setSuccessMsg(`Account created! Welcome, ${trimmedName}.`);
-            setTimeout(() => {
-              setBusy(false);
-              onOpenChange(false);
-              onSuccess?.();
-            }, 800);
-            return;
-          }
-        } catch (err: any) {
-          setBusy(false);
-          setErrorMsg(err?.message || "Sign-up failed. Please check your connection and try again.");
-          return;
-        }
-      } else {
-        // Local mode immediate signup
-        saveLocalUser({
-          name: trimmedName,
-          email: trimmedEmail,
-        });
-        setSuccessMsg(`Account created! Welcome, ${trimmedName}.`);
-        setTimeout(() => {
-          setBusy(false);
-          onOpenChange(false);
-          onSuccess?.();
-        }, 800);
-        return;
-      }
-    }
-
-    if (mode === "signin") {
-      const trimmedEmail = email.trim();
       if (!trimmedEmail || !trimmedEmail.includes("@")) {
         setBusy(false);
         setErrorMsg("Please enter a valid email address.");
@@ -255,74 +166,61 @@ export function AuthModal({
         setErrorMsg("Password must be at least 6 characters.");
         return;
       }
-
-      if (isConfigured) {
-        try {
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email: trimmedEmail,
-            password,
-          });
-
-          if (error) {
-            const msg = error.message.toLowerCase();
-            if (msg.includes("invalid login credentials") || msg.includes("invalid_grant")) {
-              setErrorMsg("Incorrect email or password. Please try again.");
-              setBusy(false);
-              return;
-            }
-            // Fallback for network issues
-            const userName = trimmedEmail.split("@")[0] || "Listener";
-            saveLocalUser({
-              name: userName,
-              email: trimmedEmail,
-            });
-            setSuccessMsg(`Signed in as ${userName}!`);
-            setTimeout(() => {
-              setBusy(false);
-              onOpenChange(false);
-              onSuccess?.();
-            }, 800);
-            return;
-          }
-
-          if (data.user) {
-            const meta = data.user.user_metadata as Record<string, any> | undefined;
-            const userName =
-              (meta && (meta["display_name"] || meta["name"])) ||
-              trimmedEmail.split("@")[0] ||
-              "Listener";
-            saveLocalUser({
-              id: data.user.id,
-              name: userName,
-              email: trimmedEmail,
-              avatar_url: meta ? meta["avatar_url"] : null,
-            });
-            setSuccessMsg(`Signed in! Welcome back, ${userName}.`);
-            setTimeout(() => {
-              setBusy(false);
-              onOpenChange(false);
-              onSuccess?.();
-            }, 800);
-            return;
-          }
-        } catch (err: any) {
-          setBusy(false);
-          setErrorMsg(err?.message || "Sign-in failed. Please verify your credentials and try again.");
-          return;
-        }
-      } else {
-        const userName = trimmedEmail.split("@")[0] || "Listener";
-        saveLocalUser({
-          name: userName,
-          email: trimmedEmail,
-        });
-        setSuccessMsg(`Signed in as ${userName}!`);
-        setTimeout(() => {
-          setBusy(false);
-          onOpenChange(false);
-          onSuccess?.();
-        }, 800);
+      if (password !== confirmPassword) {
+        setBusy(false);
+        setErrorMsg("Passwords do not match.");
         return;
+      }
+
+      try {
+        const res = await auth.signUpWithEmail(trimmedEmail, password, trimmedName);
+        if (res.success) {
+          setSuccessMsg(`Welcome, ${trimmedName}! Account created.`);
+          setTimeout(() => {
+            setBusy(false);
+            onOpenChange(false);
+            onSuccess?.();
+          }, 800);
+        } else {
+          setErrorMsg(res.error || "Sign-up failed.");
+          setBusy(false);
+        }
+      } catch (err: any) {
+        setErrorMsg(err?.message || "Sign-up error.");
+        setBusy(false);
+      }
+      return;
+    }
+
+    if (mode === "signin") {
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail || !trimmedEmail.includes("@")) {
+        setBusy(false);
+        setErrorMsg("Please enter a valid email address.");
+        return;
+      }
+      if (!password) {
+        setBusy(false);
+        setErrorMsg("Please enter your password.");
+        return;
+      }
+
+      try {
+        const res = await auth.signInWithEmail(trimmedEmail, password);
+        if (res.success) {
+          setSuccessMsg("Signed in successfully!");
+          setTimeout(() => {
+            setBusy(false);
+            onOpenChange(false);
+            onSuccess?.();
+          }, 800);
+        } else {
+          setErrorMsg(res.error || "Incorrect email or password.");
+          setBusy(false);
+        }
+      } catch (err: any) {
+        setErrorMsg(err?.message || "Sign-in error.");
+        setBusy(false);
       }
     }
   };
@@ -349,15 +247,15 @@ export function AuthModal({
               <Sparkles className="h-6 w-6 text-[#1DB954]" />
             )}
           </div>
-          <DialogTitle className="text-xl font-bold tracking-tight">
+          <DialogTitle className="text-xl font-semibold tracking-tight">
             {mode === "signin" && "Sign In to MelodyMap"}
             {mode === "signup" && "Create MelodyMap Account"}
             {mode === "profile" && "Account Profile"}
             {mode === "forgot" && "Reset Password"}
           </DialogTitle>
-          <DialogDescription className="text-sm text-white/50">
-            {mode === "signin" && "Enter your email and password to access your songs & playlists."}
-            {mode === "signup" && "Sign up to sync your favourites, playlists, and listening history."}
+          <DialogDescription className="text-xs text-white/50">
+            {mode === "signin" && "Sign in with Google or email to sync your favourites & history."}
+            {mode === "signup" && "Create an account to securely save playlists and music preferences."}
             {mode === "profile" && "Manage your display name and active account."}
             {mode === "forgot" && "We'll send you instructions to reset your password."}
           </DialogDescription>
@@ -373,7 +271,7 @@ export function AuthModal({
                 setErrorMsg(null);
                 setSuccessMsg(null);
               }}
-              className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                 mode === "signin"
                   ? "bg-[#1DB954] text-black shadow-md"
                   : "text-white/60 hover:text-white"
@@ -388,7 +286,7 @@ export function AuthModal({
                 setErrorMsg(null);
                 setSuccessMsg(null);
               }}
-              className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-all ${
+              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                 mode === "signup"
                   ? "bg-[#1DB954] text-black shadow-md"
                   : "text-white/60 hover:text-white"
@@ -399,30 +297,70 @@ export function AuthModal({
           </div>
         )}
 
-        {/* Feedback messages */}
+        {/* Feedback alerts */}
         {errorMsg && (
-          <div className="flex items-center gap-2.5 rounded-xl bg-red-500/10 border border-red-500/25 px-3.5 py-2.5 text-xs text-red-400 animate-fade-in">
+          <div className="flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 text-xs text-red-400 animate-in fade-in">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{errorMsg}</span>
+            <p className="flex-1">{errorMsg}</p>
           </div>
         )}
         {successMsg && (
-          <div className="flex items-center gap-2.5 rounded-xl bg-[#1DB954]/10 border border-[#1DB954]/30 px-3.5 py-2.5 text-xs text-[#1DB954] animate-fade-in">
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2.5 text-xs text-emerald-400 animate-in fade-in">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span>{successMsg}</span>
+            <p className="flex-1">{successMsg}</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Display Name input (Signup and Profile mode) */}
+        {/* Google One-Tap / OAuth Button */}
+        {mode !== "profile" && (
+          <div className="space-y-3 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={handleGoogleSignIn}
+              className="w-full h-10 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border-none font-medium flex items-center justify-center gap-2.5 shadow-sm active:scale-95 transition-all text-xs"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
+              Continue with Google
+            </Button>
+
+            <div className="relative flex items-center justify-center">
+              <div className="border-t border-white/10 w-full" />
+              <span className="bg-[#121212] px-2 text-[10px] text-white/40 uppercase tracking-widest font-mono">
+                or with email
+              </span>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5">
+          {/* Display Name Input */}
           {(mode === "signup" || mode === "profile") && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-white/70">Your Name</Label>
+              <Label className="text-xs text-white/70 font-medium">Display Name</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                 <Input
                   type="text"
-                  placeholder="e.g. Naresh"
+                  placeholder="Your Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={busy}
@@ -433,35 +371,41 @@ export function AuthModal({
             </div>
           )}
 
-          {/* Email input */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-white/70">Email Address</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
-              <Input
-                type="email"
-                placeholder="name@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={busy || mode === "profile"}
-                className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954] focus:ring-1 focus:ring-[#1DB954] disabled:opacity-60"
-                required
-              />
+          {/* Email Input */}
+          {mode !== "profile" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-white/70 font-medium">Email Address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={busy}
+                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954] focus:ring-1 focus:ring-[#1DB954]"
+                  required
+                />
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Password inputs (Signin and Signup) */}
+          {/* Password Input */}
           {mode !== "profile" && mode !== "forgot" && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-white/70">Password</Label>
+                <Label className="text-xs text-white/70 font-medium">Password</Label>
                 {mode === "signin" && (
                   <button
                     type="button"
-                    onClick={() => setMode("forgot")}
+                    onClick={() => {
+                      setMode("forgot");
+                      setErrorMsg(null);
+                      setSuccessMsg(null);
+                    }}
                     className="text-[11px] text-[#1DB954] hover:underline"
                   >
-                    Forgot?
+                    Forgot password?
                   </button>
                 )}
               </div>
@@ -469,7 +413,7 @@ export function AuthModal({
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                 <Input
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={busy}
@@ -487,15 +431,15 @@ export function AuthModal({
             </div>
           )}
 
-          {/* Confirm Password (Signup) */}
+          {/* Confirm Password (only for Sign Up) */}
           {mode === "signup" && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-white/70">Confirm Password</Label>
+              <Label className="text-xs text-white/70 font-medium">Confirm Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                 <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
+                  type="password"
+                  placeholder="Re-enter password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={busy}
@@ -511,7 +455,7 @@ export function AuthModal({
             <Button
               type="submit"
               disabled={busy}
-              className="w-full h-11 rounded-xl bg-[#1DB954] hover:bg-[#1aa34a] text-black font-semibold shadow-lg shadow-[#1DB954]/20 transition-all text-sm"
+              className="w-full h-11 rounded-xl bg-[#1DB954] hover:bg-[#1aa34a] text-black font-medium shadow-lg shadow-[#1DB954]/20 transition-all text-xs"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -532,7 +476,7 @@ export function AuthModal({
                 variant="outline"
                 disabled={busy}
                 onClick={handleSignOut}
-                className="w-full h-10 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-white/80 hover:text-red-400 border-white/10 hover:border-red-500/30 transition-all text-xs"
+                className="w-full h-10 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-white/80 hover:text-red-400 border-white/10 hover:border-red-500/30 transition-all text-xs font-normal"
               >
                 <LogOut className="h-3.5 w-3.5 mr-2" />
                 Sign Out / Switch Account

@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
-
-import { supabase } from "@/integrations/supabase/client";
+import {
+  auth,
+  db,
+  syncUserProfile,
+  signInWithGoogle as firebaseSignInWithGoogle,
+} from "@/lib/firebase";
+import {
+  onAuthStateChanged,
+  signOut as firebaseSignOut,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile as firebaseUpdateProfile,
+  updatePassword as firebaseUpdatePassword,
+  sendPasswordResetEmail,
+  type User,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export type Profile = {
   id: string;
@@ -8,20 +23,7 @@ export type Profile = {
   avatar_url: string | null;
 };
 
-/**
- * Remove OAuth tokens from the address bar once Supabase has consumed them,
- * so session tokens don't linger in browser history. Recovery links are left
- * alone — the flow still reads `type=recovery` from the hash.
- */
-function scrubAuthTokensFromUrl() {
-  if (typeof window === "undefined") return;
-  const { hash, search, pathname } = window.location;
-  if (!hash.includes("access_token")) return;
-  if (hash.includes("type=recovery")) return;
-  window.history.replaceState(window.history.state, "", pathname + search);
-}
-
-/** Session + profile for the signed-in listener. Local-only when signed out. */
+/** Session + profile for the signed-in listener backed by Firebase Auth & Firestore */
 export function useAuth() {
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
@@ -29,41 +31,40 @@ export function useAuth() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const handleSession = (session: any) => {
-      const u = session?.user;
-      setUserId(u?.id ?? null);
-      setEmail(u?.email ?? null);
-      setReady(true);
+    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+      if (user) {
+        setUserId(user.uid);
+        setEmail(user.email || null);
 
-      if (u) {
-        scrubAuthTokensFromUrl();
-        const meta = u.user_metadata || {};
-        const fallbackName = meta.display_name || meta.full_name || meta.name || u.email?.split("@")[0] || "Listener";
-        const fallbackAvatar = meta.avatar_url || null;
-        setProfile((prev) => prev || { id: u.id, display_name: fallbackName, avatar_url: fallbackAvatar });
-
-        // Guarantee user entry is recorded in Supabase public.profiles table
-        void (async () => {
-          try {
-            const { data, error } = await supabase
-              .from("profiles")
-              .upsert(
-                {
-                  id: u.id,
-                  display_name: fallbackName,
-                  avatar_url: fallbackAvatar,
-                  updated_at: new Date().toISOString(),
-                },
-                { onConflict: "id" }
-              );
-            if (!error && data) {
-              setProfile(data as any);
-            }
-          } catch {
-            // Non-blocking: profile sync is best-effort
+        // Fetch or sync Firestore user profile
+        try {
+          const userRef = doc(db, "users", user.uid);
+          const snap = await getDoc(userRef);
+          if (snap.exists()) {
+            const data = snap.data();
+            setProfile({
+              id: user.uid,
+              display_name: (data["displayName"] as string) || user.displayName || user.email?.split("@")[0] || "Listener",
+              avatar_url: (data["avatarUrl"] as string) || user.photoURL || null,
+            });
+          } else {
+            const synced = await syncUserProfile(user);
+            setProfile({
+              id: user.uid,
+              display_name: synced.displayName,
+              avatar_url: synced.avatarUrl || null,
+            });
           }
-        })();
+        } catch {
+          // Fallback to auth object profile
+          setProfile({
+            id: user.uid,
+            display_name: user.displayName || user.email?.split("@")[0] || "Listener",
+            avatar_url: user.photoURL || null,
+          });
+        }
       } else {
+        // Fallback to local guest profile if saved
         if (typeof window !== "undefined") {
           const raw = localStorage.getItem("melodymap.local_user");
           if (raw) {
@@ -71,125 +72,72 @@ export function useAuth() {
               const parsed = JSON.parse(raw);
               if (parsed && typeof parsed === "object") {
                 const localId = parsed.id || "local-listener";
-                const localName = parsed.name || parsed.display_name || "Listener";
                 setUserId(localId);
                 setEmail(parsed.email || null);
                 setProfile({
                   id: localId,
-                  display_name: localName,
+                  display_name: parsed.name || parsed.display_name || "Listener",
                   avatar_url: parsed.avatar_url || null,
                 });
+                setReady(true);
                 return;
               }
             } catch {}
           }
         }
+        setUserId(null);
+        setEmail(null);
         setProfile(null);
       }
-    };
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      handleSession(session);
+      setReady(true);
     });
 
-    const onAuthChanged = () => {
-      void supabase.auth.getSession().then(({ data }) => {
-        handleSession(data.session);
-      });
-    };
-
-    if (typeof window !== "undefined") {
-      window.addEventListener("melodymap:auth-changed", onAuthChanged);
-    }
-
-    return () => {
-      sub.subscription.unsubscribe();
-      if (typeof window !== "undefined") {
-        window.removeEventListener("melodymap:auth-changed", onAuthChanged);
-      }
-    };
+    return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (!userId) {
-      setProfile(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data } = await supabase
-          .from("profiles")
-          .select("id, display_name, avatar_url")
-          .eq("id", userId)
-          .maybeSingle();
-        if (!cancelled && data) setProfile(data as Profile);
-      } catch {
-        // Non-blocking: profile fetch is best-effort
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
 
   const updateProfile = useCallback(
     async (patch: { display_name?: string; avatar_url?: string }): Promise<{ success: boolean; error?: string }> => {
       if (!userId) return { success: false, error: "Not signed in" };
 
-      const isLocal =
-        userId.startsWith("local-") ||
-        userId.startsWith("user-") ||
-        userId.startsWith("google-") ||
-        userId === "local-listener";
-
-      if (isLocal) {
-        const updated = {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        // Local mode update
+        const updated: Profile = {
           id: userId,
           display_name: patch.display_name ?? profile?.display_name ?? "Listener",
           avatar_url: patch.avatar_url ?? profile?.avatar_url ?? null,
         };
         setProfile(updated);
         if (typeof window !== "undefined") {
-          let existing: Record<string, unknown> = {};
-          try {
-            const raw = localStorage.getItem("melodymap.local_user");
-            if (raw) existing = JSON.parse(raw);
-          } catch {}
-          localStorage.setItem("melodymap.local_user", JSON.stringify({ ...existing, ...updated }));
-          window.dispatchEvent(new CustomEvent("melodymap:auth-changed"));
+          localStorage.setItem("melodymap.local_user", JSON.stringify(updated));
         }
         return { success: true };
       }
 
       try {
-        // 1. Update Supabase Auth user metadata
-        const { error: metaError } = await supabase.auth.updateUser({
-          data: {
-            display_name: patch.display_name,
-            avatar_url: patch.avatar_url,
-          },
+        // 1. Update Firebase Auth Profile
+        await firebaseUpdateProfile(currentUser, {
+          displayName: patch.display_name !== undefined ? patch.display_name : currentUser.displayName,
+          photoURL: patch.avatar_url !== undefined ? patch.avatar_url : currentUser.photoURL,
         });
-        if (metaError) throw metaError;
 
-        // 2. Optimistic local state update
+        // 2. Sync Firestore Profile Document
+        const userRef = doc(db, "users", currentUser.uid);
+        await setDoc(
+          userRef,
+          {
+            displayName: patch.display_name ?? profile?.display_name ?? "Listener",
+            avatarUrl: patch.avatar_url ?? profile?.avatar_url ?? "",
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true },
+        );
+
         setProfile((prev) => ({
-          id: userId,
-          display_name: patch.display_name ?? prev?.display_name ?? null,
+          id: currentUser.uid,
+          display_name: patch.display_name ?? prev?.display_name ?? "Listener",
           avatar_url: patch.avatar_url ?? prev?.avatar_url ?? null,
         }));
-
-        // 3. Sync to public profiles table if available
-        try {
-          const { data } = await supabase
-            .from("profiles")
-            .upsert({ id: userId, ...patch })
-            .select("id, display_name, avatar_url")
-            .maybeSingle();
-          if (data) setProfile(data as Profile);
-        } catch {
-          // Non-blocking if table is not migrated
-        }
 
         return { success: true };
       } catch (err: any) {
@@ -202,22 +150,22 @@ export function useAuth() {
 
   const updatePassword = useCallback(
     async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
-      if (!userId) return { success: false, error: "Not signed in" };
+      const currentUser = auth.currentUser;
+      if (!currentUser) return { success: false, error: "Not signed in" };
       try {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        if (error) throw error;
+        await firebaseUpdatePassword(currentUser, newPassword);
         return { success: true };
       } catch (err: any) {
         console.warn("[Auth] updatePassword error:", err);
         return { success: false, error: err?.message || "Failed to update password." };
       }
     },
-    [userId],
+    [],
   );
 
   const signOut = useCallback(async () => {
     try {
-      await supabase.auth.signOut();
+      await firebaseSignOut(auth);
     } catch (err) {
       console.warn("[Auth] signOut error:", err);
     } finally {
@@ -231,40 +179,78 @@ export function useAuth() {
     }
   }, []);
 
-  return { ready, userId, email, profile, updateProfile, updatePassword, signOut };
+  const signInWithGoogle = useCallback(async () => {
+    return await firebaseSignInWithGoogle();
+  }, []);
+
+  const signInWithEmail = useCallback(async (emailInput: string, passwordInput: string) => {
+    try {
+      const cred = await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
+      await syncUserProfile(cred.user);
+      return { success: true, user: cred.user };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Sign in failed" };
+    }
+  }, []);
+
+  const signUpWithEmail = useCallback(async (emailInput: string, passwordInput: string, name?: string) => {
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
+      if (name) {
+        await firebaseUpdateProfile(cred.user, { displayName: name.trim() });
+      }
+      await syncUserProfile(cred.user, name?.trim());
+      return { success: true, user: cred.user };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Sign up failed" };
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (emailInput: string) => {
+    try {
+      await sendPasswordResetEmail(auth, emailInput.trim());
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Password reset failed" };
+    }
+  }, []);
+
+  return {
+    ready,
+    userId,
+    email,
+    profile,
+    updateProfile,
+    updatePassword,
+    signOut,
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    resetPassword,
+  };
 }
 
-export function saveLocalUser(user: { id?: string | undefined; name: string; email?: string | null | undefined; avatar_url?: string | null | undefined }) {
+export function saveLocalUser(user: {
+  id?: string | undefined;
+  name: string;
+  email?: string | null | undefined;
+  avatar_url?: string | null | undefined;
+}) {
   if (typeof window === "undefined") return;
-  const id = user.id || "user-" + (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Date.now());
+  const id =
+    user.id ||
+    "user-" +
+      (typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now());
   localStorage.setItem(
     "melodymap.local_user",
     JSON.stringify({
       id,
       name: user.name,
-      display_name: user.name,
-      email: user.email || null,
-      avatar_url: user.avatar_url || null,
+      email: user.email,
+      avatar_url: user.avatar_url,
     }),
   );
-  localStorage.removeItem("melodymap.guest_mode");
   window.dispatchEvent(new CustomEvent("melodymap:auth-changed"));
-}
-
-export function getLocalUser(): { id: string; name: string; email: string | null; avatar_url: string | null } | null {
-  if (typeof window === "undefined") return null;
-  const raw = localStorage.getItem("melodymap.local_user");
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
-      return {
-        id: parsed.id || "user-local",
-        name: parsed.name || parsed.display_name || "Listener",
-        email: parsed.email || null,
-        avatar_url: parsed.avatar_url || null,
-      };
-    }
-  } catch {}
-  return null;
 }

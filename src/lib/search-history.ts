@@ -126,20 +126,20 @@ export function useSearchHistory() {
   const [recentSearches, setRecentSearches] = useState<RecentSearchItem[]>(() => getRecentSearches());
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     setRecentSearches(getRecentSearches());
 
     const handleUpdate = () => {
       setRecentSearches(getRecentSearches());
     };
 
-    if (typeof window !== "undefined") {
-      window.addEventListener(SEARCH_HISTORY_EVENT, handleUpdate);
-      window.addEventListener("storage", handleUpdate);
-      return () => {
-        window.removeEventListener(SEARCH_HISTORY_EVENT, handleUpdate);
-        window.removeEventListener("storage", handleUpdate);
-      };
-    }
+    window.addEventListener(SEARCH_HISTORY_EVENT, handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener(SEARCH_HISTORY_EVENT, handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
   }, []);
 
   const addSearch = useCallback((q: string) => {

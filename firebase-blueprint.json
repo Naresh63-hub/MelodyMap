@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with display name and avatar",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique user ID matching auth.uid" },
+        "displayName": { "type": "string", "description": "Display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "avatarUrl": { "type": "string", "description": "Profile picture URL" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      },
+      "required": ["id", "createdAt"]
+    },
+    "TrackLike": {
+      "title": "TrackLike",
+      "description": "A track favorited by the user",
+      "type": "object",
+      "properties": {
+        "trackId": { "type": "string", "description": "ID of the favorited track" },
+        "title": { "type": "string", "description": "Song title" },
+        "artist": { "type": "string", "description": "Artist or author name" },
+        "thumbnail": { "type": "string", "description": "Album art or track image URL" },
+        "album": { "type": "string", "description": "Album title if available" },
+        "duration": { "type": "number", "description": "Duration in seconds" },
+        "likedAt": { "type": "string", "description": "Timestamp when added to favorites" }
+      },
+      "required": ["trackId", "title", "artist", "likedAt"]
+    },
+    "ListeningHistory": {
+      "title": "ListeningHistory",
+      "description": "A track listened to by the user",
+      "type": "object",
+      "properties": {
+        "trackId": { "type": "string", "description": "ID of the played track" },
+        "title": { "type": "string", "description": "Song title" },
+        "artist": { "type": "string", "description": "Artist or author name" },
+        "thumbnail": { "type": "string", "description": "Album art or track image URL" },
+        "playedAt": { "type": "string", "description": "Timestamp when played" }
+      },
+      "required": ["trackId", "title", "artist", "playedAt"]
+    },
+    "UserPlaylist": {
+      "title": "UserPlaylist",
+      "description": "Custom playlist created by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Playlist ID" },
+        "name": { "type": "string", "description": "Playlist name" },
+        "trackCount": { "type": "number", "description": "Total tracks in playlist" },
+        "updatedAt": { "type": "string", "description": "Timestamp of last modification" }
+      },
+      "required": ["id", "name"]
+    },
+    "UserPreferences": {
+      "title": "UserPreferences",
+      "description": "User preferences and audio configuration",
+      "type": "object",
+      "properties": {
+        "crossfade": { "type": "number", "description": "Crossfade duration in seconds" },
+        "languages": { "type": "string", "description": "Comma-separated list of selected languages" },
+        "artists": { "type": "string", "description": "Comma-separated list of preferred artists" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User account document"
+    },
+    "/users/{userId}/likes/{trackId}": {
+      "schema": "TrackLike",
+      "description": "User favorited tracks"
+    },
+    "/users/{userId}/history/{historyId}": {
+      "schema": "ListeningHistory",
+      "description": "User playback history"
+    },
+    "/users/{userId}/playlists/{playlistId}": {
+      "schema": "UserPlaylist",
+      "description": "User custom playlists"
+    },
+    "/users/{userId}/preferences/{prefDoc}": {
+      "schema": "UserPreferences",
+      "description": "User playback preferences"
+    }
+  }
+}

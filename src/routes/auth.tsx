@@ -9,42 +9,42 @@ import {
   Lock,
   Mail,
   User,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getSupabaseEnv, supabase } from "@/integrations/supabase/client";
-import { isNativeApp, startGoogleOAuth } from "@/lib/auth-deep-link";
 import {
-  isNativeGoogleAuthSupported,
-  getGoogleWebClientId,
-  signInWithNativeGoogle,
-} from "@/lib/native-google-auth";
+  auth,
+  signInWithGoogle,
+  syncUserProfile,
+} from "@/lib/firebase";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile as firebaseUpdateProfile,
+  updatePassword as firebaseUpdatePassword,
+  sendPasswordResetEmail,
+} from "firebase/auth";
 
 export function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
-  if (lower.includes("invalid login credentials") || lower.includes("invalid_grant")) {
-    return "Incorrect email or password. Please check your details and try again.";
+  if (lower.includes("invalid-credential") || lower.includes("wrong-password") || lower.includes("user-not-found")) {
+    return "Incorrect email or password. Please check your credentials and try again.";
   }
-  if (lower.includes("email not confirmed")) {
-    return "Please confirm your email before signing in. Check your inbox or spam folder.";
-  }
-  if (lower.includes("user already registered") || lower.includes("already exists")) {
+  if (lower.includes("email-already-in-use")) {
     return "An account with this email already exists. Try signing in instead.";
   }
-  if (lower.includes("password should be at least")) {
+  if (lower.includes("weak-password")) {
     return "Password must be at least 6 characters long.";
   }
-  if (lower.includes("rate limit") || lower.includes("too many requests")) {
-    return "Too many attempts. Please wait a moment and try again.";
+  if (lower.includes("too-many-requests")) {
+    return "Too many failed attempts. Please wait a moment and try again.";
   }
-  if (lower.includes("failed to fetch") || lower.includes("network") || lower.includes("connection")) {
-    return "Network connection issue. Please check your internet connection or continue as guest.";
-  }
-  if (lower.includes("not configured") || lower.includes("missing supabase")) {
-    return "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.";
+  if (lower.includes("popup-closed-by-user") || lower.includes("cancelled")) {
+    return "Sign in was cancelled.";
   }
   return msg;
 }
@@ -56,530 +56,239 @@ export const Route = createFileRoute("/auth")({
       {
         name: "description",
         content:
-          "Sign in to MelodyMap to sync your favourites, playlists and AI music picks across devices.",
+          "Sign in to MelodyMap with Google or email to sync your favourites, playlists, and recommendations across devices.",
       },
-      { property: "og:title", content: "Sign in — MelodyMap" },
-      {
-        property: "og:description",
-        content: "Sync your favourites, playlists and AI picks across every device.",
-      },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: AuthPage,
 });
 
-function isRecoveryUrl(): boolean {
-  if (typeof window === "undefined") return false;
-  const hash = window.location.hash;
-  const search = window.location.search;
-  return (
-    hash.includes("type=recovery") ||
-    search.includes("type=recovery") ||
-    search.includes("reset=true")
-  );
-}
-
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "reset_password">(() => {
-    return isRecoveryUrl() ? "reset_password" : "signin";
-  });
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "reset_password">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [otpCode, setOtpCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(() => {
-    if (typeof window !== "undefined") {
-      if (isRecoveryUrl()) return false;
-      const h = window.location.hash;
-      const s = window.location.search;
-      return h.includes("access_token") || s.includes("code=");
-    }
-    return false;
-  });
   const [errorNote, setErrorNote] = useState<string | null>(null);
-  const [successNote, setSuccessNote] = useState<string | null>(() => {
-    return isRecoveryUrl() ? "Password recovery link verified. Enter your new password below." : null;
-  });
-  const supabaseEnv = getSupabaseEnv();
-  const isConfigured = supabaseEnv.isConfigured;
+  const [successNote, setSuccessNote] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isConfigured) return;
-
-    if (isRecoveryUrl()) {
-      setOauthLoading(false);
-      setMode("reset_password");
-      setSuccessNote("Password recovery link verified. Enter your new password below.");
-    }
-
-    const isNative = isNativeApp();
-    const isMobileBrowser = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const hasAuthParams = typeof window !== "undefined" && (
-      window.location.search.includes("code=") ||
-      window.location.hash.includes("access_token=") ||
-      window.location.search.includes("native_return")
-    );
-    const isReturningToApp = !isNative && isMobileBrowser && hasAuthParams;
-
-    if (isReturningToApp && typeof window !== "undefined") {
-      const returnDeepLink = `com.melodymap.music://auth/callback${window.location.search}${window.location.hash}`;
-      try {
-        window.location.href = returnDeepLink;
-      } catch {}
-    }
-
-    // Listen for auth state change (Google OAuth exchange, email confirmation, recovery, etc.)
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || isRecoveryUrl()) {
-        setOauthLoading(false);
-        setMode("reset_password");
-        setSuccessNote("Password recovery link verified. Enter your new password below.");
-        return;
-      }
-
-      if (session && mode !== "reset_password" && !isRecoveryUrl()) {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user && mode !== "reset_password") {
         if (typeof window !== "undefined") {
           localStorage.removeItem("melodymap.guest_mode");
         }
-        if (!isReturningToApp) {
-          void navigate({ to: "/", replace: true });
-        }
+        void navigate({ to: "/", replace: true });
       }
     });
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (isRecoveryUrl()) {
-        setOauthLoading(false);
-        setMode("reset_password");
-        setSuccessNote("Password recovery link verified. Enter your new password below.");
-        return;
-      }
+    return () => unsubscribe();
+  }, [navigate, mode]);
 
-      if (data.session && mode !== "reset_password") {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("melodymap.guest_mode");
-        }
-        if (!isReturningToApp) {
+  const handleGoogleSignIn = async () => {
+    setGoogleBusy(true);
+    setErrorNote(null);
+    setSuccessNote(null);
+    try {
+      const res = await signInWithGoogle();
+      if (res.success) {
+        setSuccessNote("Signed in with Google successfully!");
+        setTimeout(() => {
           void navigate({ to: "/", replace: true });
-        }
+        }, 500);
+      } else {
+        setErrorNote(formatAuthError(res.error || "Google Sign-in failed"));
       }
-    });
-
-    const onAuthError = (event: Event) => {
-      const custom = event as CustomEvent<{ error: string }>;
+    } catch (err: any) {
+      setErrorNote(formatAuthError(err?.message || "Google Sign-in failed"));
+    } finally {
       setGoogleBusy(false);
-      setOauthLoading(false);
-      if (custom.detail?.error) {
-        setErrorNote(custom.detail.error);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorNote(null);
+    setSuccessNote(null);
+    setSubmitting(true);
+
+    if (mode === "reset_password") {
+      if (!password || password.length < 6) {
+        setSubmitting(false);
+        setErrorNote("New password must be at least 6 characters.");
+        return;
       }
-    };
-    if (typeof window !== "undefined") {
-      window.addEventListener("melodymap:auth-error", onAuthError);
+      if (password !== confirmPassword) {
+        setSubmitting(false);
+        setErrorNote("Passwords do not match.");
+        return;
+      }
+      const curUser = auth.currentUser;
+      if (!curUser) {
+        setSubmitting(false);
+        setErrorNote("No active session found. Please request a new reset link.");
+        return;
+      }
+      try {
+        await firebaseUpdatePassword(curUser, password);
+        setSuccessNote("Password updated! Redirecting to home...");
+        setTimeout(() => {
+          void navigate({ to: "/", replace: true });
+        }, 800);
+      } catch (err: any) {
+        setErrorNote(formatAuthError(err?.message || "Failed to update password"));
+        setSubmitting(false);
+      }
+      return;
     }
 
-    const watchdogTimer = setTimeout(() => {
-      setOauthLoading((current) => {
-        if (current) {
-          setErrorNote("Sign-in verification timed out or code expired. Please try signing in again.");
-          return false;
-        }
-        return false;
-      });
-    }, 6000);
-
-    return () => {
-      clearTimeout(watchdogTimer);
-      authListener.subscription.unsubscribe();
-      if (typeof window !== "undefined") {
-        window.removeEventListener("melodymap:auth-error", onAuthError);
+    if (mode === "forgot") {
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail) {
+        setSubmitting(false);
+        setErrorNote("Please enter your email address.");
+        return;
       }
-    };
-  }, [navigate, isConfigured, mode]);
+      try {
+        await sendPasswordResetEmail(auth, trimmedEmail);
+        setSuccessNote("Password reset instructions sent to your email! Check your inbox.");
+        setTimeout(() => setMode("signin"), 3000);
+      } catch (err: any) {
+        setErrorNote(formatAuthError(err?.message || "Failed to send reset email"));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
 
-  const handleContinueAsGuest = () => {
+    if (mode === "signup") {
+      const trimmedName = name.trim();
+      const trimmedEmail = email.trim();
+      if (!trimmedName) {
+        setSubmitting(false);
+        setErrorNote("Please enter your name.");
+        return;
+      }
+      if (!trimmedEmail || !trimmedEmail.includes("@")) {
+        setSubmitting(false);
+        setErrorNote("Please enter a valid email address.");
+        return;
+      }
+      if (!password || password.length < 6) {
+        setSubmitting(false);
+        setErrorNote("Password must be at least 6 characters.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setSubmitting(false);
+        setErrorNote("Passwords do not match.");
+        return;
+      }
+
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        await firebaseUpdateProfile(cred.user, { displayName: trimmedName });
+        await syncUserProfile(cred.user, trimmedName);
+        setSuccessNote(`Welcome, ${trimmedName}! Account created.`);
+        setTimeout(() => {
+          void navigate({ to: "/", replace: true });
+        }, 800);
+      } catch (err: any) {
+        setErrorNote(formatAuthError(err?.message || "Sign-up failed"));
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (mode === "signin") {
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail || !trimmedEmail.includes("@")) {
+        setSubmitting(false);
+        setErrorNote("Please enter a valid email address.");
+        return;
+      }
+      if (!password) {
+        setSubmitting(false);
+        setErrorNote("Please enter your password.");
+        return;
+      }
+
+      try {
+        const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        await syncUserProfile(cred.user);
+        setSuccessNote("Signed in successfully!");
+        setTimeout(() => {
+          void navigate({ to: "/", replace: true });
+        }, 600);
+      } catch (err: any) {
+        setErrorNote(formatAuthError(err?.message || "Invalid credentials"));
+        setSubmitting(false);
+      }
+    }
+  };
+
+  const continueAsGuest = () => {
     if (typeof window !== "undefined") {
       localStorage.setItem("melodymap.guest_mode", "true");
     }
     void navigate({ to: "/", replace: true });
   };
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setErrorNote(null);
-    setSuccessNote(null);
-
-    if (!isConfigured) {
-      setBusy(false);
-      setErrorNote(
-        "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest."
-      );
-      return;
-    }
-
-    if (mode === "reset_password") {
-      if (!password || password.length < 6) {
-        setBusy(false);
-        setErrorNote("New password must be at least 6 characters long.");
-        return;
-      }
-      if (password !== confirmPassword) {
-        setBusy(false);
-        setErrorNote("Passwords do not match. Please re-type your new password.");
-        return;
-      }
-
-      try {
-        // If an OTP code was entered manually, verify it first
-        if (otpCode.trim() && email.trim()) {
-          const { error: otpErr } = await supabase.auth.verifyOtp({
-            email: email.trim(),
-            token: otpCode.trim(),
-            type: "recovery",
-          });
-          if (otpErr) {
-            setBusy(false);
-            setErrorNote(formatAuthError(otpErr.message));
-            return;
-          }
-        }
-
-        const { error } = await supabase.auth.updateUser({
-          password: password,
-        });
-
-        setBusy(false);
-        if (error) {
-          setErrorNote(formatAuthError(error.message));
-          return;
-        }
-
-        setSuccessNote("Password updated successfully! Welcome back to MelodyMap.");
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("melodymap.guest_mode");
-        }
-        setTimeout(() => {
-          void navigate({ to: "/", replace: true });
-        }, 1200);
-      } catch (err: any) {
-        setBusy(false);
-        setErrorNote(err?.message || "Failed to update password.");
-      }
-      return;
-    }
-
-    if (mode === "forgot") {
-      try {
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: `${window.location.origin}/auth`,
-        });
-        setBusy(false);
-        if (error) {
-          setErrorNote(formatAuthError(error.message));
-          return;
-        }
-        setSuccessNote(
-          "Password reset link sent! Check your inbox (or spam) to open the reset link, or enter your 6-digit code below.",
-        );
-        // Switch to allow entering OTP / new password
-        setMode("reset_password");
-      } catch (err: any) {
-        setBusy(false);
-        setErrorNote(err?.message || "Failed to send reset link.");
-      }
-      return;
-    }
-
-    if (mode === "signup") {
-      try {
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { display_name: name.trim() || email.split("@")[0] },
-          },
-        });
-        setBusy(false);
-
-        if (error) {
-          const msg = error.message?.toLowerCase() || "";
-          if (msg.includes("already registered") || msg.includes("already exists")) {
-            // Already registered - try instant password sign-in
-            const { data: signInData } = await supabase.auth.signInWithPassword({
-              email: email.trim(),
-              password,
-            });
-            if (signInData?.user) {
-              if (typeof window !== "undefined") {
-                localStorage.removeItem("melodymap.guest_mode");
-              }
-              void navigate({ to: "/", replace: true });
-              return;
-            }
-            setErrorNote("An account with this email already exists. Switching to Sign In.");
-            setMode("signin");
-            return;
-          }
-
-          if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("connection")) {
-            setErrorNote("Network connection issue. Please check your internet connection or continue as guest.");
-            return;
-          }
-
-          setErrorNote(formatAuthError(error.message));
-          return;
-        }
-
-        if (data?.user) {
-          try {
-            await supabase.from("profiles").upsert(
-              {
-                id: data.user.id,
-                display_name: name.trim() || email.split("@")[0] || null,
-                avatar_url: null,
-                updated_at: new Date().toISOString(),
-              },
-              { onConflict: "id" }
-            );
-          } catch (e) {
-            console.warn("[Auth] Profile upsert notice:", e);
-          }
-        }
-
-        // Instant frictionless login:
-        if (data?.session) {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("melodymap.guest_mode");
-          }
-          void navigate({ to: "/", replace: true });
-          return;
-        }
-
-        // Try immediate password sign in if session was omitted
-        const { data: signInData } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
-        if (signInData?.session) {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("melodymap.guest_mode");
-          }
-          void navigate({ to: "/", replace: true });
-          return;
-        }
-
-        // Supabase email confirmation is enabled: prompt user to confirm
-        setBusy(false);
-        setSuccessNote("Account created! Please check your email inbox to confirm your account, then sign in.");
-        setMode("signin");
-      } catch (err: any) {
-        setBusy(false);
-        setErrorNote(err?.message || "Sign-up failed. Please check your credentials or try again.");
-      }
-      return;
-    }
-
-    // Sign in mode
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      setBusy(false);
-      if (error) {
-        const msg = error.message?.toLowerCase() || "";
-        if (msg.includes("email not confirmed")) {
-          setErrorNote("Email not confirmed. Please check your inbox for the confirmation link before signing in.");
-          return;
-        }
-
-        if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("connection")) {
-          setErrorNote("Network connection issue. Please check your internet connection or continue as guest.");
-          return;
-        }
-        setErrorNote(formatAuthError(error.message));
-        return;
-      }
-
-      if (data?.user) {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("melodymap.guest_mode");
-        }
-        try {
-          const meta = data.user.user_metadata || {};
-          await supabase.from("profiles").upsert(
-            {
-              id: data.user.id,
-              display_name: meta["display_name"] || meta["full_name"] || meta["name"] || email.split("@")[0] || null,
-              avatar_url: meta["avatar_url"] || null,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "id" }
-          );
-        } catch (e) {
-          console.warn("[Auth] Sign-in profile sync notice:", e);
-        }
-      }
-
-      void navigate({ to: "/", replace: true });
-    } catch (err: any) {
-      setBusy(false);
-      setErrorNote(err?.message || "Sign-in failed. Please verify your credentials or continue as guest.");
-    }
-  };
-
-  const google = async () => {
-    setErrorNote(null);
-    setSuccessNote(null);
-    setGoogleBusy(true);
-
-    if (isNativeApp()) {
-      const clientId = getGoogleWebClientId();
-      if (clientId && isNativeGoogleAuthSupported()) {
-        try {
-          const res = await signInWithNativeGoogle(supabase, clientId);
-          if (res.success) {
-            setGoogleBusy(false);
-            void navigate({ to: "/", replace: true });
-            return;
-          }
-        } catch (err) {
-          console.warn("[Auth] Native Google Sign-In failed, falling back to browser OAuth:", err);
-        }
-      }
-    }
-
-    // Standard OAuth redirect flow
-    try {
-      const res = await startGoogleOAuth(supabase);
-      if (!res.success) {
-        setGoogleBusy(false);
-        setErrorNote(res.error || "Google sign-in failed. Please try again or sign in with email.");
-      }
-    } catch (err: any) {
-      setGoogleBusy(false);
-      setErrorNote(err?.message || "Could not initiate Google authentication.");
-    }
-  };
-
-  const isNative = isNativeApp();
-  const isMobileBrowser = typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const hasAuthParams = typeof window !== "undefined" && (
-    window.location.search.includes("code=") ||
-    window.location.hash.includes("access_token=") ||
-    window.location.search.includes("native_return")
-  );
-  const isReturningToApp = !isNative && isMobileBrowser && hasAuthParams;
-
-  if (isReturningToApp) {
-    const returnDeepLink = `com.melodymap.music://auth/callback${typeof window !== "undefined" ? window.location.search + window.location.hash : ""}`;
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-8 text-foreground text-center">
-        <div className="flex flex-col items-center gap-5 max-w-sm w-full bg-[#121212] p-8 rounded-3xl border border-white/10 shadow-2xl animate-fade-in">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl p-0.5 shadow-xl bg-[#1DB954]/20 text-[#1DB954]">
-            <CheckCircle2 className="h-9 w-9 text-[#1DB954]" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white mb-1">Authenticated!</h2>
-            <p className="text-xs text-neutral-400">Opening the MelodyMap app...</p>
-          </div>
-          <a
-            href={returnDeepLink}
-            className="w-full flex items-center justify-center gap-2 py-3 px-6 rounded-full bg-[#1DB954] text-black font-bold text-sm hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-[#1DB954]/20"
-          >
-            Open MelodyMap App
-          </a>
-          <button
-            type="button"
-            onClick={() => void navigate({ to: "/", replace: true })}
-            className="text-xs text-neutral-500 hover:text-neutral-400 underline pt-2"
-          >
-            Continue in browser instead
-          </button>
-        </div>
-      </main>
-    );
-  }
-
-  if (oauthLoading) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center bg-black px-4 py-8 text-foreground">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl p-0.5 shadow-2xl shadow-black/60 animate-pulse">
-            <img
-              src="/brand/app-icon.png"
-              alt="MelodyMap"
-              className="h-full w-full rounded-2xl object-cover"
-            />
-          </div>
-          <div className="flex items-center gap-2 text-white/70">
-            <Loader2 className="h-5 w-5 animate-spin text-[#1DB954]" />
-            <span className="text-sm font-semibold">Completing secure sign-in...</span>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-4 py-8 text-foreground selection:bg-white/20">
-      <div className="w-full max-w-md space-y-6">
-        {/* Header Branding */}
-        <div className="flex flex-col items-center gap-3 text-center">
+    <div className="flex min-h-screen flex-col justify-center bg-[#080808] px-4 py-8 sm:px-6 lg:px-8 text-white">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center mb-2">
           <Link
             to="/"
-            className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-xl shadow-black/40 hover:scale-105 transition-transform"
+            className="flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors"
           >
-            <img
-              src="/brand/app-icon.png"
-              alt="MelodyMap"
-              className="h-full w-full rounded-2xl object-cover"
-            />
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to music</span>
           </Link>
-          <div>
-            <h1 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Melody<span className="text-[#1DB954]">Map</span>
-            </h1>
-            <p className="text-xs text-white/50 mt-1">
-              Your personalized music space
-            </p>
-          </div>
         </div>
 
-        {/* Auth Card */}
-        <div className="rounded-2xl border border-white/10 bg-[#121212] p-6 sm:p-7 shadow-2xl">
-          {/* Mode Switcher */}
-          {mode === "signin" || mode === "signup" ? (
-            <div className="mb-6 flex rounded-full bg-white/[0.04] p-1 border border-white/10 text-xs font-semibold">
-              {(["signin", "signup"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    setMode(m);
-                    setErrorNote(null);
-                    setSuccessNote(null);
-                  }}
-                  className={`flex-1 rounded-full py-2.5 transition-all duration-200 ${
-                    mode === m
-                      ? "bg-white text-black font-semibold shadow-sm"
-                      : "text-white/60 hover:text-white"
-                  }`}
-                >
-                  {m === "signin" ? "Sign In" : "Create Account"}
-                </button>
-              ))}
+        <div className="flex flex-col items-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1DB954]/20 to-[#1DB954]/5 border border-[#1DB954]/30 shadow-lg mb-3">
+            <Sparkles className="h-6 w-6 text-[#1DB954]" />
+          </div>
+          <h2 className="text-center text-2xl font-semibold tracking-tight text-white">
+            {mode === "signin" && "Sign in to MelodyMap"}
+            {mode === "signup" && "Create an account"}
+            {mode === "forgot" && "Reset your password"}
+            {mode === "reset_password" && "Set new password"}
+          </h2>
+          <p className="mt-1.5 text-center text-xs text-white/50">
+            {mode === "signin" && "Sign in with Google or email to sync across all your devices"}
+            {mode === "signup" && "Create an account to keep your listening history and favourites safe"}
+            {mode === "forgot" && "Enter your email to receive password reset instructions"}
+            {mode === "reset_password" && "Enter a secure new password for your account"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="rounded-2xl bg-[#121212] border border-white/10 p-6 sm:p-8 shadow-2xl space-y-4">
+          {/* Notification alerts */}
+          {errorNote && (
+            <div className="flex items-center gap-2.5 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <p className="flex-1">{errorNote}</p>
             </div>
-          ) : (
-            <div className="mb-6 flex items-center justify-between">
+          )}
+          {successNote && (
+            <div className="flex items-center gap-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-400">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <p className="flex-1">{successNote}</p>
+            </div>
+          )}
+
+          {/* Mode Switcher */}
+          {mode !== "reset_password" && mode !== "forgot" && (
+            <div className="flex rounded-xl bg-white/[0.04] p-1 border border-white/5">
               <button
                 type="button"
                 onClick={() => {
@@ -587,95 +296,119 @@ function AuthPage() {
                   setErrorNote(null);
                   setSuccessNote(null);
                 }}
-                className="inline-flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors cursor-pointer"
+                className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
+                  mode === "signin"
+                    ? "bg-[#1DB954] text-black shadow-md"
+                    : "text-white/60 hover:text-white"
+                }`}
               >
-                <ArrowLeft className="h-3.5 w-3.5" /> Back to Sign In
+                Sign In
               </button>
-              <span className="text-xs font-semibold text-white/70">
-                {mode === "reset_password" ? "Set New Password" : "Reset Password"}
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("signup");
+                  setErrorNote(null);
+                  setSuccessNote(null);
+                }}
+                className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
+                  mode === "signup"
+                    ? "bg-[#1DB954] text-black shadow-md"
+                    : "text-white/60 hover:text-white"
+                }`}
+              >
+                Create Account
+              </button>
             </div>
           )}
 
-          {/* Error Banner */}
-          {errorNote && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-300 animate-in fade-in">
-              <AlertCircle className="h-4 w-4 shrink-0 text-rose-400 mt-0.5" />
-              <p className="flex-1 leading-relaxed">{errorNote}</p>
+          {/* Google Sign-in */}
+          {mode !== "reset_password" && (
+            <div className="space-y-3 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={googleBusy || submitting}
+                onClick={handleGoogleSignIn}
+                className="w-full h-11 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border-none font-medium flex items-center justify-center gap-2.5 shadow-sm active:scale-95 transition-all text-xs"
+              >
+                {googleBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-neutral-900" />
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                )}
+                <span>Continue with Google</span>
+              </Button>
+
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-white/10 w-full" />
+                <span className="bg-[#121212] px-2 text-[10px] text-white/40 uppercase tracking-widest font-mono">
+                  or with email
+                </span>
+              </div>
             </div>
           )}
 
-          {/* Success Banner */}
-          {successNote && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-emerald-300 animate-in fade-in">
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
-              <p className="flex-1 leading-relaxed">{successNote}</p>
-            </div>
-          )}
-
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             {mode === "signup" && (
               <div className="space-y-1.5">
-                <Label htmlFor="name" className="text-xs text-white/80 font-medium">Display Name</Label>
+                <Label className="text-xs text-white/70 font-medium">Full Name</Label>
                 <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                   <Input
-                    id="name"
+                    type="text"
+                    placeholder="Your Name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    maxLength={60}
-                    placeholder="Your name or nickname"
-                    className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-white/30"
+                    disabled={submitting}
+                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954]"
+                    required
                   />
                 </div>
               </div>
             )}
 
-            {/* Email Address */}
-            {(mode === "signin" || mode === "signup" || mode === "forgot" || (mode === "reset_password" && !isRecoveryUrl())) && (
+            {mode !== "reset_password" && (
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-xs text-white/80 font-medium">Email Address</Label>
+                <Label className="text-xs text-white/70 font-medium">Email Address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                   <Input
-                    id="email"
                     type="email"
-                    required
-                    maxLength={255}
+                    placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="h-10 rounded-xl border-white/10 bg-white/[0.04] pl-10 text-xs text-white placeholder:text-white/30 focus:border-white/30"
+                    disabled={submitting}
+                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954]"
+                    required
                   />
                 </div>
               </div>
             )}
 
-            {/* Optional 6-digit OTP code for reset_password mode */}
-            {mode === "reset_password" && !isRecoveryUrl() && (
+            {mode !== "forgot" && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="otpCode" className="text-xs text-white/80 font-medium">
-                    Reset Code / Token <span className="text-white/40 font-normal">(if received in email)</span>
+                  <Label className="text-xs text-white/70 font-medium">
+                    {mode === "reset_password" ? "New Password" : "Password"}
                   </Label>
-                </div>
-                <Input
-                  id="otpCode"
-                  type="text"
-                  maxLength={32}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  placeholder="e.g. 123456 or token"
-                  className="h-10 rounded-xl border-white/10 bg-white/[0.04] px-3.5 text-xs text-white placeholder:text-white/30 focus:border-white/30 font-mono"
-                />
-              </div>
-            )}
-
-            {/* Password input for Sign In / Sign Up */}
-            {(mode === "signin" || mode === "signup") && (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-xs text-white/80 font-medium">Password</Label>
                   {mode === "signin" && (
                     <button
                       type="button"
@@ -684,30 +417,27 @@ function AuthPage() {
                         setErrorNote(null);
                         setSuccessNote(null);
                       }}
-                      className="text-[11px] text-white/50 hover:text-white transition-colors cursor-pointer"
+                      className="text-[11px] text-[#1DB954] hover:underline"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                   <Input
-                    id="password"
                     type={showPassword ? "text" : "password"}
-                    required
-                    minLength={6}
-                    maxLength={72}
+                    placeholder="At least 6 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 6 characters"
-                    className="h-10 rounded-lg border-white/10 bg-white/[0.06] pl-10 pr-10 text-xs text-white placeholder:text-white/40 focus:border-white/30"
+                    disabled={submitting}
+                    className="pl-9 pr-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954]"
+                    required
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -715,62 +445,31 @@ function AuthPage() {
               </div>
             )}
 
-            {/* Password input & confirmation for reset_password mode */}
-            {mode === "reset_password" && (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="new-password" className="text-xs text-white/80 font-medium">New Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-                    <Input
-                      id="new-password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      minLength={6}
-                      maxLength={72}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Enter at least 6 characters"
-                      className="h-10 rounded-lg border-white/10 bg-white/[0.06] pl-10 pr-10 text-xs text-white placeholder:text-white/40 focus:border-white/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
+            {(mode === "signup" || mode === "reset_password") && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-white/70 font-medium">Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                  <Input
+                    type="password"
+                    placeholder="Re-enter password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={submitting}
+                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954]"
+                    required
+                  />
                 </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="confirm-password" className="text-xs text-white/80 font-medium">Confirm New Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
-                    <Input
-                      id="confirm-password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      minLength={6}
-                      maxLength={72}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Re-enter your new password"
-                      className="h-10 rounded-lg border-white/10 bg-white/[0.06] pl-10 text-xs text-white placeholder:text-white/40 focus:border-white/30"
-                    />
-                  </div>
-                </div>
-              </>
+              </div>
             )}
 
             <Button
               type="submit"
-              className="w-full h-11 rounded-full bg-white hover:bg-white/90 font-semibold text-black text-sm active:scale-[0.99] transition-all cursor-pointer shadow-md"
-              disabled={busy}
+              disabled={submitting || googleBusy}
+              className="w-full h-11 rounded-xl bg-[#1DB954] hover:bg-[#1aa34a] text-black font-semibold shadow-lg shadow-[#1DB954]/20 transition-all text-xs"
             >
-              {busy ? (
-                <Loader2 className="h-4 w-4 animate-spin text-black" />
+              {submitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : mode === "signin" ? (
                 "Sign In"
               ) : mode === "signup" ? (
@@ -778,93 +477,32 @@ function AuthPage() {
               ) : mode === "forgot" ? (
                 "Send Reset Link"
               ) : (
-                "Save Password & Continue"
+                "Update Password"
               )}
             </Button>
-
-            {mode === "signin" && (
-              <div className="pt-1 text-center">
-                <button
-                  type="button"
-                  onClick={handleContinueAsGuest}
-                  className="text-xs text-white/60 hover:text-white transition-colors cursor-pointer"
-                >
-                  Or continue without signing in →
-                </button>
-              </div>
-            )}
-
-            {mode === "forgot" && (
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("reset_password");
-                    setErrorNote(null);
-                    setSuccessNote(null);
-                  }}
-                  className="text-xs text-white/60 hover:text-white underline underline-offset-4 transition-colors cursor-pointer"
-                >
-                  Already have a reset code? Enter new password
-                </button>
-              </div>
-            )}
           </form>
 
-          {mode !== "forgot" && mode !== "reset_password" && (
-            <>
-              <div className="my-5 flex items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-                <span className="h-px flex-1 bg-white/10" />
-                or continue with
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-11 rounded-full border-white/10 bg-white/[0.04] text-xs font-semibold text-white hover:bg-white/[0.08] hover:text-white transition-colors"
-                disabled={googleBusy}
-                onClick={() => void google()}
-              >
-                {googleBusy ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#EA4335"
-                      d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
-                    />
-                    <path
-                      fill="#4285F4"
-                      d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.6 14.8c-.3-.8-.4-1.8-.4-2.8s.1-2 .4-2.8L1.9 6.3C.7 8.7 0 11.3 0 14s.7 5.3 1.9 7.7l3.7-2.9z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.3-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"
-                    />
-                  </svg>
-                )}
-                Google Account
-              </Button>
-            </>
+          {mode === "forgot" && (
+            <button
+              type="button"
+              onClick={() => setMode("signin")}
+              className="w-full py-2 text-xs text-white/60 hover:text-white transition-colors text-center"
+            >
+              Back to Sign In
+            </button>
           )}
-        </div>
 
-        {/* Free flow footer */}
-        <p className="text-center text-xs text-white/40">
-          <button
-            type="button"
-            onClick={handleContinueAsGuest}
-            className="hover:text-white transition-colors cursor-pointer"
-          >
-            <span>Skip and listen as guest (local only)</span>
-          </button>
-        </p>
+          <div className="pt-2 border-t border-white/[0.06] text-center">
+            <button
+              type="button"
+              onClick={continueAsGuest}
+              className="text-xs text-white/40 hover:text-white transition-colors"
+            >
+              Skip for now · Continue as Guest
+            </button>
+          </div>
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
