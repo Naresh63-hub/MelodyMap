@@ -54,7 +54,7 @@ const securityHeadersMiddleware = createMiddleware().server(async ({ request, ne
     // anything while a strict policy is tuned.
     res.headers.set(
       "Content-Security-Policy-Report-Only",
-      "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; object-src 'none'; base-uri 'self'; form-action 'self'",
+      "default-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
     );
   }
   return res;

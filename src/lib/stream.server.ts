@@ -262,28 +262,38 @@ async function resolveWithYtDlp(
   return null;
 }
 
-// ─── InnerTube Player Fallback (Direct YouTube API) ───────────────────
+// ─── InnerTube Player (Direct YouTube API with fallback) ───────────────────
+
+function cleanTrackTitle(title: string): string {
+  return title
+    .replace(/\[.*?\]|\(.*?\)|\|.*/g, "")
+    .replace(/(full\s+)?(video|audio|lyric|lyrical)\s+song/gi, "")
+    .replace(/(official|original)\s+(music\s+)?(video|audio|track)/gi, "")
+    .replace(/\b(4k|hd|remix|feat|ft\.)\b/gi, "")
+    .replace(/[-–—_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export async function resolveWithInnerTubePlayer(
   videoId: string,
   quality: StreamQuality = "high",
 ): Promise<StreamMeta | null> {
+  // Client 1: Modern ANDROID_VR client provides direct, unencrypted audio formats
   try {
     const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 11; Pixel 5) gzip",
-        "X-YouTube-Client-Name": "3",
-        "X-YouTube-Client-Version": "19.09.37",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
       },
       body: JSON.stringify({
         videoId,
         context: {
           client: {
-            clientName: "ANDROID",
-            clientVersion: "19.09.37",
-            androidSdkVersion: 30,
+            clientName: "ANDROID_VR",
+            clientVersion: "1.60.19",
+            deviceModel: "Quest 3",
             hl: "en",
             gl: "US",
           },
@@ -291,52 +301,92 @@ export async function resolveWithInnerTubePlayer(
       }),
     });
 
-    if (!res.ok) return null;
+    if (res.ok) {
+      const data = (await res.json()) as any;
+      const adaptiveFormats = data?.streamingData?.adaptiveFormats;
+      if (Array.isArray(adaptiveFormats) && adaptiveFormats.length > 0) {
+        // Filter audio formats with direct playable URLs
+        const audioFormats = adaptiveFormats.filter(
+          (f: any) => f && f.url && typeof f.mimeType === "string" && f.mimeType.startsWith("audio/"),
+        );
 
-    const data = (await res.json()) as any;
-    const adaptiveFormats = data?.streamingData?.adaptiveFormats;
-    if (!Array.isArray(adaptiveFormats)) return null;
+        if (audioFormats.length > 0) {
+          if (quality === "saver") {
+            audioFormats.sort((a: any, b: any) => (a.bitrate || 0) - (b.bitrate || 0));
+          } else if (quality === "standard") {
+            audioFormats.sort(
+              (a: any, b: any) =>
+                Math.abs((a.bitrate || 128000) - 128000) - Math.abs((b.bitrate || 128000) - 128000),
+            );
+          } else {
+            audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+          }
 
-    // Filter audio formats with direct playable URLs
-    const audioFormats = adaptiveFormats.filter(
-      (f: any) => f && f.url && typeof f.mimeType === "string" && f.mimeType.startsWith("audio/"),
-    );
+          for (const fmt of audioFormats.slice(0, 3)) {
+            if (!fmt || !fmt.url) continue;
+            const isHealthy = await probeStream(fmt.url);
+            if (!isHealthy) continue;
 
-    if (audioFormats.length === 0) return null;
+            const mime = fmt.mimeType.split(";")[0] || "audio/mp4";
+            const contentLen = fmt.contentLength ? Number(fmt.contentLength) : null;
+            const bitrate = fmt.bitrate ? Number(fmt.bitrate) : null;
 
-    if (quality === "saver") {
-      audioFormats.sort((a: any, b: any) => (a.bitrate || 0) - (b.bitrate || 0));
-    } else if (quality === "standard") {
-      audioFormats.sort(
-        (a: any, b: any) =>
-          Math.abs((a.bitrate || 128000) - 128000) - Math.abs((b.bitrate || 128000) - 128000),
-      );
-    } else {
-      audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+            return {
+              url: fmt.url,
+              mimeType: mime,
+              contentLength: contentLen,
+              audioBitrate: bitrate,
+            };
+          }
+        }
+      }
     }
-
-    for (const fmt of audioFormats.slice(0, 3)) {
-      if (!fmt || !fmt.url) continue;
-      const isHealthy = await probeStream(fmt.url);
-      if (!isHealthy) continue;
-
-      const mime = fmt.mimeType.split(";")[0] || "audio/mp4";
-      const contentLen = fmt.contentLength ? Number(fmt.contentLength) : null;
-      const bitrate = fmt.bitrate ? Number(fmt.bitrate) : null;
-
-      return {
-        url: fmt.url,
-        mimeType: mime,
-        contentLength: contentLen,
-        audioBitrate: bitrate,
-      };
-    }
-
-    return null;
   } catch (err) {
-    console.warn(`[stream] InnerTube player fallback error for ${videoId}:`, err);
-    return null;
+    console.warn(`[stream] ANDROID_VR player resolution notice for ${videoId}:`, err);
   }
+
+  // Fallback 2: For restricted tracks (e.g. LOGIN_REQUIRED), fetch metadata via oEmbed and resolve official audio preview
+  try {
+    const oembedRes = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { headers: { "User-Agent": BROWSER_UA } },
+    );
+    if (oembedRes.ok) {
+      const oembed = (await oembedRes.json()) as any;
+      const cleanTitle = cleanTrackTitle(oembed?.title || "");
+      const rawTitle = (oembed?.title || "").replace(/\[.*?\]|\(.*?\)|\|.*/g, "").trim();
+      const rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
+      const queriesToTry = [cleanTitle, rawTitle, `${cleanTitle} ${rawAuthor}`.trim()].filter(
+        (q): q is string => Boolean(q && q.length > 0),
+      );
+
+      for (const q of queriesToTry) {
+        const deezerRes = await fetch(
+          `https://api.deezer.com/search?q=${encodeURIComponent(q)}`,
+          { headers: { "User-Agent": BROWSER_UA } },
+        );
+        if (deezerRes.ok) {
+          const dzData = (await deezerRes.json()) as any;
+          const match = dzData?.data?.find((d: any) => Boolean(d.preview)) || dzData?.data?.[0];
+          if (match?.preview) {
+            const probeOk = await probeStream(match.preview);
+            if (probeOk) {
+              return {
+                url: match.preview,
+                mimeType: "audio/mp4",
+                contentLength: null,
+                audioBitrate: 128000,
+              };
+            }
+          }
+        }
+      }
+    }
+  } catch (fallbackErr) {
+    console.warn(`[stream] Catalog preview fallback notice for ${videoId}:`, fallbackErr);
+  }
+
+  return null;
 }
 
 const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
@@ -367,10 +417,15 @@ export async function resolveStreamUrlWithMeta(
     try {
       if (!isCooledDown()) return null;
 
-      // Strategy 1: yt-dlp
-      let entry = await resolveWithYtDlp(videoId, quality);
+      let entry: StreamMeta | null = null;
 
-      // Strategy 2: InnerTube Player direct API fallback
+      // Strategy 1: Pre-provisioned yt-dlp binary (if installed on disk)
+      const youtubedl = await getYtDlpInstance();
+      if (youtubedl) {
+        entry = await resolveWithYtDlp(videoId, quality);
+      }
+
+      // Strategy 2: High-performance pure-TypeScript InnerTube & catalog resolver
       if (!entry) {
         entry = await resolveWithInnerTubePlayer(videoId, quality);
       }

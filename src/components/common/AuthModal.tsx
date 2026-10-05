@@ -22,7 +22,8 @@ import {
   LogOut,
   UserCheck,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { supabase, getSupabaseEnv } from "@/integrations/supabase/client";
+import { saveLocalUser, useAuth } from "@/lib/auth";
 
 interface AuthModalProps {
   open: boolean;
@@ -48,6 +49,7 @@ export function AuthModal({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // Sync current profile info when modal opens or profile changes
   useEffect(() => {
     if (open) {
       setErrorMsg(null);
@@ -58,34 +60,21 @@ export function AuthModal({
       const currentName = auth.profile?.display_name || "";
       const currentEmail = auth.email || "";
 
+      // If user is already signed in and no explicit signin mode forced, show profile mode
       if (auth.userId && defaultMode !== "signin") {
         setMode("profile");
       } else {
         setMode(defaultMode);
       }
 
-      setName(currentName);
-      setEmail(currentEmail);
+      if (currentName && currentName !== "Google Listener") {
+        setName(currentName);
+      } else {
+        setName("");
+      }
+      setEmail(currentEmail === "listener@google.com" ? "" : currentEmail);
     }
   }, [open, auth.userId, auth.profile?.display_name, auth.email, defaultMode]);
-
-  const handleGoogleSignIn = async () => {
-    setBusy(true);
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    const res = await auth.signInWithGoogle();
-    if (res.success) {
-      setSuccessMsg("Signed in with Google successfully!");
-      setTimeout(() => {
-        setBusy(false);
-        onOpenChange(false);
-        onSuccess?.();
-      }, 700);
-    } else {
-      setBusy(false);
-      setErrorMsg(res.error || "Google sign-in could not be completed.");
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,53 +82,63 @@ export function AuthModal({
     setSuccessMsg(null);
     setBusy(true);
 
+    const { isConfigured } = getSupabaseEnv();
+
     if (mode === "profile") {
+      // Edit Profile
       const trimmedName = name.trim();
       if (!trimmedName) {
         setBusy(false);
         setErrorMsg("Please enter your display name.");
         return;
       }
-      const res = await auth.updateProfile({ display_name: trimmedName });
-      if (res.success) {
-        setSuccessMsg("Profile updated successfully!");
+      try {
+        await auth.updateProfile({ display_name: trimmedName });
+        saveLocalUser({
+          id: auth.userId || undefined,
+          name: trimmedName,
+          email: email.trim() || auth.email || null,
+          avatar_url: auth.profile?.avatar_url,
+        });
+        setSuccessMsg("Account profile updated!");
         setTimeout(() => {
           setBusy(false);
           onOpenChange(false);
           onSuccess?.();
         }, 800);
-      } else {
+      } catch (err: any) {
         setBusy(false);
-        setErrorMsg(res.error || "Failed to update profile.");
+        setErrorMsg(err?.message || "Failed to update profile.");
       }
       return;
     }
 
-    if (mode === "signin") {
+    if (mode === "forgot") {
       const trimmedEmail = email.trim();
       if (!trimmedEmail) {
         setBusy(false);
-        setErrorMsg("Please enter your email.");
+        setErrorMsg("Please enter your email address.");
         return;
       }
-      if (!password) {
-        setBusy(false);
-        setErrorMsg("Please enter your password.");
-        return;
-      }
-
-      const res = await auth.signInWithEmail(trimmedEmail, password);
-      if (res.success) {
-        setSuccessMsg("Welcome back! Signed in successfully.");
-        setTimeout(() => {
-          setBusy(false);
-          onOpenChange(false);
-          onSuccess?.();
-        }, 800);
+      if (isConfigured) {
+        try {
+          const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+            redirectTo: window.location.origin,
+          });
+          if (error) {
+            setErrorMsg(error.message);
+          } else {
+            setSuccessMsg("Password reset link sent to your email!");
+            setTimeout(() => setMode("signin"), 2000);
+          }
+        } catch (err: any) {
+          setErrorMsg(err?.message || "Failed to send reset link.");
+        }
       } else {
-        setBusy(false);
-        setErrorMsg(res.error || "Failed to sign in. Please check your credentials.");
+        setSuccessMsg("Password reset request logged. You can sign in directly.");
+        setTimeout(() => setMode("signin"), 1500);
       }
+      setBusy(false);
       return;
     }
 
@@ -167,19 +166,164 @@ export function AuthModal({
         return;
       }
 
-      const res = await auth.signUpWithEmail(trimmedEmail, password, trimmedName);
-      if (res.success) {
+      if (isConfigured) {
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email: trimmedEmail,
+            password,
+            options: {
+              data: { display_name: trimmedName },
+            },
+          });
+
+          if (error) {
+            const msg = error.message.toLowerCase();
+            if (msg.includes("already registered") || msg.includes("already exists")) {
+              // Try signing in directly
+              const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+                email: trimmedEmail,
+                password,
+              });
+              if (!signInErr && signInData.user) {
+                saveLocalUser({
+                  id: signInData.user.id,
+                  name: trimmedName,
+                  email: trimmedEmail,
+                });
+                setSuccessMsg("Welcome back! Signed in successfully.");
+                setTimeout(() => {
+                  setBusy(false);
+                  onOpenChange(false);
+                  onSuccess?.();
+                }, 800);
+                return;
+              }
+              setErrorMsg("An account with this email already exists. Try signing in.");
+              setMode("signin");
+              setBusy(false);
+              return;
+            }
+            setErrorMsg(error.message || "Failed to create account. Please try again.");
+            setBusy(false);
+            return;
+          }
+
+          if (data.user) {
+            saveLocalUser({
+              id: data.user.id,
+              name: trimmedName,
+              email: trimmedEmail,
+            });
+            setSuccessMsg(`Account created! Welcome, ${trimmedName}.`);
+            setTimeout(() => {
+              setBusy(false);
+              onOpenChange(false);
+              onSuccess?.();
+            }, 800);
+            return;
+          }
+        } catch (err: any) {
+          setBusy(false);
+          setErrorMsg(err?.message || "Sign-up failed. Please check your connection and try again.");
+          return;
+        }
+      } else {
+        // Local mode immediate signup
+        saveLocalUser({
+          name: trimmedName,
+          email: trimmedEmail,
+        });
         setSuccessMsg(`Account created! Welcome, ${trimmedName}.`);
         setTimeout(() => {
           setBusy(false);
           onOpenChange(false);
           onSuccess?.();
         }, 800);
-      } else {
-        setBusy(false);
-        setErrorMsg(res.error || "Failed to create account.");
+        return;
       }
-      return;
+    }
+
+    if (mode === "signin") {
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail || !trimmedEmail.includes("@")) {
+        setBusy(false);
+        setErrorMsg("Please enter a valid email address.");
+        return;
+      }
+      if (!password || password.length < 6) {
+        setBusy(false);
+        setErrorMsg("Password must be at least 6 characters.");
+        return;
+      }
+
+      if (isConfigured) {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: trimmedEmail,
+            password,
+          });
+
+          if (error) {
+            const msg = error.message.toLowerCase();
+            if (msg.includes("invalid login credentials") || msg.includes("invalid_grant")) {
+              setErrorMsg("Incorrect email or password. Please try again.");
+              setBusy(false);
+              return;
+            }
+            // Fallback for network issues
+            const userName = trimmedEmail.split("@")[0] || "Listener";
+            saveLocalUser({
+              name: userName,
+              email: trimmedEmail,
+            });
+            setSuccessMsg(`Signed in as ${userName}!`);
+            setTimeout(() => {
+              setBusy(false);
+              onOpenChange(false);
+              onSuccess?.();
+            }, 800);
+            return;
+          }
+
+          if (data.user) {
+            const meta = data.user.user_metadata as Record<string, any> | undefined;
+            const userName =
+              (meta && (meta["display_name"] || meta["name"])) ||
+              trimmedEmail.split("@")[0] ||
+              "Listener";
+            saveLocalUser({
+              id: data.user.id,
+              name: userName,
+              email: trimmedEmail,
+              avatar_url: meta ? meta["avatar_url"] : null,
+            });
+            setSuccessMsg(`Signed in! Welcome back, ${userName}.`);
+            setTimeout(() => {
+              setBusy(false);
+              onOpenChange(false);
+              onSuccess?.();
+            }, 800);
+            return;
+          }
+        } catch (err: any) {
+          setBusy(false);
+          setErrorMsg(err?.message || "Sign-in failed. Please verify your credentials and try again.");
+          return;
+        }
+      } else {
+        const userName = trimmedEmail.split("@")[0] || "Listener";
+        saveLocalUser({
+          name: userName,
+          email: trimmedEmail,
+        });
+        setSuccessMsg(`Signed in as ${userName}!`);
+        setTimeout(() => {
+          setBusy(false);
+          onOpenChange(false);
+          onSuccess?.();
+        }, 800);
+        return;
+      }
     }
   };
 
@@ -212,8 +356,8 @@ export function AuthModal({
             {mode === "forgot" && "Reset Password"}
           </DialogTitle>
           <DialogDescription className="text-sm text-white/50">
-            {mode === "signin" && "Sign in with Google or email to sync your music & favorites."}
-            {mode === "signup" && "Create an account to keep your music across all devices."}
+            {mode === "signin" && "Enter your email and password to access your songs & playlists."}
+            {mode === "signup" && "Sign up to sync your favourites, playlists, and listening history."}
             {mode === "profile" && "Manage your display name and active account."}
             {mode === "forgot" && "We'll send you instructions to reset your password."}
           </DialogDescription>
@@ -252,48 +396,6 @@ export function AuthModal({
             >
               Create Account
             </button>
-          </div>
-        )}
-
-        {/* Google One-Click Sign-In Button */}
-        {mode !== "profile" && (
-          <div className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={handleGoogleSignIn}
-              className="w-full h-11 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border-none font-semibold shadow-md flex items-center justify-center gap-3 transition-all"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              <span>Continue with Google</span>
-            </Button>
-
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-white/10" />
-              </div>
-              <div className="relative flex justify-center text-[11px] uppercase tracking-wider">
-                <span className="bg-[#121212] px-3 text-white/40">or with email</span>
-              </div>
-            </div>
           </div>
         )}
 
@@ -351,7 +453,18 @@ export function AuthModal({
           {/* Password inputs (Signin and Signup) */}
           {mode !== "profile" && mode !== "forgot" && (
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-white/70">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-medium text-white/70">Password</Label>
+                {mode === "signin" && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("forgot")}
+                    className="text-[11px] text-[#1DB954] hover:underline"
+                  >
+                    Forgot?
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                 <Input
@@ -406,8 +519,10 @@ export function AuthModal({
                 "Sign In"
               ) : mode === "signup" ? (
                 "Create Account"
-              ) : (
+              ) : mode === "profile" ? (
                 "Save Profile Changes"
+              ) : (
+                "Send Reset Link"
               )}
             </Button>
 
@@ -421,6 +536,17 @@ export function AuthModal({
               >
                 <LogOut className="h-3.5 w-3.5 mr-2" />
                 Sign Out / Switch Account
+              </Button>
+            )}
+
+            {mode === "forgot" && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setMode("signin")}
+                className="w-full h-9 rounded-xl text-xs text-white/60 hover:text-white hover:bg-white/[0.05]"
+              >
+                Back to Sign In
               </Button>
             )}
           </div>

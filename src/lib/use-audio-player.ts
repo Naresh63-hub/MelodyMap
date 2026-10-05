@@ -188,8 +188,6 @@ export function useAudioPlayer(options: {
 
   const [ready] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
-  const isPlayingRef = useRef(false);
-  isPlayingRef.current = isPlaying;
   const [isLoading, setIsLoading] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [position, setPosition] = useState(0);
@@ -213,15 +211,6 @@ export function useAudioPlayer(options: {
 
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
-  const deckAGainRef = useRef<GainNode | null>(null);
-  const deckBGainRef = useRef<GainNode | null>(null);
-  const sourceNodeBRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const activeDeckRef = useRef<"A" | "B">("A");
-  const isCrossfadeInProgressRef = useRef<boolean>(false);
-  const crossfadeInitiatedRef = useRef<boolean>(false);
-  const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const crossfadeCompletionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isCrossfading, setIsCrossfading] = useState<boolean>(false);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -261,36 +250,13 @@ export function useAudioPlayer(options: {
           }
         };
 
+        const source = ctx.createMediaElementSource(audio);
+        sourceNodeRef.current = source;
+
         const mainGain = ctx.createGain();
         mainGain.gain.value = 1;
         mainGainRef.current = mainGain;
-
-        const deckAGain = ctx.createGain();
-        deckAGain.gain.value = 1;
-        deckAGainRef.current = deckAGain;
-        deckAGain.connect(mainGain);
-
-        const deckBGain = ctx.createGain();
-        deckBGain.gain.value = 1;
-        deckBGainRef.current = deckBGain;
-        deckBGain.connect(mainGain);
-
-        if (!sourceNodeRef.current) {
-          try {
-            const sourceA = ctx.createMediaElementSource(audio);
-            sourceNodeRef.current = sourceA;
-            sourceA.connect(deckAGain);
-          } catch {}
-        }
-
-        const prebufferAudio = prebufferAudioRef.current;
-        if (!sourceNodeBRef.current && prebufferAudio) {
-          try {
-            const sourceB = ctx.createMediaElementSource(prebufferAudio);
-            sourceNodeBRef.current = sourceB;
-            sourceB.connect(deckBGain);
-          } catch {}
-        }
+        source.connect(mainGain);
 
         // Build 10-band biquad filter chain
         const currentSettings = equalizerSettingsRef.current;
@@ -437,156 +403,18 @@ export function useAudioPlayer(options: {
     (seconds: number) => {
       const next: EqualizerSettings = {
         ...equalizerSettings,
-        crossfade: Math.max(0, Math.min(12, Math.round(seconds))),
+        crossfade: Math.max(0, Math.min(8, seconds)),
       };
       applyEqualizerGains(next);
     },
     [equalizerSettings, applyEqualizerGains],
   );
 
-  /**
-   * Smoothly crossfades outgoing track on the active deck into incoming track on the standby deck
-   * using trigonometric equal-power curves (no volume dips, studio grade blending).
-   */
-  const startCrossfadeTransition = useCallback(
-    (nextTrack: NextTrackInfo, fadeSec: number) => {
-      if (isCrossfadeInProgressRef.current) return;
-      isCrossfadeInProgressRef.current = true;
-      crossfadeInitiatedRef.current = true;
-      setIsCrossfading(true);
-
-      const outgoingAudio = activeDeckRef.current === "A" ? audioRef.current : prebufferAudioRef.current;
-      const incomingAudio = activeDeckRef.current === "A" ? prebufferAudioRef.current : audioRef.current;
-      const outgoingGain = activeDeckRef.current === "A" ? deckAGainRef.current : deckBGainRef.current;
-      const incomingGain = activeDeckRef.current === "A" ? deckBGainRef.current : deckAGainRef.current;
-      const ctx = audioCtxRef.current;
-
-      if (!outgoingAudio || !incomingAudio) {
-        isCrossfadeInProgressRef.current = false;
-        setIsCrossfading(false);
-        return;
-      }
-
-      const fadeDuration = Math.max(1, Math.min(12, fadeSec));
-      const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
-
-      if (incomingAudio.src !== nextUrl) {
-        incomingAudio.src = nextUrl;
-        incomingAudio.load();
-      }
-      incomingAudio.currentTime = 0;
-      incomingAudio.muted = false;
-      incomingAudio.volume = 0;
-      const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
-      incomingAudio.playbackRate = validSpeed;
-
-      if (ctx && ctx.state === "suspended") {
-        ctx.resume().catch(() => {});
-      }
-
-      if (ctx && outgoingGain && incomingGain) {
-        try {
-          outgoingGain.gain.cancelScheduledValues(ctx.currentTime);
-          incomingGain.gain.cancelScheduledValues(ctx.currentTime);
-          const curveOut = createEqualPowerCurve("out", 32);
-          const curveIn = createEqualPowerCurve("in", 32);
-          outgoingGain.gain.setValueCurveAtTime(curveOut, ctx.currentTime, fadeDuration);
-          incomingGain.gain.setValueCurveAtTime(curveIn, ctx.currentTime, fadeDuration);
-        } catch {}
-      }
-
-      const stepMs = 50;
-      const totalSteps = Math.max(1, Math.round((fadeDuration * 1000) / stepMs));
-      let step = 0;
-
-      if (crossfadeTimerRef.current) clearInterval(crossfadeTimerRef.current);
-      if (crossfadeCompletionTimerRef.current) clearTimeout(crossfadeCompletionTimerRef.current);
-
-      crossfadeTimerRef.current = setInterval(() => {
-        step++;
-        const t = Math.min(1, step / totalSteps);
-        const volOut = Math.cos((t * Math.PI) / 2);
-        const volIn = Math.sin((t * Math.PI) / 2);
-
-        outgoingAudio.volume = Math.max(0, Math.min(1, volOut));
-        incomingAudio.volume = Math.max(0, Math.min(1, volIn));
-
-        if (step >= totalSteps) {
-          if (crossfadeTimerRef.current) {
-            clearInterval(crossfadeTimerRef.current);
-            crossfadeTimerRef.current = null;
-          }
-        }
-      }, stepMs);
-
-      const playPromise = incomingAudio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn("[Crossfade] incoming play notice:", err);
-        });
-      }
-
-      activeDeckRef.current = activeDeckRef.current === "A" ? "B" : "A";
-      currentTrackIdRef.current = nextTrack.id;
-      lastValidPositionRef.current = 0;
-      setPosition(0);
-      setDuration(0);
-
-      endedRef.current(true);
-
-      crossfadeCompletionTimerRef.current = setTimeout(() => {
-        if (crossfadeTimerRef.current) {
-          clearInterval(crossfadeTimerRef.current);
-          crossfadeTimerRef.current = null;
-        }
-        try {
-          outgoingAudio.pause();
-          outgoingAudio.volume = 1;
-        } catch {}
-        if (outgoingGain) {
-          try {
-            outgoingGain.gain.value = 1;
-          } catch {}
-        }
-        incomingAudio.volume = 1;
-        if (incomingGain) {
-          try {
-            incomingGain.gain.value = 1;
-          } catch {}
-        }
-        setIsCrossfading(false);
-        isCrossfadeInProgressRef.current = false;
-        crossfadeInitiatedRef.current = false;
-      }, fadeDuration * 1000);
-    },
-    [streamUrl],
-  );
-
   /** Point the audio element at a resolved stream URL with smooth playback */
   const setStream = useCallback(
     (url: string, startAt = 0) => {
-      const audio = activeDeckRef.current === "A" ? audioRef.current : prebufferAudioRef.current;
+      const audio = audioRef.current;
       if (!audio || !url || url.includes("/api/stream/undefined") || url.endsWith("/api/stream/")) return;
-
-      if (crossfadeTimerRef.current) {
-        clearInterval(crossfadeTimerRef.current);
-        crossfadeTimerRef.current = null;
-      }
-      if (crossfadeCompletionTimerRef.current) {
-        clearTimeout(crossfadeCompletionTimerRef.current);
-        crossfadeCompletionTimerRef.current = null;
-      }
-      setIsCrossfading(false);
-      isCrossfadeInProgressRef.current = false;
-      crossfadeInitiatedRef.current = false;
-
-      const standby = activeDeckRef.current === "A" ? prebufferAudioRef.current : audioRef.current;
-      if (standby) {
-        try {
-          standby.pause();
-          standby.volume = 1;
-        } catch {}
-      }
 
       // If the engine already synchronously transitioned to this exact URL, avoid tearing it down
       if (
@@ -649,21 +477,8 @@ export function useAudioPlayer(options: {
           const curve = createEqualPowerCurve("in", 32);
           try {
             mainGain.gain.cancelScheduledValues(ctx.currentTime);
-            mainGain.gain.setValueCurveAtTime(curve, ctx.currentTime, Math.min(fadeDur, 3));
+            mainGain.gain.setValueCurveAtTime(curve, ctx.currentTime, Math.min(fadeDur, 4));
           } catch {}
-        }
-
-        if (fadeDur > 0) {
-          audio.volume = 0;
-          const stepMs = 50;
-          const steps = Math.max(1, Math.round((Math.min(fadeDur, 2.5) * 1000) / stepMs));
-          let step = 0;
-          const volTimer = setInterval(() => {
-            step++;
-            const t = Math.min(1, step / steps);
-            audio.volume = Math.sin((t * Math.PI) / 2);
-            if (step >= steps) clearInterval(volTimer);
-          }, stepMs);
         }
 
         const playPromise = audio.play();
@@ -780,262 +595,210 @@ export function useAudioPlayer(options: {
   }, [streamUrl]);
 
   useEffect(() => {
-    const audioA = audioRef.current;
-    if (!audioA) return;
+    const audio = audioRef.current;
+    if (!audio) return;
 
-    const setupDeck = (deckEl: HTMLAudioElement, deckId: "A" | "B") => {
-      const applyPendingSeek = () => {
-        if (deckId !== activeDeckRef.current) return;
-        if (pendingSeekRef.current !== null) {
-          const target = pendingSeekRef.current;
-          pendingSeekRef.current = null;
-          const dur = Number.isFinite(deckEl.duration) && deckEl.duration > 0 ? deckEl.duration : target;
-          const clamped = Math.max(0, Math.min(target, dur));
-          deckEl.currentTime = clamped;
-          setPosition(clamped);
-        }
-      };
-
-      const onPlay = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        deckEl.muted = false;
-        initWebAudio();
-        if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-          audioCtxRef.current.resume().catch(() => {});
-        }
-        setIsPlaying(true);
-        setIsLoading(false);
-        applyPendingSeek();
-      };
-
-      const onPlaying = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-          audioCtxRef.current.resume().catch(() => {});
-        }
-        if (stalledTimerRef.current) {
-          clearTimeout(stalledTimerRef.current);
-          stalledTimerRef.current = null;
-        }
-        reconnectAttemptsRef.current = 0;
-        setIsReconnecting(false);
-        setIsPlaying(true);
-        setIsLoading(false);
-        applyPendingSeek();
-      };
-
-      const onWaiting = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        if (wantPlayRef.current) {
-          setIsLoading(true);
-          if (!stalledTimerRef.current) {
-            stalledTimerRef.current = setTimeout(() => {
-              stalledTimerRef.current = null;
-              if (wantPlayRef.current && (!deckEl.currentTime || deckEl.paused)) {
-                console.warn("[MelodyMap] Stream waiting timeout. Attempting reconnect.");
-                triggerReconnect();
-              }
-            }, 6000);
-          }
-        }
-      };
-
-      const onStalled = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        if (wantPlayRef.current && currentTrackIdRef.current) {
-          if (!stalledTimerRef.current) {
-            stalledTimerRef.current = setTimeout(() => {
-              stalledTimerRef.current = null;
-              if (wantPlayRef.current && deckEl.paused) {
-                console.warn("[MelodyMap] Audio stream stalled. Triggering mid-song reconnect.");
-                triggerReconnect();
-              }
-            }, 4500);
-          }
-        }
-      };
-
-      const onCanPlay = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        setIsLoading(false);
-        applyPendingSeek();
-      };
-
-      const onLoadedMetadata = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        applyPendingSeek();
-        onTime();
-      };
-
-      const onPause = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        if (!isCrossfadeInProgressRef.current) {
-          setIsPlaying(false);
-          setIsLoading(false);
-        }
-      };
-
-      const onTime = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        const cur = deckEl.currentTime || 0;
-        const dur = Number.isFinite(deckEl.duration) ? deckEl.duration : 0;
-        lastValidPositionRef.current = cur;
-        setPosition(cur);
-        setDuration(dur);
-        if (cur > 0) setIsLoading(false);
-
-        // SponsorBlock Auto-Skip
-        if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
-          for (const seg of sponsorSegmentsRef.current) {
-            const segKey = `${seg.start.toFixed(1)}-${seg.end.toFixed(1)}`;
-            if (skippedSegmentsRef.current.has(segKey)) continue;
-
-            if (cur >= seg.start - 0.05 && cur < seg.end - 0.2) {
-              skippedSegmentsRef.current.add(segKey);
-              const target = seg.end + 0.2;
-              deckEl.currentTime = target;
-              onSponsorBlockSkippedRef.current?.(seg.category);
-              break;
-            }
-          }
-        }
-
-        // Crossfade transition detection:
-        // When remaining time <= crossfadeDuration, smoothly blend into the upcoming track
-        const crossfadeSec = equalizerSettingsRef.current.crossfade || 0;
-        if (
-          crossfadeSec > 0 &&
-          dur > crossfadeSec + 1 &&
-          dur - cur <= crossfadeSec &&
-          !crossfadeInitiatedRef.current &&
-          !isCrossfadeInProgressRef.current &&
-          wantPlayRef.current
-        ) {
-          const nextTrack = getNextTrackRef.current?.();
-          if (nextTrack && nextTrack.id) {
-            startCrossfadeTransition(nextTrack, Math.min(crossfadeSec, Math.max(1, dur - cur)));
-            return;
-          }
-        }
-
-        // Gapless Pre-buffering: when current song has <= 25s left, pre-buffer upcoming track
-        if (!isLowNetworkModeEnabled() && dur > 0 && dur - cur <= 25) {
-          const nextTrack = getNextTrackRef.current?.();
-          if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
-            prebufferedTrackIdRef.current = nextTrack.id;
-            const standby = deckId === "A" ? prebufferAudioRef.current : audioRef.current;
-            if (standby) {
-              const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
-              standby.src = nextUrl;
-              standby.load();
-            }
-          }
-        }
-      };
-
-      const onEnded = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        if (isCrossfadeInProgressRef.current || crossfadeInitiatedRef.current) return;
-        setIsPlaying(false);
-        setIsLoading(false);
-
-        const nextTrack = getNextTrackRef.current?.();
-        let didAutoAdvance = false;
-
-        if (nextTrack && wantPlayRef.current) {
-          currentTrackIdRef.current = nextTrack.id;
-          lastValidPositionRef.current = 0;
-          setPosition(0);
-          setDuration(0);
-          const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
-          deckEl.src = nextUrl;
-          const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
-          deckEl.playbackRate = validSpeed;
-          deckEl.load();
-          const p = deckEl.play();
-          if (p !== undefined) {
-            p.catch((err) => {
-              console.warn("[BackgroundPlayback] Synchronous next auto-play notice:", err);
-            });
-          }
-          didAutoAdvance = true;
-        }
-
-        endedRef.current(didAutoAdvance);
-      };
-
-      const onError = () => {
-        if (activeEngineRef.current !== "html5" || activeDeckRef.current !== deckId) return;
-        setIsPlaying(false);
-        setIsLoading(false);
-        if (
-          deckEl.error &&
-          deckEl.error.code !== 1 &&
-          deckEl.error.code !== 20 &&
-          deckEl.src &&
-          !deckEl.src.includes("/api/stream/undefined") &&
-          !deckEl.src.endsWith("/api/stream/")
-        ) {
-          console.warn("[MelodyMap] Audio stream proxy error:", deckEl.error.code, deckEl.error.message);
-
-          if (wantPlayRef.current && (deckEl.error.code === 2 || deckEl.error.code === 4)) {
-            console.warn("[MelodyMap] Audio network error detected, attempting mid-song stream reconnection.");
-            triggerReconnect();
-            return;
-          }
-
-          const activeId = currentTrackIdRef.current;
-          const isExternalNonYt =
-            Boolean(activeId) &&
-            (activeId!.startsWith("podcast:") ||
-              activeId!.startsWith("deezer:") ||
-              activeId!.startsWith("audius:") ||
-              activeId!.startsWith("jamendo:") ||
-              activeId!.startsWith("archive:"));
-
-          if (activeId && !isExternalNonYt && !isNativePlaybackEnv()) {
-            console.info(`[MelodyMap] Falling back to direct client YouTube streaming for track: ${activeId}`);
-            const resumePos = deckEl.currentTime || 0;
-            playViaYouTubeRef.current(activeId, resumePos, wantPlayRef.current);
-            return;
-          }
-
-          const message = activeId?.startsWith("podcast:")
-            ? "Couldn't play this episode. The podcast host may be temporarily unavailable."
-            : "Could not load audio stream. Tap play to retry.";
-          onErrorRef.current?.(message);
-        }
-      };
-
-      deckEl.addEventListener("play", onPlay);
-      deckEl.addEventListener("playing", onPlaying);
-      deckEl.addEventListener("waiting", onWaiting);
-      deckEl.addEventListener("stalled", onStalled);
-      deckEl.addEventListener("canplay", onCanPlay);
-      deckEl.addEventListener("pause", onPause);
-      deckEl.addEventListener("timeupdate", onTime);
-      deckEl.addEventListener("durationchange", onTime);
-      deckEl.addEventListener("loadedmetadata", onLoadedMetadata);
-      deckEl.addEventListener("ended", onEnded);
-      deckEl.addEventListener("error", onError);
-
-      return () => {
-        deckEl.removeEventListener("play", onPlay);
-        deckEl.removeEventListener("playing", onPlaying);
-        deckEl.removeEventListener("waiting", onWaiting);
-        deckEl.removeEventListener("stalled", onStalled);
-        deckEl.removeEventListener("canplay", onCanPlay);
-        deckEl.removeEventListener("pause", onPause);
-        deckEl.removeEventListener("timeupdate", onTime);
-        deckEl.removeEventListener("durationchange", onTime);
-        deckEl.removeEventListener("loadedmetadata", onLoadedMetadata);
-        deckEl.removeEventListener("ended", onEnded);
-        deckEl.removeEventListener("error", onError);
-      };
+    const applyPendingSeek = () => {
+      if (pendingSeekRef.current !== null) {
+        const target = pendingSeekRef.current;
+        pendingSeekRef.current = null;
+        const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : target;
+        const clamped = Math.max(0, Math.min(target, dur));
+        audio.currentTime = clamped;
+        setPosition(clamped);
+      }
     };
 
-    const cleanupA = setupDeck(audioA, "A");
-    const cleanupB = prebufferAudioRef.current ? setupDeck(prebufferAudioRef.current, "B") : () => {};
+    const onPlay = () => {
+      if (activeEngineRef.current !== "html5") return;
+      audio.muted = false;
+      initWebAudio();
+      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+      setIsPlaying(true);
+      setIsLoading(false);
+      applyPendingSeek();
+    };
+    const onPlaying = () => {
+      if (activeEngineRef.current !== "html5") return;
+      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+      if (stalledTimerRef.current) {
+        clearTimeout(stalledTimerRef.current);
+        stalledTimerRef.current = null;
+      }
+      reconnectAttemptsRef.current = 0;
+      setIsReconnecting(false);
+      setIsPlaying(true);
+      setIsLoading(false);
+      applyPendingSeek();
+    };
+    const onWaiting = () => {
+      if (activeEngineRef.current !== "html5") return;
+      if (wantPlayRef.current) {
+        setIsLoading(true);
+        if (!stalledTimerRef.current) {
+          stalledTimerRef.current = setTimeout(() => {
+            stalledTimerRef.current = null;
+            if (wantPlayRef.current && (!audio.currentTime || audio.paused)) {
+              console.warn("[MelodyMap] Stream waiting timeout. Attempting reconnect.");
+              triggerReconnect();
+            }
+          }, 6000);
+        }
+      }
+    };
+    const onStalled = () => {
+      if (activeEngineRef.current !== "html5") return;
+      if (wantPlayRef.current && currentTrackIdRef.current) {
+        if (!stalledTimerRef.current) {
+          stalledTimerRef.current = setTimeout(() => {
+            stalledTimerRef.current = null;
+            if (wantPlayRef.current && audio.paused) {
+              console.warn("[MelodyMap] Audio stream stalled. Triggering mid-song reconnect.");
+              triggerReconnect();
+            }
+          }, 4500);
+        }
+      }
+    };
+    const onCanPlay = () => {
+      if (activeEngineRef.current !== "html5") return;
+      setIsLoading(false);
+      applyPendingSeek();
+    };
+    const onLoadedMetadata = () => {
+      if (activeEngineRef.current !== "html5") return;
+      applyPendingSeek();
+      onTime();
+    };
+    const onPause = () => {
+      if (activeEngineRef.current !== "html5") return;
+      setIsPlaying(false);
+      setIsLoading(false);
+    };
+    const onTime = () => {
+      if (activeEngineRef.current !== "html5") return;
+      const cur = audio.currentTime || 0;
+      const dur = Number.isFinite(audio.duration) ? audio.duration : 0;
+      lastValidPositionRef.current = cur;
+      setPosition(cur);
+      setDuration(dur);
+      if (cur > 0) setIsLoading(false);
+
+      // SponsorBlock Auto-Skip: Check if currentTime falls within an intro/sponsor/outro range
+      if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
+        for (const seg of sponsorSegmentsRef.current) {
+          const segKey = `${seg.start.toFixed(1)}-${seg.end.toFixed(1)}`;
+          if (skippedSegmentsRef.current.has(segKey)) continue;
+
+          if (cur >= seg.start - 0.05 && cur < seg.end - 0.2) {
+            skippedSegmentsRef.current.add(segKey);
+            const target = seg.end + 0.2;
+            audio.currentTime = target;
+            onSponsorBlockSkippedRef.current?.(seg.category);
+            break;
+          }
+        }
+      }
+
+      // Gapless Pre-buffering: when current song has <= 25s left, pre-buffer upcoming track
+      // Disabled in Low Network Mode to minimize cellular data usage
+      if (!isLowNetworkModeEnabled() && dur > 0 && dur - cur <= 25 && prebufferAudioRef.current) {
+        const nextTrack = getNextTrackRef.current?.();
+        if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
+          prebufferedTrackIdRef.current = nextTrack.id;
+          const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
+          prebufferAudioRef.current.src = nextUrl;
+          prebufferAudioRef.current.load();
+        }
+      }
+    };
+
+    // CRITICAL FOR SPOTIFY-LIKE SCREEN-OFF CONTINUOUS PLAYBACK:
+    // When song ends with screen locked, synchronously switch .src & call .play()
+    // inside the same event loop frame so mobile OS grants immediate autoplay permission!
+    const onEnded = () => {
+      if (activeEngineRef.current !== "html5") return;
+      setIsPlaying(false);
+      setIsLoading(false);
+
+      // Synchronously grab next track BEFORE index is mutated in endedRef callback
+      const nextTrack = getNextTrackRef.current?.();
+      let didAutoAdvance = false;
+
+      // Synchronous background advance for continuous playback with screen locked
+      if (nextTrack && wantPlayRef.current) {
+        currentTrackIdRef.current = nextTrack.id;
+        lastValidPositionRef.current = 0;
+        setPosition(0);
+        setDuration(0);
+        const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
+        audio.src = nextUrl;
+        const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
+        audio.playbackRate = validSpeed;
+        audio.load();
+        const p = audio.play();
+        if (p !== undefined) {
+          p.catch((err) => {
+            console.warn("[BackgroundPlayback] Synchronous next auto-play notice:", err);
+          });
+        }
+        didAutoAdvance = true;
+      }
+
+      // Notify parent component with autoAdvance status so it doesn't trigger a duplicate load race
+      endedRef.current(didAutoAdvance);
+    };
+
+    const onError = () => {
+      if (activeEngineRef.current !== "html5") return;
+      setIsPlaying(false);
+      setIsLoading(false);
+      if (
+        audio.error &&
+        audio.error.code !== 1 &&
+        audio.error.code !== 20 &&
+        audio.src &&
+        !audio.src.includes("/api/stream/undefined") &&
+        !audio.src.endsWith("/api/stream/")
+      ) {
+        console.warn("[MelodyMap] Audio stream proxy error:", audio.error.code, audio.error.message);
+
+        // Network error (code 2 = MEDIA_ERR_NETWORK) or decode error mid-stream: trigger prompt reconnection
+        if (wantPlayRef.current && (audio.error.code === 2 || audio.error.code === 4)) {
+          console.warn("[MelodyMap] Audio network error detected, attempting mid-song stream reconnection.");
+          triggerReconnect();
+          return;
+        }
+
+        // Instant Fallback to Client YouTube Player on Vercel / server proxy block
+        const activeId = currentTrackIdRef.current;
+        const isExternalNonYt =
+          Boolean(activeId) &&
+          (activeId!.startsWith("podcast:") ||
+            activeId!.startsWith("deezer:") ||
+            activeId!.startsWith("audius:") ||
+            activeId!.startsWith("jamendo:") ||
+            activeId!.startsWith("archive:"));
+
+        // Native app: never fall back to the YouTube IFrame engine — it cannot
+        // survive screen-off/app-switch. Keep the proxy engine and surface the error.
+        if (activeId && !isExternalNonYt && !isNativePlaybackEnv()) {
+          console.info(`[MelodyMap] Falling back to direct client YouTube streaming for track: ${activeId}`);
+          const resumePos = audio.currentTime || 0;
+          playViaYouTubeRef.current(activeId, resumePos, wantPlayRef.current);
+          return;
+        }
+
+        const message = activeId?.startsWith("podcast:")
+          ? "Couldn't play this episode. The podcast host may be temporarily unavailable."
+          : "Could not load audio stream. Tap play to retry.";
+        onErrorRef.current?.(message);
+      }
+    };
 
     const handleOnline = () => {
       console.info("[MelodyMap] Device reconnected to internet. Resuming active audio session.");
@@ -1054,12 +817,34 @@ export function useAudioPlayer(options: {
       setIsReconnecting(true);
     };
 
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("stalled", onStalled);
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("durationchange", onTime);
+    audio.addEventListener("loadedmetadata", onLoadedMetadata);
+    audio.addEventListener("ended", onEnded);
+    audio.addEventListener("error", onError);
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
     return () => {
-      cleanupA();
-      cleanupB();
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("stalled", onStalled);
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("durationchange", onTime);
+      audio.removeEventListener("loadedmetadata", onLoadedMetadata);
+      audio.removeEventListener("ended", onEnded);
+      audio.removeEventListener("error", onError);
+
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
 
@@ -1072,7 +857,7 @@ export function useAudioPlayer(options: {
         stalledTimerRef.current = null;
       }
     };
-  }, [initWebAudio, streamUrl, triggerReconnect, startCrossfadeTransition]);
+  }, [initWebAudio, streamUrl, triggerReconnect]);
 
   // Initialize YouTube IFrame Player API on mount
   useEffect(() => {
@@ -1159,8 +944,18 @@ export function useAudioPlayer(options: {
             },
             onError: (event: any) => {
               console.warn("[MelodyMap] YouTube player API error:", event.data);
+              // If YouTube embed is blocked (101/150) or unavailable, immediately fallback to HTML5 stream proxy
+              const curId = currentTrackIdRef.current;
+              if (curId && activeEngineRef.current === "youtube") {
+                console.info("[MelodyMap] YouTube embed blocked or errored, falling back to HTML5 audio proxy for:", curId);
+                activeEngineRef.current = "html5";
+                try {
+                  ytPlayerRef.current?.stopVideo?.();
+                } catch {}
+                setStream(streamUrl(curId), lastValidPositionRef.current);
+                return;
+              }
               // Only fatal unplayable errors should skip to next track
-              // 101/150 = embed blocked by video owner, 100 = video removed, 2 = invalid ID
               if (event.data === 101 || event.data === 150 || event.data === 100 || event.data === 2) {
                 onErrorRef.current?.("Audio stream unavailable, skipping to next track...");
               } else {
@@ -1239,40 +1034,6 @@ export function useAudioPlayer(options: {
                 const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
                 prebufferAudioRef.current.src = nextUrl;
                 prebufferAudioRef.current.load();
-              }
-            }
-
-            // Crossfade transition detection for YouTube engine
-            const crossfadeSec = equalizerSettingsRef.current.crossfade || 0;
-            if (
-              crossfadeSec > 0 &&
-              dur > crossfadeSec + 1 &&
-              dur - cur <= crossfadeSec &&
-              !crossfadeInitiatedRef.current &&
-              !isCrossfadeInProgressRef.current &&
-              wantPlayRef.current
-            ) {
-              const nextTrack = getNextTrackRef.current?.();
-              if (nextTrack && nextTrack.id) {
-                crossfadeInitiatedRef.current = true;
-                setIsCrossfading(true);
-                let currentVol = 100;
-                try {
-                  currentVol = ytPlayerRef.current?.getVolume?.() ?? 100;
-                } catch {}
-                const fadeMs = Math.min(crossfadeSec, 4) * 1000;
-                const startFade = Date.now();
-                const ytFadeTimer = setInterval(() => {
-                  const elapsed = Date.now() - startFade;
-                  const ratio = Math.max(0, 1 - elapsed / fadeMs);
-                  try {
-                    ytPlayerRef.current?.setVolume(Math.round(currentVol * ratio));
-                  } catch {}
-                  if (elapsed >= fadeMs) {
-                    clearInterval(ytFadeTimer);
-                    setIsCrossfading(false);
-                  }
-                }, 100);
               }
             }
           } catch {}
@@ -1454,7 +1215,7 @@ export function useAudioPlayer(options: {
 
       // Stop the double-load race: if synchronous gapless advance already started
       // playing this exact track at 0:00, avoid resetting position or restarting audio
-      const audio = activeDeckRef.current === "A" ? audioRef.current : prebufferAudioRef.current;
+      const audio = audioRef.current;
       const expectedUrl = directUrl || streamUrl(id);
       if (
         currentTrackIdRef.current === id &&
@@ -1463,7 +1224,7 @@ export function useAudioPlayer(options: {
           audio &&
           (audio.src === expectedUrl || audio.src.includes(encodeURIComponent(id))) &&
           (!audio.paused || audio.readyState >= 1)) ||
-         (activeEngineRef.current === "youtube" && isPlayingRef.current))
+         (activeEngineRef.current === "youtube" && isPlaying))
       ) {
         return;
       }
@@ -1573,7 +1334,7 @@ export function useAudioPlayer(options: {
     if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
       audioCtxRef.current.resume().catch(() => {});
     }
-    const audio = activeDeckRef.current === "A" ? audioRef.current : prebufferAudioRef.current;
+    const audio = audioRef.current;
     if (audio && audio.src && audio.src.length > 0 && !audio.src.endsWith("/")) {
       audio.muted = false;
       const p = audio.play();
@@ -1594,24 +1355,11 @@ export function useAudioPlayer(options: {
       clearTimeout(seekCooldownTimerRef.current);
       seekCooldownTimerRef.current = null;
     }
-    if (crossfadeTimerRef.current) {
-      clearInterval(crossfadeTimerRef.current);
-      crossfadeTimerRef.current = null;
-    }
-    if (crossfadeCompletionTimerRef.current) {
-      clearTimeout(crossfadeCompletionTimerRef.current);
-      crossfadeCompletionTimerRef.current = null;
-    }
-    setIsCrossfading(false);
-    isCrossfadeInProgressRef.current = false;
     try {
       ytPlayerRef.current?.pauseVideo();
     } catch {}
     try {
       audioRef.current?.pause();
-    } catch {}
-    try {
-      prebufferAudioRef.current?.pause();
     } catch {}
     setIsPlaying(false);
   }, []);
@@ -1620,26 +1368,6 @@ export function useAudioPlayer(options: {
     const target = Math.max(0, seconds);
     lastValidPositionRef.current = target;
     setPosition(target);
-
-    if (crossfadeTimerRef.current) {
-      clearInterval(crossfadeTimerRef.current);
-      crossfadeTimerRef.current = null;
-    }
-    if (crossfadeCompletionTimerRef.current) {
-      clearTimeout(crossfadeCompletionTimerRef.current);
-      crossfadeCompletionTimerRef.current = null;
-    }
-    setIsCrossfading(false);
-    isCrossfadeInProgressRef.current = false;
-    crossfadeInitiatedRef.current = false;
-
-    const standby = activeDeckRef.current === "A" ? prebufferAudioRef.current : audioRef.current;
-    if (standby) {
-      try {
-        standby.pause();
-        standby.volume = 1;
-      } catch {}
-    }
 
     if (activeEngineRef.current === "youtube") {
       const p = ytPlayerRef.current;
@@ -1661,7 +1389,7 @@ export function useAudioPlayer(options: {
       return;
     }
 
-    const audio = activeDeckRef.current === "A" ? audioRef.current : prebufferAudioRef.current;
+    const audio = audioRef.current;
     if (!audio) return;
     if (audio.readyState < 1 || !Number.isFinite(audio.duration) || audio.duration === 0) {
       pendingSeekRef.current = target;
@@ -1670,7 +1398,6 @@ export function useAudioPlayer(options: {
     const max = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : target;
     const clamped = Math.max(0, Math.min(target, max));
     audio.currentTime = clamped;
-    audio.volume = 1;
     if (wantPlayRef.current && audio.paused) {
       audio.play().catch(() => {});
     }
@@ -1700,17 +1427,16 @@ export function useAudioPlayer(options: {
         ytPlayerRef.current?.setPlaybackRate(clamped);
       } catch {}
     }
-    if (audioRef.current) audioRef.current.playbackRate = clamped;
-    if (prebufferAudioRef.current) prebufferAudioRef.current.playbackRate = clamped;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.playbackRate = clamped;
+    }
   }, []);
 
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(100, v));
-    const ratio = clamped / 100;
-    if (audioRef.current) audioRef.current.volume = ratio;
-    if (prebufferAudioRef.current && !isCrossfadeInProgressRef.current) {
-      prebufferAudioRef.current.volume = ratio;
-    }
+    const audio = audioRef.current;
+    if (audio) audio.volume = clamped / 100;
     try {
       ytPlayerRef.current?.setVolume(clamped);
     } catch {}
@@ -1723,7 +1449,6 @@ export function useAudioPlayer(options: {
     isPlaying,
     isLoading,
     isReconnecting,
-    isCrossfading,
     position,
     duration,
     playbackSpeed,

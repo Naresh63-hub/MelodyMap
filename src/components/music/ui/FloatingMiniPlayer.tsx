@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Disc,
   Heart,
   Maximize2,
-  Moon,
   Pause,
   Play,
   SkipBack,
@@ -22,10 +20,6 @@ type Props = {
   position: number;
   duration: number;
   volume: number;
-  isCrossfading?: boolean;
-  isSleepTimerActive?: boolean;
-  sleepTimerRemaining?: string;
-  userInitial?: string;
   onTogglePlay: () => void;
   onToggleLike?: () => void;
   onNext: () => void;
@@ -33,7 +27,6 @@ type Props = {
   onSeek: (seconds: number) => void;
   onVolumeChange: (volume: number) => void;
   onOpenFullScreen: () => void;
-  onOpenSleepTimer?: () => void;
   onClose: () => void;
 };
 
@@ -45,10 +38,6 @@ export function FloatingMiniPlayer({
   position,
   duration,
   volume: _volume,
-  isCrossfading = false,
-  isSleepTimerActive = false,
-  sleepTimerRemaining = "",
-  userInitial = "N",
   onTogglePlay,
   onToggleLike,
   onNext,
@@ -56,7 +45,6 @@ export function FloatingMiniPlayer({
   onSeek,
   onVolumeChange: _onVolumeChange,
   onOpenFullScreen,
-  onOpenSleepTimer,
   onClose,
 }: Props) {
   const [isDragging, setIsDragging] = useState(false);
@@ -154,8 +142,6 @@ export function FloatingMiniPlayer({
     setIsScrubbing(false);
   };
 
-  const initial = userInitial.trim().charAt(0).toUpperCase() || "N";
-
   return (
     <div
       onMouseDown={handleMouseDown}
@@ -167,13 +153,13 @@ export function FloatingMiniPlayer({
           : undefined
       }
       className={cn(
-        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl bg-[#101010]/95 backdrop-blur-2xl border border-white/[0.08] text-white shadow-2xl shadow-black/80 overflow-hidden transition-shadow select-none",
+        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl bg-[#101010]/95 backdrop-blur-2xl border border-white/[0.06] text-white shadow-2xl shadow-black/80 overflow-hidden transition-shadow select-none",
         isDragging && "cursor-grabbing ring-1 ring-white/30"
       )}
     >
       {/* Background ambient glow */}
       <div
-        className="absolute inset-0 bg-cover bg-center blur-2xl opacity-15 pointer-events-none -z-10"
+        className="absolute inset-0 bg-cover bg-center blur-2xl opacity-10 pointer-events-none -z-10"
         style={{ backgroundImage: `url(${track.thumbnail})` }}
       />
 
@@ -209,19 +195,8 @@ export function FloatingMiniPlayer({
       <div className="p-3.5 space-y-3">
         {/* Header: Draggable handle & Action buttons */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase font-bold text-white/50 tracking-wider">Mini Player</span>
-            {isSleepTimerActive && (
-              <button
-                type="button"
-                onClick={onOpenSleepTimer}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1DB954]/15 border border-[#1DB954]/30 text-[#1DB954] text-[10px] font-bold animate-pulse active:scale-95 transition-all"
-                title={`Sleep timer: ${sleepTimerRemaining} remaining`}
-              >
-                <Moon className="h-3 w-3" />
-                <span>{sleepTimerRemaining}</span>
-              </button>
-            )}
+          <div className="text-[10px] uppercase font-semibold text-white/40 tracking-wider">
+            <span>Mini Player</span>
           </div>
 
           <div className="flex items-center gap-1">
@@ -244,10 +219,9 @@ export function FloatingMiniPlayer({
           </div>
         </div>
 
-        {/* Track Thumbnail, Dedicated Rotating User Vinyl Disc & Info */}
-        <div className="flex items-center gap-2.5">
-          {/* Pristine Album Thumbnail (No overlapping elements) */}
-          <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-white/[0.08] bg-[#161616] shadow-md">
+        {/* Track Thumbnail & Info */}
+        <div className="flex items-center gap-3">
+          <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-white/[0.06] bg-[#161616]">
             <img src={track.thumbnail} alt={track.title} className="h-full w-full object-cover" />
             {isPlaying && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -264,32 +238,9 @@ export function FloatingMiniPlayer({
             )}
           </div>
 
-          {/* Dedicated Rotating User Vinyl Disc (Standalone, zero overlap, strict boundaries) */}
-          <div
-            className={cn(
-              "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#121212] border border-white/20 shadow-sm select-none transition-transform",
-              isPlaying ? "animate-[spin_4s_linear_infinite]" : "rotate-0"
-            )}
-            title={`Listener: ${initial} • ${isPlaying ? "Playing (Vinyl Spinning)" : "Paused"}`}
-          >
-            <div className="absolute inset-1 rounded-full border border-white/10 pointer-events-none" />
-            <div className="relative flex h-4 w-4 items-center justify-center rounded-full bg-zinc-950 border border-[#1DB954] text-[#1DB954]">
-              <span className="font-black text-[9px] leading-none text-[#1DB954]">
-                {initial}
-              </span>
-            </div>
-          </div>
-
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <h4 className="text-xs font-bold text-[#F5F5F5] truncate leading-tight">{track.title}</h4>
-              {isCrossfading && (
-                <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-1 py-0.2 rounded animate-pulse">
-                  <Disc className="h-2.5 w-2.5 animate-spin" />
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] text-[#A1A1A1] truncate mt-0.5 leading-tight font-medium">
+            <h4 className="text-xs font-semibold text-[#F5F5F5] truncate leading-tight">{track.title}</h4>
+            <p className="text-[11px] text-[#A1A1A1] truncate mt-0.5 leading-tight">
               {track.artist}
             </p>
             <div className="flex items-center justify-between text-[10px] text-[#737373] mt-1 tabular-nums font-mono">
@@ -302,24 +253,6 @@ export function FloatingMiniPlayer({
         {/* Transport Controls */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2 flex-1 justify-center">
-            {/* Sleep Timer Controller Button */}
-            {onOpenSleepTimer && (
-              <button
-                type="button"
-                onClick={onOpenSleepTimer}
-                className={cn(
-                  "p-1.5 rounded-full active:scale-90 transition-all",
-                  isSleepTimerActive
-                    ? "text-[#1DB954] bg-[#1DB954]/15 border border-[#1DB954]/30 shadow-sm"
-                    : "text-[#737373] hover:text-[#F5F5F5] hover:bg-white/5"
-                )}
-                aria-label="Sleep timer"
-                title={isSleepTimerActive ? `Sleep timer active: ${sleepTimerRemaining}` : "Set sleep timer"}
-              >
-                <Moon className="h-4 w-4" />
-              </button>
-            )}
-
             {onToggleLike && (
               <button
                 type="button"

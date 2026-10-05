@@ -1,4 +1,4 @@
-export type EqualizerBand = {
+﻿export type EqualizerBand = {
   frequency: number;
   label: string;
   gain: number; // -12dB to +12dB
@@ -88,7 +88,7 @@ export type EqualizerSettings = {
   enabled: boolean;
   preset: EqualizerPreset;
   gains: number[];
-  crossfade: number; // in seconds (0 = off, 1-12)
+  crossfade: number; // in seconds (0 = off, 1-8)
   quality: AudioQuality;
 };
 
@@ -111,10 +111,6 @@ export function loadEqualizerSettings(): EqualizerSettings {
     return {
       ...DEFAULT_EQUALIZER_SETTINGS,
       ...parsed,
-      crossfade:
-        typeof parsed.crossfade === "number" && !isNaN(parsed.crossfade)
-          ? Math.max(0, Math.min(12, Math.round(parsed.crossfade)))
-          : DEFAULT_EQUALIZER_SETTINGS.crossfade,
       gains: Array.isArray(parsed.gains) && parsed.gains.length === 10 ? parsed.gains : DEFAULT_EQUALIZER_SETTINGS.gains,
     };
   } catch {

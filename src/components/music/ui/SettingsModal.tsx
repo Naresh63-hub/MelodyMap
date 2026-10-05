@@ -20,7 +20,6 @@ import {
   Loader2,
   HardDrive,
   Activity,
-  Disc,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { isLowNetworkModeEnabled, setLowNetworkMode } from "@/lib/network-mode";
@@ -65,8 +64,6 @@ type Props = {
   onOpenLanguages: () => void;
   continuous: boolean;
   onContinuousChange: (v: boolean) => void;
-  crossfade?: number;
-  onCrossfadeChange?: (seconds: number) => void;
   onOpenEqualizer?: () => void;
   onOpenSleepTimer?: () => void;
   onOpenShortcuts?: () => void;
@@ -90,8 +87,6 @@ export function SettingsModal({
   onOpenLanguages,
   continuous,
   onContinuousChange,
-  crossfade = 3,
-  onCrossfadeChange,
   onOpenEqualizer,
   onOpenSleepTimer,
   onOpenShortcuts,
@@ -783,65 +778,6 @@ export function SettingsModal({
                     </p>
                   </div>
                   <Switch checked={sponsorBlockOn} onCheckedChange={handleToggleSponsorBlock} />
-                </div>
-
-                <div className="h-px bg-white/[0.06]" />
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Disc className="h-4 w-4 text-purple-400" />
-                      <div>
-                        <h3 className="text-sm font-semibold text-white">Seamless Audio Crossfade</h3>
-                        <p className="text-xs text-white/40 mt-0.5">
-                          Equal-power studio blending for smooth, uninterrupted transitions between songs
-                        </p>
-                      </div>
-                    </div>
-                    <span className="rounded-full bg-purple-500/20 px-2.5 py-1 font-mono text-xs font-bold text-purple-300 border border-purple-500/30">
-                      {crossfade === 0 ? "Off" : `${crossfade}s`}
-                    </span>
-                  </div>
-
-                  {/* Preset Buttons */}
-                  <div className="grid grid-cols-6 gap-1.5 pt-1">
-                    {[0, 2, 4, 6, 8, 12].map((sec) => (
-                      <button
-                        key={sec}
-                        type="button"
-                        onClick={() => onCrossfadeChange?.(sec)}
-                        className={cn(
-                          "py-1.5 rounded-lg text-xs font-medium transition-all text-center cursor-pointer",
-                          crossfade === sec
-                            ? "bg-purple-500 text-white font-bold shadow-md shadow-purple-500/30"
-                            : "bg-white/[0.05] text-white/70 hover:bg-white/10 hover:text-white"
-                        )}
-                      >
-                        {sec === 0 ? "Off" : `${sec}s`}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Range Slider */}
-                  <div className="space-y-1">
-                    <input
-                      type="range"
-                      min="0"
-                      max="12"
-                      step="1"
-                      value={crossfade}
-                      onChange={(e) => onCrossfadeChange?.(Number(e.target.value))}
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-400"
-                    />
-                    <div className="flex justify-between text-[10px] text-white/40">
-                      <span>0s (Gapless)</span>
-                      <span>2s</span>
-                      <span>4s</span>
-                      <span>6s</span>
-                      <span>8s</span>
-                      <span>12s (Ambient DJ)</span>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="h-px bg-white/[0.06]" />

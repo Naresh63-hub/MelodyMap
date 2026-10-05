@@ -1,6 +1,5 @@
 import {
   ChevronDown,
-  Disc,
   Heart,
   HelpCircle,
   ListMusic,
@@ -22,7 +21,6 @@ import {
   Plus,
   Moon,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { ScrubBar } from "@/components/music/ScrubBar";
 import { formatTime } from "@/lib/use-audio-player";
@@ -38,9 +36,6 @@ type Props = {
   duration: number;
   volume: number;
   playbackSpeed?: number;
-  crossfade?: number;
-  onCrossfadeChange?: (seconds: number) => void;
-  isCrossfading?: boolean;
   playlistName?: string;
   shuffle?: boolean;
   repeatMode?: "off" | "all" | "one";
@@ -65,7 +60,6 @@ type Props = {
   onOpenShortcuts?: () => void;
   onOpenOptions?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
-  userInitial?: string;
   canNext: boolean;
   canPrevious: boolean;
 };
@@ -81,13 +75,9 @@ export function FullScreenPlayer({
   duration,
   volume: _volume,
   playbackSpeed = 1,
-  crossfade = 3,
-  onCrossfadeChange,
-  isCrossfading = false,
   playlistName = "My Favourites",
   shuffle = false,
   repeatMode = "off",
-  userInitial = "N",
   onToggleShuffle,
   onToggleRepeat,
   onTogglePlay,
@@ -112,21 +102,7 @@ export function FullScreenPlayer({
   canNext,
   canPrevious,
 }: Props) {
-  const initial = userInitial.trim().charAt(0).toUpperCase() || "N";
   const { isActive: isSleepTimerActive, formattedRemaining: sleepTimerCountdown } = useSleepTimer();
-  const [showCrossfadeMenu, setShowCrossfadeMenu] = useState(false);
-  const crossfadeMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!showCrossfadeMenu) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (crossfadeMenuRef.current && !crossfadeMenuRef.current.contains(e.target as Node)) {
-        setShowCrossfadeMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showCrossfadeMenu]);
 
   if (!track) return null;
 
@@ -181,8 +157,8 @@ export function FullScreenPlayer({
         </div>
 
         {/* Center Artwork */}
-        <div className="flex flex-col items-center justify-center my-auto w-full py-2 sm:py-4">
-          <div className="relative aspect-square w-60 sm:w-72 overflow-hidden rounded-2xl shadow-2xl shadow-black/90 border border-white/[0.08]">
+        <div className="flex flex-col items-center justify-center my-auto w-full py-4">
+          <div className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-2xl shadow-2xl shadow-black/90 border border-white/[0.06]">
             <img
               src={track.thumbnail}
               alt={track.title}
@@ -190,36 +166,12 @@ export function FullScreenPlayer({
             />
           </div>
 
-          {/* User Letter in Rotating Vinyl Disc Indicator (Strictly bounded, zero overlap) */}
-          <div className="flex items-center gap-2 mt-4 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.08] shadow-sm select-none">
-            <div
-              className={cn(
-                "relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#121212] border border-white/20 select-none transition-transform",
-                isPlaying ? "animate-[spin_4s_linear_infinite]" : "rotate-0"
-              )}
-              title={`Listener: ${initial} • ${isPlaying ? "Playing (Vinyl Spinning)" : "Paused"}`}
-            >
-              <div className="absolute inset-0.5 rounded-full border border-white/10 pointer-events-none" />
-              <span className="font-black text-[9px] leading-none text-[#1DB954]">{initial}</span>
-            </div>
-            <span className="text-xs font-bold text-white/90">Listener {initial}</span>
-            <span className="text-[11px] text-[#1DB954] font-medium">• {isPlaying ? "Vinyl Spinning" : "Paused"}</span>
-          </div>
-
           {/* Track Info Row */}
           <div className="flex items-center justify-between w-full mt-6 px-1">
             <div className="min-w-0 flex-1 pr-4">
-              <div className="flex items-center gap-2 min-w-0">
-                <h2 className="text-lg sm:text-xl font-bold text-[#F5F5F5] truncate tracking-tight">
-                  {track.title}
-                </h2>
-                {isCrossfading && (
-                  <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 animate-pulse">
-                    <Disc className="h-3 w-3 animate-spin text-emerald-400" />
-                    Crossfading
-                  </span>
-                )}
-              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-[#F5F5F5] truncate tracking-tight">
+                {track.title}
+              </h2>
               <p className="text-sm font-normal text-[#A1A1A1] truncate mt-0.5">
                 {track.artist}
               </p>
@@ -406,100 +358,6 @@ export function FullScreenPlayer({
                   <span className="hidden sm:inline">EQ</span>
                 </button>
               )}
-
-              {/* Dedicated Crossfade Controller */}
-              <div className="relative" ref={crossfadeMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => setShowCrossfadeMenu((v) => !v)}
-                  aria-label="Audio Crossfade Controller"
-                  title={`Audio Crossfade: ${crossfade > 0 ? `${crossfade}s` : "Off"}`}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-normal transition-all cursor-pointer",
-                    isCrossfading
-                      ? "border-emerald-500/50 bg-emerald-500/20 text-emerald-300 animate-pulse font-medium shadow-sm shadow-emerald-500/30"
-                      : crossfade > 0
-                      ? "border-purple-500/30 bg-purple-500/15 text-purple-200 hover:bg-purple-500/25"
-                      : "border-white/[0.06] bg-white/[0.04] text-[#A1A1A1] hover:bg-white/[0.08] hover:text-[#F5F5F5]"
-                  )}
-                >
-                  <Disc className={cn("h-3.5 w-3.5", isCrossfading ? "animate-spin text-emerald-400" : crossfade > 0 ? "text-purple-400" : "text-[#737373]")} />
-                  <span>{isCrossfading ? "Fading..." : crossfade > 0 ? `Fade ${crossfade}s` : "Fade Off"}</span>
-                </button>
-
-                {showCrossfadeMenu && (
-                  <div className="absolute bottom-full left-0 mb-2 z-50 w-72 rounded-2xl border border-white/10 bg-[#121212]/98 p-4 shadow-2xl backdrop-blur-2xl animate-in fade-in-0 zoom-in-95 text-white">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                      <div className="flex items-center gap-2">
-                        <Disc className="h-4 w-4 text-purple-400" />
-                        <span className="text-xs font-bold text-white tracking-wide">Audio Crossfade</span>
-                      </div>
-                      <span className="rounded-full bg-purple-500/20 px-2 py-0.5 font-mono text-[11px] font-bold text-purple-300 border border-purple-500/30">
-                        {crossfade === 0 ? "Off" : `${crossfade}s`}
-                      </span>
-                    </div>
-
-                    <p className="mt-2 text-[11px] text-white/50 leading-relaxed">
-                      Equal-power audio blending for seamless, DJ-style transitions between songs.
-                    </p>
-
-                    {/* Quick Preset Buttons */}
-                    <div className="mt-3 grid grid-cols-6 gap-1">
-                      {[0, 2, 4, 6, 8, 12].map((sec) => (
-                        <button
-                          key={sec}
-                          type="button"
-                          onClick={() => onCrossfadeChange?.(sec)}
-                          className={cn(
-                            "rounded-lg py-1 text-[11px] font-medium transition-all text-center cursor-pointer",
-                            crossfade === sec
-                              ? "bg-purple-500 text-white font-bold shadow-md shadow-purple-500/30"
-                              : "bg-white/[0.05] text-white/70 hover:bg-white/10 hover:text-white"
-                          )}
-                        >
-                          {sec === 0 ? "Off" : `${sec}s`}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Range Slider */}
-                    <div className="mt-3.5 space-y-1.5">
-                      <div className="flex justify-between text-[10px] text-white/40">
-                        <span>Gapless (0s)</span>
-                        <span className="font-semibold text-purple-300">
-                          {crossfade > 0 ? `${crossfade}s overlap` : "Direct cut"}
-                        </span>
-                        <span>12s Max</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="12"
-                        step="1"
-                        value={crossfade}
-                        onChange={(e) => onCrossfadeChange?.(Number(e.target.value))}
-                        className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-400"
-                      />
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between pt-2 border-t border-white/[0.06] text-[10px] text-white/40">
-                      <span>Studio Equal-Power Curve</span>
-                      {onOpenEqualizer && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowCrossfadeMenu(false);
-                            onOpenEqualizer();
-                          }}
-                          className="text-purple-300 hover:text-purple-200 underline cursor-pointer"
-                        >
-                          Equalizer &amp; FX
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
 
               {onOpenSleepTimer && (
                 <button

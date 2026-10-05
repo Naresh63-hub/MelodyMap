@@ -45,18 +45,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Vite internal and developer module requests — let browser fetch directly without interception
-  if (
-    url.pathname.startsWith("/src/") ||
-    url.pathname.startsWith("/@") ||
-    url.pathname.startsWith("/node_modules/") ||
-    url.searchParams.has("tsr-split") ||
-    url.searchParams.has("v") ||
-    url.searchParams.has("t")
-  ) {
-    return;
-  }
-
   // API calls & Page Navigation (HTML) — Network-first, fall back to cache when offline
   if (url.pathname === "/" || url.pathname.startsWith("/api/") || request.mode === "navigate" || request.destination === "document") {
     event.respondWith(
@@ -69,11 +57,7 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(async () => {
-          const cached = await caches.match(request);
-          if (cached) return cached;
-          return new Response("Offline", { status: 503, statusText: "Service Unavailable" });
-        }),
+        .catch(() => caches.match(request)),
     );
     return;
   }
@@ -88,11 +72,7 @@ self.addEventListener("fetch", (event) => {
         }
         return res;
       })
-      .catch(async () => {
-        const cached = await caches.match(request);
-        if (cached) return cached;
-        return new Response("Asset unavailable offline", { status: 404, statusText: "Not Found" });
-      }),
+      .catch(() => caches.match(request)),
   );
 });
 

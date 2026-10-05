@@ -23,28 +23,9 @@ export class ErrorBoundary extends Component<Props, State> {
     return { error };
   }
 
-  override componentDidMount() {
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem("melodymap_chunk_retry");
-    }
-  }
-
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     this.setState({ errorInfo });
     console.error("[MelodyMap] Render error:", error, errorInfo);
-
-    // Auto-recover from transient dynamic module load failures (e.g. server restart or stale chunk token)
-    if (
-      typeof window !== "undefined" &&
-      (error?.message?.includes("dynamically imported module") ||
-       error?.message?.includes("Importing a module script failed"))
-    ) {
-      const hasRetried = sessionStorage.getItem("melodymap_chunk_retry");
-      if (!hasRetried) {
-        sessionStorage.setItem("melodymap_chunk_retry", "true");
-        window.location.reload();
-      }
-    }
   }
 
   override render() {

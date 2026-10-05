@@ -81,13 +81,13 @@ function HorizontalScrollRow({
 
             <p
               className={cn(
-                "truncate text-xs font-semibold leading-tight",
-                active ? "text-[#1DB954]" : "text-[#F5F5F5] group-hover:text-white",
+                "truncate text-xs font-medium leading-tight",
+                active ? "text-[#1DB954]" : "text-white/90 group-hover:text-white",
               )}
             >
               {track.title}
             </p>
-            <p className="truncate text-[11px] text-[#A1A1A1] leading-tight mt-0.5">
+            <p className="truncate text-[11px] text-neutral-400 font-normal leading-tight mt-0.5">
               {track.artist}
             </p>
           </button>
@@ -121,7 +121,7 @@ function VerticalSongList({
             className={cn(
               "flex items-center gap-3 rounded-lg p-2 transition-colors",
               active
-                ? "bg-[#1D1D1D]"
+                ? "bg-white/[0.08]"
                 : "hover:bg-white/[0.03]",
             )}
           >
@@ -129,7 +129,7 @@ function VerticalSongList({
             <button
               type="button"
               onClick={() => onPlayTrack(track, tracks, i)}
-              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616] border border-white/[0.06]"
+              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616] border border-white/[0.05]"
             >
               <img
                 src={getOptimizedThumbnailUrl(track.thumbnail)}
@@ -151,13 +151,13 @@ function VerticalSongList({
             >
               <p
                 className={cn(
-                  "truncate text-[13px] font-semibold leading-tight",
-                  active ? "text-[#1DB954]" : "text-[#F5F5F5]",
+                  "truncate text-[13px] font-medium leading-tight",
+                  active ? "text-[#1DB954]" : "text-white/90",
                 )}
               >
                 {track.title}
               </p>
-              <p className="truncate text-xs text-[#A1A1A1] leading-tight mt-0.5">
+              <p className="truncate text-xs text-neutral-400 font-normal leading-tight mt-0.5">
                 {track.artist}
               </p>
             </button>
@@ -168,7 +168,7 @@ function VerticalSongList({
                 type="button"
                 onClick={() => onOpenOptions(track)}
                 aria-label="Track options"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#737373] hover:text-[#F5F5F5] transition-colors"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-white transition-colors"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -190,8 +190,8 @@ function SectionHeader({
   return (
     <div className="flex items-center justify-between mb-2.5 px-0.5">
       <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4 text-[#737373]" />}
-        <h2 className="text-sm font-bold tracking-tight text-[#F5F5F5]">{title}</h2>
+        {Icon && <Icon className="h-4 w-4 text-neutral-400" />}
+        <h2 className="text-sm font-semibold tracking-normal text-white/90">{title}</h2>
       </div>
     </div>
   );
@@ -235,30 +235,31 @@ export function MobileHomeSections({
 
   const hasAny =
     recentlyPlayed.length > 0 ||
-    (dailyMix && dailyMix.length > 0) ||
     trending.length > 0 ||
     (oldSongs && oldSongs.length > 0) ||
     newReleases.length > 0 ||
     recommended.length > 0;
 
-  return (
-    <div className="space-y-6" suppressHydrationWarning>
-      {!hasAny && (
-        <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
-          <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
-          <h3 className="text-sm font-semibold text-white/80 mb-1">Nothing here yet</h3>
-          <p className="text-xs text-neutral-400 max-w-xs px-4">
-            Search for your favorite songs or artists to start listening.
-          </p>
-        </div>
-      )}
+  if (!hasAny) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+        <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
+        <h3 className="text-sm font-semibold text-white/80 mb-1">Nothing here yet</h3>
+        <p className="text-xs text-neutral-400 max-w-xs px-4">
+          Search for your favorite songs or artists to start listening.
+        </p>
+      </div>
+    );
+  }
 
+  return (
+    <div className="space-y-6">
       {/* 1. Daily Mix */}
       {dailyMix && dailyMix.length > 0 && (
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-2.5 px-0.5">
-            <h2 className="text-sm font-bold tracking-tight text-[#F5F5F5]">Daily Mix</h2>
-            <span className="text-[11px] font-normal text-[#737373]">
+            <h2 className="text-sm font-semibold tracking-normal text-white/90">Daily Mix</h2>
+            <span className="text-[11px] font-normal text-neutral-400">
               Updated today
             </span>
           </div>
@@ -318,9 +319,9 @@ export function MobileHomeSections({
           <div className="flex items-center justify-between mb-2.5 px-0.5">
             <div className="flex items-center gap-2">
               <Disc3 className="h-4 w-4 text-amber-400/80" />
-              <h2 className="text-sm font-bold tracking-tight text-[#F5F5F5]">Old Classics</h2>
+              <h2 className="text-sm font-semibold tracking-normal text-white/90">Old Classics</h2>
             </div>
-            <span className="text-[11px] font-normal text-[#737373]">
+            <span className="text-[11px] font-normal text-neutral-400">
               Golden Era & Retro
             </span>
           </div>

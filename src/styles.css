@@ -319,19 +319,19 @@
 
 /* Safe area insets for mobile */
 @utility safe-bottom {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 10px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @utility safe-top {
-  padding-top: max(env(safe-area-inset-top, 0px), 2.5rem);
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
 @utility header-safe-top {
-  padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.85rem), 3.25rem);
+  padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.75rem), 2.75rem);
 }
 
 @utility drawer-safe-top {
-  padding-top: max(calc(env(safe-area-inset-top, 0px) + 1.25rem), 3.75rem);
+  padding-top: max(calc(env(safe-area-inset-top, 0px) + 1rem), 3.25rem);
 }
 
 @utility overscroll-none {

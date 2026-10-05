@@ -18,10 +18,12 @@ import { MobileLibrary } from "@/components/music/ui/MobileLibrary";
 import { MobileQueue } from "@/components/music/ui/MobileQueue";
 import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
 import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchResults";
+import { VoiceSearchButton } from "@/components/music/ui/VoiceSearchButton";
+import { TrendingGenresChart } from "@/components/music/ui/TrendingGenresChart";
+import { saveRecentSearch } from "@/lib/search-history";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { sleepTimerService } from "@/lib/sleep-timer";
-import { useSleepTimer } from "@/hooks/useSleepTimer";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
@@ -234,10 +236,7 @@ function MusicApp() {
     resetSettings,
   } = useLibrary(auth.userId);
 
-  // Cached home feed loaded safely after hydration to avoid SSR mismatch
-  const [cachedFeed, setCachedFeed] = useState<Partial<HomeCacheData>>({});
-
-  // --- UI state ---
+  // Initial feed & settings states — always empty/default on SSR to prevent hydration mismatches
   const [tab, setTab] = useState<NavTab>("foryou");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -280,18 +279,6 @@ function MusicApp() {
   const [showFloatingMini, setShowFloatingMini] = useState(false);
   const [optionsTrack, setOptionsTrack] = useState<Track | null>(null);
   const [showSleepTimer, setShowSleepTimer] = useState(false);
-  const {
-    isActive: isSleepTimerActive,
-    formattedRemaining: sleepTimerCountdown,
-  } = useSleepTimer();
-
-  const userInitialLetter = (
-    auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
-      ? auth.profile.display_name[0]
-      : auth.email && auth.email !== "listener@google.com"
-        ? auth.email[0]
-        : "M"
-  )?.toUpperCase() ?? "M";
   const [shareTrack, setShareTrack] = useState<Track | null>(null);
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
@@ -1449,6 +1436,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           }
           setResults(dedupeTracks(filtered));
           setSearchContinuation(res.continuation);
+          if (q.length >= 2) {
+            saveRecentSearch(q);
+          }
         }
       } catch {
         if (requestId !== activeSearchIdRef.current) return;
@@ -1534,6 +1524,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const openArtist = useCallback(
     (artist: string) => {
       setQuery(artist);
+      saveRecentSearch(artist);
       void searchFor(`${artist} songs`);
     },
     [searchFor],
@@ -1868,6 +1859,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
     const trimmed = query.trim();
     if (!trimmed) return;
+    saveRecentSearch(trimmed);
     void searchFor(trimmed, "songs", searchFilter);
   };
 
@@ -2254,51 +2246,31 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     bootstrapped.current = true;
     runStartupMigrations();
 
-    // Read stored volume & continuous play preferences safely after hydration
-    try {
-      const savedVol = localStorage.getItem("melodymap.volume.v1");
-      if (savedVol) {
-        const v = Math.min(100, Math.max(0, Number(savedVol) || 80));
-        setVolume(v);
-        player.setVolume(v);
-      }
-      const savedCont = localStorage.getItem("melodymap.continuous.v1");
-      if (savedCont !== null) setContinuous(savedCont === "true");
-    } catch {}
-
-    const cached = readHomeCache();
-    setCachedFeed(cached);
-    if (cached.recs && cached.recs.length > 0) setRecs(cached.recs);
-    if (cached.trendingList && cached.trendingList.length > 0) setTrendingList(cached.trendingList);
-    if (cached.oldSongsList && cached.oldSongsList.length > 0) {
-      setOldSongsList(cached.oldSongsList.filter(isOldEraTrack));
-    }
-    if (cached.dailyMixTracks && cached.dailyMixTracks.length > 0) {
-      setDailyMixTracks(cached.dailyMixTracks);
-    }
-    if (cached.mixTracks) {
-      setMixTracks(cached.mixTracks);
-    }
+    const cachedFeed = readHomeCache();
+    if (cachedFeed.recs?.length) setRecs(cachedFeed.recs);
+    if (cachedFeed.trendingList?.length) setTrendingList(cachedFeed.trendingList);
+    if (cachedFeed.oldSongsList?.length) setOldSongsList(cachedFeed.oldSongsList.filter(isOldEraTrack));
+    if (cachedFeed.mixTracks) setMixTracks(cachedFeed.mixTracks);
+    if (cachedFeed.dailyMixTracks?.length) setDailyMixTracks(cachedFeed.dailyMixTracks);
 
     // Auto-refresh recommendations on startup ONLY if the local feed cache is empty.
     // If the user already has cached picks, show them instantly without network delay or flashing.
     const hasCachedFeed =
-      (cached.recs && cached.recs.length > 0) ||
-      (cached.trendingList && cached.trendingList.length > 0) ||
-      (cached.oldSongsList && cached.oldSongsList.length > 0);
+      (cachedFeed.recs && cachedFeed.recs.length > 0) ||
+      (cachedFeed.trendingList && cachedFeed.trendingList.length > 0) ||
+      (cachedFeed.oldSongsList && cachedFeed.oldSongsList.length > 0);
     // Cached feeds restored for instant paint count as "previously displayed" for
     // this session, so a refresh never re-serves them.
     markFeedDisplayed([
-      ...(cached.recs || []),
-      ...(cached.trendingList || []),
-      ...((cached.oldSongsList || []).filter(isOldEraTrack)),
-      ...(cached.dailyMixTracks || []),
-      ...Object.values(cached.mixTracks || {}).flat(),
+      ...(cachedFeed.recs || []),
+      ...(cachedFeed.trendingList || []),
+      ...((cachedFeed.oldSongsList || []).filter(isOldEraTrack)),
+      ...(cachedFeed.dailyMixTracks || []),
+      ...Object.values(cachedFeed.mixTracks || {}).flat(),
     ]);
     if (!hasCachedFeed) {
       void loadRecommendations();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated, loadRecommendations, markFeedDisplayed]);
 
   // Reload recommendations ONLY when language preferences actually change in settings
@@ -2423,7 +2395,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               ? auth.email.split("@")[0]
               : "My Account"
         }
-        userInitial={userInitialLetter}
+        userInitial={
+          (auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+            ? auth.profile.display_name[0]
+            : auth.email && auth.email !== "listener@google.com"
+              ? auth.email[0]
+              : "M"
+          )?.toUpperCase() ?? "M"
+        }
         userAvatar={auth.profile?.avatar_url ?? null}
         onSignIn={() => {
           setDrawerOpen(false);
@@ -2437,45 +2416,37 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       />
 
       {/* Main column */}
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-[#080808]">
-        {/* Dynamic Spotify Ambient Canvas / Background Music Glow */}
-        {current?.thumbnail && (
-          <div
-            aria-hidden="true"
-            className="fixed inset-0 pointer-events-none -z-0 overflow-hidden transition-opacity duration-1000 select-none"
-            style={{ opacity: player.isPlaying ? 0.12 : 0.05 }}
-          >
-            <div
-              className="absolute -top-[25%] -left-[15%] w-[130%] h-[90%] bg-cover bg-center blur-[130px] scale-125 transition-all duration-1000"
-              style={{ backgroundImage: `url(${current.thumbnail})` }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/70 via-[#080808]/85 to-[#080808]" />
-          </div>
-        )}
-
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#080808]">
         {/* Mobile header — on all non-search tabs */}
         {tab !== "search" && (
           <MobileHeader
             tab={tab}
-            userInitial={userInitialLetter}
-            isPlaying={player.isPlaying}
-            onOpenAuth={() => setShowAuthModal(true)}
             onOpenMenu={() => setDrawerOpen(true)}
             onOpenSettings={() => setShowSettings((v) => !v)}
+            userInitial={
+              (auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+                ? auth.profile.display_name[0]
+                : auth.email && auth.email !== "listener@google.com"
+                  ? auth.email[0]
+                  : "U"
+              )?.toUpperCase() ?? "U"
+            }
+            userAvatar={auth.profile?.avatar_url ?? null}
+            onOpenAuth={() => setShowAuthModal(true)}
           />
         )}
 
         {/* Mobile search bar — on search tab */}
         {tab === "search" && (
-          <div className="sticky top-0 z-20 bg-[#080808]/95 backdrop-blur-lg border-b border-white/[0.04]">
+          <div className="sticky top-0 z-20 bg-[#0f0f0f]/90 backdrop-blur-xl border-b border-white/[0.05]">
             <div className="flex items-center gap-2 px-4 py-3">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
                 aria-label="Open menu"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 text-white/70 active:scale-95 transition-all"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/70 active:scale-95 transition-all"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-4 w-4" />
               </button>
               <form onSubmit={onSearch} className="relative flex-1 flex items-center gap-2">
                 <div className="relative flex-1">
@@ -2488,38 +2459,48 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       setQuery(e.target.value);
                     }}
                     placeholder="Search songs, artists, podcasts..."
-                    className="h-10 w-full rounded-full border border-white/10 bg-white/[0.04] pl-10 pr-9 text-sm text-white placeholder:text-white/30 focus:border-white/20 focus:ring-1 focus:ring-white/10 focus:outline-none"
+                    className="h-10 w-full rounded-full border border-white/[0.08] bg-white/[0.04] pl-10 pr-16 text-sm text-white placeholder:text-white/30 focus:border-white/20 focus:ring-1 focus:ring-white/10 focus:outline-none"
                     autoComplete="off"
                   />
-                  {searching ? (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {searching ? (
                       <Loader2 className="h-4 w-4 animate-spin text-[#1DB954]" />
-                    </div>
-                  ) : query ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (debounceTimerRef.current) {
-                          clearTimeout(debounceTimerRef.current);
-                          debounceTimerRef.current = null;
-                        }
-                        activeSearchIdRef.current++;
-                        setQuery("");
-                        setResults([]);
-                        setSearching(false);
+                    ) : query ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (debounceTimerRef.current) {
+                            clearTimeout(debounceTimerRef.current);
+                            debounceTimerRef.current = null;
+                          }
+                          activeSearchIdRef.current++;
+                          setQuery("");
+                          setResults([]);
+                          setSearching(false);
+                        }}
+                        className="text-white/30 hover:text-white/70 active:text-white p-1"
+                        aria-label="Clear search"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    ) : null}
+                    {/* Hands-free Voice Search Button */}
+                    <VoiceSearchButton
+                      onTranscript={(dictatedText) => {
+                        setQuery(dictatedText);
+                        setSearchFilter("all");
+                        saveRecentSearch(dictatedText);
+                        void searchFor(dictatedText, "songs", "all");
                       }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 active:text-white/60"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  ) : null}
+                    />
+                  </div>
                 </div>
-                {/* Optional manual Search trigger button */}
+                {/* Manual Search trigger button */}
                 <button
                   type="submit"
                   aria-label="Search"
                   title="Search"
-                  className="flex h-10 px-3.5 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-xs font-semibold text-white/90 active:scale-95 transition-all"
+                  className="flex h-10 px-3.5 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-medium text-white/90 active:scale-95 transition-all"
                 >
                   {searching ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1DB954]" />
@@ -2533,9 +2514,26 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 type="button"
                 onClick={() => setShowSettings(true)}
                 aria-label="Settings"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] border border-white/10 text-white/50 active:scale-95 transition-all hover:text-white"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/50 active:scale-95 transition-all hover:text-white"
               >
                 <Settings2 className="h-4 w-4" />
+              </button>
+
+              {/* Circle user mark on only top of app (Search view) */}
+              <button
+                type="button"
+                onClick={() => setShowAuthModal(true)}
+                aria-label="Account profile"
+                title="Account profile"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white overflow-hidden active:scale-95 transition-all ring-1 ring-white/[0.04]"
+              >
+                {auth.profile?.avatar_url ? (
+                  <img src={auth.profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs font-medium text-white/90">
+                    {(auth.profile?.display_name?.[0] || auth.email?.[0] || "U").toUpperCase()}
+                  </span>
+                )}
               </button>
             </div>
             {/* Quick filter chips */}
@@ -2587,17 +2585,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   {/* Greeting & Moods */}
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <h1 suppressHydrationWarning className="text-2xl font-bold tracking-tight text-white">
+                      <h1 suppressHydrationWarning className="text-xl sm:text-2xl font-semibold tracking-tight text-white/95">
                         Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {auth.profile?.display_name?.split(" ")[0] || "Listener"}
                       </h1>
-                      <p className="text-xs text-white/50 mt-0.5">Recommended based on your recent listening</p>
+                      <p className="text-xs text-neutral-400 font-normal mt-0.5">Recommended based on your recent listening</p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="rounded-full bg-white/[0.06] text-white/80 hover:bg-white/10 hover:text-white border-white/10 text-xs font-medium"
+                        className="rounded-full bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] hover:text-white border-white/[0.08] text-xs font-normal"
                         onClick={() => void loadRecommendations()}
                         disabled={recLoading}
                       >
@@ -2615,7 +2613,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         type="button"
                         onClick={() => void loadRecommendations(mood)}
                         disabled={recLoading}
-                        className="shrink-0 rounded-full border border-white/10 bg-[#181818] px-3.5 py-1 text-xs font-medium text-white/70 transition-all hover:bg-[#242424] hover:text-white active:scale-95"
+                        className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.03] px-3.5 py-1 text-xs font-normal text-neutral-300 transition-all hover:bg-white/[0.08] hover:text-white active:scale-95"
                       >
                         {mood}
                       </button>
@@ -2642,7 +2640,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     likedIds={likedIds}
                     currentId={current?.id ?? null}
                     isPlaying={player.isPlaying}
-                    loading={recLoading && recs.length === 0}
+                    loading={!hydrated || (recLoading && recs.length === 0)}
                   />
 
                 {/* Explore More Songs for low-bandwidth incremental discovery */}
@@ -2653,7 +2651,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       size="sm"
                       onClick={() => void loadMoreRecommendations()}
                       disabled={loadingMoreRecs}
-                      className="rounded-full border-white/15 bg-white/[0.04] px-5 py-2 text-xs text-white/70 hover:bg-white/10 hover:text-white transition-all shadow-md"
+                      className="rounded-full border-white/10 bg-white/[0.04] px-5 py-2 text-xs font-normal text-neutral-300 hover:bg-white/[0.08] hover:text-white transition-all shadow-md"
                     >
                       {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-[#1DB954]" /> : null}
                       Explore more songs
@@ -2665,13 +2663,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
             {/* EXPLORE TAB */}
             {tab === "explore" && (
-              <div className="space-y-4 pt-1 animate-fade-in">
+              <div className="space-y-5 pt-1 animate-fade-in">
                 <div className="flex items-center justify-between pb-1">
                   <div>
-                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F5F5F5]">
+                    <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white/95">
                       Explore & Discover
                     </h1>
-                    <p className="text-xs text-[#737373] mt-0.5">
+                    <p className="text-xs text-neutral-400 font-normal mt-0.5">
                       Top charts, fresh releases & golden classics
                     </p>
                   </div>
@@ -2680,7 +2678,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="rounded-full bg-white/[0.06] text-white/80 hover:bg-white/10 hover:text-white border-white/10 text-xs font-semibold"
+                      className="rounded-full bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] hover:text-white border-white/[0.08] text-xs font-normal"
                       onClick={() => void loadRecommendations()}
                       disabled={recLoading}
                     >
@@ -2689,6 +2687,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     </Button>
                   </div>
                 </div>
+
+                {/* Trending Music Genres & Search Volume Analytics */}
+                <TrendingGenresChart
+                  userHistory={history}
+                  userLikes={likes}
+                  onSelectGenre={(g) => {
+                    setTab("search");
+                    setQuery(g);
+                    setSearchFilter("all");
+                    saveRecentSearch(g);
+                    void searchFor(g, "songs", "all");
+                  }}
+                  className="my-1"
+                />
 
                 <ExploreSections
                   trending={trendingList}
@@ -2704,7 +2716,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   onOpenOptions={(t) => setOptionsTrack(t)}
                   currentId={current?.id ?? null}
                   isPlaying={player.isPlaying}
-                  loading={recLoading && trendingList.length === 0 && oldSongsList.length === 0}
+                  loading={!hydrated || (recLoading && trendingList.length === 0 && oldSongsList.length === 0)}
                 />
               </div>
             )}
@@ -2716,6 +2728,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 loading={searching}
                 query={query}
                 selectedFilter={searchFilter}
+                userHistory={history}
+                userLikes={likes}
                 onFilterChange={(newFilter) => {
                   setSearchFilter(newFilter);
                   if (query.trim()) {
@@ -2746,6 +2760,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onSearch={(q, type) => {
                   setQuery(q);
                   setSearchFilter("all");
+                  saveRecentSearch(q);
                   void searchFor(q, type, "all");
                 }}
                 hasMore={Boolean(searchContinuation) || results.length >= 10}
@@ -2989,17 +3004,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           liked={likedIds.has(current?.id ?? "")}
           position={player.position}
           duration={player.duration}
-          isCrossfading={player.isCrossfading}
-          isSleepTimerActive={isSleepTimerActive}
-          sleepTimerRemaining={sleepTimerCountdown}
-          userInitial={userInitialLetter}
           onTogglePlay={togglePlay}
           onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
           onPrevious={goPrev}
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
-          onOpenSleepTimer={() => setShowSleepTimer(true)}
           onSeek={(s) => player.seek(s)}
         />
       )}
@@ -3014,10 +3024,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           position={player.position}
           duration={player.duration}
           volume={volume}
-          isCrossfading={player.isCrossfading}
-          isSleepTimerActive={isSleepTimerActive}
-          sleepTimerRemaining={sleepTimerCountdown}
-          userInitial={userInitialLetter}
           onTogglePlay={togglePlay}
           onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
@@ -3031,7 +3037,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setShowFloatingMini(false);
             setShowFullScreen(true);
           }}
-          onOpenSleepTimer={() => setShowSleepTimer(true)}
           onClose={() => setShowFloatingMini(false)}
         />
       )}
@@ -3056,10 +3061,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             duration={player.duration}
             volume={volume}
             playbackSpeed={player.playbackSpeed}
-            crossfade={player.equalizerSettings.crossfade}
-            onCrossfadeChange={player.setCrossfadeDuration}
-            isCrossfading={player.isCrossfading}
-            userInitial={userInitialLetter}
             playlistName={tab === "podcasts" ? "Podcasts" : tab === "languages" ? "Languages" : "My Favourites"}
             shuffle={shuffle}
             repeatMode={repeatMode}
@@ -3200,8 +3201,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             localStorage.setItem("melodymap.continuous.v1", String(v));
           }}
           onOpenEqualizer={() => setShowEqualizer(true)}
-          crossfade={player.equalizerSettings.crossfade}
-          onCrossfadeChange={player.setCrossfadeDuration}
           onOpenSleepTimer={() => setShowSleepTimer(true)}
           onOpenShortcuts={() => setShowShortcuts(true)}
           userId={auth.userId}

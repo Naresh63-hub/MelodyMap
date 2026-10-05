@@ -1,6 +1,6 @@
 {
-  "name": "MelodyMap",
-  "description": "Clean, editorial streaming music player with discovery, offline support, audio controls, and rich multi-provider search.",
+  "name": "MelodyMap — Stream Music & Podcasts Free",
+  "description": "Stream any song or podcast for free with AI-powered recommendations that learn your taste. No account needed.",
   "permissions": [],
   "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

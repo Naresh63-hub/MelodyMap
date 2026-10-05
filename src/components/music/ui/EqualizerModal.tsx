@@ -206,32 +206,12 @@ export function EqualizerModal({
                 </span>
               </div>
               <p className="text-xs text-white/50">
-                Smoothly overlaps songs using equal-power sine/cosine curves with zero volume dips.
+                Fades out the ending song and fades in the next song for smooth DJ transitions.
               </p>
-
-              {/* Quick Preset Chips */}
-              <div className="grid grid-cols-6 gap-1.5 pt-1">
-                {[0, 2, 4, 6, 8, 12].map((sec) => (
-                  <button
-                    key={sec}
-                    type="button"
-                    onClick={() => onCrossfadeChange(sec)}
-                    className={cn(
-                      "py-1.5 rounded-lg text-xs font-medium transition-all text-center cursor-pointer",
-                      settings.crossfade === sec
-                        ? "bg-purple-500 text-white font-bold shadow-md shadow-purple-500/30"
-                        : "bg-white/[0.05] text-white/70 hover:bg-white/10 hover:text-white"
-                    )}
-                  >
-                    {sec === 0 ? "Off" : `${sec}s`}
-                  </button>
-                ))}
-              </div>
-
               <input
                 type="range"
                 min="0"
-                max="12"
+                max="8"
                 step="1"
                 value={settings.crossfade}
                 onChange={(e) => onCrossfadeChange(Number(e.target.value))}
@@ -239,10 +219,10 @@ export function EqualizerModal({
               />
               <div className="flex justify-between text-[10px] text-white/40">
                 <span>0s (Gapless)</span>
-                <span>3s (Subtle)</span>
-                <span>6s (Radio)</span>
-                <span>9s (Club)</span>
-                <span>12s (Ambient DJ)</span>
+                <span>2s</span>
+                <span>4s</span>
+                <span>6s</span>
+                <span>8s (Full DJ)</span>
               </div>
             </div>
 

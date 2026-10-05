@@ -7,11 +7,16 @@ import {
   Mic,
   ListMusic,
   Loader2,
+  Clock,
+  X,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
+import { useSearchHistory, type RecentSearchItem } from "@/lib/search-history";
+import { TrendingGenresChart } from "@/components/music/ui/TrendingGenresChart";
 
 export type SearchFilter = "all" | "songs" | "artists" | "albums" | "playlists";
 
@@ -32,6 +37,11 @@ type Props = {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  recentSearches?: RecentSearchItem[];
+  onRemoveRecentSearch?: (query: string) => void;
+  onClearRecentSearches?: () => void;
+  userHistory?: Track[];
+  userLikes?: Track[];
 };
 
 const TRENDING_SEARCH_SEEDS = [
@@ -62,9 +72,20 @@ export function SearchResults({
   hasMore,
   loadingMore,
   onLoadMore,
+  recentSearches: propsRecentSearches,
+  onRemoveRecentSearch: propsOnRemoveRecentSearch,
+  onClearRecentSearches: propsOnClearRecentSearches,
+  userHistory = [],
+  userLikes = [],
 }: Props) {
   const [internalFilter, setInternalFilter] = useState<SearchFilter>("all");
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const filter = selectedFilter ?? internalFilter;
+
+  const hookHistory = useSearchHistory();
+  const recentSearches = propsRecentSearches ?? hookHistory.recentSearches;
+  const handleRemoveRecentSearch = propsOnRemoveRecentSearch ?? hookHistory.removeSearch;
+  const handleClearRecentSearches = propsOnClearRecentSearches ?? hookHistory.clearHistory;
 
   const filterOptions: Array<{ value: SearchFilter; label: string }> = [
     { value: "all", label: "Top" },
@@ -93,23 +114,95 @@ export function SearchResults({
     );
   }
 
-  // When no query or no results, show Trending Searches & Browse Cards (Screen 2)
+  // When no query or no results, show Recent Searches, Trending Searches & Browse Cards
   if (!query.trim() && results.length === 0) {
     return (
       <div className="space-y-6 animate-fade-in pt-2">
+        {/* Recent Searches */}
+        {recentSearches.length > 0 && (
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-[#737373]" />
+                <h2 className="text-sm font-bold text-[#F5F5F5]">Recent Searches</h2>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearRecentSearches}
+                className="flex items-center gap-1 text-xs text-[#737373] hover:text-[#e05252] active:scale-95 transition-all font-medium py-1 px-1.5 rounded"
+                title="Clear all recent searches"
+              >
+                <Trash2 className="h-3 w-3" />
+                <span>Clear all</span>
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              {(showAllHistory ? recentSearches : recentSearches.slice(0, 6)).map((item) => (
+                <div
+                  key={`${item.query}-${item.timestamp}`}
+                  className="group flex items-center justify-between rounded-lg px-2.5 py-2 hover:bg-white/[0.04] transition-colors"
+                >
+                  <button
+                    type="button"
+                    onClick={() => onSearch?.(item.query, "songs")}
+                    className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                  >
+                    <Clock className="h-4 w-4 shrink-0 text-[#737373] group-hover:text-[#1DB954] transition-colors" />
+                    <span className="truncate text-sm text-[#F5F5F5] group-hover:text-[#1DB954] transition-colors font-medium">
+                      {item.query}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveRecentSearch(item.query);
+                    }}
+                    aria-label={`Remove "${item.query}" from recent searches`}
+                    title="Remove from history"
+                    className="flex h-7 w-7 items-center justify-center rounded-full text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.08] active:scale-90 transition-all ml-2 shrink-0 opacity-70 group-hover:opacity-100"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {recentSearches.length > 6 && (
+              <div className="pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShowAllHistory((prev) => !prev)}
+                  className="text-xs text-[#1DB954] font-medium hover:underline px-2.5 py-1"
+                >
+                  {showAllHistory ? "Show fewer" : `Show ${recentSearches.length - 6} more`}
+                </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Trending Genres & Search Volumes Visualization */}
+        <TrendingGenresChart
+          userHistory={userHistory}
+          userLikes={userLikes}
+          onSelectGenre={(g) => onSearch?.(g, "songs")}
+        />
+
         {/* Trending Searches */}
-        <section className="space-y-3">
+        <section className="space-y-2.5">
           <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-[#737373]" />
-            <h2 className="text-sm font-bold text-[#F5F5F5]">Trending Searches</h2>
+            <TrendingUp className="h-4 w-4 text-neutral-400" />
+            <h2 className="text-sm font-semibold text-white/90">Trending Searches</h2>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {TRENDING_SEARCH_SEEDS.map((term) => (
               <button
                 key={term}
                 type="button"
                 onClick={() => onSearch?.(term, "songs")}
-                className="rounded-full bg-[#161616] border border-white/[0.06] px-3.5 py-1.5 text-xs font-medium text-[#A1A1A1] hover:bg-[#1D1D1D] hover:text-[#F5F5F5] active:scale-95 transition-all"
+                className="rounded-full bg-white/[0.04] border border-white/[0.06] px-3.5 py-1.5 text-xs font-normal text-neutral-300 hover:bg-white/[0.08] hover:text-white active:scale-95 transition-all"
               >
                 {term}
               </button>
@@ -118,8 +211,8 @@ export function SearchResults({
         </section>
 
         {/* Browse By Category Cards */}
-        <section className="space-y-3">
-          <h2 className="text-sm font-bold text-[#F5F5F5]">Browse Categories</h2>
+        <section className="space-y-2.5">
+          <h2 className="text-sm font-semibold text-white/90">Browse Categories</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
               {
@@ -204,9 +297,33 @@ export function SearchResults({
         })}
       </div>
 
-      {/* Results Song List */}
-      <div className="space-y-1 pt-1">
-        {results.map((track, i) => {
+      {/* Results Song List or No Results */}
+      {results.length === 0 ? (
+        <div className="py-12 text-center space-y-3">
+          <p className="text-sm font-semibold text-[#F5F5F5]">No results found for &ldquo;{query}&rdquo;</p>
+          <p className="text-xs text-[#737373]">Check spelling or try searching for another artist or song</p>
+          {recentSearches.length > 0 && (
+            <div className="pt-4 max-w-xs mx-auto">
+              <p className="text-xs font-medium text-[#A1A1A1] mb-2">Or try a recent search:</p>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {recentSearches.slice(0, 4).map((item) => (
+                  <button
+                    key={item.query}
+                    type="button"
+                    onClick={() => onSearch?.(item.query, "songs")}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#161616] border border-white/[0.06] px-3 py-1 text-xs text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-[#1D1D1D] active:scale-95 transition-all"
+                  >
+                    <Clock className="h-3 w-3 text-[#737373]" />
+                    <span>{item.query}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-1 pt-1">
+          {results.map((track, i) => {
           const active = currentId === track.id;
           return (
             <div
@@ -270,6 +387,7 @@ export function SearchResults({
           );
         })}
       </div>
+      )}
 
       {/* Load More Button */}
       {hasMore && results.length > 0 && (
