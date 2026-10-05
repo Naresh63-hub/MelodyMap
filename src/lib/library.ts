@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlaybackSource } from "@/lib/providers/types";
+import {
+  saveFirestoreLike,
+  removeFirestoreLike,
+  subscribeFirestoreLikes,
+  syncLikedSongsToFirestore,
+} from "@/lib/firestore-sync";
 
 export type Track = {
   id: string;
@@ -571,7 +577,47 @@ export function useLibrary(userId?: string | null) {
     };
   }, [hydrated, userId, syncedUser, likes, dislikes, history, podcastHistory, playlists, settings, stats]);
 
+  // Real-time Firestore sync for Liked Songs across devices
+  useEffect(() => {
+    if (!hydrated || !userId) return;
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
 
+    void (async () => {
+      try {
+        const localLikes = read<Track[]>(LIKES_KEY, []);
+        const synced = await syncLikedSongsToFirestore(userId, localLikes);
+        if (cancelled) return;
+        if (synced && synced.length > 0) {
+          setLikes((prev) => {
+            const next = mergeById(synced.filter((t) => isMusicTrack(t, true, true)), prev, 200);
+            write(LIKES_KEY, next);
+            return next;
+          });
+        }
+      } catch (err) {
+        console.warn("[MelodyMap] Firestore liked songs sync error:", err);
+      }
+
+      if (cancelled) return;
+
+      try {
+        unsub = subscribeFirestoreLikes(userId, (cloudLikes) => {
+          if (cancelled) return;
+          const filtered = cloudLikes.filter((t) => isMusicTrack(t, true, true));
+          setLikes(filtered);
+          write(LIKES_KEY, filtered);
+        });
+      } catch (err) {
+        console.warn("[MelodyMap] Firestore liked songs subscription error:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }, [hydrated, userId]);
 
   const toggleLike = useCallback((track: Track) => {
     setDislikes((prev) => {
@@ -580,19 +626,36 @@ export function useLibrary(userId?: string | null) {
       return next;
     });
     setLikes((prev) => {
-      const next = trackExistsIn(prev, track as TrackLike)
+      const isLiked = trackExistsIn(prev, track as TrackLike);
+      const next = isLiked
         ? prev.filter((t) => !areSameTrack(t, track as TrackLike))
         : [track, ...prev].slice(0, 200);
       write(LIKES_KEY, next);
+
+      // Persist to connected Firebase Firestore database
+      if (userId) {
+        if (isLiked) {
+          void removeFirestoreLike(userId, track.id);
+        } else {
+          void saveFirestoreLike(userId, track);
+        }
+      }
+
       return next;
     });
-  }, []);
+  }, [userId]);
 
   /** Thumbs-down: removes from favourites and tells the AI to avoid this song. */
   const toggleDislike = useCallback((track: Track) => {
     setLikes((prev) => {
+      const isLiked = trackExistsIn(prev, track as TrackLike);
       const next = prev.filter((t) => !areSameTrack(t, track as TrackLike));
       write(LIKES_KEY, next);
+
+      if (userId && isLiked) {
+        void removeFirestoreLike(userId, track.id);
+      }
+
       return next;
     });
     setDislikes((prev) => {
@@ -602,7 +665,7 @@ export function useLibrary(userId?: string | null) {
       write(DISLIKES_KEY, next);
       return next;
     });
-  }, []);
+  }, [userId]);
 
   /** Bumps a song's behavioural counters (plays / skips / completions). */
   const bump = useCallback((track: Track, field: "plays" | "skips" | "completions") => {
