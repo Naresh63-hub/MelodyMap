@@ -7,7 +7,7 @@ import { Equalizer } from "@/components/music/NowPlayingViz";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 
 type Props = {
-  recentlyPlayed: Track[];
+  recentlyPlayed?: Track[] | undefined;
   trending: Track[];
   oldSongs?: Track[] | undefined;
   newReleases: Track[];
@@ -276,7 +276,7 @@ export function MobileHomeSections({
   }
 
   const hasAny =
-    recentlyPlayed.length > 0 ||
+    (dailyMix && dailyMix.length > 0) ||
     trending.length > 0 ||
     (oldSongs && oldSongs.length > 0) ||
     newReleases.length > 0 ||
@@ -316,22 +316,7 @@ export function MobileHomeSections({
         </section>
       )}
 
-      {/* 2. Recently Played (Jump Back In) */}
-      {recentlyPlayed.length > 0 && (
-        <section className="animate-fade-in">
-          <SectionHeader title="Recently Played" icon={Clock} />
-          <HorizontalScrollRow
-            tracks={recentlyPlayed}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onToggleLike={onToggleLike}
-            likedIds={likedIds}
-          />
-        </section>
-      )}
-
-      {/* 3. Made For You (AI / Bandit Recommendations) */}
+      {/* Made For You (AI / Bandit Recommendations) */}
       {recommended.length > 0 && (
         <section className="animate-fade-in">
           <SectionHeader title="Made For You" />

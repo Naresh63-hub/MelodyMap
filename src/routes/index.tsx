@@ -2635,7 +2635,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
                   {/* Home Sections — mobile horizontal scroll */}
                   <MobileHomeSections
-                    recentlyPlayed={history.filter(isMusicTrack).slice(0, 12)}
                     dailyMix={dailyMixTracks}
                     trending={[]}
                     oldSongs={[]}

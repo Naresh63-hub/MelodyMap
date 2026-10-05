@@ -4,7 +4,7 @@ import { CardGrid } from "@/components/common/CardGrid";
 import type { Track } from "@/lib/library";
 
 type Props = {
-  recentlyPlayed: Track[];
+  recentlyPlayed?: Track[] | undefined;
   trending: Track[];
   oldSongs?: Track[] | undefined;
   newReleases: Track[];
@@ -19,7 +19,7 @@ type Props = {
 };
 
 export function HomeSections({
-  recentlyPlayed,
+  recentlyPlayed = [],
   trending,
   oldSongs,
   newReleases,
@@ -60,7 +60,6 @@ export function HomeSections({
   }
 
   const hasAnyContent =
-    recentlyPlayed.length > 0 ||
     trending.length > 0 ||
     (oldSongs && oldSongs.length > 0) ||
     newReleases.length > 0 ||
@@ -119,13 +118,6 @@ export function HomeSections({
             Search for a song, pick a genre, or tune your feed to get personalized picks.
           </p>
         </div>
-      )}
-
-      {recentlyPlayed.length > 0 && (
-        <Section
-          title="Recently Played"
-          tracks={recentlyPlayed}
-        />
       )}
       
       {trending.length > 0 && (
