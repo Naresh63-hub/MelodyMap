@@ -178,3 +178,50 @@ export async function signInWithNativeGoogle(
     return { success: false, error: err?.message || "Native Google authentication failed" };
   }
 }
+
+/**
+ * 1-tap native Google Sign-In flow for Firebase:
+ * 1. Prompts native Google Play Services account picker directly in-app.
+ * 2. Obtains Google ID Token.
+ * 3. Exchanges ID Token with Firebase Auth via GoogleAuthProvider.credential(idToken).
+ */
+export async function signInWithNativeGoogleFirebase(
+  firebaseAuth: any,
+  googleAuthProvider: any,
+  signInWithCredentialFn: any,
+  syncUserProfileFn: any,
+  webClientId: string,
+): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    const { idToken, displayName, email } = await requestNativeGoogleToken(webClientId);
+
+    if (!idToken) {
+      return { success: false, error: "No ID token received from Google" };
+    }
+
+    const credential = googleAuthProvider.credential(idToken);
+    const result = await signInWithCredentialFn(firebaseAuth, credential);
+    if (syncUserProfileFn) {
+      try {
+        await syncUserProfileFn(result.user, displayName);
+      } catch (e) {
+        console.warn("[NativeGoogleAuth] Profile sync notice:", e);
+      }
+    }
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("melodymap.guest_mode");
+        if (typeof CustomEvent !== "undefined" && typeof window.dispatchEvent === "function") {
+          window.dispatchEvent(new CustomEvent("melodymap:auth-success"));
+        }
+      } catch (e) {
+        console.warn("[NativeGoogleAuth] Storage/Event cleanup notice:", e);
+      }
+    }
+
+    return { success: true, user: result.user };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Native Google authentication failed" };
+  }
+}

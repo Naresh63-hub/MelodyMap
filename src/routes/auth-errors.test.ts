@@ -59,6 +59,12 @@ describe("formatAuthError", () => {
     );
   });
 
+  it("handles Firebase unauthorized domain error clearly", () => {
+    expect(formatAuthError("Firebase: Error (auth/unauthorized-domain).")).toBe(
+      "This domain is not authorized in Firebase Console. Please add this domain under Firebase Authentication > Settings > Authorized domains.",
+    );
+  });
+
   it("preserves unmapped backend error messages without generating phantom fake accounts", () => {
     const raw = "Database timeout error #42";
     expect(formatAuthError(raw)).toBe(raw);

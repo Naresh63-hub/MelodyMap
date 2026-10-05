@@ -31,17 +31,56 @@ import {
 
 export function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
-  if (lower.includes("invalid-credential") || lower.includes("wrong-password") || lower.includes("user-not-found")) {
-    return "Incorrect email or password. Please check your credentials and try again.";
+  if (lower.includes("unauthorized-domain") || lower.includes("unauthorized domain")) {
+    return "This domain is not authorized in Firebase Console. Please add this domain under Firebase Authentication > Settings > Authorized domains.";
   }
-  if (lower.includes("email-already-in-use")) {
+  if (
+    lower.includes("invalid-credential") ||
+    lower.includes("invalid login credentials") ||
+    lower.includes("invalid_grant") ||
+    lower.includes("wrong-password") ||
+    lower.includes("user-not-found")
+  ) {
+    return "Incorrect email or password. Please check your details and try again.";
+  }
+  if (lower.includes("email not confirmed")) {
+    return "Please confirm your email before signing in. Check your inbox or spam folder.";
+  }
+  if (
+    lower.includes("email-already-in-use") ||
+    lower.includes("user already registered") ||
+    lower.includes("already exists")
+  ) {
     return "An account with this email already exists. Try signing in instead.";
   }
-  if (lower.includes("weak-password")) {
+  if (
+    lower.includes("weak-password") ||
+    lower.includes("password should be at least") ||
+    lower.includes("password must be at least")
+  ) {
     return "Password must be at least 6 characters long.";
   }
-  if (lower.includes("too-many-requests")) {
-    return "Too many failed attempts. Please wait a moment and try again.";
+  if (
+    lower.includes("too-many-requests") ||
+    lower.includes("too many requests") ||
+    lower.includes("rate limit")
+  ) {
+    return "Too many attempts. Please wait a moment and try again.";
+  }
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("network") ||
+    lower.includes("connection refused") ||
+    lower.includes("network-request-failed")
+  ) {
+    return "Network connection issue. Please check your internet connection or continue as guest.";
+  }
+  if (
+    lower.includes("not configured") ||
+    lower.includes("missing supabase") ||
+    lower.includes("missing firebase")
+  ) {
+    return "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.";
   }
   if (lower.includes("popup-closed-by-user") || lower.includes("cancelled")) {
     return "Sign in was cancelled.";

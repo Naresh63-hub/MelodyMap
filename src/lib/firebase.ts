@@ -12,6 +12,7 @@ import {
   updatePassword as firebaseUpdatePassword,
   sendPasswordResetEmail,
   onAuthStateChanged,
+  signInWithCredential,
   type User,
 } from "firebase/auth";
 import {
@@ -28,6 +29,12 @@ import {
   orderBy,
 } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
+import { isNativeApp } from "@/lib/auth-deep-link";
+import {
+  getGoogleWebClientId,
+  isNativeGoogleAuthSupported,
+  signInWithNativeGoogleFirebase,
+} from "@/lib/native-google-auth";
 import type { Track } from "@/lib/library";
 
 // ─── Initialize Firebase App ────────────────────────────────────────────────
@@ -117,6 +124,27 @@ export async function signInWithGoogle(): Promise<{
   user?: User;
   error?: string;
 }> {
+  // If running inside native Android app, prioritize native 1-tap Google Play Services picker
+  if (isNativeApp() && isNativeGoogleAuthSupported()) {
+    const clientId = getGoogleWebClientId() || firebaseConfig.oAuthClientId;
+    if (clientId) {
+      try {
+        const res = await signInWithNativeGoogleFirebase(
+          auth,
+          GoogleAuthProvider,
+          signInWithCredential,
+          syncUserProfile,
+          clientId,
+        );
+        if (res.success) {
+          return { success: true, user: res.user };
+        }
+      } catch (nativeErr) {
+        console.warn("[Firebase] Native Google Sign-In attempt failed:", nativeErr);
+      }
+    }
+  }
+
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
 
