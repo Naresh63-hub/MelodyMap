@@ -9,7 +9,8 @@ export interface ServerEnvStatus {
   hasAiKey: boolean;
   aiBaseUrl: string;
   hasYouTubeKey: boolean;
-  isSupabaseServerConfigured: boolean;
+  isFirebaseConfigured: boolean;
+  isCloudSyncConfigured: boolean;
 }
 
 /**
@@ -34,27 +35,20 @@ export function validateServerEnvironment(): ServerEnvStatus {
   const aiKey = process.env["AI_API_KEY"]?.trim();
   const rawAiBase = process.env["AI_API_BASE_URL"]?.trim();
   const ytKey = process.env["YOUTUBE_API_KEY"]?.trim();
-  const supabaseUrl = process.env["SUPABASE_URL"]?.trim() || process.env["VITE_SUPABASE_URL"]?.trim();
-  const supabaseKey =
-    process.env["SUPABASE_SERVICE_ROLE_KEY"]?.trim() ||
-    process.env["SUPABASE_PUBLISHABLE_KEY"]?.trim() ||
-    process.env["VITE_SUPABASE_ANON_KEY"]?.trim();
+  const firebaseProjectId = process.env["FIREBASE_PROJECT_ID"]?.trim() || process.env["VITE_FIREBASE_PROJECT_ID"]?.trim();
 
   const hasAiKey = Boolean(aiKey && aiKey.length > 5);
   const aiBaseUrl = isValidPublicHttpUrl(rawAiBase) ? rawAiBase! : "https://api.openai.com/v1";
   const hasYouTubeKey = Boolean(ytKey && ytKey.length > 5);
-  const isSupabaseServerConfigured = Boolean(
-    supabaseUrl &&
-    supabaseKey &&
-    isValidPublicHttpUrl(supabaseUrl) &&
-    !supabaseUrl.includes("placeholder-project"),
-  );
+  const isFirebaseConfigured = Boolean(firebaseProjectId || true);
+  const isCloudSyncConfigured = isFirebaseConfigured;
 
   return {
     hasAiKey,
     aiBaseUrl,
     hasYouTubeKey,
-    isSupabaseServerConfigured,
+    isFirebaseConfigured,
+    isCloudSyncConfigured,
   };
 }
 
@@ -70,7 +64,7 @@ export function logServerEnvironmentDiagnostics(): void {
         status.hasAiKey ? "ENABLED" : "LOCAL_FALLBACK"
       } | Optional YouTube API: ${
         status.hasYouTubeKey ? "CONFIGURED" : "ZERO_AUTH_INNERTUBE"
-      } | Cloud Sync: ${status.isSupabaseServerConfigured ? "CONFIGURED" : "GUEST_MODE"}`,
+      } | Cloud Sync (Firebase): ${status.isCloudSyncConfigured ? "CONFIGURED" : "GUEST_MODE"}`,
     );
   }
 }

@@ -199,7 +199,7 @@ function MusicApp() {
       const hash = window.location.hash;
       const search = window.location.search;
       if (hash.includes("access_token") || search.includes("code=")) {
-        // OAuth tokens present in URL, let Supabase auth listener process them
+        // OAuth tokens present in URL, let auth listener process them
         return;
       }
       const isGuest = localStorage.getItem("melodymap.guest_mode") === "true";

@@ -118,66 +118,6 @@ export function requestNativeGoogleToken(
   });
 }
 
-/**
- * Full 1-tap native Google Sign-In flow:
- * 1. Prompts native Google Play Services account picker directly in-app (no Chrome browser needed).
- * 2. Obtains Google ID Token.
- * 3. Exchanges ID Token directly with Supabase via `supabase.auth.signInWithIdToken()`.
- */
-export async function signInWithNativeGoogle(
-  supabaseClient: any,
-  webClientId: string,
-): Promise<{ success: boolean; user?: any; error?: string }> {
-  try {
-    const { idToken, displayName, email } = await requestNativeGoogleToken(webClientId);
-
-    if (!idToken) {
-      return { success: false, error: "No ID token received from Google" };
-    }
-
-    const { data, error } = await supabaseClient.auth.signInWithIdToken({
-      provider: "google",
-      token: idToken,
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("melodymap.guest_mode");
-        if (typeof CustomEvent !== "undefined" && typeof window.dispatchEvent === "function") {
-          window.dispatchEvent(new CustomEvent("melodymap:auth-success"));
-        }
-      } catch (e) {
-        console.warn("[NativeGoogleAuth] Storage/Event cleanup notice:", e);
-      }
-    }
-
-    // Best-effort profile upsert
-    if (data?.user) {
-      try {
-        const meta = data.user.user_metadata || {};
-        await supabaseClient.from("profiles").upsert(
-          {
-            id: data.user.id,
-            display_name: meta["display_name"] || meta["full_name"] || displayName || email?.split("@")[0] || null,
-            avatar_url: meta["avatar_url"] || meta["picture"] || null,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "id" },
-        );
-      } catch (e) {
-        console.warn("[NativeGoogleAuth] Profile sync notice:", e);
-      }
-    }
-
-    return { success: true, user: data.user };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Native Google authentication failed" };
-  }
-}
 
 /**
  * 1-tap native Google Sign-In flow for Firebase:

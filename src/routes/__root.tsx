@@ -13,7 +13,6 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
-import { supabase } from "@/integrations/supabase/client";
 import { setupNativeAuthListeners } from "@/lib/auth-deep-link";
 
 function NotFoundComponent() {
@@ -167,7 +166,7 @@ function RootComponent() {
 
   // Set up native deep-link auth listener for Android OAuth return
   useEffect(() => {
-    const cleanup = setupNativeAuthListeners(supabase, () => {
+    const cleanup = setupNativeAuthListeners(() => {
       void router.navigate({ to: "/", replace: true });
     });
     return cleanup;

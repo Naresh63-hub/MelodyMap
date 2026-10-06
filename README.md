@@ -46,7 +46,7 @@
 - [13. Android Release APK Build Instructions](#13-android-release-apk-build-instructions)
 - [14. Capacitor Configuration](#14-capacitor-configuration)
 - [15. Background Playback & MediaSession Implementation](#15-background-playback--mediasession-implementation)
-- [16. Supabase Setup & Migrations](#16-supabase-setup--migrations)
+- [16. Firebase Setup & Architecture](#16-firebase-setup--architecture)
 - [17. Security Architecture & CodeQL Remediation](#17-security-architecture--codeql-remediation)
 - [18. Deployment Instructions](#18-deployment-instructions)
 - [19. Keyboard Shortcuts](#19-keyboard-shortcuts)
@@ -76,7 +76,7 @@
 - 🔍 **Live Debounced Multi-Catalog Search**: Fast search across YouTube Music, Deezer, Audius, Jamendo, and Internet Archive with instant deduplication.
 - 📝 **Synchronized Lyrics**: Real-time timed lyrics synced via LRCLIB.
 - ⏩ **SponsorBlock Auto-Skip**: Configurable automatic skipping of non-music intros, sponsor segments, and outro chatter.
-- 💾 **Local-First & Offline Caching**: Complete library, playlist, and audio caching in IndexedDB; optional Supabase cross-device sync.
+- 💾 **Local-First & Offline Caching**: Complete library, playlist, and audio caching in IndexedDB; optional Firebase cross-device sync.
 - 🛡️ **Zero CodeQL Vulnerabilities**: Architecturally eliminated network-to-filesystem write sinks (`js/http-to-file-access`).
 
 ---
@@ -100,7 +100,7 @@
 | **Audio & DSP** | HTML5 Audio, Web Audio API (`AudioContext`, `BiquadFilterNode`, `DynamicsCompressorNode`), MediaSession API |
 | **Server & API** | Nitro Server Engine, TanStack Start Server Functions, H3 HTTP utilities |
 | **Mobile Runtime** | Capacitor 8.5 (Target SDK 36, Min SDK 24, Android Gradle 8.14.3) |
-| **Database & Auth** | Supabase JS (PostgreSQL, Row-Level Security, Auth session management) |
+| **Database & Auth** | Firebase (Firebase Authentication, Cloud Firestore, Google Play Services 1-tap) |
 | **AI & Recommendation**| Contextual Multi-Armed Bandit (Linear Thompson Sampling with Cholesky factorization) |
 | **Testing** | Vitest 5.0 (218 unit/integration tests), Playwright 1.58 (6 E2E playback scenarios) |
 | **Security Scanning** | GitHub CodeQL Action v3 (javascript-typescript suite), Dependabot |
@@ -364,14 +364,18 @@ To deliver an authentic Spotify-like experience when the screen is locked, minim
 
 ---
 
-## 16. Supabase Setup & Migrations
+## 16. Firebase Setup & Architecture
 
-MelodyMap operates completely client-side in guest mode, but supports multi-device synchronization via Supabase.
+MelodyMap operates completely client-side in guest mode, but supports multi-device synchronization via Firebase Authentication and Cloud Firestore.
 
-### Database Migrations (`supabase/migrations/`)
+### Cloud Firestore Architecture (`src/lib/firebase.ts`)
 
-1. **`20260808085443_...sql`**: Creates `profiles`, `playlists`, `playlist_tracks`, and `liked_songs` tables with Row-Level Security (RLS) policies ensuring users can only read and modify their own records.
-2. **`20260808085506_...sql`**: Adds indexes on `user_id` and `track_id` for $O(1)$ lookups on user favorites and playlist collections.
+1. **`users/{userId}`**: Stores profile documents with `displayName`, `email`, `avatarUrl`, and timestamps.
+2. **`users/{userId}/likes/{trackId}`**: Subcollection storing favorited tracks with metadata for cross-device favorites syncing.
+3. **`users/{userId}/history/{historyDocId}`**: Subcollection storing real-time listening history to train the LinTS recommendation engine.
+4. **Google Sign-In**:
+   - Web: Firebase Auth with Google OAuth popup / redirect.
+   - Android APK: Native 1-tap Google Play Services credential picker (`signInWithNativeGoogleFirebase`).
 
 ---
 

@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -38,10 +39,19 @@ import {
 import type { Track } from "@/lib/library";
 
 // ─── Initialize Firebase App ────────────────────────────────────────────────
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
 // ─── Initialize Services ───────────────────────────────────────────────────
 export const auth = getAuth(app);
+
+export let analytics: Analytics | null = null;
+if (typeof window !== "undefined") {
+  isSupported().then((supported) => {
+    if (supported && firebaseConfig.measurementId) {
+      analytics = getAnalytics(app);
+    }
+  }).catch(() => {});
+}
 
 // Use provisioned firestore database ID or default
 export const db = firebaseConfig.firestoreDatabaseId

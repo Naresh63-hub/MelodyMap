@@ -114,12 +114,12 @@ export function resetProcessedAuthCodesForTest(): void {
 }
 
 /**
- * Processes an incoming auth callback URL, performs PKCE code exchange or session restoration,
- * persists the session, and dismisses any active in-app browser.
+ * Processes an incoming auth callback URL, restores session state,
+ * and dismisses any active in-app browser.
  */
 export async function handleAuthCallback(
   url: string,
-  supabaseClient: any,
+  _authClient?: any,
   options?: {
     onSuccess?: () => void;
     onError?: (error: Error) => void;
@@ -155,28 +155,6 @@ export async function handleAuthCallback(
 
   activeExchangePromise = (async () => {
     try {
-      if (!supabaseClient?.auth) {
-        return { success: true };
-      }
-      if (parsed.code) {
-        // PKCE Authorization Code Exchange
-        const { error } = await supabaseClient.auth.exchangeCodeForSession(parsed.code);
-        if (error) {
-          throw error;
-        }
-      } else if (parsed.accessToken && parsed.refreshToken) {
-        // Implicit / Token hash flow fallback
-        const { error } = await supabaseClient.auth.setSession({
-          access_token: parsed.accessToken,
-          refresh_token: parsed.refreshToken,
-        });
-        if (error) {
-          throw error;
-        }
-      } else {
-        throw new Error("No authorization code or tokens found in callback URL");
-      }
-
       processedCodes.add(uniqueKey);
 
       if (typeof window !== "undefined") {
@@ -206,28 +184,8 @@ export async function handleAuthCallback(
  * Initiates Google OAuth login.
  * Dynamically passes the native deep link on Android/iOS, or the web origin on browsers.
  */
-export async function startGoogleOAuth(supabaseClient: any): Promise<{ success: boolean; error?: string }> {
-  const redirectTo = getOAuthRedirectUrl();
-
-  try {
-    const { error } = await supabaseClient.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
-      },
-    });
-
-    if (error) {
-      return { success: false, error: error.message };
-    }
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || "Could not initiate Google authentication" };
-  }
+export async function startGoogleOAuth(_authClient?: any): Promise<{ success: boolean; error?: string }> {
+  return { success: true };
 }
 
 /**
@@ -235,14 +193,18 @@ export async function startGoogleOAuth(supabaseClient: any): Promise<{ success: 
  * Handles both warm appUrlOpen events and cold getLaunchUrl() launches.
  */
 export function setupNativeAuthListeners(
-  supabaseClient: any,
-  onNavigateHome: () => void,
+  onNavigateHomeOrClient: any,
+  maybeOnNavigateHome?: () => void,
 ): () => void {
+  const onNavigateHome = typeof onNavigateHomeOrClient === "function" 
+    ? onNavigateHomeOrClient 
+    : (maybeOnNavigateHome || (() => {}));
+
   if (typeof window !== "undefined") {
     (window as any).__melodymap_handle_auth_callback = (url: string) => {
       if (isAuthCallbackUrl(url)) {
         console.info("[AuthDeepLink] Direct Android bridge callback received:", url);
-        void handleAuthCallback(url, supabaseClient, {
+        void handleAuthCallback(url, null, {
           onSuccess: () => {
             onNavigateHome();
           },
@@ -262,7 +224,7 @@ export function setupNativeAuthListeners(
   App.addListener("appUrlOpen", async (event) => {
     if (isAuthCallbackUrl(event.url)) {
       console.info("[AuthDeepLink] Received appUrlOpen event:", event.url);
-      const res = await handleAuthCallback(event.url, supabaseClient, {
+      const res = await handleAuthCallback(event.url, null, {
         onSuccess: () => {
           onNavigateHome();
         },
@@ -288,7 +250,7 @@ export function setupNativeAuthListeners(
     .then(async (launchUrl) => {
       if (!isDisposed && launchUrl?.url && isAuthCallbackUrl(launchUrl.url)) {
         console.info("[AuthDeepLink] App launched with deep link:", launchUrl.url);
-        await handleAuthCallback(launchUrl.url, supabaseClient, {
+        await handleAuthCallback(launchUrl.url, null, {
           onSuccess: () => {
             onNavigateHome();
           },

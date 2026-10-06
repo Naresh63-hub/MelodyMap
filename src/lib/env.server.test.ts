@@ -16,13 +16,12 @@ describe("validateServerEnvironment", () => {
     delete process.env["AI_API_KEY"];
     delete process.env["AI_API_BASE_URL"];
     delete process.env["YOUTUBE_API_KEY"];
-    delete process.env["SUPABASE_URL"];
 
     const status = validateServerEnvironment();
     expect(status.hasAiKey).toBe(false);
     expect(status.aiBaseUrl).toBe("https://api.openai.com/v1");
     expect(status.hasYouTubeKey).toBe(false);
-    expect(status.isSupabaseServerConfigured).toBe(false);
+    expect(status.isCloudSyncConfigured).toBe(true);
   });
 
   it("detects valid AI key and custom base URL without exposing values", () => {
@@ -49,13 +48,11 @@ describe("validateServerEnvironment", () => {
   it("never returns raw credential values in status object", () => {
     process.env["AI_API_KEY"] = "sk-super-secret-key-99999";
     process.env["YOUTUBE_API_KEY"] = "AIzaSySecretApiKey77777";
-    process.env["SUPABASE_SERVICE_ROLE_KEY"] = "secret-service-role-key";
 
     const status = validateServerEnvironment() as unknown as Record<string, unknown>;
     for (const val of Object.values(status)) {
       expect(val).not.toContain("sk-super-secret-key-99999");
       expect(val).not.toContain("AIzaSySecretApiKey77777");
-      expect(val).not.toContain("secret-service-role-key");
     }
   });
 

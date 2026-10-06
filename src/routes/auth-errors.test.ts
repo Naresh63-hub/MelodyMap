@@ -54,7 +54,7 @@ describe("formatAuthError", () => {
     expect(formatAuthError("Authentication service is not configured")).toBe(
       "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.",
     );
-    expect(formatAuthError("Missing Supabase credentials")).toBe(
+    expect(formatAuthError("Missing Firebase credentials")).toBe(
       "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.",
     );
   });
