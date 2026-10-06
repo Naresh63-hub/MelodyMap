@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ChevronDown,
   HelpCircle,
   ListMusic,
@@ -62,6 +63,8 @@ type Props = {
   onAddToPlaylist?: (track: Track) => void;
   canNext: boolean;
   canPrevious: boolean;
+  isReplacementSource?: boolean;
+  streamSource?: "youtube" | "audius" | "deezer" | null;
 };
 
 const SPEEDS = [1, 1.25, 1.5, 2];
@@ -101,6 +104,8 @@ export function FullScreenPlayer({
   onAddToPlaylist,
   canNext,
   canPrevious,
+  isReplacementSource = false,
+  streamSource,
 }: Props) {
   const { isActive: isSleepTimerActive, formattedRemaining: sleepTimerCountdown } = useSleepTimer();
 
@@ -179,6 +184,12 @@ export function FullScreenPlayer({
                 <p className="text-xs text-[#737373] truncate mt-0.5">
                   {[track.album, track.year].filter(Boolean).join(" • ")}
                 </p>
+              )}
+              {isReplacementSource && (
+                <span className="inline-flex items-center gap-1.5 mt-1.5 text-xs font-medium text-amber-400/90 bg-amber-400/10 border border-amber-400/20 rounded-full px-2.5 py-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Playing replacement recording{streamSource ? ` (${streamSource})` : ""}
+                </span>
               )}
             </div>
 

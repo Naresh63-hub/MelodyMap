@@ -55,6 +55,31 @@ export async function streamProxyMiddleware(
     return;
   }
 
+  // HEAD requests: resolve source and return headers only (no body).
+  // Used by the client to detect the stream source without downloading audio.
+  if (req.method === "HEAD") {
+    const result = await fetchUpstreamAudio({
+      videoId,
+      quality,
+      rangeHeader: null,
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!result.ok) {
+      res.statusCode = result.status;
+      res.end();
+      return;
+    }
+    res.statusCode = 200;
+    res.setHeader("access-control-allow-origin", originHeader || "*");
+    res.setHeader("vary", "Origin");
+    res.setHeader("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges, X-MelodyMap-Source");
+    res.setHeader("content-type", result.mimeType);
+    res.setHeader("accept-ranges", "bytes");
+    res.setHeader("x-melodymap-source", result.source ?? "youtube");
+    res.end();
+    return;
+  }
+
   // Abort upstream work when the client disconnects mid-stream
   const disconnectController = new AbortController();
   req.on("close", () => {
@@ -79,9 +104,10 @@ export async function streamProxyMiddleware(
   res.setHeader("access-control-allow-origin", originHeader || "*");
   res.setHeader("vary", "Origin");
   res.setHeader("access-control-allow-headers", "Range, Accept-Ranges, Content-Type");
-  res.setHeader("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges");
+  res.setHeader("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges, X-MelodyMap-Source");
   res.setHeader("content-type", result.mimeType);
   res.setHeader("accept-ranges", "bytes");
+  res.setHeader("x-melodymap-source", result.source ?? "youtube");
 
   const contentRange = result.upstream.headers.get("content-range");
   if (contentRange) res.setHeader("content-range", contentRange);

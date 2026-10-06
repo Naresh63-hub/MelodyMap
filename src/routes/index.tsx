@@ -3040,6 +3040,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           liked={likedIds.has(current?.id ?? "")}
           position={player.position}
           duration={player.duration}
+          isReplacementSource={player.isReplacementSource}
           onTogglePlay={togglePlay}
           onToggleLike={() => current && handleToggleLike(current)}
           onNext={goNext}
@@ -3129,6 +3130,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             onAddToPlaylist={(t) => setCreatePlaylistTrack(t)}
             canNext={canNext}
             canPrevious={canPrev}
+            isReplacementSource={player.isReplacementSource}
+            streamSource={player.streamSource}
           />
         )}
 

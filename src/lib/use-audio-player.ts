@@ -97,6 +97,26 @@ export function useAudioPlayer(options: {
     return `/api/stream/${encodeURIComponent(id)}?quality=${encodeURIComponent(q)}`;
   }, []);
 
+  /** Probe the X-MelodyMap-Source header via a lightweight HEAD request. */
+  const sourceProbeAbortRef = useRef<AbortController | null>(null);
+  const detectStreamSource = useCallback((url: string) => {
+    // Only probe same-origin proxy URLs (not direct CDN/offline blob URLs)
+    if (!url.includes("/api/stream/")) {
+      setStreamSource(null);
+      return;
+    }
+    sourceProbeAbortRef.current?.abort();
+    const controller = new AbortController();
+    sourceProbeAbortRef.current = controller;
+
+    fetch(url, { method: "HEAD", signal: controller.signal })
+      .then((res) => {
+        const src = res.headers.get("X-MelodyMap-Source") as "youtube" | "audius" | "deezer" | null;
+        if (src) setStreamSource(src);
+      })
+      .catch(() => {/* probe failed; no indicator shown */});
+  }, []);
+
   // Initialize and attach core audio + prebuffer + YouTube iframe container to DOM.
   // Must run in an effect, not during render: creating/appending DOM nodes is a
   // side effect and violates render purity (breaks under StrictMode re-renders
@@ -193,6 +213,7 @@ export function useAudioPlayer(options: {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [streamSource, setStreamSource] = useState<"youtube" | "audius" | "deezer" | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
     try {
@@ -458,6 +479,9 @@ export function useAudioPlayer(options: {
         ytPlayerRef.current?.stopVideo?.();
       } catch {}
 
+      // Detect stream source from proxy header (replacement recording indicator)
+      detectStreamSource(url);
+
       try {
         audio.pause();
       } catch {}
@@ -513,7 +537,10 @@ export function useAudioPlayer(options: {
         }
       }
     },
-    [initWebAudio],
+    [
+      initWebAudio,
+      detectStreamSource,
+    ],
   );
 
   const setAudioQuality = useCallback(
@@ -1200,6 +1227,7 @@ export function useAudioPlayer(options: {
   /** Cleanup on unmount */
   useEffect(() => {
     return () => {
+      sourceProbeAbortRef.current?.abort();
       const audio = audioRef.current;
       if (audio) {
         audio.pause();
@@ -1286,6 +1314,7 @@ export function useAudioPlayer(options: {
       qualityFallbackStepRef.current = 0;
       sponsorSegmentsRef.current = [];
       skippedSegmentsRef.current.clear();
+      setStreamSource(null);
 
       if (!directUrl && id) {
         void fetchSponsorBlockSegments(id).then((segs) => {
@@ -1327,6 +1356,7 @@ export function useAudioPlayer(options: {
       qualityFallbackStepRef.current = 0;
       sponsorSegmentsRef.current = [];
       skippedSegmentsRef.current.clear();
+      setStreamSource(null);
 
       if (!directUrl && id) {
         void fetchSponsorBlockSegments(id).then((segs) => {
@@ -1495,6 +1525,9 @@ export function useAudioPlayer(options: {
 
   playViaYouTubeRef.current = playViaYouTube;
 
+  /** True when the stream is a replacement recording (non-YouTube source). */
+  const isReplacementSource = streamSource !== null && streamSource !== "youtube";
+
   return {
     ready,
     isPlaying,
@@ -1503,6 +1536,8 @@ export function useAudioPlayer(options: {
     position,
     duration,
     playbackSpeed,
+    streamSource,
+    isReplacementSource,
     equalizerSettings,
     setEqualizerPreset,
     setBandGain,
