@@ -275,74 +275,86 @@ function cleanTrackTitle(title: string): string {
     .trim();
 }
 
+const INNERTUBE_CLIENTS = [
+  {
+    clientName: "ANDROID_VR",
+    clientVersion: "1.60.19",
+    deviceModel: "Quest 3",
+    hl: "en",
+    gl: "US",
+  },
+  {
+    clientName: "IOS",
+    clientVersion: "19.29.1",
+    deviceModel: "iPhone16,2",
+    hl: "en",
+    gl: "US",
+  },
+  {
+    clientName: "WEB_REMIX",
+    clientVersion: "1.20240318.01.00",
+    hl: "en",
+    gl: "US",
+  },
+];
+
 export async function resolveWithInnerTubePlayer(
   videoId: string,
   quality: StreamQuality = "high",
 ): Promise<StreamMeta | null> {
-  // Client 1: Modern ANDROID_VR client provides direct, unencrypted audio formats
-  try {
-    const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-      },
-      body: JSON.stringify({
-        videoId,
-        context: {
-          client: {
-            clientName: "ANDROID_VR",
-            clientVersion: "1.60.19",
-            deviceModel: "Quest 3",
-            hl: "en",
-            gl: "US",
-          },
+  for (const clientContext of INNERTUBE_CLIENTS) {
+    try {
+      const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
         },
-      }),
-    });
+        body: JSON.stringify({
+          videoId,
+          context: { client: clientContext },
+        }),
+      });
 
-    if (res.ok) {
-      const data = (await res.json()) as any;
-      const adaptiveFormats = data?.streamingData?.adaptiveFormats;
-      if (Array.isArray(adaptiveFormats) && adaptiveFormats.length > 0) {
-        // Filter audio formats with direct playable URLs
-        const audioFormats = adaptiveFormats.filter(
-          (f: any) => f && f.url && typeof f.mimeType === "string" && f.mimeType.startsWith("audio/"),
-        );
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        const adaptiveFormats = data?.streamingData?.adaptiveFormats;
+        if (Array.isArray(adaptiveFormats) && adaptiveFormats.length > 0) {
+          const audioFormats = adaptiveFormats.filter(
+            (f: any) => f && f.url && typeof f.mimeType === "string" && f.mimeType.startsWith("audio/"),
+          );
 
-        if (audioFormats.length > 0) {
-          if (quality === "saver") {
-            audioFormats.sort((a: any, b: any) => (a.bitrate || 0) - (b.bitrate || 0));
-          } else if (quality === "standard") {
-            audioFormats.sort(
-              (a: any, b: any) =>
-                Math.abs((a.bitrate || 128000) - 128000) - Math.abs((b.bitrate || 128000) - 128000),
-            );
-          } else {
-            audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
-          }
+          if (audioFormats.length > 0) {
+            if (quality === "saver") {
+              audioFormats.sort((a: any, b: any) => (a.bitrate || 0) - (b.bitrate || 0));
+            } else if (quality === "standard") {
+              audioFormats.sort(
+                (a: any, b: any) =>
+                  Math.abs((a.bitrate || 128000) - 128000) - Math.abs((b.bitrate || 128000) - 128000),
+              );
+            } else {
+              audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+            }
 
-          for (const fmt of audioFormats.slice(0, 3)) {
-            if (!fmt || !fmt.url) continue;
-            const isHealthy = await probeStream(fmt.url);
-            if (!isHealthy) continue;
+            const best = audioFormats[0];
+            if (best && best.url) {
+              const mime = best.mimeType.split(";")[0] || "audio/mp4";
+              const contentLen = best.contentLength ? Number(best.contentLength) : null;
+              const bitrate = best.bitrate ? Number(best.bitrate) : null;
 
-            const mime = fmt.mimeType.split(";")[0] || "audio/mp4";
-            const contentLen = fmt.contentLength ? Number(fmt.contentLength) : null;
-            const bitrate = fmt.bitrate ? Number(fmt.bitrate) : null;
-
-            return {
-              url: fmt.url,
-              mimeType: mime,
-              contentLength: contentLen,
-              audioBitrate: bitrate,
-            };
+              return {
+                url: best.url,
+                mimeType: mime,
+                contentLength: contentLen,
+                audioBitrate: bitrate,
+              };
+            }
           }
         }
       }
+    } catch (err) {
+      console.warn(`[stream] ${clientContext.clientName} resolution notice for ${videoId}:`, err);
     }
-  } catch (err) {
-    console.warn(`[stream] ANDROID_VR player resolution notice for ${videoId}:`, err);
   }
 
   // Fallback 2: For restricted tracks (e.g. LOGIN_REQUIRED), fetch metadata via oEmbed and resolve official audio preview

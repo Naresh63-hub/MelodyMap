@@ -611,6 +611,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, [settings.discovery, history, stats, likes]);
 
   const sleepTimerHaltedRef = useRef<boolean>(false);
+  const extendQueueRef = useRef<(() => Promise<Track[]>) | null>(null);
 
   // --- Player ---
   const player = useAudioPlayer({
@@ -927,6 +928,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       // 3. Mark active track and synchronously load & play ONLY this track
       loadedTrackIdRef.current = track.id;
       void load(track.id, track.previewUrl, 0);
+
+      // 4. Auto-populate upcoming queue with similar songs for continuous screen-off playback
+      if (continuousRef.current) {
+        setTimeout(() => {
+          if (queueRef.current.length <= 2) {
+            void extendQueueRef.current?.();
+          }
+        }, 400);
+      }
     },
     [load, player],
   );
@@ -1376,6 +1386,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setExtending(false);
     }
   }, [extending, runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed]);
+  extendQueueRef.current = extendQueue;
 
   const searchFor = useCallback(
     async (term: string, searchType?: "songs" | "podcasts", filter?: SearchFilter) => {
