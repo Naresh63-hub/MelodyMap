@@ -54,14 +54,14 @@ describe("formatAuthError", () => {
     expect(formatAuthError("Authentication service is not configured")).toBe(
       "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.",
     );
-    expect(formatAuthError("Missing Firebase credentials")).toBe(
+    expect(formatAuthError("Missing Supabase credentials")).toBe(
       "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.",
     );
   });
 
-  it("handles Firebase unauthorized domain error clearly", () => {
-    expect(formatAuthError("Firebase: Error (auth/unauthorized-domain).")).toBe(
-      "This domain is not authorized in Firebase Console. Please add this domain under Firebase Authentication > Settings > Authorized domains.",
+  it("handles unauthorized domain error clearly", () => {
+    expect(formatAuthError("Error (auth/unauthorized-domain).")).toBe(
+      "This domain is not authorized. Please add this domain under Authentication > Settings > Authorized domains / Redirect URLs.",
     );
   });
 

@@ -18,7 +18,61 @@ export type StreamMeta = {
   mimeType: string;
   contentLength: number | null;
   audioBitrate: number | null;
+  /** Which resolver produced this stream ("youtube" is the implicit default). */
+  source?: "youtube" | "audius" | "deezer";
 };
+
+// ─── Audius match scoring ────────────────────────────────────────────
+
+const AUDIUS_MIN_SCORE = 1.2;
+
+/** Lowers case, strips bracketed tags/punctuation, returns word tokens. */
+function titleTokens(text: string | null | undefined): string[] {
+  return (text || "")
+    .toLowerCase()
+    .replace(/\(.*?\)|\[.*?\]/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
+ * Score an Audius candidate against the original track (pure, exported for tests).
+ *
+ * Covers/re-recordings usually have a DIFFERENT artist name and a somewhat
+ * different length, so the original artist's own Audius upload wins on artist
+ * overlap; duration proximity breaks ties. Title overlap anchors the match.
+ * Max ≈ 5 (2 title + 2 artist + 1 duration).
+ */
+export function scoreAudiusCandidate(
+  candidate: { title?: string; artist?: string; durationSeconds?: number },
+  target: { title: string; artist: string; durationSeconds: number | null },
+): number {
+  let score = 0;
+
+  const candTitle = new Set(titleTokens(candidate.title));
+  const targetTitle = titleTokens(target.title);
+  if (targetTitle.length > 0 && candTitle.size > 0) {
+    let overlap = 0;
+    for (const tok of targetTitle) if (candTitle.has(tok)) overlap++;
+    score += (overlap / targetTitle.length) * 2;
+  }
+
+  const candArtist = titleTokens(candidate.artist).join(" ");
+  const targetArtist = titleTokens(target.artist);
+  if (targetArtist.length > 0 && candArtist) {
+    const hits = targetArtist.filter((t) => candArtist.includes(t)).length;
+    score += (hits / targetArtist.length) * 2;
+  }
+
+  const candDur = Number(candidate.durationSeconds) || 0;
+  if (target.durationSeconds && target.durationSeconds > 0 && candDur > 0) {
+    const diff = Math.abs(candDur - target.durationSeconds);
+    score += Math.max(0, 1 - diff / Math.max(20, target.durationSeconds * 0.2));
+  }
+
+  return score;
+}
 
 // ─── Stream URL cache (LRU, 25-min TTL) ──────────────────────────────
 
@@ -347,6 +401,12 @@ export async function resolveWithInnerTubePlayer(
 
       if (res.ok) {
         const data = (await res.json()) as any;
+        // Even a bot-blocked (LOGIN_REQUIRED) response carries videoDetails —
+        // stash the real duration for the Audius fallback's match scoring.
+        const lenSec = Number(data?.videoDetails?.lengthSeconds);
+        if (Number.isFinite(lenSec) && lenSec > 0) {
+          lastSeenDurations.set(videoId, lenSec);
+        }
         const adaptiveFormats = data?.streamingData?.adaptiveFormats;
         if (Array.isArray(adaptiveFormats) && adaptiveFormats.length > 0) {
           const audioFormats = adaptiveFormats.filter(
@@ -405,22 +465,38 @@ export async function resolveWithInnerTubePlayer(
       );
 
       for (const q of queriesToTry) {
-        const audiusMatches = await searchAudius(q, { limit: 5 });
+        const audiusMatches = await searchAudius(q, { limit: 10 });
         if (audiusMatches.length === 0) continue;
-        const targetDuration = typeof oembed?.duration === "number" ? oembed.duration : null;
-        const best =
-          audiusMatches.find((t) => {
-            const dur = Number(t.durationSeconds) || 0;
-            return targetDuration ? Math.abs(dur - targetDuration) <= Math.max(30, targetDuration * 0.25) : true;
-          }) || audiusMatches[0];
-        const audiusStreamUrl = best?.playbackSource?.url;
-        if (audiusStreamUrl) {
-          return {
-            url: audiusStreamUrl,
-            mimeType: "audio/mpeg",
-            contentLength: null,
-            audioBitrate: 320000,
-          };
+        const innerTubeDuration = lastSeenDurations.get(videoId);
+        const targetDuration =
+          innerTubeDuration && innerTubeDuration > 0
+            ? innerTubeDuration
+            : typeof oembed?.duration === "number"
+              ? oembed.duration
+              : null;
+        const target = { title: cleanTitle, artist: rawAuthor, durationSeconds: targetDuration };
+        let best: (typeof audiusMatches)[number] | null = null;
+        let bestScore = 0;
+        for (const candidate of audiusMatches) {
+          const s = scoreAudiusCandidate(candidate, target);
+          if (s > bestScore) {
+            best = candidate;
+            bestScore = s;
+          }
+        }
+        // Below the threshold the pool only holds covers/unrelated recordings —
+        // refusing here (per-track backoff) beats playing the wrong song.
+        if (best && bestScore >= AUDIUS_MIN_SCORE) {
+          const audiusStreamUrl = best.playbackSource?.url;
+          if (audiusStreamUrl) {
+            return {
+              url: audiusStreamUrl,
+              mimeType: "audio/mpeg",
+              contentLength: null,
+              audioBitrate: 320000,
+              source: "audius",
+            };
+          }
         }
       }
     }
@@ -454,12 +530,13 @@ export async function resolveWithInnerTubePlayer(
           if (match?.preview) {
             const probeOk = await probeStream(match.preview);
             if (probeOk) {
-              return {
-                url: match.preview,
-                mimeType: "audio/mp4",
-                contentLength: null,
-                audioBitrate: 128000,
-              };
+            return {
+              url: match.preview,
+              mimeType: "audio/mp4",
+              contentLength: null,
+              audioBitrate: 128000,
+              source: "deezer",
+            };
             }
           }
         }
@@ -473,6 +550,9 @@ export async function resolveWithInnerTubePlayer(
 }
 
 const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
+
+/** Real track durations captured from InnerTube videoDetails (see client loop). */
+const lastSeenDurations = new Map<string, number>();
 
 const inFlightResolutions = new Map<string, Promise<StreamMeta | null>>();
 

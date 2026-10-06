@@ -132,7 +132,13 @@ const UPSTREAM_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
 export type UpstreamAudioResult =
-  | { ok: true; upstream: Response; mimeType: string }
+  | {
+      ok: true;
+      upstream: Response;
+      mimeType: string;
+      /** Which resolver produced the stream, surfaced as X-MelodyMap-Source. */
+      source?: "youtube" | "audius" | "deezer" | undefined;
+    }
   | { ok: false; status: number; message: string };
 
 export const DEFAULT_PROXY_CHUNK_SIZE = 512 * 1024; // 512 KB per chunk (~32s of audio, ~2-3s download)
@@ -235,6 +241,7 @@ export async function fetchUpstreamAudio(options: {
       ok: true,
       upstream: upstreamRes,
       mimeType: resolveAudioMimeType(stream?.mimeType, upstreamRes.headers.get("content-type")),
+      source: stream?.source ?? "youtube",
     };
   } catch (err: unknown) {
     if (err instanceof Error && err.name === "AbortError") {

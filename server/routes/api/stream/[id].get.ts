@@ -51,9 +51,10 @@ export default defineEventHandler(async (event) => {
     "Access-Control-Allow-Origin": originHeader || "*",
     Vary: "Origin",
     "Access-Control-Allow-Headers": "Range, Accept-Ranges, Content-Type",
-    "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges",
+    "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, X-MelodyMap-Source",
     "Content-Type": result.mimeType,
     "Accept-Ranges": "bytes",
+    "X-MelodyMap-Source": result.source ?? "youtube",
   });
 
   const contentRange = result.upstream.headers.get("content-range");

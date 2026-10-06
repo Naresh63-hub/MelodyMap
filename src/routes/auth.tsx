@@ -20,7 +20,7 @@ import { useAuth } from "@/lib/auth";
 export function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
   if (lower.includes("unauthorized-domain") || lower.includes("unauthorized domain")) {
-    return "This domain is not authorized in Firebase Console. Please add this domain under Firebase Authentication > Settings > Authorized domains.";
+    return "This domain is not authorized. Please add this domain under Authentication > Settings > Authorized domains / Redirect URLs.";
   }
   if (
     lower.includes("invalid-credential") ||
@@ -65,8 +65,7 @@ export function formatAuthError(msg: string): string {
   }
   if (
     lower.includes("not configured") ||
-    lower.includes("missing supabase") ||
-    lower.includes("missing firebase")
+    lower.includes("missing supabase")
   ) {
     return "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.";
   }

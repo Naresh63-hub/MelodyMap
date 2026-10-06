@@ -4,7 +4,7 @@ import {
   getGoogleWebClientId,
   setGoogleWebClientId,
   requestNativeGoogleToken,
-  signInWithNativeGoogleFirebase,
+  signInWithNativeGoogle,
 } from "./native-google-auth";
 
 const storage = new Map<string, string>();
@@ -84,7 +84,7 @@ describe("native-google-auth", () => {
     expect(result.displayName).toBe("Test User");
   });
 
-  it("signs in to Firebase via signInWithNativeGoogleFirebase", async () => {
+  it("signs in via signInWithNativeGoogle", async () => {
     (globalThis as any).Capacitor = { isNativePlatform: () => true };
 
     (globalThis as any).AndroidGoogleAuth = {
@@ -99,29 +99,24 @@ describe("native-google-auth", () => {
       signOut: vi.fn(),
     };
 
-    const mockAuth = {};
-    const mockProvider = {
-      credential: vi.fn().mockReturnValue({ providerId: "google.com", token: "mock-jwt-token" }),
+    const mockSupabase = {
+      auth: {
+        signInWithIdToken: vi.fn().mockResolvedValue({
+          data: { user: { id: "user-123", email: "user@gmail.com" } },
+          error: null,
+        }),
+      },
     };
-    const mockSignInWithCredential = vi.fn().mockResolvedValue({
-      user: { uid: "user-123", email: "user@gmail.com", displayName: "Test User" },
-    });
-    const mockSyncUserProfile = vi.fn().mockResolvedValue({
-      displayName: "Test User",
-      avatarUrl: "",
-    });
 
-    const res = await signInWithNativeGoogleFirebase(
-      mockAuth,
-      mockProvider,
-      mockSignInWithCredential,
-      mockSyncUserProfile,
+    const res = await signInWithNativeGoogle(
+      mockSupabase,
       "test-client.apps.googleusercontent.com",
     );
 
     expect(res.success).toBe(true);
-    expect(mockProvider.credential).toHaveBeenCalledWith("mock-jwt-token");
-    expect(mockSignInWithCredential).toHaveBeenCalled();
-    expect(mockSyncUserProfile).toHaveBeenCalled();
+    expect(mockSupabase.auth.signInWithIdToken).toHaveBeenCalledWith({
+      provider: "google",
+      token: "mock-jwt-token",
+    });
   });
 });
