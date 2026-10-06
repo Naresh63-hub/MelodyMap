@@ -946,22 +946,8 @@ export function useAudioPlayer(options: {
                 } catch {}
               } else if (event.data === 2) {
                 // 2 = Paused
-                if (wantPlayRef.current && !isSeekingRef.current) {
-                  // Screen locked / app backgrounded: immediately resume playback!
-                  try {
-                    event.target.playVideo();
-                  } catch {}
-                  setTimeout(() => {
-                    if (wantPlayRef.current && ytPlayerRef.current && typeof ytPlayerRef.current.playVideo === "function") {
-                      try {
-                        ytPlayerRef.current.playVideo();
-                      } catch {}
-                    }
-                  }, 40);
-                } else {
-                  setIsPlaying(false);
-                  setIsLoading(false);
-                }
+                setIsPlaying(false);
+                setIsLoading(false);
               } else if (event.data === 3) {
                 // 3 = Buffering
                 setIsLoading(true);

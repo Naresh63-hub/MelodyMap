@@ -113,9 +113,15 @@ public class MediaPlaybackService extends Service {
                 stopForegroundService();
                 return START_NOT_STICKY;
             case ACTION_PLAY:
+                if (intent == null || !intent.hasExtra(EXTRA_PAYLOAD)) {
+                    dispatchMediaCommand("play");
+                }
                 handlePlay(intent != null ? intent.getStringExtra(EXTRA_PAYLOAD) : null);
                 break;
             case ACTION_PAUSE:
+                if (intent == null || !intent.hasExtra(EXTRA_PAYLOAD)) {
+                    dispatchMediaCommand("pause");
+                }
                 handlePause();
                 break;
             case ACTION_UPDATE_POSITION:

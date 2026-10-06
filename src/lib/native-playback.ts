@@ -98,6 +98,7 @@ export function resolvePlaybackEngine(opts: {
   isNative: boolean;
   hostname: string;
 }): PlaybackEngine {
+  if (opts.isNative) return "html5";
   const host = (opts.hostname || "").toLowerCase();
   if (host === "localhost" || host === "127.0.0.1") return "html5";
   // In AI Studio and Cloud Run preview environments where YouTube iframe embeds are blocked
