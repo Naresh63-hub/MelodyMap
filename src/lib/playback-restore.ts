@@ -71,3 +71,27 @@ export function resolveRestorablePlayback<T extends TrackLike = TrackLike>(
 
   return { queue: cleaned, index, position, empty: false };
 }
+
+/**
+ * Decide where a restored track should start.
+ *
+ * The save loop persists position every 2.5s, so the snapshot is fresh enough to
+ * resume mid-song — including in the Android app after background process death
+ * (a cold reload previously threw the position away and restarted at 0:00).
+ *
+ * Clamp rules (apply to music AND podcasts):
+ *  - a saved position under 5s means the track had (re)started: begin at 0:00
+ *  - a position within the last 15s of a known duration means the track was
+ *    effectively finished: begin at 0:00 so the listener hears the song
+ *  - otherwise resume at the saved position
+ *
+ * Callers still deliver the start position through cue() so nothing autoplays
+ * without a tap.
+ */
+export function resolveRestoreStartSeconds(savedPosition: number, durationSeconds: number | null | undefined): number {
+  if (!Number.isFinite(savedPosition) || savedPosition < 5) return 0;
+  if (typeof durationSeconds === "number" && Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    if (savedPosition >= durationSeconds - 15) return 0;
+  }
+  return Math.floor(savedPosition);
+}

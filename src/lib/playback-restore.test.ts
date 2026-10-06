@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveRestorablePlayback } from "./playback-restore";
+import { resolveRestorablePlayback, resolveRestoreStartSeconds } from "./playback-restore";
 import type { TrackLike } from "./track-dedup";
 
 function track(overrides: Partial<TrackLike> & { id: string }): TrackLike {
@@ -122,5 +122,33 @@ describe("resolveRestorablePlayback", () => {
       resolveRestorablePlayback({ queue: undefined as unknown as Array<TrackLike | null | undefined>, index: 0 })
         .empty,
     ).toBe(true);
+  });
+});
+
+describe("resolveRestoreStartSeconds", () => {
+  it("resumes mid-song at the saved position", () => {
+    expect(resolveRestoreStartSeconds(83, 225)).toBe(83);
+  });
+
+  it("restarts at 0:00 when the saved position is under 5 seconds", () => {
+    expect(resolveRestoreStartSeconds(0, 225)).toBe(0);
+    expect(resolveRestoreStartSeconds(2.9, 225)).toBe(0);
+    expect(resolveRestoreStartSeconds(Number.NaN, 225)).toBe(0);
+  });
+
+  it("restarts at 0:00 when the track was effectively finished", () => {
+    expect(resolveRestoreStartSeconds(215, 225)).toBe(0); // last 10s
+    expect(resolveRestoreStartSeconds(224.5, 225)).toBe(0);
+  });
+
+  it("resumes near the end when duration is unknown", () => {
+    expect(resolveRestoreStartSeconds(140, null)).toBe(140);
+    expect(resolveRestoreStartSeconds(140, undefined)).toBe(140);
+    expect(resolveRestoreStartSeconds(140, 0)).toBe(140);
+  });
+
+  it("resumes podcasts identically (no special-casing)", () => {
+    expect(resolveRestoreStartSeconds(600, 2710)).toBe(600);
+    expect(resolveRestoreStartSeconds(3, 2710)).toBe(0);
   });
 });

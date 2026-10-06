@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PlaybackSource } from "@/lib/providers/types";
+import { inferLanguageFromArtists } from "./language-artists";
 
 export type Track = {
   id: string;
@@ -60,6 +61,12 @@ export const LANGUAGES = [
   "Korean",
   "Spanish",
   "Arabic",
+  "Bengali",
+  "Marathi",
+  "Gujarati",
+  "Bhojpuri",
+  "Urdu",
+  "Japanese",
 ] as const;
 
 export const PODCAST_TOPICS = [
@@ -1060,6 +1067,17 @@ export function isLanguageConsistent(
         }
       }
     }
+  }
+
+  // 4. Artist-based language detection: the artist map is the ONLY reliable
+  // signal for romanized titles ("Kadhalin Deepam" has no Tamil script and no
+  // language tag). A known artist tied to a non-selected language marks the
+  // track as out-of-feed. Ambiguous multi-industry artists (playback singers
+  // like Shreya Ghoshal or Arijit Singh) return null and are let through, so
+  // cross-language legends are never wrongly rejected.
+  const inferred = inferLanguageFromArtists(rawArtist);
+  if (inferred && !selectedSet.has(inferred.toLowerCase())) {
+    return false;
   }
 
   return true;

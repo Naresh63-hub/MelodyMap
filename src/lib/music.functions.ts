@@ -1,3 +1,4 @@
+import { LANGUAGE_ARTISTS } from "./language-artists";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -177,49 +178,6 @@ const RecommendInput = z.object({
 
 const CURRENT_YEAR = new Date().getFullYear();
 const PREV_YEAR = CURRENT_YEAR - 1;
-
-const LANGUAGE_ARTISTS: Record<string, string[]> = {
-  Telugu: [
-    "Sid Sriram", "Anurag Kulkarni", "Ram Miriyala", "Devi Sri Prasad", "S. Thaman",
-    "Anirudh Ravichander", "Shreya Ghoshal", "Armaan Malik", "Mangli", "Jaspreet Jasz",
-    "SP Balasubrahmanyam", "M.M. Keeravaani", "Karthik", "Hariharan", "K.S. Chithra",
-    "Haricharan", "Mano", "Geetha Madhuri", "Sunitha", "Rahul Sipligunj", "Hemachandra",
-    "Pradeep Kumar", "Kapil Kapilan", "Hesham Abdul Wahab", "G.V. Prakash Kumar",
-    "Chaitan Bharadwaj", "Mickey J Meyer", "Bheems Ceciroleo", "Vivek Sagar"
-  ],
-  Hindi: [
-    "Arijit Singh", "Shreya Ghoshal", "Vishal Mishra", "Jubin Nautiyal", "B Praak",
-    "Atif Aslam", "Sonu Nigam", "KK", "Mohit Chauhan", "Sunidhi Chauhan", "Neha Kakkar",
-    "Pritam", "A.R. Rahman", "Sachin-Jigar", "Badshah", "Diljit Dosanjh", "Kishore Kumar",
-    "Lata Mangeshkar", "Mohammed Rafi", "Kumar Sanu", "Udit Narayan", "Alka Yagnik",
-    "Shaan", "Armaan Malik", "Darshan Raval", "Anuv Jain", "Prateek Kuhad", "Amit Trivedi"
-  ],
-  Tamil: [
-    "Anirudh Ravichander", "A.R. Rahman", "Yuvan Shankar Raja", "Harris Jayaraj",
-    "Sid Sriram", "Pradeep Kumar", "D. Imman", "Santhosh Narayanan", "Sean Roldan",
-    "Ilaiyaraaja", "SP Balasubrahmanyam", "Karthik", "Shreya Ghoshal", "Vijay Antony",
-    "G.V. Prakash Kumar", "Dhanush", "Jonita Gandhi", "K.J. Yesudas", "Haricharan"
-  ],
-  English: [
-    "The Weeknd", "Taylor Swift", "Bruno Mars", "Ed Sheeran", "Billie Eilish",
-    "Drake", "Post Malone", "Dua Lipa", "Coldplay", "Eminem", "Imagine Dragons",
-    "Ariana Grande", "Justin Bieber", "Maroon 5", "Adele", "Sam Smith", "Harry Styles",
-    "Lady Gaga", "OneRepublic", "Charlie Puth", "Shawn Mendes", "Sia", "Katy Perry"
-  ],
-  Punjabi: [
-    "Diljit Dosanjh", "Karan Aujla", "AP Dhillon", "Sidhu Moose Wala", "Shubh",
-    "Guru Randhawa", "Amrinder Gill", "B Praak", "Jassie Gill", "Hardy Sandhu",
-    "Gurdas Maan", "Satinder Sartaaj", "Maninder Buttar"
-  ],
-  Malayalam: [
-    "Sushin Shyam", "Hesham Abdul Wahab", "Jassie Gift", "K.J. Yesudas", "K.S. Chithra",
-    "Vineeth Sreenivasan", "Shaan Rahman", "Gopi Sundar", "Haricharan", "Vijay Yesudas"
-  ],
-  Kannada: [
-    "Vijay Prakash", "Sanjith Hegde", "Arjun Janya", "Charan Raj", "Raghu Dixit",
-    "Sonu Nigam", "Shreya Ghoshal", "Armaan Malik", "B. Ajaneesh Loknath"
-  ],
-};
 
 const DIVERSE_THEMES = [
   `latest romantic melody songs ${CURRENT_YEAR}`,

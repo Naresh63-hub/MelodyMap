@@ -103,7 +103,7 @@ import { useMediaSession } from "@/lib/use-media-session";
 import { listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 import { trackExistsIn, dedupeTracks, type TrackLike } from "@/lib/track-dedup";
-import { resolveRestorablePlayback } from "@/lib/playback-restore";
+import { resolveRestorablePlayback, resolveRestoreStartSeconds } from "@/lib/playback-restore";
 import {
   installMediaCommandHandler,
   isNativePlaybackEnv,
@@ -1232,6 +1232,22 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     [runRecommend, runTrending, runOldSongs, runMix, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
+  // Reload every home feed when language/artist preferences change. Previously
+  // only the Settings modal's Apply button (and onboarding save) refreshed —
+  // toggling a language elsewhere (Languages tab, settings picker) updated
+  // settings but left stale wrong-language songs on screen.
+  const preferencesSignature = `${settings.languages.join(",")}|${settings.artists.join(",")}`;
+  const firstPrefsRunRef = useRef(true);
+  useEffect(() => {
+    if (!resumed) return;
+    if (firstPrefsRunRef.current) {
+      firstPrefsRunRef.current = false;
+      return;
+    }
+    void loadRecommendations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferencesSignature, resumed]);
+
   const loadMoreRecommendations = useCallback(
     async (mood?: string) => {
       if (loadingMoreRecs) return;
@@ -1970,7 +1986,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setResumed(true);
         const targetTrack = resolved.queue[resolved.index];
         if (targetTrack) {
-          const savedPos = isPodcastTrack(targetTrack) ? resolved.position : 0;
+          // Resume where the listener left off (clamped: near-start/near-end restarts at 0:00).
+          // Fixes cold reloads in the Android app restarting the song at 0:00.
+          const savedPos = resolveRestoreStartSeconds(
+            resolved.position,
+            isPodcastTrack(targetTrack) ? null : parseDurationSeconds(targetTrack.duration),
+          );
           resumeRef.current = savedPos;
           loadedTrackIdRef.current = targetTrack.id;
           // Always cue on initial restore to avoid NotAllowedError on mobile and audio clashes across devices
@@ -1999,7 +2020,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setResumed(true);
             const targetTrack = resolved.queue[resolved.index];
             if (targetTrack) {
-              const savedPos = isPodcastTrack(targetTrack) ? resolved.position : 0;
+              // Same clamp policy as the mount restore so cross-device sync resumes mid-song
+              const savedPos = resolveRestoreStartSeconds(
+                resolved.position,
+                isPodcastTrack(targetTrack) ? null : parseDurationSeconds(targetTrack.duration),
+              );
               loadedTrackIdRef.current = targetTrack.id;
               cue(targetTrack.id, savedPos, targetTrack.previewUrl);
             }

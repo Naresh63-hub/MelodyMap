@@ -1080,6 +1080,11 @@ export function useAudioPlayer(options: {
   // Maintain uninterrupted playback across tab switches and app foreground/background
   useEffect(() => {
     if (typeof document === "undefined") return;
+    // Native APK: the foreground MediaPlaybackService owns background state
+    // (audio focus, lockscreen controls, OEM doze handling). A JS-side resume
+    // loop here would fight the OS — e.g. re-playing after an audio-focus pause
+    // causes the play/pause cycling and a "playing" animation with no sound.
+    if (isNativePlaybackEnv()) return;
     const onVisibilityChange = () => {
       // Never pause, swap engines, or re-seek when tabs are switched or app is hidden.
       // Audio must continue playing seamlessly in the background.

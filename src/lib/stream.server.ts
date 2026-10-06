@@ -9,6 +9,7 @@
 
 import fs from "node:fs";
 import { createLruCache } from "./lru-cache";
+import { searchAudius } from "./providers/audius";
 
 export type StreamQuality = "saver" | "standard" | "high";
 
@@ -91,30 +92,58 @@ export async function getYtDlpInstance() {
   }
 }
 
-// ─── Circuit breaker ─────────────────────────────────────────────────
+// ─── Per-track resolve backoff ──────────────────────────────────────
+//
+// Previously a GLOBAL circuit breaker (20 consecutive failures → 15s cooldown)
+// guarded resolution. One unresolvable track (bot-blocked, region-locked, or
+// deleted) could freeze resolution for the ENTIRE catalog — the user saw
+// "audio connection interrupted" for every song after a few bad tracks.
+// Backoff is now per video ID: a track that keeps failing resolves gets paused
+// (60s, doubling up to 10 min) while every other track resolves immediately.
 
-const FAILURE_THRESHOLD = 20;
-const COOLDOWN_MS = 15 * 1000; // 15 seconds
+const TRACK_FAILURE_THRESHOLD = 2;
+const TRACK_BACKOFF_BASE_MS = 60 * 1000;
+const TRACK_BACKOFF_MAX_MS = 10 * 60 * 1000;
 
-let consecutiveFailures = 0;
-let cooldownUntil = 0;
+const resolveFailures = new Map<string, { count: number; blockedUntil: number }>();
 
-function isCooledDown(): boolean {
-  return Date.now() > cooldownUntil;
+/** True when this videoId is currently allowed to attempt resolution. */
+function isTrackAllowed(videoId: string): boolean {
+  const state = resolveFailures.get(videoId);
+  if (!state) return true;
+  return Date.now() >= state.blockedUntil;
 }
 
-function recordSuccess() {
-  consecutiveFailures = 0;
-  cooldownUntil = 0;
+function recordResolveSuccess(videoId: string) {
+  resolveFailures.delete(videoId);
 }
 
-function recordFailure() {
-  consecutiveFailures++;
-  if (consecutiveFailures >= FAILURE_THRESHOLD) {
-    cooldownUntil = Date.now() + COOLDOWN_MS;
+/** Exponential backoff for a track that keeps failing to resolve (pure, exported for tests). */
+export function computeTrackBackoffMs(failureCount: number): number {
+  return Math.min(
+    TRACK_BACKOFF_BASE_MS * Math.pow(2, failureCount - TRACK_FAILURE_THRESHOLD),
+    TRACK_BACKOFF_MAX_MS,
+  );
+}
+
+function recordResolveFailure(videoId: string) {
+  const state = resolveFailures.get(videoId) ?? { count: 0, blockedUntil: 0 };
+  state.count += 1;
+  if (state.count >= TRACK_FAILURE_THRESHOLD) {
+    const backoff = computeTrackBackoffMs(state.count);
+    state.blockedUntil = Date.now() + backoff;
     console.warn(
-      `[stream] Circuit breaker tripped — ${consecutiveFailures} consecutive failures, backing off for ${COOLDOWN_MS / 1000}s`,
+      `[stream] Track ${videoId} failed ${state.count} resolutions — backing off for ${Math.round(backoff / 1000)}s`,
     );
+  }
+  resolveFailures.set(videoId, state);
+
+  // Bound the map: drop expired entries once it grows large.
+  if (resolveFailures.size > 500) {
+    const now = Date.now();
+    for (const [id, s] of resolveFailures) {
+      if (now >= s.blockedUntil) resolveFailures.delete(id);
+    }
   }
 }
 
@@ -357,7 +386,49 @@ export async function resolveWithInnerTubePlayer(
     }
   }
 
-  // Fallback 2: For restricted tracks (e.g. LOGIN_REQUIRED), fetch metadata via oEmbed and resolve official audio preview
+  // Fallback 2: Audius full-length match — YouTube is frequently bot-blocked
+  // from serverless IPs (LOGIN_REQUIRED), which previously dropped every such
+  // track to the 30-second Deezer preview below. A full-length replacement
+  // stream from Audius keeps songs playing past 0:30 when YouTube refuses.
+  try {
+    const oembedRes = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { headers: { "User-Agent": BROWSER_UA } },
+    );
+    if (oembedRes.ok) {
+      const oembed = (await oembedRes.json()) as any;
+      const cleanTitle = cleanTrackTitle(oembed?.title || "");
+      const rawTitle = (oembed?.title || "").replace(/\[.*?\]|\(.*?\)|\|.*/g, "").trim();
+      const rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
+      const queriesToTry = [`${cleanTitle} ${rawAuthor}`.trim(), cleanTitle].filter(
+        (q): q is string => Boolean(q && q.length > 0),
+      );
+
+      for (const q of queriesToTry) {
+        const audiusMatches = await searchAudius(q, { limit: 5 });
+        if (audiusMatches.length === 0) continue;
+        const targetDuration = typeof oembed?.duration === "number" ? oembed.duration : null;
+        const best =
+          audiusMatches.find((t) => {
+            const dur = Number(t.durationSeconds) || 0;
+            return targetDuration ? Math.abs(dur - targetDuration) <= Math.max(30, targetDuration * 0.25) : true;
+          }) || audiusMatches[0];
+        const audiusStreamUrl = best?.playbackSource?.url;
+        if (audiusStreamUrl) {
+          return {
+            url: audiusStreamUrl,
+            mimeType: "audio/mpeg",
+            contentLength: null,
+            audioBitrate: 320000,
+          };
+        }
+      }
+    }
+  } catch (audiusErr) {
+    console.warn(`[stream] Audius full-length fallback notice for ${videoId}:`, audiusErr);
+  }
+
+  // Fallback 3 (last resort): 30-second catalog preview via Deezer
   try {
     const oembedRes = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
@@ -427,7 +498,7 @@ export async function resolveStreamUrlWithMeta(
 
   const resolutionPromise = (async () => {
     try {
-      if (!isCooledDown()) return null;
+      if (!isTrackAllowed(videoId)) return null;
 
       let entry: StreamMeta | null = null;
 
@@ -444,11 +515,11 @@ export async function resolveStreamUrlWithMeta(
 
       if (entry) {
         streamCache.set(cacheKey, entry);
-        recordSuccess();
+        recordResolveSuccess(videoId);
         return entry;
       }
 
-      recordFailure();
+      recordResolveFailure(videoId);
       return null;
     } finally {
       inFlightResolutions.delete(cacheKey);

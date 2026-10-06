@@ -82,6 +82,9 @@ public class MediaPlaybackService extends Service {
     private double trackPositionSec = 0;
     private boolean isJsPlaying = false;
     private boolean resumeOnFocusGain = false;
+    private long lastFocusLossAt = 0;
+
+    private static final long FOCUS_LOSS_DEBOUNCE_MS = 500;
     private boolean started = false;
 
     private static volatile boolean isRunning = false;
@@ -166,6 +169,9 @@ public class MediaPlaybackService extends Service {
 
     private void handlePause() {
         isJsPlaying = false;
+        // A real pause (user, notification, headset, or focus loss) must never be
+        // silently auto-resumed later by a stale transient-focus-loss flag.
+        resumeOnFocusGain = false;
         updateNotification();
         refreshMediaSession();
         releaseLocks();
@@ -384,22 +390,27 @@ public class MediaPlaybackService extends Service {
             focusChangeListener = focusChange -> {
                 switch (focusChange) {
                     case AudioManager.AUDIOFOCUS_LOSS:
-                        resumeOnFocusGain = false;
-                        if (isJsPlaying) {
-                            dispatchMediaCommand("pause");
-                        }
-                        handlePause();
-                        break;
                     case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                        // We cannot duck WebView audio from the native side —
-                        // pause instead, and auto-resume when focus returns.
-                        resumeOnFocusGain = isJsPlaying;
-                        if (isJsPlaying) {
+                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK: {
+                        // Chromium's own MediaSession can request focus concurrently;
+                        // rapid duplicate loss callbacks caused pause/play ping-pong.
+                        long now = SystemClock.elapsedRealtime();
+                        if (now - lastFocusLossAt < FOCUS_LOSS_DEBOUNCE_MS) {
+                            break;
+                        }
+                        lastFocusLossAt = now;
+
+                        boolean wasPlaying = isJsPlaying;
+                        if (wasPlaying) {
                             dispatchMediaCommand("pause");
                         }
+                        // Clears resumeOnFocusGain — set the transient flag AFTER,
+                        // so only genuine transient losses auto-resume on GAIN.
                         handlePause();
+                        resumeOnFocusGain =
+                                wasPlaying && focusChange != AudioManager.AUDIOFOCUS_LOSS;
                         break;
+                    }
                     case AudioManager.AUDIOFOCUS_GAIN:
                         if (resumeOnFocusGain) {
                             resumeOnFocusGain = false;
