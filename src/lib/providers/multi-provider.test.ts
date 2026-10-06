@@ -19,8 +19,8 @@ describe("Multi-Provider Streaming Architecture", () => {
       expect(jamendo.playbackType).toBe("full");
 
       const deezer = PROVIDER_REGISTRY.deezer;
-      expect(deezer.canPlayback).toBe(true);
-      expect(deezer.playbackType).toBe("preview");
+      expect(deezer.canPlayback).toBe(false);
+      expect(deezer.playbackType).toBe("none");
 
       const mb = PROVIDER_REGISTRY.musicbrainz;
       expect(mb.canPlayback).toBe(false);

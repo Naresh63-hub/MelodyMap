@@ -6,8 +6,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0a0f",
-  "theme_color": "#0b0716",
+  "background_color": "#050b12",
+  "theme_color": "#050b12",
   "categories": ["music", "podcasts", "entertainment"],
   "prefer_related_applications": false,
   "icons": [

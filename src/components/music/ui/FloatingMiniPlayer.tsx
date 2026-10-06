@@ -153,7 +153,7 @@ export function FloatingMiniPlayer({
           : undefined
       }
       className={cn(
-        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl bg-[#101010]/95 backdrop-blur-2xl border border-white/[0.06] text-white shadow-2xl shadow-black/80 overflow-hidden transition-shadow select-none",
+        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl bg-surface/95 backdrop-blur-2xl border border-white/[0.06] text-white shadow-2xl shadow-black/80 overflow-hidden transition-shadow select-none",
         isDragging && "cursor-grabbing ring-1 ring-white/30"
       )}
     >
@@ -179,13 +179,13 @@ export function FloatingMiniPlayer({
         onPointerCancel={handleScrubPointerCancel}
       >
         <div
-          className="h-1 w-full bg-white group-hover:bg-[#1DB954] transition-all rounded-full"
+          className="h-1 w-full bg-white group-hover:bg-primary transition-all rounded-full"
           style={{ width: `${progressPct}%` }}
         />
         <span
           className={cn(
             "absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md transition-transform duration-75",
-            isScrubbing ? "scale-125 opacity-100 ring-2 ring-[#1DB954]/40" : "opacity-0 group-hover:opacity-100 scale-100",
+            isScrubbing ? "scale-125 opacity-100 ring-2 ring-primary/40" : "opacity-0 group-hover:opacity-100 scale-100",
           )}
           style={{ left: `${progressPct}%` }}
         />
@@ -221,7 +221,7 @@ export function FloatingMiniPlayer({
 
         {/* Track Thumbnail & Info */}
         <div className="flex items-center gap-3">
-          <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-white/[0.06] bg-[#161616]">
+          <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-white/[0.06] bg-card">
             <img src={track.thumbnail} alt={track.title} className="h-full w-full object-cover" />
             {isPlaying && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/40">
@@ -229,7 +229,7 @@ export function FloatingMiniPlayer({
                   {[0, 1, 2].map((i) => (
                     <div
                       key={i}
-                      className="w-0.5 bg-[#1DB954] rounded-full animate-bar"
+                      className="w-0.5 bg-primary rounded-full animate-bar"
                       style={{ animationDelay: `${i * 0.15}s`, height: "100%" }}
                     />
                   ))}
@@ -264,7 +264,7 @@ export function FloatingMiniPlayer({
                 <Heart
                   className={cn(
                     "h-4 w-4 transition-transform duration-200",
-                    liked ? "fill-[#1DB954] text-[#1DB954] scale-110" : "hover:scale-110"
+                    liked ? "fill-primary text-primary scale-110" : "hover:scale-110"
                   )}
                 />
               </button>

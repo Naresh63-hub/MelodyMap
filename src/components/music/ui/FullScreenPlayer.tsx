@@ -119,7 +119,7 @@ export function FullScreenPlayer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#080808] overflow-hidden animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-hidden animate-fade-in">
       {/* Soft ambient background art glow */}
       <div
         className="absolute inset-0 bg-cover bg-center blur-3xl opacity-15 scale-125 transition-all duration-700 pointer-events-none"
@@ -127,7 +127,7 @@ export function FullScreenPlayer({
           backgroundImage: `url(${track.thumbnail})`,
         }}
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[#080808]/70 via-[#080808]/90 to-[#080808] pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/90 to-background pointer-events-none" />
 
       {/* Main Container */}
       <div className="relative z-10 flex h-full w-full max-w-md flex-col justify-between px-6 py-6 pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pt-[calc(env(safe-area-inset-top,0px)+16px)]">
@@ -238,7 +238,7 @@ export function FullScreenPlayer({
               onClick={onToggleShuffle}
               className={cn(
                 "p-2 text-[#737373] hover:text-[#F5F5F5] transition-colors active:scale-95",
-                shuffle && "text-[#1DB954]"
+                shuffle && "text-primary"
               )}
               aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
               title={shuffle ? "Shuffle: On" : "Shuffle: Off"}
@@ -315,7 +315,7 @@ export function FullScreenPlayer({
               onClick={onToggleRepeat}
               className={cn(
                 "relative p-2 text-[#737373] hover:text-[#F5F5F5] transition-colors active:scale-95",
-                repeatMode !== "off" && "text-[#1DB954]"
+                repeatMode !== "off" && "text-primary"
               )}
               aria-label={`Repeat mode: ${repeatMode}`}
               title={
@@ -327,7 +327,7 @@ export function FullScreenPlayer({
               }
             >
               {repeatMode === "one" ? (
-                <Repeat1 className="h-5 w-5 text-[#1DB954]" />
+                <Repeat1 className="h-5 w-5 text-primary" />
               ) : (
                 <Repeat className="h-5 w-5" />
               )}
@@ -369,11 +369,11 @@ export function FullScreenPlayer({
                   className={cn(
                     "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-normal transition-all",
                     isSleepTimerActive
-                      ? "border-[#1DB954]/40 bg-[#1DB954]/15 text-[#1DB954] shadow-sm font-mono font-medium"
+                      ? "border-primary/40 bg-primary/15 text-primary shadow-sm font-mono font-medium"
                       : "border-white/[0.06] bg-white/[0.04] text-[#A1A1A1] hover:bg-white/[0.08] hover:text-[#F5F5F5]"
                   )}
                 >
-                  <Moon className={cn("h-3.5 w-3.5", isSleepTimerActive ? "text-[#1DB954]" : "text-[#737373]")} />
+                  <Moon className={cn("h-3.5 w-3.5", isSleepTimerActive ? "text-primary" : "text-[#737373]")} />
                   <span>{isSleepTimerActive ? sleepTimerCountdown : "Timer"}</span>
                 </button>
               )}
@@ -429,7 +429,7 @@ export function FullScreenPlayer({
                   className={cn(
                     "flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-95",
                     isQueueOpen
-                      ? "text-[#1DB954] bg-[#1DB954]/15"
+                      ? "text-primary bg-primary/15"
                       : "text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.06]"
                   )}
                 >

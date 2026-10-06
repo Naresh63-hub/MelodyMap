@@ -811,13 +811,13 @@ export function SettingsModal({
                 <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4 space-y-3.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#1DB954]/10 text-[#1DB954] border border-[#1DB954]/20">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
                         <Disc className="h-4 w-4" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-semibold text-white">Gapless Playback &amp; Smart Crossfade</h3>
-                          <span className="rounded-full bg-[#1DB954]/15 px-2 py-0.5 text-[10px] font-semibold text-[#1DB954] border border-[#1DB954]/25">
+                          <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary border border-primary/25">
                             Studio
                           </span>
                         </div>
@@ -826,7 +826,7 @@ export function SettingsModal({
                         </p>
                       </div>
                     </div>
-                    <span className="text-xs font-mono font-medium text-[#1DB954] bg-[#1DB954]/10 px-2.5 py-1 rounded-full border border-[#1DB954]/20 shrink-0">
+                    <span className="text-xs font-mono font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20 shrink-0">
                       {currentCrossfade === 0 ? "Gapless (0s)" : `${currentCrossfade}s Blend`}
                     </span>
                   </div>
@@ -839,7 +839,7 @@ export function SettingsModal({
                       step="1"
                       value={currentCrossfade}
                       onChange={(e) => handleCrossfadeChange(Number(e.target.value))}
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#1DB954]"
+                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                     <div className="flex justify-between text-[10px] text-white/40 font-mono">
                       <span>0s (Gapless)</span>
@@ -864,7 +864,7 @@ export function SettingsModal({
                         onClick={() => handleCrossfadeChange(p.seconds)}
                         className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all text-center border ${
                           currentCrossfade === p.seconds
-                            ? "bg-[#1DB954]/20 border-[#1DB954]/40 text-[#1DB954]"
+                            ? "bg-primary/20 border-primary/40 text-primary"
                             : "bg-white/[0.03] border-white/[0.06] text-white/60 hover:text-white hover:bg-white/[0.06]"
                         }`}
                       >

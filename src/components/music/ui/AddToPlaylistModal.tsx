@@ -47,14 +47,14 @@ export function AddToPlaylistModal({
       />
 
       {/* Sheet / Dialog */}
-      <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-[#101010] border border-white/[0.06] p-5 shadow-2xl shadow-black/80 z-10 animate-slide-up space-y-4">
+      <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-surface border border-white/[0.06] p-5 shadow-2xl shadow-black/80 z-10 animate-slide-up space-y-4">
         {/* Grab bar on mobile */}
         <div className="mx-auto h-1 w-12 rounded-full bg-white/20 sm:hidden" />
 
         {/* Header */}
         <div className="flex items-center justify-between pb-1">
           <div className="flex items-center gap-2">
-            <ListMusic className="h-5 w-5 text-[#1DB954]" />
+            <ListMusic className="h-5 w-5 text-primary" />
             <h2 className="text-base font-bold text-[#F5F5F5]">Add to Playlist</h2>
           </div>
           <button
@@ -68,7 +68,7 @@ export function AddToPlaylistModal({
         </div>
 
         {/* Track preview */}
-        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-[#161616] border border-white/[0.06]">
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-card border border-white/[0.06]">
           <img
             src={track.thumbnail}
             alt=""
@@ -101,7 +101,7 @@ export function AddToPlaylistModal({
             <button
               type="submit"
               disabled={!newPlaylistName.trim()}
-              className="h-10 px-4 rounded-xl bg-[#1DB954] hover:bg-[#1ed760] disabled:opacity-40 text-black font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
+              className="h-10 px-4 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground font-semibold text-xs transition-all active:scale-95 flex items-center gap-1.5 shrink-0"
             >
               <Plus className="h-3.5 w-3.5" />
               Create
@@ -133,7 +133,7 @@ export function AddToPlaylistModal({
                       "flex w-full items-center justify-between p-2.5 rounded-xl border text-left transition-all",
                       alreadyContains
                         ? "bg-white/[0.02] border-transparent opacity-60 cursor-default"
-                        : "bg-[#161616] hover:bg-[#1D1D1D] border-white/[0.04] active:scale-[0.99]"
+                        : "bg-card hover:bg-popover border-white/[0.04] active:scale-[0.99]"
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -149,7 +149,7 @@ export function AddToPlaylistModal({
                     </div>
 
                     {alreadyContains ? (
-                      <span className="flex items-center gap-1 text-xs text-[#1DB954] shrink-0 font-medium">
+                      <span className="flex items-center gap-1 text-xs text-primary shrink-0 font-medium">
                         <Check className="h-3.5 w-3.5" />
                         Added
                       </span>

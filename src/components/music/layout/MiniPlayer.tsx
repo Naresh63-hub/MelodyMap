@@ -57,7 +57,7 @@ export function MiniPlayer({
 
   return (
     <div
-      className="fixed z-40 border-t border-border bg-surface/95 backdrop-blur-xl shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between"
+      className="fixed z-40 border-t border-border bg-surface/95 backdrop-blur-xl shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between safe-bottom"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
       {/* 2px Hairline Progress Indicator at Top */}
@@ -72,7 +72,7 @@ export function MiniPlayer({
         className="relative w-full h-[2px] bg-white/[0.06] cursor-pointer"
       >
         <div
-          className="h-full bg-[#1DB954] transition-all duration-150 ease-linear"
+          className="h-full bg-primary transition-all duration-150 ease-linear"
           style={{ width: `${progressPct}%` }}
         />
       </div>

@@ -108,7 +108,7 @@ export function SleepTimerModal({
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1DB954]/15 text-[#1DB954]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary">
               <Moon className="h-4 w-4" />
             </div>
             <div className="text-left">
@@ -138,7 +138,7 @@ export function SleepTimerModal({
             className={cn(
               "relative flex h-40 w-40 items-center justify-center rounded-full border-2 transition-all bg-card",
               isActive
-                ? "border-[#1DB954] shadow-[0_0_24px_rgba(29,185,84,0.2)]"
+                ? "border-primary shadow-[0_0_24px_rgba(56,189,248,0.25)]"
                 : isExpired
                 ? "border-amber-500/50"
                 : "border-white/10"
@@ -146,8 +146,8 @@ export function SleepTimerModal({
           >
             <div className="flex flex-col items-center">
               {isActive && (
-                <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-[#1DB954] mb-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse" />
+                <span className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-primary mb-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                   Remaining
                 </span>
               )}
@@ -177,7 +177,7 @@ export function SleepTimerModal({
               onClick={() => setIsCustomMode(!isCustomMode)}
               className={cn(
                 "text-[11px] font-semibold transition-colors flex items-center gap-1",
-                isCustomMode ? "text-[#1DB954]" : "text-[#737373] hover:text-[#F5F5F5]"
+                isCustomMode ? "text-primary" : "text-[#737373] hover:text-[#F5F5F5]"
               )}
             >
               <Sliders className="h-3 w-3" />
@@ -197,7 +197,7 @@ export function SleepTimerModal({
                     className={cn(
                       "rounded-xl border py-2 px-1 text-xs font-semibold transition-all text-center",
                       isSelected
-                        ? "border-[#1DB954] bg-[#1DB954]/15 text-[#1DB954] shadow-sm"
+                        ? "border-primary bg-primary/15 text-primary shadow-sm"
                         : "border-border bg-surface-hover text-[#A1A1A1] hover:bg-surface-hover-strong hover:text-[#F5F5F5]"
                     )}
                   >
@@ -210,7 +210,7 @@ export function SleepTimerModal({
             <div className="rounded-xl border border-border bg-surface-hover p-3 text-left">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-[#A1A1A1]">Minutes:</span>
-                <span className="text-sm font-bold text-[#1DB954] tabular-nums">
+                <span className="text-sm font-bold text-primary tabular-nums">
                   {customInput} min
                 </span>
               </div>
@@ -224,7 +224,7 @@ export function SleepTimerModal({
                   const val = parseInt(e.target.value, 10);
                   setCustomInput(val);
                 }}
-                className="w-full accent-[#1DB954] cursor-pointer"
+                className="w-full accent-primary cursor-pointer"
               />
               <div className="flex justify-between text-[10px] font-medium text-[#737373] mt-1">
                 <span>5m</span>
@@ -254,7 +254,7 @@ export function SleepTimerModal({
                     handleCustomApply();
                     onClose();
                   }}
-                  className="rounded-2xl bg-[#1DB954] py-3 px-4 text-sm font-semibold text-black hover:bg-[#1ed760] transition-all"
+                  className="rounded-2xl bg-primary py-3 px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all"
                 >
                   Apply
                 </button>
@@ -269,7 +269,7 @@ export function SleepTimerModal({
                   restartTimer();
                   onClose();
                 }}
-                className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-sm font-semibold text-black active:scale-[0.99] transition-all"
+                className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-primary hover:bg-primary/90 py-3 text-sm font-semibold text-primary-foreground active:scale-[0.99] transition-all"
               >
                 <RotateCcw className="h-4 w-4" />
                 Restart ({selectedMinutes}m)
@@ -289,7 +289,7 @@ export function SleepTimerModal({
             <button
               type="button"
               onClick={() => handleStart(isCustomMode ? customInput : selectedMinutes)}
-              className="w-full rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] py-3 text-sm font-semibold text-black shadow-lg shadow-[#1DB954]/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+              className="w-full rounded-2xl bg-primary hover:bg-primary/90 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 active:scale-[0.99] transition-all flex items-center justify-center gap-2"
             >
               <Clock className="h-4 w-4" />
               Start Sleep Timer ({isCustomMode ? customInput : selectedMinutes} min)

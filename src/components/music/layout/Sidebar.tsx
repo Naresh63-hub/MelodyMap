@@ -97,7 +97,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex shrink-0 flex-col border-r border-white/[0.06] bg-[#101010] sidebar-transition",
+        "flex shrink-0 flex-col border-r border-white/[0.06] bg-surface sidebar-transition",
         collapsed ? "w-[72px]" : "w-[260px]",
       )}
       style={{ minWidth: collapsed ? 72 : 260 }}
@@ -120,7 +120,7 @@ export function Sidebar({
           <div className="min-w-0 animate-fade-in-up">
             <p className="truncate text-base font-semibold tracking-tight">
               <span className="text-[#F5F5F5]">Melody</span>
-              <span className="text-[#1DB954]">Map</span>
+              <span className="text-primary">Map</span>
             </p>
             <p className="text-[10px] uppercase tracking-[0.12em] text-[#737373] font-normal">
               Music player
@@ -157,14 +157,14 @@ export function Sidebar({
                   >
                     {/* Active indicator bar */}
                     {active && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2.5px] rounded-full bg-[#1DB954]" />
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2.5px] rounded-full bg-primary" />
                     )}
 
                     <Icon
                       className={cn(
                         "h-[18px] w-[18px] shrink-0 transition-colors",
                         active
-                          ? "text-[#1DB954]"
+                          ? "text-primary"
                           : "text-[#737373] group-hover:text-[#A1A1A1]",
                       )}
                     />
@@ -199,7 +199,7 @@ export function Sidebar({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-[#181818] border border-white/[0.06]">
+                <div className="flex h-full w-full items-center justify-center bg-card border border-white/[0.06]">
                   <Disc3 className="h-5 w-5 text-[#737373]" />
                 </div>
               )}
@@ -257,17 +257,25 @@ export function Sidebar({
         {!collapsed && (
           <div className="mb-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 hover:bg-white/[0.04] transition-colors cursor-default group/user">
             <div className="relative shrink-0">
-              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#242424] text-xs font-semibold text-white border border-white/10">
+              {isPlaying && (
+                <div className="playing-ring-conic animate-avatar-ring absolute -inset-[2.5px] rounded-full opacity-90" />
+              )}
+              <div
+                className={cn(
+                  "relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-popover text-xs font-semibold text-white border border-white/10",
+                  isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
+                )}
+              >
                 {userAvatar ? (
                   <img src={userAvatar} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <User className="h-4 w-4 text-white/70" />
                 )}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#121212] bg-[#1DB954]" />
+              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white/90">
+              <p className={cn("truncate text-xs font-semibold text-white/90", isPlaying && "animate-name-glow")}>
                 {userName ?? "Listener"}
               </p>
               <p className="truncate text-[10px] text-white/40">

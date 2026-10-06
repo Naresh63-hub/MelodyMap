@@ -34,9 +34,9 @@ export function HomeSections({
   /** Skeleton placeholder card with neutral shimmer. */
   const SkeletonCard = () => (
     <div className="space-y-2">
-      <div className="aspect-square w-full rounded-lg bg-[#181818] border border-white/[0.04] animate-pulse" />
+      <div className="aspect-square w-full rounded-lg bg-card border border-white/[0.04] animate-pulse" />
       <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
-      <div className="h-2.5 w-1/2 rounded bg-[#181818] animate-pulse" />
+      <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
     </div>
   );
 

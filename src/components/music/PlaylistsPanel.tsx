@@ -83,11 +83,11 @@ export function PlaylistsPanel({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="New playlist name…"
-          className="h-11 rounded-full bg-[#161616] border border-white/[0.08] text-[#F5F5F5] placeholder:text-[#737373] focus:border-white/20 focus:ring-1 focus:ring-white/10"
+          className="h-11 rounded-full bg-card border border-white/[0.08] text-[#F5F5F5] placeholder:text-[#737373] focus:border-white/20 focus:ring-1 focus:ring-white/10"
         />
         <Button
           type="submit"
-          className="h-11 rounded-full px-5 bg-[#1DB954] hover:bg-[#1ed760] text-black font-semibold text-xs transition-colors shrink-0"
+          className="h-11 rounded-full px-5 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs transition-colors shrink-0"
         >
           <Plus className="mr-1 h-4 w-4" />
           Create
@@ -95,7 +95,7 @@ export function PlaylistsPanel({
       </form>
 
       {playlists.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 bg-[#161616]/40 px-5 py-10 text-center text-sm text-[#737373]">
+        <p className="rounded-xl border border-dashed border-white/10 bg-card/40 px-5 py-10 text-center text-sm text-[#737373]">
           No playlists yet. Create one, then use the + on any song to save it here.
         </p>
       ) : (
@@ -110,7 +110,7 @@ export function PlaylistsPanel({
                   "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors",
                   p.id === openId
                     ? "border-transparent bg-[#F5F5F5] text-black font-medium shadow-sm"
-                    : "border-white/[0.06] bg-[#161616] text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-[#1D1D1D]",
+                    : "border-white/[0.06] bg-card text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-popover",
                 )}
               >
                 <ListMusic className="h-4 w-4" />

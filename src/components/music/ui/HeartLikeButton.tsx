@@ -60,7 +60,7 @@ export function HeartLikeButton({
         "relative flex items-center justify-center rounded-full transition-all focus:outline-none active:scale-90",
         buttonSizes[size],
         liked
-          ? "text-[#1DB954] hover:text-[#1ed760]"
+          ? "text-primary hover:text-[#7dd3fc]"
           : "text-white/40 hover:text-white/80 hover:bg-white/[0.04]",
         className,
       )}
@@ -70,14 +70,14 @@ export function HeartLikeButton({
           iconSizes[size],
           "transition-all duration-200 transform",
           liked
-            ? "fill-[#1DB954] text-[#1DB954] drop-shadow-[0_0_6px_rgba(29,185,84,0.4)]"
+            ? "fill-primary text-primary drop-shadow-[0_0_6px_rgba(56,189,248,0.45)]"
             : "fill-transparent",
           isBouncing && "scale-125",
         )}
       />
       {/* Subtle pulse ring on click */}
       {isBouncing && (
-        <span className="absolute inset-0 rounded-full animate-ping bg-[#1DB954]/25 pointer-events-none" />
+        <span className="absolute inset-0 rounded-full animate-ping bg-primary/25 pointer-events-none" />
       )}
     </button>
   );

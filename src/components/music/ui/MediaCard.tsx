@@ -44,7 +44,7 @@ export function MediaCard({
     <div
       style={style}
       className={cn(
-        "group/card shrink-0 cursor-pointer p-2 rounded-xl transition-colors bg-[#161616]/60 hover:bg-[#1D1D1D] border border-white/[0.04] hover:border-white/[0.08]",
+        "group/card shrink-0 cursor-pointer p-2 rounded-xl transition-colors bg-card/60 hover:bg-popover border border-white/[0.04] hover:border-white/[0.08] card-modern-lift card-glow-border",
         dims,
         className,
       )}
@@ -53,8 +53,8 @@ export function MediaCard({
         type="button"
         onClick={onPlay}
         className={cn(
-          "relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#181818] border border-white/[0.06] transition-all duration-200 button-press focus-visible:ring-2 focus-visible:ring-[#1DB954]",
-          active && "ring-1 ring-[#1DB954]",
+          "relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06] transition-all duration-200 button-press focus-visible:ring-2 focus-visible:ring-primary",
+          active && "ring-1 ring-primary",
         )}
       >
         {image && !imageError ? (
@@ -71,7 +71,7 @@ export function MediaCard({
             )}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-[#181818] text-[#737373]">
+          <div className="flex h-full w-full items-center justify-center bg-card text-[#737373]">
             <Music2 className="h-7 w-7 opacity-50" />
           </div>
         )}
@@ -82,7 +82,7 @@ export function MediaCard({
         {/* Clean Circular Play Button */}
         <span
           className={cn(
-            "absolute bottom-2.5 right-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-[#1DB954] text-black shadow-md shadow-black/40 transition-all duration-200",
+            "absolute bottom-2.5 right-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-black/40 transition-all duration-200",
             playing
               ? "scale-100 opacity-100"
               : "scale-90 opacity-0 group-hover/card:scale-100 group-hover/card:opacity-100 hover:scale-105 active:scale-95",
@@ -101,7 +101,7 @@ export function MediaCard({
           <p
             className={cn(
               "truncate text-[13px] font-medium leading-snug transition-colors",
-              active ? "text-[#1DB954]" : "text-[#F5F5F5] group-hover/card:text-white",
+              active ? "text-primary" : "text-[#F5F5F5] group-hover/card:text-white",
             )}
           >
             {title}

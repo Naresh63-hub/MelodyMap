@@ -240,11 +240,11 @@ export function AuthModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md bg-popover border border-border text-foreground p-6 shadow-overlay rounded-2xl">
         <DialogHeader className="space-y-1.5 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1DB954]/20 to-[#1DB954]/5 border border-[#1DB954]/30 mb-1">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 mb-1">
             {mode === "profile" ? (
-              <UserCheck className="h-6 w-6 text-[#1DB954]" />
+              <UserCheck className="h-6 w-6 text-primary" />
             ) : (
-              <Sparkles className="h-6 w-6 text-[#1DB954]" />
+              <Sparkles className="h-6 w-6 text-primary" />
             )}
           </div>
           <DialogTitle className="text-xl font-semibold tracking-[-0.01em]">
@@ -273,7 +273,7 @@ export function AuthModal({
               }}
               className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                 mode === "signin"
-                  ? "bg-[#1DB954] text-black shadow-md"
+                  ? "bg-primary text-primary-foreground shadow-md"
                   : "text-white/60 hover:text-white"
               }`}
             >
@@ -288,7 +288,7 @@ export function AuthModal({
               }}
               className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                 mode === "signup"
-                  ? "bg-[#1DB954] text-black shadow-md"
+                  ? "bg-primary text-primary-foreground shadow-md"
                   : "text-white/60 hover:text-white"
               }`}
             >
@@ -344,7 +344,7 @@ export function AuthModal({
 
             <div className="relative flex items-center justify-center">
               <div className="border-t border-white/10 w-full" />
-              <span className="bg-[#121212] px-2 text-[10px] text-white/40 uppercase tracking-widest font-mono">
+              <span className="bg-background px-2 text-[10px] text-white/40 uppercase tracking-widest font-mono">
                 or with email
               </span>
             </div>
@@ -364,7 +364,7 @@ export function AuthModal({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={busy}
-                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954] focus:ring-1 focus:ring-[#1DB954]"
+                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
                   required
                 />
               </div>
@@ -383,7 +383,7 @@ export function AuthModal({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={busy}
-                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954] focus:ring-1 focus:ring-[#1DB954]"
+                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
                   required
                 />
               </div>
@@ -403,7 +403,7 @@ export function AuthModal({
                       setErrorMsg(null);
                       setSuccessMsg(null);
                     }}
-                    className="text-[11px] text-[#1DB954] hover:underline"
+                    className="text-[11px] text-primary hover:underline"
                   >
                     Forgot password?
                   </button>
@@ -417,7 +417,7 @@ export function AuthModal({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={busy}
-                  className="pl-9 pr-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954] focus:ring-1 focus:ring-[#1DB954]"
+                  className="pl-9 pr-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
                   required
                 />
                 <button
@@ -443,7 +443,7 @@ export function AuthModal({
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={busy}
-                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954] focus:ring-1 focus:ring-[#1DB954]"
+                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
                   required
                 />
               </div>
@@ -455,7 +455,7 @@ export function AuthModal({
             <Button
               type="submit"
               disabled={busy}
-              className="w-full h-11 rounded-xl bg-[#1DB954] hover:bg-[#1aa34a] text-black font-medium shadow-lg shadow-[#1DB954]/20 transition-all text-xs"
+              className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg shadow-primary/20 transition-all text-xs"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />

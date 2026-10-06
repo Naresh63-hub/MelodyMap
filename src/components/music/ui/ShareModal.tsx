@@ -69,7 +69,7 @@ export function ShareModal({ open, track, onClose }: Props) {
       />
 
       {/* Sheet Panel */}
-      <div className="relative w-full max-w-lg rounded-t-3xl bg-[#101010] border-t border-white/[0.06] p-5 shadow-2xl z-10 animate-slide-up">
+      <div className="relative w-full max-w-lg rounded-t-3xl bg-surface border-t border-white/[0.06] p-5 shadow-2xl z-10 animate-slide-up">
         {/* Grab bar */}
         <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-white/20" />
 
@@ -85,7 +85,7 @@ export function ShareModal({ open, track, onClose }: Props) {
         </div>
 
         {/* Track Preview Card */}
-        <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-[#161616] border border-white/[0.06] mb-5">
+        <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-card border border-white/[0.06] mb-5">
           <img
             src={track.thumbnail}
             alt=""
@@ -130,8 +130,8 @@ export function ShareModal({ open, track, onClose }: Props) {
         >
           {copied ? (
             <>
-              <Check className="h-4 w-4 text-[#1DB954]" />
-              <span className="text-[#1DB954]">Link Copied!</span>
+              <Check className="h-4 w-4 text-primary" />
+              <span className="text-primary">Link Copied!</span>
             </>
           ) : (
             <>

@@ -86,7 +86,7 @@ export function SearchResults(props: Props) {
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 p-2 rounded-lg bg-[#161616] border border-white/[0.04] animate-pulse"
+            className="flex items-center gap-3 p-2 rounded-lg bg-card border border-white/[0.04] animate-pulse"
           >
             <div className="h-11 w-11 rounded-md bg-white/[0.06]" />
             <div className="flex-1 space-y-2">
@@ -149,9 +149,9 @@ export function SearchResults(props: Props) {
                   key={cat.title}
                   type="button"
                   onClick={() => onSearch?.(cat.query, cat.type)}
-                  className="flex flex-col justify-between p-4 rounded-xl bg-[#161616] hover:bg-[#1D1D1D] border border-white/[0.06] text-left transition-all active:scale-[0.98] h-28 group"
+                  className="flex flex-col justify-between p-4 rounded-xl bg-card hover:bg-popover border border-white/[0.06] text-left transition-all active:scale-[0.98] h-28 group"
                 >
-                  <Icon className="h-5 w-5 text-[#A1A1A1] group-hover:text-[#1DB954] transition-colors" />
+                  <Icon className="h-5 w-5 text-[#A1A1A1] group-hover:text-primary transition-colors" />
                   <div>
                     <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">
                       {cat.title}
@@ -210,7 +210,7 @@ export function SearchResults(props: Props) {
                     key={item.query}
                     type="button"
                     onClick={() => onSearch?.(item.query, "songs")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#161616] border border-white/[0.06] px-3 py-1 text-xs text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-[#1D1D1D] active:scale-95 transition-all"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-card border border-white/[0.06] px-3 py-1 text-xs text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-popover active:scale-95 transition-all"
                   >
                     <Clock className="h-3 w-3 text-[#737373]" />
                     <span>{item.query}</span>
@@ -230,7 +230,7 @@ export function SearchResults(props: Props) {
               className={cn(
                 "group flex items-center gap-3 rounded-lg p-2 transition-colors",
                 active
-                  ? "bg-[#1D1D1D]"
+                  ? "bg-popover"
                   : "hover:bg-white/[0.03]"
               )}
             >
@@ -238,7 +238,7 @@ export function SearchResults(props: Props) {
               <button
                 type="button"
                 onClick={() => onPlayTrack(track, i)}
-                className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616]"
+                className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card"
               >
                 <img
                   src={getOptimizedThumbnailUrl(track.thumbnail)}
@@ -247,7 +247,7 @@ export function SearchResults(props: Props) {
                 />
                 {active && isPlaying && (
                   <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                    <Equalizer active className="h-4 w-4 text-[#1DB954]" />
+                    <Equalizer active className="h-4 w-4 text-primary" />
                   </div>
                 )}
               </button>
@@ -261,7 +261,7 @@ export function SearchResults(props: Props) {
                 <p
                   className={cn(
                     "truncate text-sm font-semibold leading-tight",
-                    active ? "text-[#1DB954]" : "text-[#F5F5F5]"
+                    active ? "text-primary" : "text-[#F5F5F5]"
                   )}
                 >
                   {track.title}
@@ -302,9 +302,9 @@ export function SearchResults(props: Props) {
             type="button"
             onClick={onLoadMore}
             disabled={loadingMore}
-            className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#161616] px-5 py-2 text-xs font-medium text-[#F5F5F5] hover:bg-[#1D1D1D] active:scale-95 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-card px-5 py-2 text-xs font-medium text-[#F5F5F5] hover:bg-popover active:scale-95 transition-all disabled:opacity-50"
           >
-            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin text-[#1DB954]" /> : null}
+            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
             {loadingMore ? "Loading more..." : "Load more results"}
           </button>
         </div>

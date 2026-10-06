@@ -269,7 +269,7 @@ function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-[#080808] px-4 py-8 sm:px-6 lg:px-8 text-white">
+    <div className="flex min-h-screen flex-col justify-center bg-background px-4 py-8 sm:px-6 lg:px-8 text-white">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-2">
           <Link
@@ -282,8 +282,8 @@ function AuthPage() {
         </div>
 
         <div className="flex flex-col items-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1DB954]/20 to-[#1DB954]/5 border border-[#1DB954]/30 shadow-lg mb-3">
-            <Sparkles className="h-6 w-6 text-[#1DB954]" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 shadow-lg mb-3">
+            <Sparkles className="h-6 w-6 text-primary" />
           </div>
           <h2 className="text-center text-2xl font-semibold tracking-tight text-white">
             {mode === "signin" && "Sign in to MelodyMap"}
@@ -301,7 +301,7 @@ function AuthPage() {
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="rounded-2xl bg-[#121212] border border-white/10 p-6 sm:p-8 shadow-2xl space-y-4">
+        <div className="rounded-2xl bg-background border border-white/10 p-6 sm:p-8 shadow-2xl space-y-4">
           {/* Notification alerts */}
           {errorNote && (
             <div className="flex items-center gap-2.5 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">
@@ -328,7 +328,7 @@ function AuthPage() {
                 }}
                 className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                   mode === "signin"
-                    ? "bg-[#1DB954] text-black shadow-md"
+                    ? "bg-primary text-primary-foreground shadow-md"
                     : "text-white/60 hover:text-white"
                 }`}
               >
@@ -343,7 +343,7 @@ function AuthPage() {
                 }}
                 className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                   mode === "signup"
-                    ? "bg-[#1DB954] text-black shadow-md"
+                    ? "bg-primary text-primary-foreground shadow-md"
                     : "text-white/60 hover:text-white"
                 }`}
               >
@@ -389,7 +389,7 @@ function AuthPage() {
 
               <div className="relative flex items-center justify-center">
                 <div className="border-t border-white/10 w-full" />
-                <span className="bg-[#121212] px-2 text-[10px] text-white/40 uppercase tracking-widest font-mono">
+                <span className="bg-background px-2 text-[10px] text-white/40 uppercase tracking-widest font-mono">
                   or with email
                 </span>
               </div>
@@ -408,7 +408,7 @@ function AuthPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954]"
+                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -426,7 +426,7 @@ function AuthPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954]"
+                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -447,7 +447,7 @@ function AuthPage() {
                         setErrorNote(null);
                         setSuccessNote(null);
                       }}
-                      className="text-[11px] text-[#1DB954] hover:underline"
+                      className="text-[11px] text-primary hover:underline"
                     >
                       Forgot password?
                     </button>
@@ -461,7 +461,7 @@ function AuthPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 pr-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954]"
+                    className="pl-9 pr-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary"
                     required
                   />
                   <button
@@ -486,7 +486,7 @@ function AuthPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-[#1DB954]"
+                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -496,7 +496,7 @@ function AuthPage() {
             <Button
               type="submit"
               disabled={submitting || googleBusy}
-              className="w-full h-11 rounded-xl bg-[#1DB954] hover:bg-[#1aa34a] text-black font-semibold shadow-lg shadow-[#1DB954]/20 transition-all text-xs"
+              className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 transition-all text-xs"
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />

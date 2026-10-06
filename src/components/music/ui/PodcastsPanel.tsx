@@ -234,8 +234,8 @@ export function PodcastsPanel({
         </div>
 
         {/* Show Header Card */}
-        <div className="p-5 md:p-6 rounded-2xl bg-[#121212] border border-white/[0.08] flex flex-col md:flex-row gap-5 items-start">
-          <div className="relative shrink-0 w-32 h-32 md:w-44 md:h-44 rounded-xl overflow-hidden bg-[#181818] border border-white/[0.08] shadow-lg">
+        <div className="p-5 md:p-6 rounded-2xl bg-background border border-white/[0.08] flex flex-col md:flex-row gap-5 items-start">
+          <div className="relative shrink-0 w-32 h-32 md:w-44 md:h-44 rounded-xl overflow-hidden bg-card border border-white/[0.08] shadow-lg">
             {selectedShow.artworkUrl ? (
               <img
                 src={selectedShow.artworkUrl}
@@ -301,7 +301,7 @@ export function PodcastsPanel({
                       onPlayEpisode(firstEp, episodes, 0);
                     }
                   }}
-                  className="rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black font-semibold px-5 h-9 text-xs"
+                  className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-5 h-9 text-xs"
                 >
                   {isShowPlaying ? (
                     <>
@@ -330,7 +330,7 @@ export function PodcastsPanel({
 
           {loadingEpisodes ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3 text-white/40">
-              <Loader2 className="h-6 w-6 animate-spin text-[#1DB954]" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <p className="text-xs">Loading episodes…</p>
             </div>
           ) : episodesError ? (
@@ -363,7 +363,7 @@ export function PodcastsPanel({
                     className={cn(
                       "group p-3 md:p-4 rounded-xl transition-colors flex items-start gap-3.5",
                       isCurrentEp
-                        ? "bg-white/[0.06] border border-[#1DB954]/30"
+                        ? "bg-white/[0.06] border border-primary/30"
                         : "hover:bg-white/[0.03] border border-transparent",
                     )}
                   >
@@ -381,10 +381,10 @@ export function PodcastsPanel({
                       className={cn(
                         "shrink-0 mt-0.5 h-10 w-10 rounded-full flex items-center justify-center transition-transform active:scale-95",
                         isThisPlaying
-                          ? "bg-[#1DB954] text-black shadow-md shadow-[#1DB954]/20"
+                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
                           : isCurrentEp
                             ? "bg-white text-black"
-                            : "bg-white/[0.08] text-white hover:bg-[#1DB954] hover:text-black",
+                            : "bg-white/[0.08] text-white hover:bg-primary hover:text-primary-foreground",
                       )}
                       title={isThisPlaying ? "Pause" : "Play"}
                     >
@@ -401,16 +401,16 @@ export function PodcastsPanel({
                         <h3
                           className={cn(
                             "text-sm font-medium leading-snug line-clamp-1",
-                            isCurrentEp ? "text-[#1DB954]" : "text-white group-hover:text-white",
+                            isCurrentEp ? "text-primary" : "text-white group-hover:text-white",
                           )}
                         >
                           {ep.title}
                         </h3>
                         {isThisPlaying && (
                           <div className="flex items-end gap-0.5 h-3">
-                            <span className="w-0.5 h-3 bg-[#1DB954] animate-pulse" />
-                            <span className="w-0.5 h-2 bg-[#1DB954] animate-pulse delay-75" />
-                            <span className="w-0.5 h-3.5 bg-[#1DB954] animate-pulse delay-150" />
+                            <span className="w-0.5 h-3 bg-primary animate-pulse" />
+                            <span className="w-0.5 h-2 bg-primary animate-pulse delay-75" />
+                            <span className="w-0.5 h-3.5 bg-primary animate-pulse delay-150" />
                           </div>
                         )}
                       </div>
@@ -503,7 +503,7 @@ export function PodcastsPanel({
                 className={cn(
                   "shrink-0 rounded-full border px-3 py-1 text-xs transition-colors font-medium",
                   isActive
-                    ? "border-[#1DB954]/50 bg-[#1DB954]/15 text-[#1DB954]"
+                    ? "border-primary/50 bg-primary/15 text-primary"
                     : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:bg-white/[0.06] hover:text-white",
                 )}
               >
@@ -522,7 +522,7 @@ export function PodcastsPanel({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={`Search ${selectedLanguage} podcasts, creators, or topics…`}
-          className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] pl-10 pr-10 py-2.5 text-sm text-white placeholder-white/40 focus:border-[#1DB954]/60 focus:bg-white/[0.06] focus:outline-none transition-all"
+          className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] pl-10 pr-10 py-2.5 text-sm text-white placeholder-white/40 focus:border-primary/60 focus:bg-white/[0.06] focus:outline-none transition-all"
         />
         <div className="absolute right-2.5 flex items-center gap-1.5">
           {loadingShows && debouncedQuery && (
@@ -570,7 +570,7 @@ export function PodcastsPanel({
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
-              <Headphones className="h-3.5 w-3.5 text-[#1DB954]" />
+              <Headphones className="h-3.5 w-3.5 text-primary" />
               Continue Listening
             </h2>
             <button
@@ -599,7 +599,7 @@ export function PodcastsPanel({
                   }}
                   className="w-36 shrink-0 snap-start text-left group p-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] transition-colors"
                 >
-                  <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#181818] border border-white/[0.06]">
+                  <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06]">
                     {ep.thumbnail ? (
                       <img
                         src={ep.thumbnail}
@@ -614,14 +614,14 @@ export function PodcastsPanel({
                     {isCurrent && isPlaying && (
                       <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                         <div className="flex items-end gap-0.5 h-4">
-                          <span className="w-1 bg-[#1DB954] animate-pulse" />
-                          <span className="w-1 bg-[#1DB954] animate-pulse delay-75" />
-                          <span className="w-1 bg-[#1DB954] animate-pulse delay-150" />
+                          <span className="w-1 bg-primary animate-pulse" />
+                          <span className="w-1 bg-primary animate-pulse delay-75" />
+                          <span className="w-1 bg-primary animate-pulse delay-150" />
                         </div>
                       </div>
                     )}
                   </div>
-                  <p className="truncate text-xs font-medium text-white group-hover:text-[#1DB954] transition-colors">
+                  <p className="truncate text-xs font-medium text-white group-hover:text-primary transition-colors">
                     {ep.title}
                   </p>
                   <p className="truncate text-[11px] text-white/40 mt-0.5">{ep.artist}</p>
@@ -703,7 +703,7 @@ export function PodcastsPanel({
                 onClick={() => void handleSelectShow(show)}
                 className="group text-left p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] hover:border-white/[0.12] transition-all flex flex-col"
               >
-                <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#181818] border border-white/[0.06]">
+                <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06]">
                   {show.artworkUrl ? (
                     <img
                       src={show.artworkUrl}
@@ -723,7 +723,7 @@ export function PodcastsPanel({
                   )}
                 </div>
 
-                <h3 className="text-xs font-semibold text-white leading-tight line-clamp-1 group-hover:text-[#1DB954] transition-colors">
+                <h3 className="text-xs font-semibold text-white leading-tight line-clamp-1 group-hover:text-primary transition-colors">
                   {show.title}
                 </h3>
                 <p className="text-[11px] text-white/50 line-clamp-1 mt-0.5">{show.publisher}</p>

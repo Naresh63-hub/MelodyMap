@@ -159,7 +159,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
           <div
             className={cn(
               "absolute inset-y-0 left-0 rounded-full transition-colors",
-              isDragging ? "bg-[#1DB954]" : "bg-white group-hover:bg-[#1DB954]"
+              isDragging ? "bg-primary" : "bg-white group-hover:bg-primary"
             )}
             style={{ width: `${pct}%` }}
           />
@@ -167,7 +167,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
           <span
             className={cn(
               "absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md transition-transform duration-100",
-              isDragging ? "scale-125 opacity-100 ring-4 ring-[#1DB954]/25" : "opacity-0 group-hover:opacity-100 group-hover:scale-110",
+              isDragging ? "scale-125 opacity-100 ring-4 ring-primary/25" : "opacity-0 group-hover:opacity-100 group-hover:scale-110",
             )}
             style={{ left: `${pct}%` }}
           />

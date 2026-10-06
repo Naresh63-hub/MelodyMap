@@ -187,7 +187,7 @@ export function LyricsPanel({
       >
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
-            <Loader2 className="h-8 w-8 text-[#1DB954] animate-spin" />
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
             <p className="text-xs text-white/50">Fetching synchronized lyrics...</p>
           </div>
         ) : filteredLyrics.length === 0 ? (

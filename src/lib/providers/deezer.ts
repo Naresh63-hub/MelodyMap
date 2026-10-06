@@ -86,18 +86,10 @@ export async function searchDeezerTracks(
           isExplicit: Boolean(t.explicit_lyrics),
           provider: "deezer" as const,
           providerTrackId: String(t.id),
-          playable: Boolean(t.preview),
-          playbackSource: t.preview
-            ? {
-                provider: "deezer" as const,
-                providerTrackId: String(t.id),
-                url: t.preview,
-                type: "preview" as const,
-                format: "mp3",
-              }
-            : undefined,
+          playable: false,
+          playbackSource: undefined,
           availableAlternatives: [],
-          previewUrl: t.preview,
+          previewUrl: undefined,
           source: "deezer" as const,
         };
       });

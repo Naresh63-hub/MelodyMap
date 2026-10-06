@@ -86,14 +86,14 @@ export function TrackList({
             className={cn(
               "group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors sm:px-3",
               active
-                ? "bg-[#1D1D1D]"
+                ? "bg-popover"
                 : "hover:bg-white/[0.03]",
             )}
           >
             <button
               type="button"
               onClick={() => onPlay(track, index)}
-              className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-[#181818] border border-white/[0.06] transition-transform duration-150 active:scale-95"
+              className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-card border border-white/[0.06] transition-transform duration-150 active:scale-95"
               aria-label={`Play ${track.title}`}
             >
               <img
@@ -106,7 +106,7 @@ export function TrackList({
               <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                 {active && isPlaying ? (
                   <div className="flex items-center gap-0.5">
-                    <Equalizer active className="h-3.5 w-3.5 text-[#1DB954]" />
+                    <Equalizer active className="h-3.5 w-3.5 text-primary" />
                   </div>
                 ) : (
                   <Play className="h-3.5 w-3.5 text-white fill-current ml-0.5" />
@@ -114,7 +114,7 @@ export function TrackList({
               </span>
               {active && (
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:hidden">
-                  <Equalizer active className="h-3.5 w-3.5 text-[#1DB954]" />
+                  <Equalizer active className="h-3.5 w-3.5 text-primary" />
                 </div>
               )}
             </button>
@@ -128,7 +128,7 @@ export function TrackList({
                 <p
                   className={cn(
                     "truncate text-sm font-semibold transition-colors duration-150",
-                    active ? "text-[#1DB954]" : "text-[#F5F5F5] group-hover:text-white",
+                    active ? "text-primary" : "text-[#F5F5F5] group-hover:text-white",
                   )}
                 >
                   {track.title}
@@ -172,7 +172,7 @@ export function TrackList({
                   {downloadingIds?.has(track.id) ? (
                     <Loader2 className="h-4 w-4 animate-spin text-white/60" />
                   ) : downloadedIds?.has(track.id) ? (
-                    <CheckCircle2 className="h-4 w-4 text-[#1DB954]" />
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
                   ) : (
                     <Download className="h-4 w-4" />
                   )}

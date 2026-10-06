@@ -7,8 +7,8 @@
 /*
  * MelodyMap Design System
  * Clean, human-designed editorial dark streaming aesthetic.
- * Content-first: deep OLED black (#000000), neutral surfaces (#121212, #181818, #242424),
- * and a restrained emerald accent (#1DB954). Album artwork provides visual color.
+ * Content-first: midnight-sky base (#050B12), blue-tinted surfaces (#08111C, #0C1826, #102032),
+ * and a luminous sky-blue accent (#38BDF8). Album artwork provides visual color.
  */
 
 @theme inline {
@@ -49,40 +49,40 @@
   --radius: 0.625rem;
   --mobile-nav-height: 56px;
 
-  /* Palette: refined streaming dark theme */
-  --bg-main: #080808;
-  --bg-secondary: #101010;
-  --bg-card: #161616;
-  --bg-elevated: #1d1d1d;
+  /* Palette: refined midnight-sky theme */
+  --bg-main: #050b12;
+  --bg-secondary: #08111c;
+  --bg-card: #0c1826;
+  --bg-elevated: #102032;
 
   --text-primary: #f5f5f5;
   --text-secondary: #a1a1a1;
   --text-muted: #737373;
 
-  --background: #080808;
+  --background: #050b12;
   --foreground: #f5f5f5;
 
-  /* Surfaces: neutral streaming darks */
-  --card: #161616;
+  /* Surfaces: midnight-blue tinted darks */
+  --card: #0c1826;
   --card-foreground: #f5f5f5;
-  --surface: #101010;
+  --surface: #08111c;
   --surface-foreground: #f5f5f5;
-  --surface-elevated: #1d1d1d;
-  --popover: #1d1d1d;
+  --surface-elevated: #102032;
+  --popover: #102032;
   --popover-foreground: #f5f5f5;
 
-  /* Primary & Accent: clean streaming emerald */
-  --primary: #1db954;
-  --primary-foreground: #000000;
-  --accent: #1db954;
-  --accent-foreground: #000000;
+  /* Primary & Accent: luminous sky blue */
+  --primary: #38bdf8;
+  --primary-foreground: #052034;
+  --accent: #38bdf8;
+  --accent-foreground: #052034;
 
-  /* Secondary: dark neutral surface for chips, hover, controls */
-  --secondary: #161616;
+  /* Secondary: dark water surface for chips, hover, controls */
+  --secondary: #0c1826;
   --secondary-foreground: #a1a1a1;
 
   /* Muted: secondary and tertiary gray text */
-  --muted: #101010;
+  --muted: #08111c;
   --muted-foreground: #737373;
 
   /* Destructive: soft restrained red */
@@ -92,8 +92,8 @@
   /* Borders: subtle white transparency */
   --border: rgba(255, 255, 255, 0.06);
   --input: rgba(255, 255, 255, 0.08);
-  --ring: #1db954;
-  --ring-soft: rgba(29, 185, 84, 0.2);
+  --ring: #7dd3fc;
+  --ring-soft: rgba(125, 211, 252, 0.25);
 
   /* Interactive surface steps: single restrained hover elevation */
   --surface-hover: rgba(255, 255, 255, 0.04);
@@ -141,7 +141,7 @@
   }
 
   ::selection {
-    background-color: rgba(29, 185, 84, 0.2);
+    background-color: rgba(56, 189, 248, 0.35);
     color: #f5f5f5;
   }
 
@@ -169,7 +169,7 @@
 
 /* Restrained surface utilities */
 @utility glass {
-  background: rgba(16, 16, 16, 0.92);
+  background: rgba(8, 17, 28, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -192,10 +192,54 @@
 
 /* Subtle clean panel */
 @utility glass-panel {
-  background: rgba(16, 16, 16, 0.96);
+  background: rgba(8, 17, 28, 0.96);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Now-playing profile effects: rotating conic ring + glowing name */
+@keyframes avatar-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility animate-avatar-ring {
+  animation: avatar-ring-spin 3.5s linear infinite;
+}
+
+@utility playing-ring-conic {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--primary) 60deg,
+    var(--ring) 150deg,
+    transparent 240deg,
+    transparent 360deg
+  );
+  filter: blur(1px);
+}
+
+@keyframes name-glow-pulse {
+  0%,
+  100% {
+    text-shadow: 0 0 6px color-mix(in srgb, var(--primary) 55%, transparent);
+  }
+  50% {
+    text-shadow: 0 0 16px color-mix(in srgb, var(--primary) 85%, transparent);
+  }
+}
+
+@utility animate-name-glow {
+  animation: name-glow-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-avatar-ring,
+  .animate-name-glow {
+    animation: none;
+  }
 }
 
 /* Hide scrollbar but keep scroll */
@@ -218,7 +262,7 @@
 
 /* Clean restrained surface */
 @utility glass-premium {
-  background: rgba(16, 16, 16, 0.95);
+  background: rgba(8, 17, 28, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -257,7 +301,7 @@
 }
 
 @utility skeleton-shimmer {
-  background: linear-gradient(90deg, #161616 25%, #1d1d1d 50%, #161616 75%);
+  background: linear-gradient(90deg, #0c1826 25%, #102032 50%, #0c1826 75%);
   background-size: 200% 100%;
   animation: neutral-shimmer 1.8s ease-in-out infinite;
 }
@@ -266,18 +310,18 @@
 @utility focus-ring-neon {
   outline: none;
   &:focus-visible {
-    outline: 2px solid #1db954;
+    outline: 2px solid var(--primary);
     outline-offset: 2px;
   }
 }
 
 /* Clean compatibility classes (replacing old neon utilities) */
 .gradient-border {
-  border: 1px solid rgba(29, 185, 84, 0.5) !important;
+  border: 1px solid rgba(56, 189, 248, 0.5) !important;
 }
 
 .neon-border-animate {
-  border-color: rgba(29, 185, 84, 0.5) !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
 }
 
 .icon-glow {
@@ -324,7 +368,7 @@
 
 /* Safe area insets for mobile */
 @utility safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
 }
 
 @utility safe-top {
@@ -332,7 +376,7 @@
 }
 
 @utility header-safe-top {
-  padding-top: max(calc(env(safe-area-inset-top, 0px) + 0.75rem), 2.75rem);
+  padding-top: max(calc(env(safe-area-inset-top, 0px) + 1rem), 3.5rem);
 }
 
 @utility drawer-safe-top {
@@ -412,5 +456,195 @@
 @utility text-metadata {
   font-family: var(--font-sans);
   font-weight: 400;
+}
+
+/* ==========================================================================
+   Modern UI Animations for MelodyMap
+   Prominent & playful animations for visual impact
+   ========================================================================== */
+
+/* Prominent playful rotation for user avatar */
+@keyframes avatar-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.05);
+  }
+  50% {
+    transform: rotate(180deg) scale(1);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.05);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+/* Gentle continuous rotation */
+@keyframes avatar-gentle-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pulsing glow effect */
+@keyframes avatar-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(139, 92, 246, 0);
+  }
+}
+
+@utility animate-avatar-spin {
+  animation: avatar-spin 8s linear infinite;
+}
+
+@utility animate-avatar-gentle {
+  animation: avatar-gentle-spin 10s linear infinite;
+}
+
+@utility animate-avatar-glow {
+  animation: avatar-glow 2s ease-in-out infinite;
+}
+
+/* Modern button hover with glow */
+@utility button-modern-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(139, 92, 246, 0.4);
+  }
+  &:active {
+    transform: translateY(0) scale(0.98);
+  }
+}
+
+/* Modern card with 3D lift effect */
+@utility card-modern-lift {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-style: preserve-3d;
+  &:hover {
+    transform: translateY(-8px) rotateX(2deg);
+    box-shadow: 0 20px 40px -10px rgba(139, 92, 246, 0.3);
+  }
+}
+
+/* Card shine effect on hover */
+.card-shine-effect {
+  position: relative;
+  overflow: hidden;
+}
+.card-shine-effect::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left 0.5s;
+  pointer-events: none;
+}
+.card-shine-effect:hover::before {
+  left: 100%;
+}
+
+/* Card border glow */
+@utility card-glow-border {
+  transition: all 0.3s ease;
+  &:hover {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.2);
+  }
+}
+
+/* Slide in from right */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Slide in from left */
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Scale and fade */
+@keyframes scale-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility animate-slide-right {
+  animation: slide-in-right 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@utility animate-slide-left {
+  animation: slide-in-left 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@utility animate-scale-fade {
+  animation: scale-fade-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Chip bounce animation */
+@utility chip-bounce {
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  &:hover {
+    transform: scale(1.1) translateY(-2px);
+  }
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+/* Text gradient shift animation */
+@keyframes text-gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@utility text-animated-gradient {
+  background: linear-gradient(90deg, #f5f5f5, #a78bfa, #f5f5f5);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-gradient-shift 3s linear infinite;
 }
 

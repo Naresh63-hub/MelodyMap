@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#0b0716" },
+      { name: "theme-color", content: "#050b12" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "MelodyMap" },
@@ -117,7 +117,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "apple-touch-icon", sizes: "192x192", href: "/icons/icon-192.png" },
       { rel: "apple-touch-icon", sizes: "512x512", href: "/icons/icon-512.png" },
       { rel: "manifest", href: "/manifest.json" },
-      { rel: "mask-icon", href: "/icons/icon.svg", color: "#8b5cf6" },
+      { rel: "mask-icon", href: "/icons/icon.svg", color: "#38bdf8" },
     ],
   }),
   shellComponent: RootShell,

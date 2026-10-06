@@ -23,6 +23,7 @@ type Props = {
   onNavigate: (tab: NavTab) => void;
   onOpenSettings: () => void;
   isSynced: boolean;
+  isPlaying?: boolean;
   userName?: string | undefined;
   userInitial?: string | undefined;
   userAvatar?: string | null | undefined;
@@ -37,6 +38,7 @@ export function MobileDrawer({
   onNavigate,
   onOpenSettings,
   isSynced,
+  isPlaying = false,
   userName = "Listener",
   userInitial = "L",
   userAvatar,
@@ -92,7 +94,7 @@ export function MobileDrawer({
             />
             <span className="font-display text-base font-semibold">
               <span className="text-foreground">Melody</span>
-              <span className="text-[#1DB954]">Map</span>
+              <span className="text-primary">Map</span>
             </span>
           </div>
           <button
@@ -119,19 +121,34 @@ export function MobileDrawer({
               className="flex items-center justify-between gap-3 px-5 py-3.5 bg-surface-hover hover:bg-surface-hover-strong active:bg-surface-hover-strong border-b border-border cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                {userAvatar ? (
-                  <img
-                    src={userAvatar}
-                    alt=""
-                    className="h-9 w-9 rounded-full object-cover border border-[#1DB954]/40"
-                  />
-                ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary font-semibold text-xs border border-primary/25">
-                    {displayInitial}
-                  </div>
-                )}
+                <div className="relative shrink-0">
+                  {isPlaying && (
+                    <div className="playing-ring-conic animate-avatar-ring absolute -inset-[2.5px] rounded-full opacity-90" />
+                  )}
+                  {userAvatar ? (
+                    <img
+                      src={userAvatar}
+                      alt=""
+                      className={cn(
+                        "relative h-9 w-9 rounded-full object-cover border border-primary/40",
+                        isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
+                      )}
+                    />
+                  ) : (
+                    <div
+                      className={cn(
+                        "relative flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary font-semibold text-xs border border-primary/25",
+                        isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
+                      )}
+                    >
+                      {displayInitial}
+                    </div>
+                  )}
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-white">{displayUserName}</p>
+                  <p className={cn("truncate text-sm font-semibold text-white", isPlaying && "animate-name-glow")}>
+                    {displayUserName}
+                  </p>
                   <p className="text-[11px] text-white/50">
                     {isSynced ? "Synced Account • Tap to edit" : "Tap to sign in / manage"}
                   </p>
@@ -179,7 +196,7 @@ export function MobileDrawer({
                       <Icon
                         className={cn(
                           "h-4 w-4 shrink-0",
-                          active ? "text-[#1DB954]" : "text-white/40"
+                          active ? "text-primary" : "text-white/40"
                         )}
                       />
                       <span>{item.label}</span>

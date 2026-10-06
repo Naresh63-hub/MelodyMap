@@ -41,7 +41,7 @@ export function MobileLibrary({
       label: "Favourites",
       icon: Heart,
       detail: `${likes.length} songs`,
-      iconBg: "bg-white/[0.06] text-[#1DB954] border border-white/10",
+      iconBg: "bg-white/[0.06] text-primary border border-white/10",
     },
     {
       id: "history" as const,
@@ -107,7 +107,7 @@ export function MobileLibrary({
             <button
               type="button"
               onClick={() => onNavigateSection("history")}
-              className="text-xs font-semibold text-[#1DB954] hover:underline"
+              className="text-xs font-semibold text-primary hover:underline"
             >
               See all
             </button>
@@ -129,7 +129,7 @@ export function MobileLibrary({
                   <button
                     type="button"
                     onClick={() => onPlayTrack(history, i)}
-                    className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#181818]"
+                    className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card"
                   >
                     <img
                       src={track.thumbnail}
@@ -138,7 +138,7 @@ export function MobileLibrary({
                     />
                     {active && isPlaying && (
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <Equalizer active className="h-3.5 w-3.5 text-[#1DB954]" />
+                        <Equalizer active className="h-3.5 w-3.5 text-primary" />
                       </div>
                     )}
                   </button>
@@ -151,7 +151,7 @@ export function MobileLibrary({
                     <p
                       className={cn(
                         "truncate text-sm font-semibold leading-tight",
-                        active ? "text-[#1DB954]" : "text-white"
+                        active ? "text-primary" : "text-white"
                       )}
                     >
                       {track.title}

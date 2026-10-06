@@ -49,7 +49,7 @@ function HorizontalScrollRow({
             key={track.id}
             className="group relative w-[132px] shrink-0 snap-start text-left transition-transform p-1.5 rounded-xl hover:bg-white/[0.04]"
           >
-            <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-[#161616] border border-white/[0.06]">
+            <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06]">
               <button
                 type="button"
                 onClick={() => onPlayTrack(track, tracks, i)}
@@ -75,7 +75,7 @@ function HorizontalScrollRow({
                       {[0, 1, 2].map((j) => (
                         <div
                           key={j}
-                          className="w-[2.5px] rounded-full bg-[#1DB954] animate-bar"
+                          className="w-[2.5px] rounded-full bg-primary animate-bar"
                           style={{ animationDelay: `${j * 0.15}s`, height: "100%" }}
                         />
                       ))}
@@ -105,7 +105,7 @@ function HorizontalScrollRow({
               <p
                 className={cn(
                   "truncate text-xs font-medium leading-tight",
-                  active ? "text-[#1DB954]" : "text-white/90 group-hover:text-white",
+                  active ? "text-primary" : "text-white/90 group-hover:text-white",
                 )}
               >
                 {track.title}
@@ -156,7 +156,7 @@ function VerticalSongList({
             <button
               type="button"
               onClick={() => onPlayTrack(track, tracks, i)}
-              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-[#161616] border border-white/[0.05]"
+              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card border border-white/[0.05]"
             >
               <img
                 src={track.thumbnail}
@@ -165,7 +165,7 @@ function VerticalSongList({
               />
               {active && isPlaying && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <Equalizer active className="h-3.5 w-3.5 text-[#1DB954]" />
+                  <Equalizer active className="h-3.5 w-3.5 text-primary" />
                 </div>
               )}
             </button>
@@ -179,7 +179,7 @@ function VerticalSongList({
               <p
                 className={cn(
                   "truncate text-[13px] font-medium leading-tight",
-                  active ? "text-[#1DB954]" : "text-white/90",
+                  active ? "text-primary" : "text-white/90",
                 )}
               >
                 {track.title}
@@ -261,9 +261,9 @@ export function ExploreSections({
             <div className="flex gap-3 overflow-hidden">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="w-[132px] shrink-0 space-y-2">
-                  <div className="aspect-square w-full rounded-lg bg-[#161616] border border-white/[0.04] animate-pulse" />
+                  <div className="aspect-square w-full rounded-lg bg-card border border-white/[0.04] animate-pulse" />
                   <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
-                  <div className="h-2.5 w-1/2 rounded bg-[#161616] animate-pulse" />
+                  <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
                 </div>
               ))}
             </div>

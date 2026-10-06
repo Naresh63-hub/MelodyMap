@@ -95,7 +95,7 @@ export function SongOptionsModal({
             <Heart
               className={cn(
                 "h-5 w-5",
-                isLiked ? "fill-[#1DB954] text-[#1DB954]" : "text-white/40"
+                isLiked ? "fill-primary text-primary" : "text-white/40"
               )}
             />
           </button>
@@ -128,7 +128,7 @@ export function SongOptionsModal({
             <Download
               className={cn(
                 "h-5 w-5",
-                isDownloaded ? "text-[#1DB954]" : "text-white/40"
+                isDownloaded ? "text-primary" : "text-white/40"
               )}
             />
           </button>

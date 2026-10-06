@@ -91,12 +91,12 @@ export function MobileHeader({
             onClick={onOpenAuth}
             aria-label="Account profile"
             title="Account profile"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white overflow-hidden active:scale-95 transition-all ml-0.5 ring-1 ring-white/[0.04]"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 hover:from-primary/30 hover:to-primary/10 border border-primary/30 text-white overflow-hidden active:scale-95 transition-all ml-0.5 ring-2 ring-primary/20 animate-avatar-glow animate-avatar-gentle"
           >
             {userAvatar ? (
               <img src={userAvatar} alt="Profile" className="h-full w-full object-cover" />
             ) : userInitial ? (
-              <span className="text-xs font-medium text-white/90">{userInitial}</span>
+              <span className="text-xs font-medium text-white/90 font-bold tracking-wide">{userInitial}</span>
             ) : (
               <User className="h-3.5 w-3.5 text-white/70" />
             )}

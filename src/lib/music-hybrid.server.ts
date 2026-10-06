@@ -73,13 +73,13 @@ export async function searchHybrid(
 }
 
 /**
- * Get radio/recommendation tracks — YouTube radio first, Deezer trending fallback.
+ * Get radio/recommendation tracks — YouTube radio.
  */
 export async function getRadioHybrid(
   videoId: string,
   count = 15,
 ): Promise<HybridTrack[]> {
-  // Try YouTube radio first
+  // Try YouTube radio
   try {
     const { getRadioTracks } = await import("./radio.server");
     const res = await getRadioTracks(videoId, count);
@@ -90,32 +90,19 @@ export async function getRadioHybrid(
     console.warn("[MelodyMap] YouTube radio failed:", err);
   }
 
-  // Fallback: search Deezer for similar content
-  try {
-    const { searchDeezer } = await import("./deezer.server");
-    const dzTracks = await searchDeezer("popular songs", count);
-    return dzTracks;
-  } catch (err) {
-    console.warn("[MelodyMap] Deezer radio fallback also failed:", err);
-    return [];
-  }
+  return [];
 }
 
 /**
- * Check if a track has a Deezer preview URL.
+ * Check if a track is a Deezer track.
  */
 export function isDeezerTrack(track: Track): track is HybridTrack {
-  return !!(track as HybridTrack)._deezerPreview;
+  return track.source === "deezer" || track.id.startsWith("deezer:");
 }
 
 /**
  * Get the playable URL for a track.
- * - YouTube tracks: use the /api/stream/:videoId endpoint
- * - Deezer tracks: use the preview URL directly
  */
 export function getTrackStreamUrl(track: Track): string {
-  if (isDeezerTrack(track)) {
-    return track._deezerPreview!;
-  }
   return `/api/stream/${track.id}`;
 }

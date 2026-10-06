@@ -20,7 +20,7 @@ type Props = {
 export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props) {
   return (
     <nav
-      className="fixed z-40 flex items-stretch justify-around border-t border-white/[0.06] bg-[#080808]/95 backdrop-blur-xl safe-bottom max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 bottom-0"
+      className="fixed z-40 flex items-stretch justify-around border-t border-white/[0.06] bg-background/95 backdrop-blur-xl safe-bottom max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 bottom-0"
       style={{ height: "var(--mobile-nav-height, 56px)" }}
       aria-label="Mobile navigation"
     >
@@ -41,7 +41,7 @@ export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props)
             <Icon
               className={cn(
                 "h-5 w-5 transition-transform",
-                active ? "text-[#1DB954]" : "text-[#737373]"
+                active ? "text-primary" : "text-[#737373]"
               )}
               strokeWidth={active ? 2.2 : 1.7}
             />

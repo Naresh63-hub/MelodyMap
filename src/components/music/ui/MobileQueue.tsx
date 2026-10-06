@@ -43,7 +43,7 @@ export function MobileQueue({
     >
       {/* Sheet */}
       <div
-        className="relative max-h-[82vh] w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto flex flex-col rounded-t-3xl bg-[#121212] border-t border-white/10 shadow-2xl animate-slide-up"
+        className="relative max-h-[82vh] w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto flex flex-col rounded-t-3xl bg-background border-t border-white/10 shadow-2xl animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle */}
@@ -84,12 +84,12 @@ export function MobileQueue({
           {/* Now Playing */}
           {current && (
             <div className="mb-4">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#1DB954] mb-2 px-1 flex items-center gap-1.5">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#1DB954] animate-pulse" />
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-primary mb-2 px-1 flex items-center gap-1.5">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                 Now Playing
               </p>
-              <div className="flex items-center gap-3 rounded-xl bg-[#1D1D1D] border border-[#1DB954]/30 p-3 shadow-md">
-                <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[#161616]">
+              <div className="flex items-center gap-3 rounded-xl bg-popover border border-primary/30 p-3 shadow-md">
+                <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-card">
                   {current.thumbnail ? (
                     <img src={current.thumbnail} alt="" className="h-full w-full object-cover" />
                   ) : (
@@ -103,7 +103,7 @@ export function MobileQueue({
                         {[0, 1, 2].map((j) => (
                           <div
                             key={j}
-                            className="w-[2px] rounded-full bg-[#1DB954] animate-bar"
+                            className="w-[2px] rounded-full bg-primary animate-bar"
                             style={{ animationDelay: `${j * 0.15}s`, height: "100%" }}
                           />
                         ))}
@@ -115,7 +115,7 @@ export function MobileQueue({
                   <p className="truncate text-sm font-semibold text-[#F5F5F5]">{current.title}</p>
                   <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{current.artist}</p>
                 </div>
-                <Equalizer active={isPlaying} className="h-4 w-4 text-[#1DB954] shrink-0" />
+                <Equalizer active={isPlaying} className="h-4 w-4 text-primary shrink-0" />
               </div>
             </div>
           )}
@@ -171,7 +171,7 @@ export function MobileQueue({
                         <span className="w-5 text-center text-[10px] text-[#737373] tabular-nums shrink-0">
                           {realIndex + 1}
                         </span>
-                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md bg-[#161616]">
+                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md bg-card">
                           {track.thumbnail ? (
                             <img src={track.thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" />
                           ) : (

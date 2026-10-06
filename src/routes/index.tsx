@@ -238,6 +238,8 @@ function MusicApp() {
 
   // Initial feed & settings states — always empty/default on SSR to prevent hydration mismatches
   const [tab, setTab] = useState<NavTab>("foryou");
+  const [prevTab, setPrevTab] = useState<NavTab>("foryou");
+  const [tabDirection, setTabDirection] = useState<'left' | 'right'>('right');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Track[]>([]);
@@ -775,7 +777,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (triedCount < track.availableAlternatives.length) {
           const altSource = track.availableAlternatives[triedCount];
           triedAlternativesRef.current.set(track.id, triedCount + 1);
-          if (altSource && altSource.url) {
+          if (altSource && altSource.url && altSource.type !== "preview") {
             setMessage(`Switching source (${altSource.provider})...`);
             setTimeout(() => setMessage(null), 2500);
             void load(track.id, altSource.url, player.position || 0);
@@ -1943,6 +1945,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     void loadMix(mix);
   }, [tab, mix, loadMix]);
 
+  // Track tab changes for directional animations
+  useEffect(() => {
+    const tabOrder: NavTab[] = ['foryou', 'explore', 'search', 'podcasts', 'library', 'likes', 'history', 'mixes', 'languages', 'playlists'];
+    const currentIndex = tabOrder.indexOf(tab);
+    const prevIndex = tabOrder.indexOf(prevTab);
+    
+    if (currentIndex > prevIndex) {
+      setTabDirection('right');
+    } else {
+      setTabDirection('left');
+    }
+    
+    setPrevTab(tab);
+  }, [tab]);
+
 
 
   const handlePlayPodcastEpisode = useCallback(
@@ -2283,31 +2300,50 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     runStartupMigrations();
 
     const cachedFeed = readHomeCache();
-    if (cachedFeed.recs?.length) setRecs(cachedFeed.recs);
-    if (cachedFeed.trendingList?.length) setTrendingList(cachedFeed.trendingList);
-    if (cachedFeed.oldSongsList?.length) setOldSongsList(cachedFeed.oldSongsList.filter(isOldEraTrack));
-    if (cachedFeed.mixTracks) setMixTracks(cachedFeed.mixTracks);
-    if (cachedFeed.dailyMixTracks?.length) setDailyMixTracks(cachedFeed.dailyMixTracks);
+    const userLangs = settings.languages || [];
+    const filterCached = (list?: Track[]) => {
+      if (!list) return [];
+      return list.filter((t) => {
+        if (!t || !t.id) return false;
+        // Strictly eliminate 30-second Deezer preview tracks
+        if (t.source === "deezer" || t.id.startsWith("deezer:")) return false;
+        // Strictly enforce language consistency if user has selected languages
+        if (userLangs.length > 0 && !isLanguageConsistent(t, userLangs)) return false;
+        return true;
+      });
+    };
 
-    // Auto-refresh recommendations on startup ONLY if the local feed cache is empty.
-    // If the user already has cached picks, show them instantly without network delay or flashing.
-    const hasCachedFeed =
-      (cachedFeed.recs && cachedFeed.recs.length > 0) ||
-      (cachedFeed.trendingList && cachedFeed.trendingList.length > 0) ||
-      (cachedFeed.oldSongsList && cachedFeed.oldSongsList.length > 0);
-    // Cached feeds restored for instant paint count as "previously displayed" for
-    // this session, so a refresh never re-serves them.
+    const cleanRecs = filterCached(cachedFeed.recs);
+    const cleanTrending = filterCached(cachedFeed.trendingList);
+    const cleanOldSongs = filterCached(cachedFeed.oldSongsList?.filter(isOldEraTrack));
+    const cleanDailyMix = filterCached(cachedFeed.dailyMixTracks);
+    const cleanMixTracks = cachedFeed.mixTracks
+      ? {
+          discover: filterCached(cachedFeed.mixTracks.discover),
+          newrelease: filterCached(cachedFeed.mixTracks.newrelease),
+          explore: filterCached(cachedFeed.mixTracks.explore),
+        }
+      : undefined;
+
+    if (cleanRecs.length) setRecs(cleanRecs);
+    if (cleanTrending.length) setTrendingList(cleanTrending);
+    if (cleanOldSongs.length) setOldSongsList(cleanOldSongs);
+    if (cleanMixTracks) setMixTracks(cleanMixTracks);
+    if (cleanDailyMix.length) setDailyMixTracks(cleanDailyMix);
+
+    // Auto-refresh recommendations on startup if cached feed is empty or lacks clean tracks matching user languages
+    const hasCachedFeed = cleanRecs.length >= 6 && cleanTrending.length >= 6;
     markFeedDisplayed([
-      ...(cachedFeed.recs || []),
-      ...(cachedFeed.trendingList || []),
-      ...((cachedFeed.oldSongsList || []).filter(isOldEraTrack)),
-      ...(cachedFeed.dailyMixTracks || []),
-      ...Object.values(cachedFeed.mixTracks || {}).flat(),
+      ...cleanRecs,
+      ...cleanTrending,
+      ...cleanOldSongs,
+      ...cleanDailyMix,
+      ...Object.values(cleanMixTracks || {}).flat(),
     ]);
     if (!hasCachedFeed) {
       void loadRecommendations();
     }
-  }, [hydrated, loadRecommendations, markFeedDisplayed]);
+  }, [hydrated, loadRecommendations, markFeedDisplayed, settings.languages]);
 
   // Reload recommendations ONLY when language preferences actually change in settings
   const prevLanguagesRef = useRef<string | null>(null);
@@ -2412,7 +2448,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, []);
 
   return (
-    <div className="flex flex-col h-dvh bg-[#080808] text-foreground selection:bg-[#1DB954]/20 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-white/[0.04]">
+    <div className="flex flex-col h-dvh bg-background text-foreground selection:bg-primary/20 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-white/[0.04]">
       {/* Slide-out Mobile Sidebar Drawer */}
       <MobileDrawer
         open={drawerOpen}
@@ -2424,6 +2460,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           setShowSettings(true);
         }}
         isSynced={!!auth.userId}
+        isPlaying={player.isPlaying}
         userName={
           auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
             ? auth.profile.display_name
@@ -2452,7 +2489,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       />
 
       {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#080808]">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
         {/* Mobile header — on all non-search tabs */}
         {tab !== "search" && (
           <MobileHeader
@@ -2474,7 +2511,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
         {/* Mobile search bar — on search tab */}
         {tab === "search" && (
-          <div className="sticky top-0 z-20 bg-[#0f0f0f]/90 backdrop-blur-xl border-b border-white/[0.05]">
+          <div className="sticky top-0 z-20 bg-[#0f0f0f]/90 backdrop-blur-xl border-b border-white/[0.05] header-safe-top">
             <div className="flex items-center gap-2 px-4 py-3">
               <button
                 type="button"
@@ -2500,7 +2537,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   />
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     {searching ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-[#1DB954]" />
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     ) : query ? (
                       <button
                         type="button"
@@ -2539,7 +2576,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   className="flex h-10 px-3.5 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-medium text-white/90 active:scale-95 transition-all"
                 >
                   {searching ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#1DB954]" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                   ) : (
                     <Search className="h-3.5 w-3.5 text-white/70" />
                   )}
@@ -2597,8 +2634,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           <ErrorBoundary>
             <div className="relative w-full px-4 py-5 sm:px-6 pb-32">
               {message && (
-                <div className="pointer-events-auto fixed bottom-28 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center gap-3 rounded-full border border-white/10 bg-[#181818]/95 px-5 py-2.5 shadow-2xl backdrop-blur-md">
+                <div className="pointer-events-auto fixed bottom-36 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center gap-3 rounded-full border border-white/10 bg-card/95 px-5 py-2.5 shadow-2xl backdrop-blur-md">
                     <p className="text-xs font-medium text-white/90">
                       {message}
                     </p>
@@ -2606,7 +2643,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       <button
                         type="button"
                         onClick={handleUndo}
-                        className="text-xs font-semibold text-[#1DB954] hover:underline transition-colors"
+                        className="text-xs font-semibold text-primary hover:underline transition-colors"
                       >
                         {undoLabel}
                       </button>
@@ -2617,12 +2654,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
               {/* FOR YOU TAB */}
               {tab === "foryou" && (
-                <div className="space-y-6">
+                <div className={cn("space-y-6", tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
                   {/* Greeting & Moods */}
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                       <h1 suppressHydrationWarning className="text-xl sm:text-2xl font-semibold tracking-tight text-white/95">
-                        Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {auth.profile?.display_name?.split(" ")[0] || "Listener"}
+                        Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, <span className="text-animated-gradient">{auth.profile?.display_name?.split(" ")[0] || "Listener"}</span>
                       </h1>
                       <p className="text-xs text-neutral-400 font-normal mt-0.5">Recommended based on your recent listening</p>
                     </div>
@@ -2631,7 +2668,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="rounded-full bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] hover:text-white border-white/[0.08] text-xs font-normal"
+                        className="rounded-full bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] hover:text-white border-white/[0.08] text-xs font-normal button-modern-hover"
                         onClick={() => void loadRecommendations()}
                         disabled={recLoading}
                       >
@@ -2649,7 +2686,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         type="button"
                         onClick={() => void loadRecommendations(mood)}
                         disabled={recLoading}
-                        className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.03] px-3.5 py-1 text-xs font-normal text-neutral-300 transition-all hover:bg-white/[0.08] hover:text-white active:scale-95"
+                        className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.03] px-3.5 py-1 text-xs font-normal text-neutral-300 transition-all hover:bg-white/[0.08] hover:text-white active:scale-95 chip-bounce"
                       >
                         {mood}
                       </button>
@@ -2701,7 +2738,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       disabled={loadingMoreRecs}
                       className="rounded-full border-white/10 bg-white/[0.04] px-5 py-2 text-xs font-normal text-neutral-300 hover:bg-white/[0.08] hover:text-white transition-all shadow-md"
                     >
-                      {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-[#1DB954]" /> : null}
+                      {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" /> : null}
                       Explore more songs
                     </Button>
                   </div>
@@ -2711,7 +2748,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
             {/* EXPLORE TAB */}
             {tab === "explore" && (
-              <div className="space-y-5 pt-1 animate-fade-in">
+              <div className={cn("space-y-5 pt-1", tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
                 <div className="flex items-center justify-between pb-1">
                   <div>
                     <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white/95">
@@ -2759,7 +2796,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
             {/* SEARCH TAB */}
             {tab === "search" && (
-              <SearchResults
+              <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
+                <SearchResults
                 results={results}
                 loading={searching}
                 query={query}
@@ -2803,11 +2841,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 loadingMore={loadingMoreSearch}
                 onLoadMore={() => void loadMoreResults()}
               />
+              </div>
             )}
 
             {/* MIXES TAB */}
             {tab === "mixes" && (
-              <MixesPanel
+              <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
+                <MixesPanel
                 active={mix}
                 tracks={visibleMix}
                 loading={mixLoading}
@@ -2844,11 +2884,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   setCreatePlaylistTrack(track);
                 }}
               />
+              </div>
             )}
 
             {/* PODCASTS TAB */}
             {tab === "podcasts" && (
-              <PodcastsPanel
+              <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
+                <PodcastsPanel
                 currentTrackId={current?.id}
                 isPlaying={player.isPlaying}
                 onPlayEpisode={handlePlayPodcastEpisode}
@@ -2860,11 +2902,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 userLanguages={settings.languages}
                 onOpenSettings={() => setShowSettings(true)}
               />
+              </div>
             )}
 
             {/* PLAYLISTS TAB */}
             {tab === "playlists" && (
-              <PlaylistsPanel
+              <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
+                <PlaylistsPanel
                 playlists={playlists}
                 currentId={current?.id}
                 isPlaying={player.isPlaying}
@@ -2878,11 +2922,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onReorder={reorderPlaylist}
                 onPlay={(tracks, i) => startQueue(tracks, i)}
               />
+              </div>
             )}
 
             {/* LANGUAGES TAB */}
             {tab === "languages" && (
-              <LanguagesPanel
+              <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
+                <LanguagesPanel
                 settings={settings}
                 onChangeSettings={updateSettings}
                 onPlay={(tracks, i) => startQueue(tracks, i)}
@@ -2904,11 +2950,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onDownload={(track) => void handleDownload(track)}
                 onRemoveDownload={(track) => void handleRemoveDownload(track)}
               />
+              </div>
             )}
 
             {/* MOBILE LIBRARY TAB */}
             {tab === "library" && (
-              <MobileLibrary
+              <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
+                <MobileLibrary
                 likes={likes}
                 history={history}
                 playlists={playlists}
@@ -2929,11 +2977,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   startQueue(tracks, i);
                 }}
               />
+              </div>
             )}
 
             {/* FAVOURITES / HISTORY TABS (TrackList) */}
             {(tab === "likes" || tab === "history") && (
-              <div className="space-y-4">
+              <div className={cn("space-y-4", tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-white">
