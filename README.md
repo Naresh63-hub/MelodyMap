@@ -11,11 +11,11 @@
   </p>
 
   <p>
-    <a href="https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.2">
-      <img src="https://img.shields.io/badge/Release-v1.0.2-1DB954?style=flat-square&logo=android" alt="Release v1.0.2" />
+    <a href="https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.4">
+      <img src="https://img.shields.io/badge/Release-v1.0.4-1DB954?style=flat-square&logo=android" alt="Release v1.0.4" />
     </a>
     <img src="https://img.shields.io/badge/CI-Passing-brightgreen?style=flat-square&logo=githubactions" alt="CI Passing" />
-    <img src="https://img.shields.io/badge/Unit_Tests-218_Passed-brightgreen?style=flat-square&logo=vitest" alt="Vitest 218 Passed" />
+    <img src="https://img.shields.io/badge/Unit_Tests-291_Passed-brightgreen?style=flat-square&logo=vitest" alt="Vitest 291 Passed" />
     <img src="https://img.shields.io/badge/E2E_Tests-6_Passed-brightgreen?style=flat-square&logo=playwright" alt="Playwright E2E 6 Passed" />
     <img src="https://img.shields.io/badge/CodeQL-0_Alerts-brightgreen?style=flat-square&logo=github" alt="CodeQL Clean" />
     <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square&logo=react" alt="React 19" />
@@ -303,17 +303,17 @@ apksigner verify --verbose --print-certs release\MelodyMap-v1.0.1.apk
 ```
 
 ### Verified Release Artifact
-
-- **GitHub Release Page**: [MelodyMap v1.0.2 Release](https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.2)
-- **Direct APK Download**: [Download MelodyMap-v1.0.2.apk](https://github.com/Naresh63-hub/MelodyMap/releases/download/v1.0.2/MelodyMap-v1.0.2.apk)
-- **Local Location**: `release/MelodyMap-v1.0.2.apk`
-- **File Size**: `11,122,194 bytes` (~10.61 MB)
+ 
+- **GitHub Release Page**: [MelodyMap v1.0.4 Release](https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.4)
+- **Direct APK Download**: [Download MelodyMap-v1.0.4.apk](https://github.com/Naresh63-hub/MelodyMap/releases/download/v1.0.4/MelodyMap-v1.0.4.apk)
+- **Local Location**: `release/MelodyMap-v1.0.4.apk`
+- **File Size**: `11,880,996 bytes` (~11.88 MB)
 - **Application ID**: `com.melodymap.music`
-- **Version Code**: `3`
-- **Version Name**: `1.0.2`
+- **Version Code**: `5`
+- **Version Name**: `1.0.4`
 - **Target SDK**: `36` (Android 16) | **Min SDK**: `24` (Android 7.0 Nougat+)
 - **Signature Scheme**: APK Signature Scheme v2 (Verified)
-- **SHA-256**: `BED88686F00C43C6A865D4A0B0D7E0FADCC802D2E7F74CB7A3A37448D6F20351`
+- **SHA-256**: `686A895239DCA584E9D6C33CD1D67DA5CB15206DAC2B4E946E3FD050FC08BB47`
 - **Certificate Digest (SHA-256)**: `1e16d14e27191bba677c29b39b4f7772152547a795841aa74cd06613f54bb085`
 
 ---
