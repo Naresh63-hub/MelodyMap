@@ -11,10 +11,9 @@ export type StreamQualityParam = "saver" | "standard" | "high";
 /**
  * Validate that the upstream URL is a legitimate media endpoint.
  *
- * Google/YouTube hosts cover the primary resolver; dzcdn.net covers the
- * Deezer 30s-preview fallback; audius.co covers the full-length Audius
- * fallback (its discovery/creator nodes serve authorized artist streams
- * and are already an integrated playback provider in the app).
+ * Google/YouTube hosts cover the primary resolver; audius.co covers the
+ * full-length Audius fallback; jamendo.com/jamendo.net covers the full-length
+ * Jamendo fallback. 30s Deezer previews are disallowed.
  */
 export function isAllowedUpstreamUrl(urlStr: string): boolean {
   try {
@@ -25,12 +24,14 @@ export function isAllowedUpstreamUrl(urlStr: string): boolean {
       host.endsWith(".googlevideo.com") ||
       host.endsWith(".youtube.com") ||
       host.endsWith(".ytimg.com") ||
-      host.endsWith(".dzcdn.net") ||
       host.endsWith(".audius.co") ||
+      host.endsWith(".jamendo.com") ||
+      host.endsWith(".jamendo.net") ||
       host === "googlevideo.com" ||
       host === "youtube.com" ||
-      host === "dzcdn.net" ||
-      host === "audius.co"
+      host === "audius.co" ||
+      host === "jamendo.com" ||
+      host === "jamendo.net"
     );
   } catch {
     return false;
@@ -137,7 +138,7 @@ export type UpstreamAudioResult =
       upstream: Response;
       mimeType: string;
       /** Which resolver produced the stream, surfaced as X-MelodyMap-Source. */
-      source?: "youtube" | "audius" | "deezer" | undefined;
+      source?: "youtube" | "audius" | "jamendo" | undefined;
     }
   | { ok: false; status: number; message: string };
 

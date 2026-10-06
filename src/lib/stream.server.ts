@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import { createLruCache } from "./lru-cache";
 import { searchAudius } from "./providers/audius";
+import { searchJamendo } from "./providers/jamendo";
 
 export type StreamQuality = "saver" | "standard" | "high";
 
@@ -19,7 +20,7 @@ export type StreamMeta = {
   contentLength: number | null;
   audioBitrate: number | null;
   /** Which resolver produced this stream ("youtube" is the implicit default). */
-  source?: "youtube" | "audius" | "deezer";
+  source?: "youtube" | "audius" | "jamendo";
 };
 
 // ─── Audius match scoring ────────────────────────────────────────────
@@ -447,9 +448,8 @@ export async function resolveWithInnerTubePlayer(
   }
 
   // Fallback 2: Audius full-length match — YouTube is frequently bot-blocked
-  // from serverless IPs (LOGIN_REQUIRED), which previously dropped every such
-  // track to the 30-second Deezer preview below. A full-length replacement
-  // stream from Audius keeps songs playing past 0:30 when YouTube refuses.
+  // from serverless IPs (LOGIN_REQUIRED). A full-length replacement
+  // stream keeps songs playing uninterrupted when YouTube refuses.
   try {
     const oembedRes = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
@@ -504,7 +504,7 @@ export async function resolveWithInnerTubePlayer(
     console.warn(`[stream] Audius full-length fallback notice for ${videoId}:`, audiusErr);
   }
 
-  // Fallback 3 (last resort): 30-second catalog preview via Deezer
+  // Fallback 3: Jamendo full-length Creative Commons / independent licensed stream
   try {
     const oembedRes = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
@@ -515,37 +515,52 @@ export async function resolveWithInnerTubePlayer(
       const cleanTitle = cleanTrackTitle(oembed?.title || "");
       const rawTitle = (oembed?.title || "").replace(/\[.*?\]|\(.*?\)|\|.*/g, "").trim();
       const rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
-      const queriesToTry = [cleanTitle, rawTitle, `${cleanTitle} ${rawAuthor}`.trim()].filter(
+      const queriesToTry = [`${cleanTitle} ${rawAuthor}`.trim(), cleanTitle].filter(
         (q): q is string => Boolean(q && q.length > 0),
       );
 
       for (const q of queriesToTry) {
-        const deezerRes = await fetch(
-          `https://api.deezer.com/search?q=${encodeURIComponent(q)}`,
-          { headers: { "User-Agent": BROWSER_UA } },
-        );
-        if (deezerRes.ok) {
-          const dzData = (await deezerRes.json()) as any;
-          const match = dzData?.data?.find((d: any) => Boolean(d.preview)) || dzData?.data?.[0];
-          if (match?.preview) {
-            const probeOk = await probeStream(match.preview);
-            if (probeOk) {
+        const jamendoMatches = await searchJamendo(q, { limit: 10 }).catch(() => []);
+        if (jamendoMatches.length === 0) continue;
+        const innerTubeDuration = lastSeenDurations.get(videoId);
+        const targetDuration =
+          innerTubeDuration && innerTubeDuration > 0
+            ? innerTubeDuration
+            : typeof oembed?.duration === "number"
+              ? oembed.duration
+              : null;
+        const target = { title: cleanTitle, artist: rawAuthor, durationSeconds: targetDuration };
+        let best: (typeof jamendoMatches)[number] | null = null;
+        let bestScore = 0;
+        for (const candidate of jamendoMatches) {
+          const s = scoreAudiusCandidate(candidate, target);
+          if (s > bestScore) {
+            best = candidate;
+            bestScore = s;
+          }
+        }
+        if (best && bestScore >= AUDIUS_MIN_SCORE) {
+          const jamendoStreamUrl = best.playbackSource?.url;
+          // Verify bytes actually flow before the URL is cached for 25 minutes —
+          // a dead match must fall through to the next query, not fail mid-play.
+          if (jamendoStreamUrl && (await probeStream(jamendoStreamUrl))) {
             return {
-              url: match.preview,
-              mimeType: "audio/mp4",
+              url: jamendoStreamUrl,
+              mimeType: "audio/mpeg",
               contentLength: null,
-              audioBitrate: 128000,
-              source: "deezer",
+              audioBitrate: 192000,
+              source: "jamendo",
             };
-            }
           }
         }
       }
     }
-  } catch (fallbackErr) {
-    console.warn(`[stream] Catalog preview fallback notice for ${videoId}:`, fallbackErr);
+  } catch (jamendoErr) {
+    console.warn(`[stream] Jamendo full-length fallback notice for ${videoId}:`, jamendoErr);
   }
 
+  // Strictly return null if no authorized full-length audio stream is found.
+  // 30-second Deezer previews are completely eliminated to ensure full-length playback only.
   return null;
 }
 

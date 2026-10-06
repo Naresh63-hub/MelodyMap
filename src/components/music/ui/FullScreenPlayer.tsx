@@ -64,7 +64,7 @@ type Props = {
   canNext: boolean;
   canPrevious: boolean;
   isReplacementSource?: boolean;
-  streamSource?: "youtube" | "audius" | "deezer" | null;
+  streamSource?: "youtube" | "audius" | "jamendo" | null;
 };
 
 const SPEEDS = [1, 1.25, 1.5, 2];

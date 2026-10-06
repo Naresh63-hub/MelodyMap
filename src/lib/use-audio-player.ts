@@ -111,7 +111,7 @@ export function useAudioPlayer(options: {
 
     fetch(url, { method: "HEAD", signal: controller.signal })
       .then((res) => {
-        const src = res.headers.get("X-MelodyMap-Source") as "youtube" | "audius" | "deezer" | null;
+        const src = res.headers.get("X-MelodyMap-Source") as "youtube" | "audius" | "jamendo" | null;
         if (src) setStreamSource(src);
       })
       .catch(() => {/* probe failed; no indicator shown */});
@@ -213,7 +213,7 @@ export function useAudioPlayer(options: {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [streamSource, setStreamSource] = useState<"youtube" | "audius" | "deezer" | null>(null);
+  const [streamSource, setStreamSource] = useState<"youtube" | "audius" | "jamendo" | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
     try {

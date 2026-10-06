@@ -5,7 +5,7 @@
  * Catalog tracks (plain YouTube IDs) advertise a `previewUrl` from metadata
  * enrichment — a Deezer 30-SECOND SAMPLE. Playing that URL directly bypasses
  * the stream proxy entirely, so the server-side full-length fallback chain
- * (YouTube → Audius full track → Deezer preview) never runs. That is why
+ * (YouTube → Audius full track → Jamendo full track) never runs. That is why
  * songs used to cut off at 0:30 even after the server fallback shipped.
  *
  * Policy:
