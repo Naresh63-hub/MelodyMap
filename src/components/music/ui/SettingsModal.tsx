@@ -269,41 +269,41 @@ export function SettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border-white/10 bg-[#0c0a15]/95 p-0 text-white backdrop-blur-3xl shadow-2xl rounded-3xl scrollbar-hide">
+      <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-border bg-popover/95 p-0 text-foreground backdrop-blur-xl shadow-overlay rounded-2xl scrollbar-hide">
         {/* Header - Native App Style */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.08] bg-[#0c0a15]/90 px-6 py-4 backdrop-blur-2xl">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-popover/90 px-6 py-4 backdrop-blur-xl">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 shadow-lg shadow-purple-500/20">
-              <Sliders className="h-4 w-4 text-white" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
+              <Sliders className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-base font-bold text-white tracking-tight">Settings &amp; Profile</DialogTitle>
-              <p className="text-[11px] text-purple-200/50">Personalize identity, recommendations, audio &amp; cloud sync</p>
+              <DialogTitle className="text-base font-semibold text-foreground tracking-[-0.01em]">Settings &amp; Profile</DialogTitle>
+              <p className="text-[11px] text-muted-foreground">Personalize identity, recommendations, audio &amp; cloud sync</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => onOpenChange(false)}
             aria-label="Close Settings"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.04] text-white/50 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-hover text-muted-foreground hover:bg-surface-hover-strong hover:text-foreground transition-all cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Section Navigation Pills */}
-        <div className="flex border-b border-white/[0.06] bg-white/[0.02] px-6 py-2.5 gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex border-b border-border bg-card px-6 py-2.5 gap-2 overflow-x-auto scrollbar-hide">
           <button
             type="button"
             onClick={() => setActiveSection("account")}
             className={cn(
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "account"
-                ? "bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-white border border-purple-500/30 shadow-sm"
+              ? "bg-primary/15 text-primary border border-primary/30"
                 : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
             )}
           >
-            <User className="h-3.5 w-3.5 text-pink-400" />
+            <User className="h-3.5 w-3.5 text-primary" />
             Profile &amp; Account
           </button>
           <button
@@ -312,11 +312,11 @@ export function SettingsModal({
             className={cn(
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "languages"
-                ? "bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-white border border-purple-500/30 shadow-sm"
+              ? "bg-primary/15 text-primary border border-primary/30"
                 : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
             )}
           >
-            <Globe2 className="h-3.5 w-3.5 text-cyan-400" />
+            <Globe2 className="h-3.5 w-3.5 text-primary" />
             Languages &amp; Artists
           </button>
           <button
@@ -325,11 +325,11 @@ export function SettingsModal({
             className={cn(
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "picks"
-                ? "bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-white border border-purple-500/30 shadow-sm"
+              ? "bg-primary/15 text-primary border border-primary/30"
                 : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
             )}
           >
-            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
             AI Taste Picks
           </button>
           <button
@@ -338,11 +338,11 @@ export function SettingsModal({
             className={cn(
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "playback"
-                ? "bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-white border border-purple-500/30 shadow-sm"
+              ? "bg-primary/15 text-primary border border-primary/30"
                 : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
             )}
           >
-            <Volume2 className="h-3.5 w-3.5 text-purple-400" />
+            <Volume2 className="h-3.5 w-3.5 text-primary" />
             Playback &amp; Hardware
           </button>
           <button
@@ -351,11 +351,11 @@ export function SettingsModal({
             className={cn(
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "insights"
-                ? "bg-gradient-to-r from-pink-500/20 to-purple-500/20 text-white border border-purple-500/30 shadow-sm"
+              ? "bg-primary/15 text-primary border border-primary/30"
                 : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
             )}
           >
-            <Activity className="h-3.5 w-3.5 text-emerald-400" />
+            <Activity className="h-3.5 w-3.5 text-primary" />
             Listening Insights
           </button>
         </div>
@@ -366,11 +366,11 @@ export function SettingsModal({
           {activeSection === "account" && (
             <div className="space-y-5">
               {/* Profile Card */}
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6 space-y-5 shadow-lg backdrop-blur-md">
+              <div className="rounded-xl border border-border bg-card p-5 sm:p-6 space-y-5">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
-                  {/* Glowing Avatar with Edit Overlay */}
+                  {/* Avatar with Edit Overlay */}
                   <div className="relative group shrink-0">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 via-purple-600 to-indigo-600 text-2xl font-bold text-white shadow-xl shadow-purple-500/25 ring-4 ring-white/10 overflow-hidden">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 text-2xl font-semibold text-primary ring-1 ring-border overflow-hidden">
                       {safeAvatarUrl ? (
                         <img
                           src={safeAvatarUrl}
@@ -387,7 +387,7 @@ export function SettingsModal({
                       type="button"
                       onClick={() => setIsEditingAvatar((v) => !v)}
                       aria-label="Change avatar"
-                      className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-purple-600 text-white shadow-md hover:bg-purple-500 transition-colors cursor-pointer ring-2 ring-[#0c0a15]"
+                      className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer ring-2 ring-card"
                     >
                       <Camera className="h-3.5 w-3.5" />
                     </button>
@@ -396,7 +396,7 @@ export function SettingsModal({
                   {/* Profile Details & Inline Name Edit */}
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-purple-300 uppercase tracking-wider">
+                      <span className="text-xs font-medium text-primary uppercase tracking-[0.06em]">
                         {userId ? "MelodyMap Listener" : "Guest Listener"}
                       </span>
                       <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
@@ -416,13 +416,13 @@ export function SettingsModal({
                           onChange={(e) => setDisplayName(e.target.value)}
                           maxLength={50}
                           placeholder="Your display name"
-                          className="h-9 rounded-xl border-white/10 bg-white/[0.04] px-3 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                          className="h-9 rounded-lg border-border bg-surface-hover px-3 text-xs text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
                         />
                         <Button
                           size="sm"
                           disabled={profileSaving}
                           onClick={handleSaveProfile}
-                          className="h-9 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-xs font-semibold text-white hover:brightness-110 shadow-md shrink-0 cursor-pointer"
+                          className="h-9 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 shrink-0 cursor-pointer"
                         >
                           {profileSaving ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -466,8 +466,8 @@ export function SettingsModal({
                           className={cn(
                             "flex flex-col items-center gap-1.5 rounded-xl p-2 border transition-all cursor-pointer",
                             avatarUrl === p.url
-                              ? "border-purple-500 bg-purple-500/20 shadow-md ring-2 ring-purple-500/30"
-                              : "border-white/5 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.05]"
+                              ? "border-primary bg-primary/15 ring-2 ring-primary/30"
+                              : "border-border bg-surface-hover hover:border-white/20 hover:bg-surface-hover-strong"
                           )}
                         >
                           <img

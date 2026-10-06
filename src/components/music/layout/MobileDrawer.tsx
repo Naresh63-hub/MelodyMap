@@ -81,24 +81,24 @@ export function MobileDrawer({
       />
 
       {/* Drawer panel */}
-      <div className="relative flex w-4/5 max-w-xs flex-1 flex-col bg-[#121212] border-r border-white/10 shadow-2xl z-10 animate-slide-in">
+      <div className="relative flex w-4/5 max-w-xs flex-1 flex-col bg-card border-r border-border shadow-overlay z-10 animate-slide-in">
         {/* Header with guaranteed clearance below Android status bar and camera cutouts */}
-        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-white/10">
+        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-border">
           <div className="flex items-center gap-2.5">
             <img
               src="/brand/app-icon.png"
               alt="MelodyMap"
-              className="h-8 w-8 rounded-lg object-cover shadow-sm"
+              className="h-8 w-8 rounded-lg object-cover"
             />
-            <span className="font-display text-base font-bold">
-              <span className="text-white">Melody</span>
+            <span className="font-display text-base font-semibold">
+              <span className="text-foreground">Melody</span>
               <span className="text-[#1DB954]">Map</span>
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-hover-strong hover:text-foreground transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -116,7 +116,7 @@ export function MobileDrawer({
                   onSignIn();
                 }
               }}
-              className="flex items-center justify-between gap-3 px-5 py-3.5 bg-white/[0.03] hover:bg-white/[0.07] active:bg-white/[0.1] border-b border-white/[0.06] cursor-pointer transition-colors"
+              className="flex items-center justify-between gap-3 px-5 py-3.5 bg-surface-hover hover:bg-surface-hover-strong active:bg-surface-hover-strong border-b border-border cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 {userAvatar ? (
@@ -126,7 +126,7 @@ export function MobileDrawer({
                     className="h-9 w-9 rounded-full object-cover border border-[#1DB954]/40"
                   />
                 ) : (
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#1DB954]/25 to-white/10 text-white font-bold text-xs border border-[#1DB954]/30 shadow-sm">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary font-semibold text-xs border border-primary/25">
                     {displayInitial}
                   </div>
                 )}

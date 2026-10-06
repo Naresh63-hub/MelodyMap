@@ -54,7 +54,7 @@ export function SongOptionsModal({
       />
 
       {/* Modal Sheet */}
-      <div className="relative w-full max-w-lg rounded-t-3xl bg-[#101010] border-t border-white/[0.06] p-5 shadow-2xl z-10 animate-slide-up">
+      <div className="relative w-full max-w-lg rounded-t-2xl bg-card border-t border-border p-5 shadow-overlay z-10 animate-slide-up">
         {/* Grab bar */}
         <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-white/20" />
 

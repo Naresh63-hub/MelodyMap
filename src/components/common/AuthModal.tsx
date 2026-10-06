@@ -238,7 +238,7 @@ export function AuthModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-[#121212] border-white/10 text-white p-6 shadow-2xl rounded-2xl">
+      <DialogContent className="sm:max-w-md bg-popover border border-border text-foreground p-6 shadow-overlay rounded-2xl">
         <DialogHeader className="space-y-1.5 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1DB954]/20 to-[#1DB954]/5 border border-[#1DB954]/30 mb-1">
             {mode === "profile" ? (
@@ -247,7 +247,7 @@ export function AuthModal({
               <Sparkles className="h-6 w-6 text-[#1DB954]" />
             )}
           </div>
-          <DialogTitle className="text-xl font-semibold tracking-tight">
+          <DialogTitle className="text-xl font-semibold tracking-[-0.01em]">
             {mode === "signin" && "Sign In to MelodyMap"}
             {mode === "signup" && "Create MelodyMap Account"}
             {mode === "profile" && "Account Profile"}

@@ -57,7 +57,7 @@ export function MiniPlayer({
 
   return (
     <div
-      className="fixed z-40 border-t border-white/[0.06] bg-[#101010]/95 backdrop-blur-xl shadow-xl max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between"
+      className="fixed z-40 border-t border-border bg-surface/95 backdrop-blur-xl shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
       {/* 2px Hairline Progress Indicator at Top */}
@@ -86,7 +86,7 @@ export function MiniPlayer({
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
           aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
-          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-[#181818] border border-white/[0.06]">
+          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-card border border-border">
             {track?.thumbnail ? (
               <img
                 src={track.thumbnail}
@@ -94,7 +94,7 @@ export function MiniPlayer({
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[#181818]" />
+              <div className="flex h-full w-full items-center justify-center bg-card" />
             )}
           </div>
 

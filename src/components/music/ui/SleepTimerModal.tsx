@@ -102,17 +102,17 @@ export function SleepTimerModal({
 
       {/* Modal Dialog */}
       <div
-        className="relative w-full max-w-sm rounded-3xl bg-[#121212] border border-white/10 p-6 shadow-2xl z-10 animate-scale-in text-center select-none"
+        className="relative w-full max-w-sm rounded-2xl bg-popover border border-border p-6 shadow-overlay z-10 animate-scale-in text-center select-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1DB954]/15 text-[#1DB954]">
               <Moon className="h-4 w-4" />
             </div>
             <div className="text-left">
-              <h2 className="text-sm font-bold text-[#F5F5F5] leading-tight">Sleep Timer</h2>
+              <h2 className="text-sm font-semibold text-[#F5F5F5] leading-tight">Sleep Timer</h2>
               <p className="text-[11px] text-[#737373] leading-none mt-0.5">
                 {isActive
                   ? "Active • Automatically stops playback"
@@ -125,7 +125,7 @@ export function SleepTimerModal({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-surface-hover-strong hover:text-foreground transition-colors"
             aria-label="Close sleep timer"
           >
             <X className="h-4 w-4" />
@@ -136,7 +136,7 @@ export function SleepTimerModal({
         <div className="my-5 relative flex flex-col items-center justify-center">
           <div
             className={cn(
-              "relative flex h-40 w-40 items-center justify-center rounded-full border-2 transition-all bg-[#181818]",
+              "relative flex h-40 w-40 items-center justify-center rounded-full border-2 transition-all bg-card",
               isActive
                 ? "border-[#1DB954] shadow-[0_0_24px_rgba(29,185,84,0.2)]"
                 : isExpired
@@ -169,7 +169,7 @@ export function SleepTimerModal({
         {/* Preset Chips */}
         <div className="space-y-2 mb-5">
           <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-semibold text-[#737373] uppercase tracking-wider">
+            <span className="text-[11px] font-medium text-[#737373] uppercase tracking-[0.06em]">
               {isActive ? "Change Duration" : "Select Duration"}
             </span>
             <button
@@ -198,7 +198,7 @@ export function SleepTimerModal({
                       "rounded-xl border py-2 px-1 text-xs font-semibold transition-all text-center",
                       isSelected
                         ? "border-[#1DB954] bg-[#1DB954]/15 text-[#1DB954] shadow-sm"
-                        : "border-white/[0.06] bg-white/[0.03] text-[#A1A1A1] hover:bg-white/[0.06] hover:text-[#F5F5F5]"
+                        : "border-border bg-surface-hover text-[#A1A1A1] hover:bg-surface-hover-strong hover:text-[#F5F5F5]"
                     )}
                   >
                     {p.label}
@@ -207,7 +207,7 @@ export function SleepTimerModal({
               })}
             </div>
           ) : (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 text-left">
+            <div className="rounded-xl border border-border bg-surface-hover p-3 text-left">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-[#A1A1A1]">Minutes:</span>
                 <span className="text-sm font-bold text-[#1DB954] tabular-nums">

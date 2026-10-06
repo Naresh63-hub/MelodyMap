@@ -58,17 +58,17 @@ export function EqualizerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md sm:max-w-lg md:max-w-xl bg-[#0f0b1d]/95 backdrop-blur-2xl border-purple-500/20 text-white p-5 sm:p-6 rounded-3xl shadow-2xl shadow-purple-950/80 max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="flex flex-row items-center justify-between pb-3 border-b border-white/10">
+      <DialogContent className="max-w-md sm:max-w-lg md:max-w-xl bg-popover/95 backdrop-blur-xl border border-border text-foreground p-6 sm:p-7 rounded-2xl shadow-overlay max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="flex flex-row items-center justify-between pb-3 border-b border-border">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 shadow-inner">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
               <Sliders className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-base sm:text-lg font-bold text-white tracking-tight">
+              <DialogTitle className="text-base sm:text-lg font-semibold text-foreground tracking-[-0.01em]">
                 Audio FX & Equalizer
               </DialogTitle>
-              <p className="text-[11px] text-purple-300/60 font-medium">10-Band EQ, Bass Boost & Crossfade</p>
+              <p className="text-[11px] text-muted-foreground font-medium">10-Band EQ, Bass Boost & Crossfade</p>
             </div>
           </div>
 
@@ -77,10 +77,10 @@ export function EqualizerModal({
               type="button"
               onClick={() => onToggleEnabled()}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
                 settings.enabled
-                  ? "bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm shadow-purple-500/20"
-                  : "bg-white/[0.04] text-white/40 border-white/10 hover:text-white/70"
+                  ? "bg-primary/15 text-primary border-primary/30"
+                  : "bg-surface-hover text-muted-foreground border-border hover:text-foreground"
               )}
             >
               <Power className="h-3.5 w-3.5" />
@@ -90,13 +90,13 @@ export function EqualizerModal({
         </DialogHeader>
 
         {/* Tab switcher */}
-        <div className="flex gap-2 my-2 p-1 bg-white/[0.03] rounded-2xl border border-white/5">
+        <div className="flex gap-2 my-2 p-1 bg-surface-hover rounded-xl border border-border">
           <button
             type="button"
             onClick={() => setTab("eq")}
             className={cn(
-              "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5",
-              tab === "eq" ? "bg-purple-600 text-white shadow-md" : "text-white/50 hover:text-white"
+              "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+              tab === "eq" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <Waves className="h-3.5 w-3.5" />
@@ -106,8 +106,8 @@ export function EqualizerModal({
             type="button"
             onClick={() => setTab("fx")}
             className={cn(
-              "flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5",
-              tab === "fx" ? "bg-purple-600 text-white shadow-md" : "text-white/50 hover:text-white"
+              "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+              tab === "fx" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -120,9 +120,9 @@ export function EqualizerModal({
             {/* Presets Horizontal Carousel */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-white/70 uppercase tracking-wider">Presets</span>
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-[0.06em]">Presets</span>
                 {settings.preset === "custom" && (
-                  <span className="text-[10px] text-purple-400 font-semibold uppercase bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20">
+                  <span className="text-[10px] text-primary font-medium uppercase bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
                     Custom Tuning
                   </span>
                 )}
@@ -136,10 +136,10 @@ export function EqualizerModal({
                       type="button"
                       onClick={() => onPresetChange(p)}
                       className={cn(
-                        "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all border",
+                        "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border",
                         active
-                          ? "bg-purple-600 border-purple-400 text-white shadow-md shadow-purple-600/30"
-                          : "bg-white/[0.03] border-white/10 text-white/60 hover:text-white hover:bg-white/[0.06]"
+                          ? "bg-primary/15 border-primary/40 text-primary"
+                          : "bg-surface-hover border-border text-muted-foreground hover:text-foreground hover:bg-surface-hover-strong"
                       )}
                     >
                       {EQUALIZER_PRESETS[p]?.name}
@@ -150,14 +150,14 @@ export function EqualizerModal({
             </div>
 
             {/* 10 Sliders visualizer */}
-            <div className="p-4 rounded-2xl bg-black/30 border border-white/5 transition-opacity">
+            <div className="p-4 rounded-xl bg-card border border-border transition-opacity">
               <div className="flex items-end justify-between gap-1 sm:gap-2 h-44 pb-2">
                 {EQUALIZER_FREQUENCIES.map((band, idx) => {
                   const gain = settings.gains[idx] || 0;
                   return (
                     <div key={band.frequency} className="flex flex-col items-center flex-1 h-full justify-between">
                       {/* Gain badge */}
-                      <span className={cn("text-[10px] font-mono font-bold leading-none", gain > 0 ? "text-purple-400" : gain < 0 ? "text-pink-400" : "text-white/40")}>
+                      <span className={cn("text-[10px] font-mono font-medium leading-none", gain > 0 ? "text-primary" : gain < 0 ? "text-muted-foreground" : "text-muted-foreground")}>
                         {gain > 0 ? `+${gain}` : gain}
                       </span>
 
@@ -171,19 +171,19 @@ export function EqualizerModal({
                           value={gain}
                           onChange={(e) => onBandGainChange(idx, Number(e.target.value))}
                           aria-label={`${band.label} Gain`}
-                          className="w-28 h-2 bg-purple-950/60 rounded-lg appearance-none cursor-pointer accent-purple-400 -rotate-90"
+                          className="w-28 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#1db954] -rotate-90"
                         />
                       </div>
 
                       {/* Frequency label */}
-                      <span className="text-[10px] text-white/50 font-medium truncate leading-none">
+                      <span className="text-[10px] text-muted-foreground font-medium truncate leading-none">
                         {band.label}
                       </span>
                     </div>
                   );
                 })}
               </div>
-              <div className="flex justify-between items-center text-[10px] text-white/40 pt-2 border-t border-white/5 px-1">
+              <div className="flex justify-between items-center text-[10px] text-muted-foreground pt-2 border-t border-border px-1">
                 <span>-12 dB</span>
                 <span>0 dB (Flat)</span>
                 <span>+12 dB</span>
@@ -195,17 +195,17 @@ export function EqualizerModal({
         {tab === "fx" && (
           <div className="space-y-6 pt-1">
             {/* Crossfade */}
-            <div className="p-4 rounded-2xl bg-black/30 border border-white/5 space-y-3">
+            <div className="p-4 rounded-xl bg-card border border-border space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Disc className="h-4 w-4 text-purple-400" />
-                  <span className="text-xs sm:text-sm font-bold text-white">Smooth Crossfade</span>
+                  <Disc className="h-4 w-4 text-primary" />
+                  <span className="text-xs sm:text-sm font-semibold text-foreground">Smooth Crossfade</span>
                 </div>
-                <span className="text-xs font-mono font-bold text-purple-300 bg-purple-500/15 px-2.5 py-1 rounded-full border border-purple-500/20">
+                <span className="text-xs font-mono font-medium text-primary bg-primary/10 px-2.5 py-1 rounded-full border border-primary/20">
                   {settings.crossfade === 0 ? "Off" : `${settings.crossfade}s`}
                 </span>
               </div>
-              <p className="text-xs text-white/50">
+              <p className="text-xs text-muted-foreground">
                 Fades out the ending song and fades in the next song for smooth DJ transitions.
               </p>
               <input
@@ -215,9 +215,9 @@ export function EqualizerModal({
                 step="1"
                 value={settings.crossfade}
                 onChange={(e) => onCrossfadeChange(Number(e.target.value))}
-                className="w-full h-2 bg-purple-950/60 rounded-lg appearance-none cursor-pointer accent-purple-400"
+                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#1db954]"
               />
-              <div className="flex justify-between text-[10px] text-white/40">
+              <div className="flex justify-between text-[10px] text-muted-foreground">
                 <span>0s (Gapless)</span>
                 <span>2s</span>
                 <span>4s</span>
@@ -227,10 +227,10 @@ export function EqualizerModal({
             </div>
 
             {/* Audio Quality */}
-            <div className="p-4 rounded-2xl bg-black/30 border border-white/5 space-y-3">
+            <div className="p-4 rounded-xl bg-card border border-border space-y-3">
               <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-purple-400" />
-                <span className="text-xs sm:text-sm font-bold text-white">Streaming Audio Quality</span>
+                <Zap className="h-4 w-4 text-primary" />
+                <span className="text-xs sm:text-sm font-semibold text-foreground">Streaming Audio Quality</span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -247,15 +247,15 @@ export function EqualizerModal({
                       className={cn(
                         "p-3 rounded-xl border text-left transition-all",
                         active
-                          ? "bg-purple-600/20 border-purple-400 text-white shadow-md shadow-purple-950/50"
-                          : "bg-white/[0.02] border-white/5 text-white/50 hover:bg-white/[0.05] hover:text-white/80"
+                          ? "bg-primary/15 border-primary/40 text-foreground"
+                          : "bg-surface-hover border-border text-muted-foreground hover:bg-surface-hover-strong hover:text-foreground"
                       )}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold">{q.label}</span>
-                        {active && <Check className="h-3 w-3 text-purple-400" />}
+                        <span className="text-xs font-semibold">{q.label}</span>
+                        {active && <Check className="h-3 w-3 text-primary" />}
                       </div>
-                      <span className="text-[10px] text-white/40 block">{q.desc}</span>
+                      <span className="text-[10px] text-muted-foreground block">{q.desc}</span>
                     </button>
                   );
                 })}
@@ -264,13 +264,13 @@ export function EqualizerModal({
           </div>
         )}
 
-        <div className="mt-4 pt-3 border-t border-white/10 flex justify-end">
+        <div className="mt-4 pt-3 border-t border-border flex justify-end">
           <Button
             type="button"
             variant="secondary"
             size="sm"
             onClick={() => onOpenChange(false)}
-            className="rounded-full bg-purple-600 text-white hover:bg-purple-500 font-semibold px-5"
+            className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium px-5"
           >
             Done
           </Button>

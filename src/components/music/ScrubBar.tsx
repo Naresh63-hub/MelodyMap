@@ -121,7 +121,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
     >
       {hoverX !== null && duration > 0 && (
         <div
-          className="pointer-events-none absolute bottom-6 z-30 -translate-x-1/2 rounded-md border border-white/10 bg-[#181818] p-1.5 shadow-xl backdrop-blur-md"
+          className="pointer-events-none absolute bottom-6 z-30 -translate-x-1/2 rounded-md border border-border bg-popover p-1.5 shadow-lift backdrop-blur-md"
           style={{ left: hoverX }}
         >
           {thumbnail && (

@@ -143,7 +143,7 @@ export function FullScreenPlayer({
           </button>
 
           <div className="text-center px-4 min-w-0">
-            <p className="text-[10px] font-medium tracking-[0.14em] uppercase text-[#737373]">
+            <p className="text-[10px] font-medium tracking-[0.08em] uppercase text-muted-foreground">
               PLAYING FROM
             </p>
             <p className="text-xs font-normal text-[#A1A1A1] truncate max-w-[200px] mt-0.5">
@@ -163,7 +163,7 @@ export function FullScreenPlayer({
 
         {/* Center Artwork */}
         <div className="flex flex-col items-center justify-center my-auto w-full py-4">
-          <div className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-2xl shadow-2xl shadow-black/90 border border-white/[0.06]">
+          <div className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border">
             <img
               src={track.thumbnail}
               alt={track.title}
@@ -174,7 +174,7 @@ export function FullScreenPlayer({
           {/* Track Info Row */}
           <div className="flex items-center justify-between w-full mt-6 px-1">
             <div className="min-w-0 flex-1 pr-4">
-              <h2 className="text-lg sm:text-xl font-medium text-[#F5F5F5] truncate tracking-tight">
+              <h2 className="text-lg sm:text-xl font-semibold text-[#F5F5F5] truncate tracking-[-0.01em]">
                 {track.title}
               </h2>
               <p className="text-sm font-normal text-[#A1A1A1] truncate mt-0.5">
