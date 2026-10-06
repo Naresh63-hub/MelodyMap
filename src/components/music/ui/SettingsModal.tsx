@@ -269,7 +269,7 @@ export function SettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto border border-border bg-popover/95 p-0 text-foreground backdrop-blur-xl shadow-overlay rounded-2xl scrollbar-hide">
+      <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-0 text-foreground glass-heavy rounded-2xl scrollbar-hide">
         {/* Header - Native App Style */}
         <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-popover/90 px-6 py-4 backdrop-blur-xl">
           <div className="flex items-center gap-3">

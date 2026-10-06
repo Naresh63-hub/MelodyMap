@@ -2593,21 +2593,29 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               </button>
 
               {/* Circle user mark on only top of app (Search view) */}
-              <button
-                type="button"
-                onClick={() => setShowAuthModal(true)}
-                aria-label="Account profile"
-                title="Account profile"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white overflow-hidden active:scale-95 transition-all ring-1 ring-white/[0.04]"
-              >
-                {auth.profile?.avatar_url ? (
-                  <img src={auth.profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-xs font-medium text-white/90">
-                    {(auth.profile?.display_name?.[0] || auth.email?.[0] || "U").toUpperCase()}
-                  </span>
+              <div className="relative shrink-0">
+                {player.isPlaying && (
+                  <div className="playing-ring-conic animate-avatar-ring absolute -inset-[2.5px] rounded-full opacity-90" />
                 )}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAuthModal(true)}
+                  aria-label="Account profile"
+                  title="Account profile"
+                  className={cn(
+                    "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white overflow-hidden active:scale-95 transition-all ring-1 ring-white/[0.04]",
+                    player.isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
+                  )}
+                >
+                  {auth.profile?.avatar_url ? (
+                    <img src={auth.profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-medium text-white/90">
+                      {(auth.profile?.display_name?.[0] || auth.email?.[0] || "U").toUpperCase()}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
             {/* Quick filter chips */}
             <div className="flex gap-1.5 overflow-x-auto px-4 pb-2.5 scrollbar-hide">
