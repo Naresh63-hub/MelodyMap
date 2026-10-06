@@ -8,7 +8,14 @@ export const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
 
 export type StreamQualityParam = "saver" | "standard" | "high";
 
-/** Validate that the upstream URL is a legitimate Google/YouTube media endpoint */
+/**
+ * Validate that the upstream URL is a legitimate media endpoint.
+ *
+ * Google/YouTube hosts cover the primary resolver; dzcdn.net covers the
+ * Deezer 30s-preview fallback; audius.co covers the full-length Audius
+ * fallback (its discovery/creator nodes serve authorized artist streams
+ * and are already an integrated playback provider in the app).
+ */
 export function isAllowedUpstreamUrl(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
@@ -19,9 +26,11 @@ export function isAllowedUpstreamUrl(urlStr: string): boolean {
       host.endsWith(".youtube.com") ||
       host.endsWith(".ytimg.com") ||
       host.endsWith(".dzcdn.net") ||
+      host.endsWith(".audius.co") ||
       host === "googlevideo.com" ||
       host === "youtube.com" ||
-      host === "dzcdn.net"
+      host === "dzcdn.net" ||
+      host === "audius.co"
     );
   } catch {
     return false;
