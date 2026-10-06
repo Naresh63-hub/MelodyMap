@@ -413,14 +413,17 @@ export function useLibrary(userId?: string | null) {
 
     void (async () => {
       try {
-        const { db } = await import("@/lib/firebase");
-        const { doc, getDoc } = await import("firebase/firestore");
-        const snap = await getDoc(doc(db, "users", userId, "preferences", "library"));
+        const { supabase } = await import("@/lib/supabase");
+        const { data, error } = await supabase
+          .from("user_library")
+          .select("data")
+          .eq("user_id", userId)
+          .maybeSingle();
 
         if (cancelled) return;
 
-        if (snap.exists()) {
-          const docData = snap.data() as Partial<LibraryDoc>;
+        if (data?.data && !error) {
+          const docData = data.data as Partial<LibraryDoc>;
           setLikes((prev) => {
             const next = mergeById((docData.likes ?? []).filter((t) => isMusicTrack(t, true, true)), prev, 200);
             write(LIKES_KEY, next);
@@ -504,8 +507,7 @@ export function useLibrary(userId?: string | null) {
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       try {
-        const { db } = await import("@/lib/firebase");
-        const { doc, setDoc } = await import("firebase/firestore");
+        const { supabase } = await import("@/lib/supabase");
         const { thompsonSamplingPolicy } = await import("@/lib/bandit-policy");
         const { telemetry } = await import("@/lib/telemetry");
         if (cancelled) return;
@@ -513,9 +515,9 @@ export function useLibrary(userId?: string | null) {
         const banditModel = thompsonSamplingPolicy.getModelState();
         const recentTelemetry = telemetry.drainEvents(30);
 
-        await setDoc(
-          doc(db, "users", userId, "preferences", "library"),
-          {
+        const { error } = await supabase.from("user_library").upsert({
+          user_id: userId,
+          data: {
             likes,
             dislikes,
             history: history.slice(0, 100),
@@ -528,10 +530,13 @@ export function useLibrary(userId?: string | null) {
             playback: readPlayback() ?? null,
             updatedAt: new Date().toISOString(),
           },
-          { merge: true },
-        );
+          updated_at: new Date().toISOString(),
+        });
+        if (error) {
+          console.warn("[MelodyMap] Library Supabase sync failed:", error.message);
+        }
       } catch (err) {
-        console.warn("[MelodyMap] Library Firestore sync error:", err);
+        console.warn("[MelodyMap] Library Supabase sync error:", err);
       }
     }, 1200);
     return () => {

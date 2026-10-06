@@ -15,19 +15,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  auth,
-  signInWithGoogle,
-  syncUserProfile,
-} from "@/lib/firebase";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile as firebaseUpdateProfile,
-  updatePassword as firebaseUpdatePassword,
-  sendPasswordResetEmail,
-} from "firebase/auth";
+import { useAuth } from "@/lib/auth";
 
 export function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -104,6 +92,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "reset_password">("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -116,29 +105,22 @@ function AuthPage() {
   const [successNote, setSuccessNote] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user && mode !== "reset_password") {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("melodymap.guest_mode");
-        }
-        void navigate({ to: "/", replace: true });
+    if (auth.userId && mode !== "reset_password") {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("melodymap.guest_mode");
       }
-    });
-
-    return () => unsubscribe();
-  }, [navigate, mode]);
+      void navigate({ to: "/", replace: true });
+    }
+  }, [navigate, mode, auth.userId]);
 
   const handleGoogleSignIn = async () => {
     setGoogleBusy(true);
     setErrorNote(null);
     setSuccessNote(null);
     try {
-      const res = await signInWithGoogle();
+      const res = await auth.signInWithGoogle();
       if (res.success) {
-        setSuccessNote("Signed in with Google successfully!");
-        setTimeout(() => {
-          void navigate({ to: "/", replace: true });
-        }, 500);
+        setSuccessNote("Redirecting to Google Sign-in...");
       } else {
         setErrorNote(formatAuthError(res.error || "Google Sign-in failed"));
       }
@@ -166,20 +148,19 @@ function AuthPage() {
         setErrorNote("Passwords do not match.");
         return;
       }
-      const curUser = auth.currentUser;
-      if (!curUser) {
-        setSubmitting(false);
-        setErrorNote("No active session found. Please request a new reset link.");
-        return;
-      }
       try {
-        await firebaseUpdatePassword(curUser, password);
-        setSuccessNote("Password updated! Redirecting to home...");
-        setTimeout(() => {
-          void navigate({ to: "/", replace: true });
-        }, 800);
+        const res = await auth.updatePassword(password);
+        if (res.success) {
+          setSuccessNote("Password updated! Redirecting to home...");
+          setTimeout(() => {
+            void navigate({ to: "/", replace: true });
+          }, 800);
+        } else {
+          setErrorNote(formatAuthError(res.error || "Failed to update password"));
+        }
       } catch (err: any) {
         setErrorNote(formatAuthError(err?.message || "Failed to update password"));
+      } finally {
         setSubmitting(false);
       }
       return;
@@ -193,9 +174,13 @@ function AuthPage() {
         return;
       }
       try {
-        await sendPasswordResetEmail(auth, trimmedEmail);
-        setSuccessNote("Password reset instructions sent to your email! Check your inbox.");
-        setTimeout(() => setMode("signin"), 3000);
+        const res = await auth.resetPassword(trimmedEmail);
+        if (res.success) {
+          setSuccessNote("Password reset instructions sent to your email! Check your inbox.");
+          setTimeout(() => setMode("signin"), 3000);
+        } else {
+          setErrorNote(formatAuthError(res.error || "Failed to send reset email"));
+        }
       } catch (err: any) {
         setErrorNote(formatAuthError(err?.message || "Failed to send reset email"));
       } finally {
@@ -229,15 +214,18 @@ function AuthPage() {
       }
 
       try {
-        const cred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
-        await firebaseUpdateProfile(cred.user, { displayName: trimmedName });
-        await syncUserProfile(cred.user, trimmedName);
-        setSuccessNote(`Welcome, ${trimmedName}! Account created.`);
-        setTimeout(() => {
-          void navigate({ to: "/", replace: true });
-        }, 800);
+        const res = await auth.signUpWithEmail(trimmedEmail, password, trimmedName);
+        if (res.success) {
+          setSuccessNote(`Welcome, ${trimmedName}! Account created.`);
+          setTimeout(() => {
+            void navigate({ to: "/", replace: true });
+          }, 800);
+        } else {
+          setErrorNote(formatAuthError(res.error || "Sign-up failed"));
+        }
       } catch (err: any) {
         setErrorNote(formatAuthError(err?.message || "Sign-up failed"));
+      } finally {
         setSubmitting(false);
       }
       return;
@@ -257,14 +245,18 @@ function AuthPage() {
       }
 
       try {
-        const cred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
-        await syncUserProfile(cred.user);
-        setSuccessNote("Signed in successfully!");
-        setTimeout(() => {
-          void navigate({ to: "/", replace: true });
-        }, 600);
+        const res = await auth.signInWithEmail(trimmedEmail, password);
+        if (res.success) {
+          setSuccessNote("Signed in successfully!");
+          setTimeout(() => {
+            void navigate({ to: "/", replace: true });
+          }, 600);
+        } else {
+          setErrorNote(formatAuthError(res.error || "Invalid credentials"));
+        }
       } catch (err: any) {
         setErrorNote(formatAuthError(err?.message || "Invalid credentials"));
+      } finally {
         setSubmitting(false);
       }
     }

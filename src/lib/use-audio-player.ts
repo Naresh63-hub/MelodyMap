@@ -16,6 +16,7 @@ import {
 } from "@/lib/sponsorblock";
 import { isLowNetworkModeEnabled } from "@/lib/network-mode";
 import { isNativePlaybackEnv, resolvePlaybackEngine } from "@/lib/native-playback";
+import { hasFullLengthDirectSource } from "@/lib/track-stream-policy";
 
 export type NextTrackInfo = {
   id: string;
@@ -725,7 +726,10 @@ export function useAudioPlayer(options: {
         const nextTrack = getNextTrackRef.current?.();
         if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
           prebufferedTrackIdRef.current = nextTrack.id;
-          const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
+          const nextUrl =
+            nextTrack.previewUrl && hasFullLengthDirectSource(nextTrack.id)
+              ? nextTrack.previewUrl
+              : streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
           prebufferAudioRef.current.src = nextUrl;
           prebufferAudioRef.current.load();
         }
@@ -773,7 +777,10 @@ export function useAudioPlayer(options: {
         lastValidPositionRef.current = 0;
         setPosition(0);
         setDuration(0);
-        const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
+        const nextUrl =
+          nextTrack.previewUrl && hasFullLengthDirectSource(nextTrack.id)
+            ? nextTrack.previewUrl
+            : streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
         audio.src = nextUrl;
         const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
         audio.playbackRate = validSpeed;
@@ -1055,7 +1062,10 @@ export function useAudioPlayer(options: {
               const nextTrack = getNextTrackRef.current?.();
               if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
                 prebufferedTrackIdRef.current = nextTrack.id;
-                const nextUrl = nextTrack.previewUrl || streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
+                const nextUrl =
+            nextTrack.previewUrl && hasFullLengthDirectSource(nextTrack.id)
+              ? nextTrack.previewUrl
+              : streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
                 prebufferAudioRef.current.src = nextUrl;
                 prebufferAudioRef.current.load();
               }
@@ -1237,9 +1247,20 @@ export function useAudioPlayer(options: {
     [setStream],
   );
 
+  /**
+   * Direct URLs are only honored for providers whose streams are full-length
+   * (audius/jamendo/archive/podcast). Catalog tracks advertise a Deezer
+   * 30-second preview as previewUrl — honoring it would bypass the proxy's
+   * full-length fallback chain, so it is dropped and the track streams via
+   * the proxy instead.
+   */
+  const sanitizeDirectUrl = (trackId: string, directUrl?: string): string | undefined =>
+    directUrl && hasFullLengthDirectSource(trackId) ? directUrl : undefined;
+
   /** Load a track and auto-play */
   const load = useCallback(
     async (id: string, directUrl?: string, startAt = 0) => {
+      directUrl = sanitizeDirectUrl(id, directUrl);
       wantPlayRef.current = true;
 
       // Stop the double-load race: if synchronous gapless advance already started
@@ -1297,6 +1318,7 @@ export function useAudioPlayer(options: {
   /** Cue a track at specific second without autoplay */
   const cue = useCallback(
     async (id: string, startSeconds = 0, directUrl?: string) => {
+      directUrl = sanitizeDirectUrl(id, directUrl);
       wantPlayRef.current = false;
       currentTrackIdRef.current = id;
       lastValidPositionRef.current = startSeconds;

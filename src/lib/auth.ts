@@ -1,21 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  auth,
-  db,
-  syncUserProfile,
-  signInWithGoogle as firebaseSignInWithGoogle,
-} from "@/lib/firebase";
-import {
-  onAuthStateChanged,
-  signOut as firebaseSignOut,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updateProfile as firebaseUpdateProfile,
-  updatePassword as firebaseUpdatePassword,
-  sendPasswordResetEmail,
-  type User,
-} from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { supabase } from "@/lib/supabase";
+import { getOAuthRedirectUrl } from "@/lib/auth-deep-link";
+import type { User } from "@supabase/supabase-js";
 
 export type Profile = {
   id: string;
@@ -23,46 +9,65 @@ export type Profile = {
   avatar_url: string | null;
 };
 
-/** Session + profile for the signed-in listener backed by Firebase Auth & Firestore */
+/** Session + profile for the signed-in listener backed by Supabase Auth & PostgreSQL */
 export function useAuth() {
   const [userId, setUserId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-      if (user) {
-        setUserId(user.uid);
-        setEmail(user.email || null);
+  // Sync profile from Supabase profiles table
+  const fetchProfile = useCallback(async (user: User) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
 
-        // Fetch or sync Firestore user profile
-        try {
-          const userRef = doc(db, "users", user.uid);
-          const snap = await getDoc(userRef);
-          if (snap.exists()) {
-            const data = snap.data();
-            setProfile({
-              id: user.uid,
-              display_name: (data["displayName"] as string) || user.displayName || user.email?.split("@")[0] || "Listener",
-              avatar_url: (data["avatarUrl"] as string) || user.photoURL || null,
-            });
-          } else {
-            const synced = await syncUserProfile(user);
-            setProfile({
-              id: user.uid,
-              display_name: synced.displayName,
-              avatar_url: synced.avatarUrl || null,
-            });
-          }
-        } catch {
-          // Fallback to auth object profile
-          setProfile({
-            id: user.uid,
-            display_name: user.displayName || user.email?.split("@")[0] || "Listener",
-            avatar_url: user.photoURL || null,
-          });
-        }
+      if (data && !error) {
+        setProfile({
+          id: user.id,
+          display_name: data.display_name || user.user_metadata?.["display_name"] || user.email?.split("@")[0] || "Listener",
+          avatar_url: data.avatar_url || user.user_metadata?.["avatar_url"] || null,
+        });
+        return;
+      }
+
+      // Upsert default profile if not exists
+      const fallbackName = user.user_metadata?.["display_name"] || user.user_metadata?.["full_name"] || user.email?.split("@")[0] || "Listener";
+      const fallbackAvatar = user.user_metadata?.["avatar_url"] || null;
+      await supabase.from("profiles").upsert({
+        id: user.id,
+        display_name: fallbackName,
+        avatar_url: fallbackAvatar,
+        updated_at: new Date().toISOString(),
+      });
+
+      setProfile({
+        id: user.id,
+        display_name: fallbackName,
+        avatar_url: fallbackAvatar,
+      });
+    } catch {
+      setProfile({
+        id: user.id,
+        display_name: user.user_metadata?.["display_name"] || user.email?.split("@")[0] || "Listener",
+        avatar_url: user.user_metadata?.["avatar_url"] || null,
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    // Listen to Supabase auth events
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return;
+      if (session?.user) {
+        setUserId(session.user.id);
+        setEmail(session.user.email || null);
+        await fetchProfile(session.user);
       } else {
         // Fallback to local guest profile if saved
         if (typeof window !== "undefined") {
@@ -92,14 +97,30 @@ export function useAuth() {
       setReady(true);
     });
 
-    return () => unsubscribe();
-  }, []);
+    // Check initial session
+    void supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      if (session?.user) {
+        setUserId(session.user.id);
+        setEmail(session.user.email || null);
+        await fetchProfile(session.user);
+      }
+      setReady(true);
+    });
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, [fetchProfile]);
 
   const updateProfile = useCallback(
     async (patch: { display_name?: string; avatar_url?: string }): Promise<{ success: boolean; error?: string }> => {
       if (!userId) return { success: false, error: "Not signed in" };
 
-      const currentUser = auth.currentUser;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentUser = sessionData.session?.user;
+
       if (!currentUser) {
         // Local mode update
         const updated: Profile = {
@@ -115,26 +136,17 @@ export function useAuth() {
       }
 
       try {
-        // 1. Update Firebase Auth Profile
-        await firebaseUpdateProfile(currentUser, {
-          displayName: patch.display_name !== undefined ? patch.display_name : currentUser.displayName,
-          photoURL: patch.avatar_url !== undefined ? patch.avatar_url : currentUser.photoURL,
+        const { error } = await supabase.from("profiles").upsert({
+          id: currentUser.id,
+          display_name: patch.display_name ?? profile?.display_name ?? "Listener",
+          avatar_url: patch.avatar_url ?? profile?.avatar_url ?? null,
+          updated_at: new Date().toISOString(),
         });
 
-        // 2. Sync Firestore Profile Document
-        const userRef = doc(db, "users", currentUser.uid);
-        await setDoc(
-          userRef,
-          {
-            displayName: patch.display_name ?? profile?.display_name ?? "Listener",
-            avatarUrl: patch.avatar_url ?? profile?.avatar_url ?? "",
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true },
-        );
+        if (error) throw error;
 
         setProfile((prev) => ({
-          id: currentUser.uid,
+          id: currentUser.id,
           display_name: patch.display_name ?? prev?.display_name ?? "Listener",
           avatar_url: patch.avatar_url ?? prev?.avatar_url ?? null,
         }));
@@ -150,10 +162,9 @@ export function useAuth() {
 
   const updatePassword = useCallback(
     async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
-      const currentUser = auth.currentUser;
-      if (!currentUser) return { success: false, error: "Not signed in" };
       try {
-        await firebaseUpdatePassword(currentUser, newPassword);
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
         return { success: true };
       } catch (err: any) {
         console.warn("[Auth] updatePassword error:", err);
@@ -165,7 +176,7 @@ export function useAuth() {
 
   const signOut = useCallback(async () => {
     try {
-      await firebaseSignOut(auth);
+      await supabase.auth.signOut();
     } catch (err) {
       console.warn("[Auth] signOut error:", err);
     } finally {
@@ -179,36 +190,73 @@ export function useAuth() {
     }
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
-    return await firebaseSignInWithGoogle();
+  const signInWithGoogle = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const redirectUrl = getOAuthRedirectUrl();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+        },
+      });
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      console.warn("[Auth] signInWithGoogle error:", err);
+      return { success: false, error: err?.message || "Google sign in failed" };
+    }
   }, []);
 
   const signInWithEmail = useCallback(async (emailInput: string, passwordInput: string) => {
     try {
-      const cred = await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
-      await syncUserProfile(cred.user);
-      return { success: true, user: cred.user };
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.trim(),
+        password: passwordInput,
+      });
+      if (error) throw error;
+      if (data.user) {
+        await fetchProfile(data.user);
+      }
+      return { success: true, user: data.user };
     } catch (err: any) {
       return { success: false, error: err?.message || "Sign in failed" };
     }
-  }, []);
+  }, [fetchProfile]);
 
   const signUpWithEmail = useCallback(async (emailInput: string, passwordInput: string, name?: string) => {
     try {
-      const cred = await createUserWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
-      if (name) {
-        await firebaseUpdateProfile(cred.user, { displayName: name.trim() });
+      const { data, error } = await supabase.auth.signUp({
+        email: emailInput.trim(),
+        password: passwordInput,
+        options: {
+          data: {
+            display_name: name?.trim(),
+            full_name: name?.trim(),
+          },
+        },
+      });
+      if (error) throw error;
+      if (data.user) {
+        await fetchProfile(data.user);
       }
-      await syncUserProfile(cred.user, name?.trim());
-      return { success: true, user: cred.user };
+      return { success: true, user: data.user };
     } catch (err: any) {
       return { success: false, error: err?.message || "Sign up failed" };
     }
-  }, []);
+  }, [fetchProfile]);
 
   const resetPassword = useCallback(async (emailInput: string) => {
     try {
-      await sendPasswordResetEmail(auth, emailInput.trim());
+      const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/auth` : undefined;
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        emailInput.trim(),
+        redirectUrl ? { redirectTo: redirectUrl } : {},
+      );
+      if (error) throw error;
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || "Password reset failed" };
