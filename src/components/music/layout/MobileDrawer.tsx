@@ -83,9 +83,9 @@ export function MobileDrawer({
       />
 
       {/* Drawer panel */}
-      <div className="relative flex w-4/5 max-w-xs flex-1 flex-col bg-card border-r border-border shadow-overlay z-10 animate-slide-in">
+      <div className="relative flex w-4/5 max-w-xs flex-1 flex-col glass-medium border-r border-white/[0.08] shadow-lift z-10 animate-slide-in">
         {/* Header with guaranteed clearance below Android status bar and camera cutouts */}
-        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-border">
+        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-white/[0.08] glass-light">
           <div className="flex items-center gap-2.5">
             <img
               src="/brand/app-icon.png"
@@ -118,7 +118,7 @@ export function MobileDrawer({
                   onSignIn();
                 }
               }}
-              className="flex items-center justify-between gap-3 px-5 py-3.5 bg-surface-hover hover:bg-surface-hover-strong active:bg-surface-hover-strong border-b border-border cursor-pointer transition-colors"
+              className="flex items-center justify-between gap-3 px-5 py-3.5 glass-light border-b border-white/[0.08] cursor-pointer transition-colors hover:bg-white/[0.05]"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="relative shrink-0">

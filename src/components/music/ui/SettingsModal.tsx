@@ -271,7 +271,7 @@ export function SettingsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-0 text-foreground glass-heavy rounded-2xl scrollbar-hide">
         {/* Header - Native App Style */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-popover/90 px-6 py-4 backdrop-blur-xl">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.08] glass-frosted px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
               <Sliders className="h-4 w-4 text-primary" />
