@@ -6,6 +6,7 @@ import {
   extractClientIp,
   isAllowedOrigin,
   isAllowedUpstreamUrl,
+  normalizeUpstreamRange,
   resolveAudioMimeType,
 } from "./stream-proxy-core";
 
@@ -106,5 +107,28 @@ describe("resolveAudioMimeType", () => {
   it("falls back to the resolved format mime", () => {
     expect(resolveAudioMimeType("audio/webm", null)).toBe("audio/webm");
     expect(resolveAudioMimeType(null, null)).toBe("audio/mp4");
+  });
+});
+
+describe("normalizeUpstreamRange", () => {
+  it("defaults open-ended requests to chunk-size bounds", () => {
+    expect(normalizeUpstreamRange("bytes=0-")).toBe(`bytes=0-${512 * 1024 - 1}`);
+    expect(normalizeUpstreamRange(null)).toBe(`bytes=0-${512 * 1024 - 1}`);
+    expect(normalizeUpstreamRange(undefined)).toBe(`bytes=0-${512 * 1024 - 1}`);
+    expect(normalizeUpstreamRange("invalid")).toBe(`bytes=0-${512 * 1024 - 1}`);
+  });
+
+  it("chunks mid-stream open-ended ranges", () => {
+    const start = 524288;
+    expect(normalizeUpstreamRange(`bytes=${start}-`)).toBe(`bytes=${start}-${start + 512 * 1024 - 1}`);
+  });
+
+  it("preserves small probe range requests", () => {
+    expect(normalizeUpstreamRange("bytes=0-1024")).toBe("bytes=0-1024");
+    expect(normalizeUpstreamRange("bytes=100-200")).toBe("bytes=100-200");
+  });
+
+  it("clamps oversized client ranges to the chunk size", () => {
+    expect(normalizeUpstreamRange("bytes=0-50000000")).toBe(`bytes=0-${512 * 1024 - 1}`);
   });
 });

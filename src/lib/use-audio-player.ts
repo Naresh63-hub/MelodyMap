@@ -229,9 +229,16 @@ export function useAudioPlayer(options: {
     return curve;
   };
 
-  // Initialize Web Audio API 10-band equalizer + Dynamics Compressor graph on user interaction
   const initWebAudio = useCallback(() => {
     if (typeof window === "undefined") return;
+    // Native app (APK): Direct hardware audio playback.
+    // In Android WebView, connecting an <audio> element to an AudioContext
+    // routes its sound through the Chromium WebAudio render graph, which
+    // Chromium suspends after a few seconds when the screen locks or app is minimized.
+    // Playing directly to the native <audio> element avoids suspension and keeps
+    // background audio streaming continuously via MediaPlaybackService.
+    if (isNativePlaybackEnv()) return;
+
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -537,7 +544,7 @@ export function useAudioPlayer(options: {
     if (!trackId || !wantPlayRef.current) return;
 
     const attempts = reconnectAttemptsRef.current;
-    if (attempts >= 4) {
+    if (attempts >= 6) {
       setIsReconnecting(false);
       const isExternalNonYt =
         trackId.startsWith("podcast:") ||
@@ -545,8 +552,8 @@ export function useAudioPlayer(options: {
         trackId.startsWith("audius:") ||
         trackId.startsWith("jamendo:") ||
         trackId.startsWith("archive:");
-      // Fallback to client-side YouTube player if proxy stream ever drops/fails
-      if (!isExternalNonYt) {
+      // Fallback to client-side YouTube player if proxy stream ever drops/fails on web
+      if (!isExternalNonYt && !isNativePlaybackEnv()) {
         console.info(`[MelodyMap] Reconnection threshold reached. Switching to YouTube playback engine for: ${trackId}`);
         const resumePos = lastValidPositionRef.current || 0;
         playViaYouTubeRef.current(trackId, resumePos, true);
@@ -654,7 +661,7 @@ export function useAudioPlayer(options: {
               console.warn("[MelodyMap] Stream waiting timeout. Attempting reconnect.");
               triggerReconnect();
             }
-          }, 6000);
+          }, 12000);
         }
       }
     };
@@ -668,7 +675,7 @@ export function useAudioPlayer(options: {
               console.warn("[MelodyMap] Audio stream stalled. Triggering mid-song reconnect.");
               triggerReconnect();
             }
-          }, 4500);
+          }, 12000);
         }
       }
     };

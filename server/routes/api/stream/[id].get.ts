@@ -1,4 +1,4 @@
-import { defineEventHandler, getRouterParam, getQuery, setHeaders, sendStream, createError } from "h3";
+import { defineEventHandler, getRouterParam, getQuery, setHeaders, sendStream, createError, setResponseStatus } from "h3";
 import {
   VIDEO_ID_REGEX,
   isAllowedOrigin,
@@ -62,8 +62,11 @@ export default defineEventHandler(async (event) => {
   const contentLength = result.upstream.headers.get("content-length");
   if (contentLength) setHeaders(event, { "Content-Length": contentLength });
 
-  if (result.upstream.status === 206 && event.node?.res) {
-    event.node.res.statusCode = 206;
+  if (result.upstream.status === 206) {
+    setResponseStatus(event, 206);
+    if (event.node?.res) {
+      event.node.res.statusCode = 206;
+    }
   }
 
   try {

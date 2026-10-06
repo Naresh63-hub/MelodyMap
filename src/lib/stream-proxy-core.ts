@@ -126,6 +126,41 @@ export type UpstreamAudioResult =
   | { ok: true; upstream: Response; mimeType: string }
   | { ok: false; status: number; message: string };
 
+export const DEFAULT_PROXY_CHUNK_SIZE = 512 * 1024; // 512 KB per chunk (~32s of audio, ~2-3s download)
+
+/**
+ * Normalizes client Range headers into serverless-safe chunk requests.
+ *
+ * Full-file or open-ended requests (like bytes=0-) streamed through a serverless
+ * proxy exceed Vercel's execution timeout (10-15s), causing mid-stream drops.
+ * Clamping open-ended and oversized ranges to 512 KB ensures each partial response
+ * finishes in 2-3s and allows standard HTML5 <audio> players to stream smoothly
+ * chunk by chunk without interruption.
+ */
+export function normalizeUpstreamRange(
+  rangeHeader: string | null | undefined,
+  chunkSize: number = DEFAULT_PROXY_CHUNK_SIZE,
+): string {
+  if (!rangeHeader || !rangeHeader.startsWith("bytes=")) {
+    return `bytes=0-${chunkSize - 1}`;
+  }
+  const parts = rangeHeader.slice(6).split("-");
+  const start = parseInt(parts[0] || "0", 10);
+  if (isNaN(start) || start < 0) {
+    return `bytes=0-${chunkSize - 1}`;
+  }
+  if (parts[1] && parts[1].trim() !== "") {
+    const end = parseInt(parts[1], 10);
+    if (!isNaN(end) && end >= start) {
+      if (end - start + 1 <= chunkSize) {
+        return `bytes=${start}-${end}`;
+      }
+      return `bytes=${start}-${start + chunkSize - 1}`;
+    }
+  }
+  return `bytes=${start}-${start + chunkSize - 1}`;
+}
+
 /**
  * Resolve a verified upstream audio URL for `videoId` and fetch it.
  * Handles cache invalidation + one retry on upstream 403, validates the
@@ -148,11 +183,12 @@ export async function fetchUpstreamAudio(options: {
   const onExternalAbort = () => controller.abort();
   signal?.addEventListener("abort", onExternalAbort, { once: true });
 
+  const effectiveRange = normalizeUpstreamRange(rangeHeader);
   const upstreamHeaders: Record<string, string> = {
     "User-Agent": UPSTREAM_UA,
     Referer: "https://www.youtube.com/",
+    Range: effectiveRange,
   };
-  if (rangeHeader) upstreamHeaders["Range"] = rangeHeader;
 
   try {
     let stream = await resolveStreamUrlWithMeta(videoId, quality);
