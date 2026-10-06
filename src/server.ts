@@ -97,9 +97,13 @@ async function handleStreamProxy(request: Request): Promise<Response | null> {
   responseHeaders.set("access-control-allow-origin", originHeader || "*");
   responseHeaders.set("vary", "Origin");
   responseHeaders.set("access-control-allow-headers", "Range, Accept-Ranges, Content-Type");
-  responseHeaders.set("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges");
+  responseHeaders.set(
+    "access-control-expose-headers",
+    "Content-Range, Content-Length, Accept-Ranges, X-MelodyMap-Source",
+  );
   responseHeaders.set("content-type", result.mimeType);
   responseHeaders.set("accept-ranges", "bytes");
+  responseHeaders.set("x-melodymap-source", result.source ?? "youtube");
 
   const contentRange = result.upstream.headers.get("content-range");
   if (contentRange) responseHeaders.set("content-range", contentRange);
