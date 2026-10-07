@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { ScrubBar } from "@/components/music/ScrubBar";
 import { formatTime } from "@/lib/use-audio-player";
 import { useSleepTimer } from "@/hooks/useSleepTimer";
+import { useSwipeGestures, useDoubleTapSeek } from "@/hooks/use-gesture-controls";
 import type { Track } from "@/lib/library";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 
@@ -109,6 +110,14 @@ export function FullScreenPlayer({
 }: Props) {
   const { isActive: isSleepTimerActive, formattedRemaining: sleepTimerCountdown } = useSleepTimer();
 
+  // Gesture controls: swipe down to collapse, double-tap artwork to seek ±10s
+  const swipeProps = useSwipeGestures({ onSwipeDown: onClose, threshold: 80 });
+  const { gestureProps: doubleTapProps, flash } = useDoubleTapSeek({
+    onBackward: (s) => (onSkipBackward ? onSkipBackward(s) : onSeek(Math.max(0, position - s))),
+    onForward: (s) => (onSkipForward ? onSkipForward(s) : onSeek(Math.min(duration, position + s))),
+    seconds: 10,
+  });
+
   if (!track) return null;
 
   const cycleSpeed = () => {
@@ -119,7 +128,10 @@ export function FullScreenPlayer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-hidden animate-fade-in">
+    <div
+      {...swipeProps}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-hidden animate-fade-in"
+    >
       {/* Soft ambient background art glow */}
       <div
         className="absolute inset-0 bg-cover bg-center blur-3xl opacity-15 scale-125 transition-all duration-700 pointer-events-none"
@@ -163,12 +175,29 @@ export function FullScreenPlayer({
 
         {/* Center Artwork */}
         <div className="flex flex-col items-center justify-center my-auto w-full py-4">
-          <div className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border">
+          <div
+            {...doubleTapProps}
+            className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border touch-manipulation select-none"
+          >
             <img
               src={track.thumbnail}
               alt={track.title}
               className="h-full w-full object-cover"
             />
+            {/* Double-tap seek feedback halves */}
+            {flash && (
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-y-0 w-1/2 flex items-center justify-center bg-black/35 animate-fade-in",
+                  flash === "left" ? "left-0 rounded-l-xl" : "right-0 rounded-r-xl",
+                )}
+              >
+                <span className="flex flex-col items-center gap-1 text-white">
+                  {flash === "left" ? <RotateCcw className="h-6 w-6" /> : <RotateCw className="h-6 w-6" />}
+                  <span className="text-xs font-semibold tabular-nums">10s</span>
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Track Info Row */}

@@ -3,6 +3,8 @@ import { AlertTriangle, Loader2, Pause, Play, SkipBack, SkipForward } from "luci
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
+import { triggerHaptic } from "@/lib/haptics";
+import { useSwipeGestures } from "@/hooks/use-gesture-controls";
 
 type Props = {
   track: Track | undefined;
@@ -44,6 +46,9 @@ export function MiniPlayer({
 }: Props) {
   const barRef = useRef<HTMLDivElement | null>(null);
 
+  // Swipe up anywhere on the dock expands the full-screen player
+  const swipeProps = useSwipeGestures({ onSwipeUp: onOpenPlayer });
+
   const progressPct =
     duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
 
@@ -57,7 +62,8 @@ export function MiniPlayer({
 
   return (
     <div
-      className="fixed z-40 border-t border-border bg-surface/95 backdrop-blur-xl shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between safe-bottom"
+      {...swipeProps}
+      className="fixed z-40 border-t border-white/[0.08] glass-frosted shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between safe-bottom"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
       {/* 2px Hairline Progress Indicator at Top */}
