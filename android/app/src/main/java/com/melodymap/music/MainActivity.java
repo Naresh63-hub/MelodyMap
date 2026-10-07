@@ -38,11 +38,6 @@ public class MainActivity extends BridgeActivity {
                 settings.setBuiltInZoomControls(false);
                 settings.setDisplayZoomControls(false);
 
-                String currentUa = settings.getUserAgentString();
-                if (currentUa != null && !currentUa.contains("MelodyMapApp")) {
-                    settings.setUserAgentString(currentUa + " MelodyMapApp");
-                }
-
                 // Register SleepTimer JavaScript interface bridge
                 webView.addJavascriptInterface(new SleepTimerBridge(this), "AndroidSleepTimer");
 

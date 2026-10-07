@@ -174,13 +174,13 @@ export function useAudioPlayer(options: {
       const holder = document.createElement("div");
       holder.id = "melodymap-yt-wrapper";
       holder.style.position = "fixed";
-      holder.style.bottom = "0px";
-      holder.style.right = "0px";
-      holder.style.width = "1px";
-      holder.style.height = "1px";
+      holder.style.bottom = "-9999px";
+      holder.style.right = "-9999px";
+      holder.style.width = "200px";
+      holder.style.height = "200px";
       holder.style.opacity = "0.01";
       holder.style.pointerEvents = "none";
-      holder.style.zIndex = "1";
+      holder.style.zIndex = "-1";
       holder.style.overflow = "hidden";
       const iframeDiv = document.createElement("div");
       iframeDiv.id = "melodymap-yt-iframe";
@@ -976,8 +976,8 @@ export function useAudioPlayer(options: {
       if (!targetEl) return;
       try {
         ytPlayerRef.current = new window.YT.Player("melodymap-yt-iframe", {
-          height: "1",
-          width: "1",
+          height: "200",
+          width: "200",
           playerVars: {
             autoplay: 1,
             controls: 0,
@@ -1037,19 +1037,20 @@ export function useAudioPlayer(options: {
             },
             onError: (event: any) => {
               console.warn("[MelodyMap] YouTube player API error:", event.data);
-              // If YouTube embed is blocked (101/150) or unavailable, immediately fallback to HTML5 stream proxy
-              const curId = currentTrackIdRef.current;
-              if (curId && activeEngineRef.current === "youtube") {
-                console.info("[MelodyMap] YouTube embed blocked or errored, falling back to HTML5 audio proxy for:", curId);
-                activeEngineRef.current = "html5";
-                try {
-                  ytPlayerRef.current?.stopVideo?.();
-                } catch {}
-                setStream(streamUrl(curId), lastValidPositionRef.current);
-                return;
-              }
-              // Only fatal unplayable errors should skip to next track
+              // Fatal unplayable error (100 = deleted/private, 101/150 = embed disallowed, 2 = invalid parameter)
               if (event.data === 101 || event.data === 150 || event.data === 100 || event.data === 2) {
+                const curId = currentTrackIdRef.current;
+                // On web, attempt stream proxy fallback once
+                if (curId && !isNativePlaybackEnv()) {
+                  console.info("[MelodyMap] Web YouTube embed blocked or errored, attempting stream proxy fallback for:", curId);
+                  activeEngineRef.current = "html5";
+                  try {
+                    ytPlayerRef.current?.stopVideo?.();
+                  } catch {}
+                  setStream(streamUrl(curId), lastValidPositionRef.current);
+                  return;
+                }
+                // On native APK, gracefully inform and skip without entering a failing 404 proxy loop
                 onErrorRef.current?.("Audio stream unavailable, skipping to next track...");
               } else {
                 console.warn("[MelodyMap] Non-fatal YouTube player error, ignoring transient code:", event.data);
