@@ -6,6 +6,19 @@
 import type { ProviderCapabilities, MusicProviderName } from "./types";
 
 export const PROVIDER_REGISTRY: Record<MusicProviderName, ProviderCapabilities> = {
+  saavn: {
+    name: "saavn",
+    displayName: "JioSaavn",
+    canDiscover: true,
+    canMetadata: true,
+    canPlayback: true,
+    playbackType: "full",
+    requiresAuth: false,
+    requiresApiKey: false,
+    rateLimitPerMin: 180,
+    description: "High-definition 320kbps licensed music streaming with direct CDN audio playback.",
+    termsUrl: "https://www.jiosaavn.com/terms",
+  },
   audius: {
     name: "audius",
     displayName: "Audius (Decentralized Catalog)",

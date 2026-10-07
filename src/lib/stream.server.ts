@@ -11,6 +11,7 @@ import fs from "node:fs";
 import { createLruCache } from "./lru-cache";
 import { searchAudius } from "./providers/audius";
 import { searchJamendo } from "./providers/jamendo";
+import { resolveSaavnByMeta } from "./providers/saavn";
 
 export type StreamQuality = "saver" | "standard" | "high";
 
@@ -20,7 +21,7 @@ export type StreamMeta = {
   contentLength: number | null;
   audioBitrate: number | null;
   /** Which resolver produced this stream ("youtube" is the implicit default). */
-  source?: "youtube" | "audius" | "jamendo";
+  source?: "youtube" | "saavn" | "audius" | "jamendo";
 };
 
 // ─── Audius match scoring ────────────────────────────────────────────
@@ -513,6 +514,22 @@ export async function resolveWithInnerTubePlayer(
       const queriesToTry = [`${cleanTitle} ${rawAuthor}`.trim(), cleanTitle].filter(
         (q): q is string => Boolean(q && q.length > 0),
       );
+
+      // Primary Fallback: JioSaavn full-length 320kbps licensed stream (direct CDN, crystal-clear audio)
+      const saavnMatch = await resolveSaavnByMeta(
+        cleanTitle,
+        rawAuthor,
+        lastSeenDurations.get(videoId) ?? null,
+      ).catch(() => null);
+      if (saavnMatch?.url) {
+        return {
+          url: saavnMatch.url,
+          mimeType: saavnMatch.mimeType,
+          contentLength: null,
+          audioBitrate: 320000,
+          source: "saavn",
+        };
+      }
 
       for (const q of queriesToTry) {
         const audiusMatches = await searchAudius(q, { limit: 10 });

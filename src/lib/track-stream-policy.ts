@@ -13,7 +13,7 @@
  *  - audius/jamendo/archive → direct URL (already full-length, provider-authorized)
  *  - podcast:*              → direct URL (episode media, needs its own host)
  */
-const FULL_LENGTH_DIRECT_PREFIXES = ["audius:", "jamendo:", "archive:", "podcast:"];
+const FULL_LENGTH_DIRECT_PREFIXES = ["saavn:", "audius:", "jamendo:", "archive:", "podcast:"];
 
 /** True when `track.id` belongs to a provider whose direct URL is a full-length track. */
 export function hasFullLengthDirectSource(id: string | null | undefined): boolean {

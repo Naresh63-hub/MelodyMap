@@ -587,6 +587,7 @@ export function useAudioPlayer(options: {
     if (attempts >= 3) {
       setIsReconnecting(false);
       const isExternalNonYt =
+        trackId.startsWith("saavn:") ||
         trackId.startsWith("podcast:") ||
         trackId.startsWith("deezer:") ||
         trackId.startsWith("audius:") ||
@@ -878,7 +879,8 @@ export function useAudioPlayer(options: {
         const activeId = currentTrackIdRef.current;
         const isExternalNonYt =
           Boolean(activeId) &&
-          (activeId!.startsWith("podcast:") ||
+          (activeId!.startsWith("saavn:") ||
+            activeId!.startsWith("podcast:") ||
             activeId!.startsWith("deezer:") ||
             activeId!.startsWith("audius:") ||
             activeId!.startsWith("jamendo:") ||

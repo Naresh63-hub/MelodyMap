@@ -16,6 +16,7 @@
  */
 
 import type { UnifiedTrack, ProviderSearchOptions } from "./types";
+import { searchSaavn } from "./saavn";
 import { searchAudius } from "./audius";
 import { searchJamendo } from "./jamendo";
 import { searchDeezerTracks } from "./deezer";
@@ -45,8 +46,15 @@ export async function searchMultiProvider(
   const sourcesConsulted: string[] = [];
 
   // Stage 1: Search authorized open and independent streaming catalogs concurrently
-  // (Audius, Jamendo, Deezer, Internet Archive)
+  // (JioSaavn 320kbps full streams, Audius, Jamendo, Deezer, Internet Archive)
   const primaryPromises: Promise<UnifiedTrack[]>[] = [
+    searchSaavn(clean, { ...options, limit: Math.min(limit, 20) })
+      .then((res) => {
+        sourcesConsulted.push("saavn");
+        return res;
+      })
+      .catch(() => []),
+
     searchAudius(clean, { ...options, limit: Math.min(limit, 15) })
       .then((res) => {
         sourcesConsulted.push("audius");

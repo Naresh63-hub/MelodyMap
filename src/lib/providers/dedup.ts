@@ -76,6 +76,7 @@ export function areSameMultiProviderTrack(a: UnifiedTrack, b: UnifiedTrack): boo
 function getSourcePriority(track: UnifiedTrack): number {
   if (!track.playable) return 0;
   if (track.playbackSource?.type === "full") {
+    if (track.provider === "saavn") return 110;
     if (track.provider === "audius" || track.provider === "jamendo") return 100;
     return 90;
   }

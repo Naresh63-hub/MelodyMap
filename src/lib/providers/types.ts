@@ -4,6 +4,7 @@
  */
 
 export type MusicProviderName =
+  | "saavn"
   | "audius"
   | "jamendo"
   | "deezer"
@@ -68,7 +69,7 @@ export interface UnifiedTrack {
   isrc?: string | undefined; // International Standard Recording Code
   isExplicit?: boolean | undefined;
   year?: string | undefined;
-  source?: "audius" | "jamendo" | "deezer" | "archive" | "youtube" | "podcast" | "multi" | undefined;
+  source?: "saavn" | "audius" | "jamendo" | "deezer" | "archive" | "youtube" | "podcast" | "multi" | undefined;
   previewUrl?: string | undefined; // direct audio URL for HTML5 player
   reason?: string | undefined;
 }

@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./registry";
+export * from "./saavn";
 export * from "./audius";
 export * from "./jamendo";
 export * from "./deezer";
@@ -8,3 +9,4 @@ export * from "./musicbrainz";
 export * from "./youtube";
 export * from "./dedup";
 export * from "./multi-search";
+

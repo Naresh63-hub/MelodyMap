@@ -11,6 +11,7 @@ import { hasFullLengthDirectSource, resolveTrackStreamUrl } from "./track-stream
  */
 describe("track-stream-policy", () => {
   it("marks external full-length providers as direct-source", () => {
+    expect(hasFullLengthDirectSource("saavn:xyz789")).toBe(true);
     expect(hasFullLengthDirectSource("audius:abc")).toBe(true);
     expect(hasFullLengthDirectSource("jamendo:123")).toBe(true);
     expect(hasFullLengthDirectSource("archive:gate27")).toBe(true);

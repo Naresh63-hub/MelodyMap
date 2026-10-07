@@ -24,11 +24,13 @@ export function isAllowedUpstreamUrl(urlStr: string): boolean {
       host.endsWith(".googlevideo.com") ||
       host.endsWith(".youtube.com") ||
       host.endsWith(".ytimg.com") ||
+      host.endsWith(".saavncdn.com") ||
       host.endsWith(".audius.co") ||
       host.endsWith(".jamendo.com") ||
       host.endsWith(".jamendo.net") ||
       host === "googlevideo.com" ||
       host === "youtube.com" ||
+      host === "saavncdn.com" ||
       host === "audius.co" ||
       host === "jamendo.com" ||
       host === "jamendo.net"
@@ -138,7 +140,7 @@ export type UpstreamAudioResult =
       upstream: Response;
       mimeType: string;
       /** Which resolver produced the stream, surfaced as X-MelodyMap-Source. */
-      source?: "youtube" | "audius" | "jamendo" | undefined;
+      source?: "youtube" | "saavn" | "audius" | "jamendo" | undefined;
     }
   | { ok: false; status: number; message: string };
 

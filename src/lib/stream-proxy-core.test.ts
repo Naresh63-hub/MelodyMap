@@ -31,6 +31,7 @@ describe("isAllowedUpstreamUrl (SSRF guard)", () => {
   it("allows legitimate media hosts", () => {
     expect(isAllowedUpstreamUrl("https://rr1---sn-xyz.googlevideo.com/videoplayback?x=1")).toBe(true);
     expect(isAllowedUpstreamUrl("https://www.youtube.com/api/manifest")).toBe(true);
+    expect(isAllowedUpstreamUrl("https://aac.saavncdn.com/562/abc_320.mp4")).toBe(true);
     expect(isAllowedUpstreamUrl("https://discoveryprovider.audius.co/v1/tracks/stream/1")).toBe(true);
     expect(isAllowedUpstreamUrl("https://mp3d.jamendo.com/download/track/123/mp32")).toBe(true);
   });
