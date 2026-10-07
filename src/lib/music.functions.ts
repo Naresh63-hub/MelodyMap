@@ -105,7 +105,7 @@ export const suggestSearch = createServerFn({ method: "POST" })
     }
   });
 
-/** Search Deezer for tracks — free, no API key. Returns tracks with playable preview URLs. */
+/** Search Deezer for track metadata — free, no API key. Metadata only; playback resolves through the full-length stream proxy. */
 export const searchDeezerTracks = createServerFn({ method: "POST" })
   .validator((input: unknown) => SearchInput.parse(input))
   .handler(async ({ data }) => {

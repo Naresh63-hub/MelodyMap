@@ -1277,10 +1277,10 @@ export function useAudioPlayer(options: {
 
   /**
    * Direct URLs are only honored for providers whose streams are full-length
-   * (audius/jamendo/archive/podcast). Catalog tracks advertise a Deezer
-   * 30-second preview as previewUrl — honoring it would bypass the proxy's
-   * full-length fallback chain, so it is dropped and the track streams via
-   * the proxy instead.
+   * (audius/jamendo/archive/podcast). Metadata-enriched catalog tracks carry
+   * a `previewUrl` that is not a full-length source — honoring it would bypass
+   * the proxy's full-length resolution chain, so it is dropped and the track
+   * streams via the proxy instead.
    */
   const sanitizeDirectUrl = (trackId: string, directUrl?: string): string | undefined =>
     directUrl && hasFullLengthDirectSource(trackId) ? directUrl : undefined;

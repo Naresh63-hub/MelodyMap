@@ -71,7 +71,7 @@ export function areSameMultiProviderTrack(a: UnifiedTrack, b: UnifiedTrack): boo
  * Priority scoring for choosing the primary playback source:
  * 1. Authorized Full Playback (Audius / Jamendo / Archive full stream) -> Highest
  * 2. YouTube streaming proxy -> Middle
- * Previews (Deezer 30s) are given 0 priority and never chosen for playback.
+ * Sample/preview sources are given 0 priority and never chosen for playback.
  */
 function getSourcePriority(track: UnifiedTrack): number {
   if (!track.playable) return 0;

@@ -1,19 +1,19 @@
 /**
- * Hybrid music search — YouTube primary, Deezer fallback.
+ * Hybrid music search — multi-provider primary, YouTube fallback.
  *
  * YouTube gives full songs but many are restricted from streaming.
- * Deezer gives free 30-second previews that always work.
+ * Deezer contributes commercial metadata only — never 30-second samples.
  *
  * Strategy:
  * 1. Search YouTube first (full songs)
  * 2. If YouTube returns results, use them
  * 3. If YouTube fails or returns nothing, search Deezer
- * 4. Deezer tracks get a special `_deezerPreview` field for the stream proxy
+ * 4. Playback is resolved later by the stream proxy (full-length only)
  */
 
 import type { Track, SearchFilter } from "./music.server";
 
-export type HybridTrack = Track & { _deezerPreview?: string };
+export type HybridTrack = Track;
 
 export type HybridSearchResult = {
   tracks: HybridTrack[];

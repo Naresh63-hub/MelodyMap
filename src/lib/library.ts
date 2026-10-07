@@ -9,7 +9,7 @@ export type Track = {
   duration: string;
   thumbnail: string;
   reason?: string | undefined;
-  /** Direct audio URL (e.g. Audius stream, Jamendo MP3, Deezer preview, Archive, podcast) — bypasses stream proxy. */
+  /** Direct audio URL (e.g. Audius stream, Jamendo MP3, Archive, podcast) — bypasses stream proxy. */
   previewUrl?: string | undefined;
   /** Source provider */
   source?: "youtube" | "deezer" | "audius" | "jamendo" | "archive" | "podcast" | "multi" | undefined;

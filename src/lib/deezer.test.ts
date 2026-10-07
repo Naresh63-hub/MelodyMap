@@ -86,7 +86,8 @@ describe("deezer.server hermetic tests (mocked network)", () => {
     expect(results[0]?.id).toBe("deezer:9999");
     expect(results[0]?.title).toBe("Mock Song");
     expect(results[0]?.artist).toBe("Mock Artist");
-    expect(results[0]?.previewUrl).toBe("https://cdns-preview.dzcdn.net/stream/mock.mp3");
+    // Deezer's 30-second sample must never be surfaced as a playback URL.
+    expect(results[0]?.previewUrl).toBeUndefined();
     expect(results[0]?.duration).toBe("3:35");
   });
 });

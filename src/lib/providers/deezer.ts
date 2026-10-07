@@ -1,6 +1,6 @@
 /**
  * Deezer API Provider Adapter
- * Provides rich commercial music metadata, ISRC codes, and high-fidelity 30-second previews.
+ * Provides rich commercial music metadata and ISRC codes. Deezer's 30-second sample MP3s are ignored — playback is full-length only.
  *
  * API Docs: https://developers.deezer.com/api
  */
@@ -13,7 +13,7 @@ interface DeezerRawTrack {
   title_short?: string;
   isrc?: string;
   duration: number; // in seconds
-  preview: string; // 30-second MP3 URL
+  preview?: string; // 30-second sample MP3 from the API — intentionally never used
   artist: {
     id: number;
     name: string;

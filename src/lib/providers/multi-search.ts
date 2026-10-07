@@ -4,7 +4,7 @@
  * Orchestrates concurrent searches across:
  * - Audius (Decentralized Catalog, full streams)
  * - Jamendo (Creative Commons Licensed, full streams)
- * - Deezer (ISRC, commercial metadata, previews)
+ * - Deezer (ISRC, commercial metadata — no sample playback)
  * - Internet Archive (Live & historical music recordings)
  * - YouTube (Graceful secondary fallback)
  *

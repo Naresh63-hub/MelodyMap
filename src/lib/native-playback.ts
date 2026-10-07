@@ -91,7 +91,7 @@ export type PlaybackEngine = "html5" | "youtube";
  * stream reliability, avoiding datacenter IP blocks on serverless platforms.
  *
  * Localhost environments with local yt-dlp binaries use the HTML5 proxy engine.
- * Direct audio sources (podcasts, Deezer previews, offline cache) always
+ * Direct audio sources (podcasts, provider streams, offline cache) always
  * automatically route through HTML5 via setStream().
  */
 export function resolvePlaybackEngine(opts: {

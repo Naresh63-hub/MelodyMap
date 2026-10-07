@@ -1,9 +1,11 @@
 /**
  * Deezer Search API — free, no API key needed.
  *
- * Provides 30-second audio previews for tracks. Used as a fallback when
- * YouTube search fails or tracks are restricted. The preview URLs are
- * direct MP3 links that play in a plain <audio> element.
+ * Provides commercial music METADATA only (title, artist, artwork, duration).
+ * Deezer's API also returns 30-second sample MP3s; MelodyMap deliberately
+ * ignores them — full-length playback is resolved by the stream proxy
+ * (YouTube → Audius full track → Jamendo full track) — so Deezer results never
+ * carry a `previewUrl`.
  */
 
 import type { Track } from "./music.server";
@@ -17,7 +19,8 @@ type DeezerTrack = {
     cover_medium: string;
     cover_big: string;
   };
-  preview: string; // 30-second MP3 URL
+  /** Present in the API response, intentionally never used (30-second sample). */
+  preview?: string;
   duration: number; // seconds
 };
 
@@ -34,7 +37,7 @@ function formatDuration(seconds: number): string {
 
 /**
  * Search Deezer for tracks matching a query.
- * Returns tracks with direct audio preview URLs.
+ * Returns metadata-only tracks — no sample/preview playback URLs.
  */
 export async function searchDeezer(
   query: string,
@@ -61,38 +64,15 @@ export async function searchDeezer(
   }
 
   return (body.data ?? [])
-    .filter((t) => t.preview && t.duration > 30)
+    .filter((t) => t.id && t.title && t.duration > 0)
     .map((t) => ({
       id: `deezer:${t.id}`,
       title: t.title,
       artist: t.artist?.name ?? "Unknown",
       duration: formatDuration(t.duration),
       thumbnail: t.album?.cover_medium ?? t.album?.cover_big ?? "",
-      previewUrl: t.preview,
       source: "deezer" as const,
     }));
-}
-
-/**
- * Given a YouTube track title + artist, search Deezer for the same song.
- * Returns the direct preview URL or null.
- */
-export async function findDeezerPreview(
-  title: string,
-  artist: string,
-): Promise<string | null> {
-  // Strip common YouTube title clutter for a cleaner search
-  const cleanTitle = title
-    .replace(/\|.*$/, "") // everything after |
-    .replace(/\(.*official.*\)/gi, "") // (Official Video), etc.
-    .replace(/\[.*\]/g, "") // [Lyrics], [HD], etc.
-    .replace(/official video|official audio|lyrics|hd|4k|mv/gi, "")
-    .trim()
-    .slice(0, 80);
-
-  const query = cleanTitle ? `${cleanTitle} ${artist}` : `${title} ${artist}`;
-  const results = await searchDeezer(query, 3);
-  return results[0]?.previewUrl ?? null;
 }
 
 // ─── Related Artists Graph & Fallback ──────────────────────────────
