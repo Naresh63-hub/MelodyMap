@@ -28,13 +28,17 @@ export function SwipeableListItem({
   const startXRef = useRef(0);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    startXRef.current = e.touches[0].clientX;
+    const touch = e.touches[0];
+    if (!touch) return;
+    startXRef.current = touch.clientX;
     setIsDragging(true);
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isDragging) return;
-    const currentX = e.touches[0].clientX;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const currentX = touch.clientX;
     const diff = currentX - startXRef.current;
     const clampedDiff = Math.max(-100, Math.min(100, diff * 0.6));
     setDragX(clampedDiff);

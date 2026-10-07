@@ -69,6 +69,8 @@ export function usePullToRefresh({ onRefresh, threshold = 80 }: Props) {
     onTouchStart,
     onTouchMove,
     onTouchEnd,
+    // Grouped handlers so consumers can spread them onto the scroll container.
+    pullToRefreshProps: { onTouchStart, onTouchMove, onTouchEnd },
     pullDistance,
     isPulling,
     isRefreshing,

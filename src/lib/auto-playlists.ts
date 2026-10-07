@@ -144,7 +144,7 @@ const AUTO_PLAYLISTS: Record<AutoPlaylistType, AutoPlaylist> = {
       const targetLower = ctx.targetArtist.toLowerCase();
       const similar = allTracks.filter(
         track => track.artist.toLowerCase() === targetLower ||
-                 track.artist.toLowerCase().includes(targetLower.split(' ')[0])
+                 track.artist.toLowerCase().includes(targetLower.split(' ')[0] ?? '')
       );
       
       const shuffled = similar.sort(() => Math.random() - 0.5);

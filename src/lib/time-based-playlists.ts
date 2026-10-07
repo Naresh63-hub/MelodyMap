@@ -47,7 +47,7 @@ export function getCurrentTimeOfDay(): TimeOfDay {
 
 export function getTimeBasedPlaylist(): TimeBasedPlaylist {
   const currentTime = getCurrentTimeOfDay();
-  return TIME_BASED_PLAYLISTS.find(p => p.time === currentTime) || TIME_BASED_PLAYLISTS[0];
+  return TIME_BASED_PLAYLISTS.find(p => p.time === currentTime) || TIME_BASED_PLAYLISTS[0]!;
 }
 
 export function filterTracksByTimeOfDay(
