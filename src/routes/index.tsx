@@ -7,6 +7,7 @@ import {
   Search,
   Settings2,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { type NavTab, NAV_ITEMS } from "@/components/music/layout/Sidebar";
 import { MobileNav } from "@/components/music/layout/MobileNav";
@@ -23,6 +24,7 @@ import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSecti
 import { saveRecentSearch } from "@/lib/search-history";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { sleepTimerService } from "@/lib/sleep-timer";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
@@ -97,7 +99,17 @@ import {
   recommendTracks,
   searchTracks,
   getDailyMix,
+  moodPicks,
 } from "@/lib/music.functions";
+import {
+  countQuickFilterMatches,
+  filterTracksByQuickFilters,
+  findQuickFilter,
+  QUICK_FILTERS,
+  quickFilterRadioQueries,
+  toggleQuickFilter,
+} from "@/lib/mood-genre-filters";
+import { GenreMoodFilterBar } from "@/components/music/ui/GenreMoodFilterBar";
 import { useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
 import { listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
@@ -184,6 +196,7 @@ function MusicApp() {
   const runSearch = useServerFn(searchTracks);
   const runRecommend = useServerFn(recommendTracks);
   const runTrending = useServerFn(getRealTrendingTracks);
+  const runMoodPicks = useServerFn(moodPicks);
   const runOldSongs = useServerFn(getOldSongsTracks);
   const runMix = useServerFn(buildMix);
   const runPrewarm = useServerFn(prewarmStreams);
@@ -255,6 +268,25 @@ function MusicApp() {
   const [oldSongsList, setOldSongsList] = useState<Track[]>([]);
   const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const { pullToRefreshProps, isPulling } = usePullToRefresh({
+    onRefresh: async () => {
+      setRefreshing(true);
+      // Reload recommendations
+      try {
+        const newRecs = await runRecommend({ data: { settings: settingsToBrief(settings) } });
+        setRecs(newRecs);
+        // Reload trending
+        const newTrending = await runTrending({ data: { limit: 20 } });
+        setTrendingList(newTrending);
+      } catch (e) {
+        console.error('Error refreshing:', e);
+      } finally {
+        setRefreshing(false);
+      }
+    },
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [index, setIndex] = useState(0);
@@ -272,6 +304,9 @@ function MusicApp() {
   >({ discover: [], newrelease: [], explore: [] });
   const [mixLoading, setMixLoading] = useState(false);
   const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>([]);
+  const [quickFilters, setQuickFilters] = useState<string[]>([]);
+  const [quickFilterTracks, setQuickFilterTracks] = useState<Track[]>([]);
+  const [quickFilterLoading, setQuickFilterLoading] = useState(false);
 
   const [loadingMoreRecs, setLoadingMoreRecs] = useState(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
@@ -1233,6 +1268,76 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     },
     [runRecommend, runTrending, runOldSongs, runMix, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
+
+  /**
+   * Genre & Mood quick filters.
+   *
+   * Filtering is instant: the chips narrow the already-loaded feed on the same
+   * tap. Selecting a chip additionally pulls matching tracks from the mood radio
+   * (no AI key needed) so deeper results keep arriving, and picking a mood still
+   * refreshes the recommendation feed exactly as it did before.
+   */
+  const quickFilterPool = useMemo(
+    () => dedupeTracks([...quickFilterTracks, ...recs, ...dailyMixTracks]),
+    [quickFilterTracks, recs, dailyMixTracks],
+  );
+
+  const quickFilteredFeed = useMemo(
+    () => filterTracksByQuickFilters(quickFilterPool, quickFilters),
+    [quickFilterPool, quickFilters],
+  );
+
+  const quickFilterCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const filter of QUICK_FILTERS) {
+      counts[filter.id] = countQuickFilterMatches(quickFilterPool, filter);
+    }
+    return counts;
+  }, [quickFilterPool]);
+
+  const handleToggleQuickFilter = useCallback(
+    (id: string) => {
+      const next = toggleQuickFilter(quickFilters, id);
+      setQuickFilters(next);
+
+      const filter = findQuickFilter(id);
+      if (filter?.kind === "mood" && next.includes(id)) {
+        void loadRecommendations(filter.label);
+      }
+
+      if (next.length === 0) {
+        setQuickFilterTracks([]);
+        setQuickFilterLoading(false);
+        return;
+      }
+
+      const queries = quickFilterRadioQueries(next);
+      if (queries.length === 0) return;
+
+      setQuickFilterLoading(true);
+      void (async () => {
+        try {
+          const results = await Promise.allSettled(queries.map((query) => runMoodPicks({ data: { mood: query } })));
+          const fetched: Track[] = [];
+          for (const result of results) {
+            if (result.status === "fulfilled") {
+              for (const track of (result.value.tracks ?? []) as Track[]) fetched.push(track);
+            }
+          }
+          setQuickFilterTracks(dedupeTracks(fetched));
+        } finally {
+          setQuickFilterLoading(false);
+        }
+      })();
+    },
+    [quickFilters, loadRecommendations, runMoodPicks],
+  );
+
+  const handleClearQuickFilters = useCallback(() => {
+    setQuickFilters([]);
+    setQuickFilterTracks([]);
+    setQuickFilterLoading(false);
+  }, []);
 
   // Reload every home feed when language/artist preferences change. Previously
   // only the Settings modal's Apply button (and onboarding save) refreshed —
@@ -2638,8 +2743,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           </div>
         )}
 
-        <main className="relative flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-36">
+        <main 
+          className="relative flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-36"
+          {...pullToRefreshProps}
+        >
           <ErrorBoundary>
+            {/* Pull-to-refresh indicator */}
+            {isPulling && (
+              <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 border border-primary/30 backdrop-blur-md animate-fade-in">
+                <RefreshCw className="h-4 w-4 text-primary animate-spin" />
+                <span className="text-xs font-medium text-primary">Refreshing...</span>
+              </div>
+            )}
+            
             <div className="relative w-full px-4 py-5 sm:px-6 pb-32">
               {message && (
                 <div className="pointer-events-auto fixed bottom-36 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -2686,20 +2802,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     </div>
                   </div>
 
-                  {/* Mood chips */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
-                    {MOODS.map((mood) => (
-                      <button
-                        key={mood}
-                        type="button"
-                        onClick={() => void loadRecommendations(mood)}
-                        disabled={recLoading}
-                        className="shrink-0 rounded-full border border-white/[0.06] bg-white/[0.03] px-3.5 py-1 text-xs font-normal text-neutral-300 transition-all hover:bg-white/[0.08] hover:text-white active:scale-95 chip-bounce"
-                      >
-                        {mood}
-                      </button>
-                    ))}
-                  </div>
+                  {/* Genre & Mood quick filters — instant, local filtering */}
+                  <GenreMoodFilterBar
+                    activeIds={quickFilters}
+                    onToggle={handleToggleQuickFilter}
+                    onClear={handleClearQuickFilters}
+                    counts={quickFilterCounts}
+                  />
 
                   {/* Recent Searches section in the main view (stores last 5 searched artist or song terms locally) */}
                   <RecentSearchesSection
@@ -2716,11 +2825,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
                   {/* Home Sections — mobile horizontal scroll */}
                   <MobileHomeSections
-                    dailyMix={dailyMixTracks}
+                    dailyMix={quickFilters.length > 0 ? [] : dailyMixTracks}
                     trending={[]}
                     oldSongs={[]}
                     newReleases={[]}
-                    recommended={recs}
+                    recommended={quickFilters.length > 0 ? quickFilteredFeed : recs}
+                    quickFilterIds={quickFilters}
+                    onClearQuickFilters={handleClearQuickFilters}
                     onPlayTrack={(track, sectionTracks, i) => {
                       if (current?.id === track.id && player.isPlaying) {
                         pause();
@@ -2733,7 +2844,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     likedIds={likedIds}
                     currentId={current?.id ?? null}
                     isPlaying={player.isPlaying}
-                    loading={!hydrated || (recLoading && recs.length === 0)}
+                    loading={
+                      !hydrated ||
+                      (recLoading && recs.length === 0) ||
+                      (quickFilters.length > 0 && quickFilterLoading && quickFilteredFeed.length === 0)
+                    }
                   />
 
                 {/* Explore More Songs for low-bandwidth incremental discovery */}

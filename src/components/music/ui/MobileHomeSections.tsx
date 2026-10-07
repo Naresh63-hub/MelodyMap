@@ -5,6 +5,8 @@ import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
+import { GenreMoodFilterBar } from "@/components/music/ui/GenreMoodFilterBar";
+import { filterTracksByQuickFilters } from "@/lib/mood-genre-filters";
 
 type Props = {
   recentlyPlayed?: Track[] | undefined;
@@ -20,6 +22,12 @@ type Props = {
   currentId?: string | null | undefined;
   isPlaying: boolean;
   loading?: boolean | undefined;
+  /** Active genre/mood quick filter ids (state lives in the home route). */
+  quickFilterIds?: readonly string[] | undefined;
+  onToggleQuickFilter?: ((id: string) => void) | undefined;
+  onClearQuickFilters?: (() => void) | undefined;
+  /** Instant match counts per filter id, shown on the chips. */
+  quickFilterCounts?: Record<string, number> | undefined;
 };
 
 /** Horizontal scrollable row of track cards */
@@ -51,9 +59,9 @@ function HorizontalScrollRow({
         return (
           <div
             key={track.id}
-            className="group relative w-[132px] shrink-0 snap-start text-left transition-transform p-1.5 rounded-xl hover:bg-white/[0.04]"
+            className="group relative w-[132px] shrink-0 snap-start text-left transition-transform p-1.5 rounded-xl hover:bg-chip"
           >
-            <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06]">
+            <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair">
               <button
                 type="button"
                 onClick={() => onPlayTrack(track, tracks, i)}
@@ -109,7 +117,7 @@ function HorizontalScrollRow({
               <p
                 className={cn(
                   "truncate text-xs font-medium leading-tight",
-                  active ? "text-primary" : "text-white/90 group-hover:text-white",
+                  active ? "text-primary" : "text-foreground/90 group-hover:text-foreground",
                 )}
               >
                 {track.title}
@@ -154,15 +162,15 @@ function VerticalSongList({
             className={cn(
               "flex items-center gap-3 rounded-lg p-2 transition-colors",
               active
-                ? "bg-white/[0.08]"
-                : "hover:bg-white/[0.03]",
+                ? "bg-chip-strong"
+                : "hover:bg-chip-subtle",
             )}
           >
             {/* Thumbnail + Play Action */}
             <button
               type="button"
               onClick={() => onPlayTrack(track, tracks, i)}
-              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card border border-white/[0.05]"
+              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card border border-hair"
             >
               <img
                 src={getOptimizedThumbnailUrl(track.thumbnail)}
@@ -185,7 +193,7 @@ function VerticalSongList({
               <p
                 className={cn(
                   "truncate text-[13px] font-medium leading-tight",
-                  active ? "text-primary" : "text-white/90",
+                  active ? "text-primary" : "text-foreground/90",
                 )}
               >
                 {track.title}
@@ -210,7 +218,7 @@ function VerticalSongList({
                 type="button"
                 onClick={() => onOpenOptions(track)}
                 aria-label="Track options"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-white transition-colors"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-foreground transition-colors"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -233,7 +241,7 @@ function SectionHeader({
     <div className="flex items-center justify-between mb-2.5 px-0.5">
       <div className="flex items-center gap-2">
         {Icon && <Icon className="h-4 w-4 text-neutral-400" />}
-        <h2 className="text-sm font-semibold tracking-normal text-white/90">{title}</h2>
+        <h2 className="text-sm font-semibold tracking-normal text-foreground/90">{title}</h2>
       </div>
     </div>
   );
@@ -253,7 +261,19 @@ export function MobileHomeSections({
   currentId,
   isPlaying,
   loading = false,
+  quickFilterIds = [],
+  onToggleQuickFilter,
+  onClearQuickFilters,
+  quickFilterCounts,
 }: Props) {
+  // Genre & mood quick filters narrow every section instantly, on the client.
+  const visibleDailyMix = filterTracksByQuickFilters(dailyMix ?? [], quickFilterIds);
+  const visibleRecommended = filterTracksByQuickFilters(recommended, quickFilterIds);
+  const visibleTrending = filterTracksByQuickFilters(trending, quickFilterIds);
+  const visibleOldSongs = filterTracksByQuickFilters(oldSongs ?? [], quickFilterIds);
+  const visibleNewReleases = filterTracksByQuickFilters(newReleases, quickFilterIds);
+  const visibleRecentlyPlayed = filterTracksByQuickFilters(recentlyPlayed ?? [], quickFilterIds);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -263,7 +283,7 @@ export function MobileHomeSections({
             <div className="flex gap-3 overflow-hidden">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="w-[132px] shrink-0 space-y-2">
-                  <div className="aspect-square w-full rounded-lg bg-card border border-white/[0.04] animate-pulse" />
+                  <div className="aspect-square w-full rounded-lg bg-card border border-hair animate-pulse" />
                   <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
                   <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
                 </div>
@@ -276,37 +296,88 @@ export function MobileHomeSections({
   }
 
   const hasAny =
-    (dailyMix && dailyMix.length > 0) ||
-    trending.length > 0 ||
-    (oldSongs && oldSongs.length > 0) ||
-    newReleases.length > 0 ||
-    recommended.length > 0;
+    visibleDailyMix.length > 0 ||
+    visibleTrending.length > 0 ||
+    visibleOldSongs.length > 0 ||
+    visibleNewReleases.length > 0 ||
+    visibleRecommended.length > 0 ||
+    visibleRecentlyPlayed.length > 0;
+
+  const filterBar = onToggleQuickFilter ? (
+    <GenreMoodFilterBar
+      activeIds={quickFilterIds}
+      onToggle={onToggleQuickFilter}
+      onClear={onClearQuickFilters ?? (() => {})}
+      counts={quickFilterCounts}
+      className="-mx-4 px-4"
+    />
+  ) : null;
 
   if (!hasAny) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
-        <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
-        <h3 className="text-sm font-semibold text-white/80 mb-1">Nothing here yet</h3>
-        <p className="text-xs text-neutral-400 max-w-xs px-4">
-          Search for your favorite songs or artists to start listening.
-        </p>
+      <div className="space-y-6">
+        {filterBar}
+        {quickFilterIds.length > 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+            <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
+            <h3 className="text-sm font-semibold text-foreground/80 mb-1">No tracks match these filters</h3>
+            <p className="text-xs text-neutral-400 max-w-xs px-4">
+              Pick another genre or mood, or clear the filters to see your full feed.
+            </p>
+            {onClearQuickFilters && (
+              <button
+                type="button"
+                onClick={onClearQuickFilters}
+                className="mt-3 rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-1.5 text-xs text-neutral-300 transition hover:bg-white/[0.08] hover:text-white"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
+            <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
+            <h3 className="text-sm font-semibold text-foreground/80 mb-1">Nothing here yet</h3>
+            <p className="text-xs text-neutral-400 max-w-xs px-4">
+              Search for your favorite songs or artists to start listening.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Genre & Mood quick filters — filtering is instant and local */}
+      {filterBar}
+
+      {/* 0. Recently Played - Quick Access */}
+      {visibleRecentlyPlayed.length > 0 && (
+        <section className="animate-fade-in">
+          <SectionHeader title="Recently Played" icon={Clock} />
+          <HorizontalScrollRow
+            tracks={visibleRecentlyPlayed}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
+          />
+        </section>
+      )}
+
       {/* 1. Daily Mix */}
-      {dailyMix && dailyMix.length > 0 && (
+      {visibleDailyMix.length > 0 && (
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-2.5 px-0.5">
-            <h2 className="text-sm font-semibold tracking-normal text-white/90">Daily Mix</h2>
+            <h2 className="text-sm font-semibold tracking-normal text-foreground/90">Daily Mix</h2>
             <span className="text-[11px] font-normal text-neutral-400">
               Updated today
             </span>
           </div>
           <HorizontalScrollRow
-            tracks={dailyMix}
+            tracks={visibleDailyMix}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
@@ -317,11 +388,11 @@ export function MobileHomeSections({
       )}
 
       {/* Made For You (AI / Bandit Recommendations) */}
-      {recommended.length > 0 && (
+      {visibleRecommended.length > 0 && (
         <section className="animate-fade-in">
           <SectionHeader title="Made For You" />
           <VerticalSongList
-            tracks={recommended}
+            tracks={visibleRecommended}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
@@ -333,11 +404,11 @@ export function MobileHomeSections({
       )}
 
       {/* 4. Trending Now (Optional if rendered in Home) */}
-      {trending && trending.length > 0 && (
+      {visibleTrending.length > 0 && (
         <section className="animate-fade-in">
           <SectionHeader title="Trending Now" icon={TrendingUp} />
           <VerticalSongList
-            tracks={trending.slice(0, 8)}
+            tracks={visibleTrending.slice(0, 8)}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
@@ -349,19 +420,19 @@ export function MobileHomeSections({
       )}
 
       {/* 5. Old Classics (Optional if rendered in Home) */}
-      {oldSongs && oldSongs.length > 0 && (
+      {visibleOldSongs.length > 0 && (
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-2.5 px-0.5">
             <div className="flex items-center gap-2">
               <Disc3 className="h-4 w-4 text-amber-400/80" />
-              <h2 className="text-sm font-semibold tracking-normal text-white/90">Old Classics</h2>
+              <h2 className="text-sm font-semibold tracking-normal text-foreground/90">Old Classics</h2>
             </div>
             <span className="text-[11px] font-normal text-neutral-400">
               Golden Era & Retro
             </span>
           </div>
           <HorizontalScrollRow
-            tracks={oldSongs}
+            tracks={visibleOldSongs}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
@@ -372,11 +443,11 @@ export function MobileHomeSections({
       )}
 
       {/* 6. New Releases (Optional if rendered in Home) */}
-      {newReleases && newReleases.length > 0 && (
+      {visibleNewReleases.length > 0 && (
         <section className="animate-fade-in">
           <SectionHeader title="New Releases" icon={Flame} />
           <HorizontalScrollRow
-            tracks={newReleases}
+            tracks={visibleNewReleases}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
