@@ -36,32 +36,22 @@ export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props)
               onNavigate(id);
             }}
             className={cn(
-              "relative flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-medium transition-all active:scale-95",
-              active ? "text-foreground font-semibold nav-item-glow" : "text-muted-foreground hover:text-secondary-foreground"
+              "relative flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-medium transition-colors active:scale-95",
+              active ? "text-foreground font-semibold" : "text-muted-foreground hover:text-secondary-foreground"
             )}
             aria-label={label}
             aria-current={active ? "page" : undefined}
           >
-            {/* Active indicator with glow */}
-            {active && (
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full shadow-[0_0_12px_#38bdf8]" />
-            )}
-            
-            {/* Floating bubble background for active tab */}
-            {active && (
-              <div className="absolute inset-0 bg-primary/10 rounded-xl backdrop-blur-sm border border-primary/20" />
-            )}
-            
             <Icon
               className={cn(
-                "h-5 w-5 transition-transform relative z-10",
+                "h-5 w-5 transition-transform",
                 active ? "text-primary" : "text-muted-foreground"
               )}
               strokeWidth={active ? 2.2 : 1.7}
             />
             <span
               className={cn(
-                "truncate max-w-[64px] relative z-10",
+                "truncate max-w-[64px]",
                 active ? "font-semibold text-foreground" : ""
               )}
             >
