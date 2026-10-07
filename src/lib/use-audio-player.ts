@@ -234,6 +234,7 @@ export function useAudioPlayer(options: {
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
   const isFadingOutRef = useRef<boolean>(false);
 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -316,7 +317,13 @@ export function useAudioPlayer(options: {
         compressor.release.setValueAtTime(0.25, ctx.currentTime);
         compressorRef.current = compressor;
 
-        // Connect main gain -> filter[0] -> ... -> compressor -> destination
+        // Passive FFT tap for the audio visualizer (does not alter the sound)
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.82;
+        analyserRef.current = analyser;
+
+        // Connect main gain -> filter[0] -> ... -> compressor -> analyser -> destination
         if (filters.length > 0 && filters[0]) {
           mainGain.connect(filters[0]);
           let prevNode: AudioNode = filters[0];
@@ -328,10 +335,12 @@ export function useAudioPlayer(options: {
             }
           }
           prevNode.connect(compressor);
-          compressor.connect(ctx.destination);
+          compressor.connect(analyser);
+          analyser.connect(ctx.destination);
         } else {
           mainGain.connect(compressor);
-          compressor.connect(ctx.destination);
+          compressor.connect(analyser);
+          analyser.connect(ctx.destination);
         }
       } catch (err) {
         console.warn("[WebAudio] Equalizer init notice:", err);
@@ -1553,6 +1562,7 @@ export function useAudioPlayer(options: {
     skipBackward,
     setSpeed,
     setVolume,
+    getAnalyser: () => analyserRef.current,
   };
 }
 

@@ -140,14 +140,14 @@ export function LyricsPanel({
   );
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#0a0a18]/95 backdrop-blur-xl border-l border-white/5 shadow-2xl animate-slide-up sm:max-w-sm md:max-w-md" role="dialog" aria-label="Lyrics panel">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#0a0a18]/95 backdrop-blur-xl border-l border-hair shadow-2xl animate-slide-up sm:max-w-sm md:max-w-md" role="dialog" aria-label="Lyrics panel">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-white/5 p-4">
+      <div className="flex items-center justify-between border-b border-hair p-4">
         <div className="flex items-center gap-3">
           <MessageSquare className="h-5 w-5 text-pink-400 icon-glow" />
           <div>
-            <h3 className="font-semibold text-white">Lyrics</h3>
-            <p className="text-xs text-white/40 truncate max-w-[200px]">
+            <h3 className="font-semibold text-foreground">Lyrics</h3>
+            <p className="text-xs text-foreground/40 truncate max-w-[200px]">
               {trackTitle} · {trackArtist}
             </p>
           </div>
@@ -157,21 +157,21 @@ export function LyricsPanel({
           size="icon"
           onClick={onClose}
           aria-label="Close lyrics"
-          className="h-8 w-8 text-white/60 hover:text-white button-press"
+          className="h-8 w-8 text-foreground/60 hover:text-foreground button-press"
         >
           <X className="h-4 w-4" />
         </Button>
       </div>
 
       {/* Search */}
-      <div className="p-4 border-b border-white/5">
+      <div className="p-4 border-b border-hair">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/30" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search lyrics..."
-            className="pl-9 bg-white/[0.04] border-white/10 text-white placeholder:text-white/30 focus:border-white/20 focus:ring-1 focus:ring-white/10"
+            className="pl-9 bg-chip border-hair-strong text-foreground placeholder:text-foreground/30 focus:border-hair-strong focus:ring-1 focus:ring-chip-strong"
           />
         </div>
       </div>
@@ -188,12 +188,12 @@ export function LyricsPanel({
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
-            <p className="text-xs text-white/50">Fetching synchronized lyrics...</p>
+            <p className="text-xs text-foreground/50">Fetching synchronized lyrics...</p>
           </div>
         ) : filteredLyrics.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <MessageSquare className="h-12 w-12 text-white/20 mb-3" />
-            <p className="text-sm text-white/40">
+            <MessageSquare className="h-12 w-12 text-foreground/20 mb-3" />
+            <p className="text-sm text-foreground/40">
               {searchQuery
                 ? "No lyrics found matching your search"
                 : "Lyrics not available for this track"}
@@ -215,8 +215,8 @@ export function LyricsPanel({
                   className={cn(
                     "w-full text-center transition-all duration-300 py-2.5 px-4 rounded-xl cursor-pointer select-none",
                     isActive
-                      ? "text-[#F5F5F5] font-semibold text-lg scale-105 bg-white/[0.08] border border-white/[0.08]"
-                      : "text-white/40 text-sm hover:text-white/80 hover:bg-white/[0.03]",
+                      ? "text-foreground font-semibold text-lg scale-105 bg-chip-strong border border-hair-strong"
+                      : "text-foreground/40 text-sm hover:text-foreground/80 hover:bg-chip-subtle",
                   )}
                 >
                   {line.text}
@@ -228,8 +228,8 @@ export function LyricsPanel({
       </div>
 
       {/* Footer info */}
-      <div className="border-t border-white/5 p-3 text-center">
-        <p className="text-[10px] text-white/30">
+      <div className="border-t border-hair p-3 text-center">
+        <p className="text-[10px] text-foreground/30">
           {loading
             ? "Loading..."
             : isPlaying

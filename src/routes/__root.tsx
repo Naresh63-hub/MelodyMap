@@ -131,6 +131,16 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        {/* Apply persisted light/dark theme before first paint (avoids flash) */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{var m=localStorage.getItem("melodymap-theme")||"dark";' +
+              'var l=m==="light"||(m==="auto"&&window.matchMedia("(prefers-color-scheme: light)").matches);' +
+              'if(l){document.documentElement.classList.add("light");document.documentElement.style.colorScheme="light";' +
+              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#f2f5fa";}}catch(e){}})();',
+          }}
+        />
         <script src="https://www.youtube.com/iframe_api" async></script>
       </head>
       <body>

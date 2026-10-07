@@ -83,7 +83,7 @@ export function PlaylistsPanel({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="New playlist name…"
-          className="h-11 rounded-full bg-card border border-white/[0.08] text-[#F5F5F5] placeholder:text-[#737373] focus:border-white/20 focus:ring-1 focus:ring-white/10"
+          className="h-11 rounded-full bg-card border border-hair-strong text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-chip-strong"
         />
         <Button
           type="submit"
@@ -95,7 +95,7 @@ export function PlaylistsPanel({
       </form>
 
       {playlists.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 bg-card/40 px-5 py-10 text-center text-sm text-[#737373]">
+        <p className="rounded-xl border border-dashed border-hair-strong bg-card/40 px-5 py-10 text-center text-sm text-muted-foreground">
           No playlists yet. Create one, then use the + on any song to save it here.
         </p>
       ) : (
@@ -110,7 +110,7 @@ export function PlaylistsPanel({
                   "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors",
                   p.id === openId
                     ? "border-transparent bg-[#F5F5F5] text-black font-medium shadow-sm"
-                    : "border-white/[0.06] bg-card text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-popover",
+                    : "border-hair bg-card text-secondary-foreground hover:text-foreground hover:bg-popover",
                 )}
               >
                 <ListMusic className="h-4 w-4" />
@@ -321,15 +321,15 @@ export function PlaylistsPanel({
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
-        <DialogContent className="sm:max-w-md bg-[#12121e] border-white/10 text-white">
+        <DialogContent className="sm:max-w-md bg-[#12121e] border-hair-strong text-foreground">
           <DialogHeader>
-            <DialogTitle className="text-white">Delete playlist?</DialogTitle>
-            <DialogDescription className="text-white/50">
+            <DialogTitle className="text-foreground">Delete playlist?</DialogTitle>
+            <DialogDescription className="text-foreground/50">
               This cannot be undone. {deleteTarget?.tracks.length ?? 0} track{deleteTarget?.tracks.length === 1 ? "" : "s"} will be removed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" className="text-white/60 hover:text-white" onClick={() => setDeleteConfirmId(null)}>
+            <Button variant="ghost" className="text-foreground/60 hover:text-foreground" onClick={() => setDeleteConfirmId(null)}>
               Cancel
             </Button>
             <Button

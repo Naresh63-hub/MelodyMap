@@ -66,9 +66,9 @@ export function TrackList({
 
   if (tracks.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-10 text-center">
-        <Music2 className="mx-auto h-12 w-12 text-white/20 mb-3" />
-        <p className="text-sm text-white/30">
+      <div className="rounded-xl border border-dashed border-hair-strong bg-chip-subtle px-5 py-10 text-center">
+        <Music2 className="mx-auto h-12 w-12 text-foreground/20 mb-3" />
+        <p className="text-sm text-foreground/30">
           {emptyMessage ?? "Nothing here yet."}
         </p>
       </div>
@@ -87,13 +87,13 @@ export function TrackList({
               "group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors sm:px-3",
               active
                 ? "bg-popover"
-                : "hover:bg-white/[0.03]",
+                : "hover:bg-chip-subtle",
             )}
           >
             <button
               type="button"
               onClick={() => onPlay(track, index)}
-              className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-card border border-white/[0.06] transition-transform duration-150 active:scale-95"
+              className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-card border border-hair transition-transform duration-150 active:scale-95"
               aria-label={`Play ${track.title}`}
             >
               <img
@@ -128,18 +128,18 @@ export function TrackList({
                 <p
                   className={cn(
                     "truncate text-sm font-semibold transition-colors duration-150",
-                    active ? "text-primary" : "text-[#F5F5F5] group-hover:text-white",
+                    active ? "text-primary" : "text-foreground group-hover:text-foreground",
                   )}
                 >
                   {track.title}
                 </p>
               </button>
-              <p className="truncate text-xs text-[#A1A1A1] group-hover:text-[#F5F5F5] transition-colors duration-150 mt-0.5">
+              <p className="truncate text-xs text-secondary-foreground group-hover:text-foreground transition-colors duration-150 mt-0.5">
                 {onArtistClick ? (
                   <button
                     type="button"
                     onClick={() => onArtistClick(track.artist)}
-                    className="hover:text-white hover:underline transition-colors"
+                    className="hover:text-foreground hover:underline transition-colors"
                   >
                     {track.artist}
                   </button>
@@ -150,7 +150,7 @@ export function TrackList({
               </p>
             </div>
 
-            <span className="hidden text-xs tabular-nums text-[#737373] group-hover:text-[#A1A1A1] transition-colors sm:block">
+            <span className="hidden text-xs tabular-nums text-muted-foreground group-hover:text-secondary-foreground transition-colors sm:block">
               {track.duration}
             </span>
 
@@ -167,10 +167,10 @@ export function TrackList({
                       ? "Remove offline copy"
                       : "Download for offline"
                   }
-                  className="rounded-full p-2 text-white/40 transition-colors hover:text-white active:scale-95"
+                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-foreground active:scale-95"
                 >
                   {downloadingIds?.has(track.id) ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+                    <Loader2 className="h-4 w-4 animate-spin text-foreground/60" />
                   ) : downloadedIds?.has(track.id) ? (
                     <CheckCircle2 className="h-4 w-4 text-primary" />
                   ) : (
@@ -190,7 +190,7 @@ export function TrackList({
                   type="button"
                   onClick={() => onToggleDislike(track)}
                   aria-label="Not for me"
-                  className="rounded-full p-2 text-white/40 transition-colors hover:text-red-400 active:scale-95"
+                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-red-400 active:scale-95"
                 >
                   <ThumbsDown
                     className={cn(
@@ -205,7 +205,7 @@ export function TrackList({
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     aria-label="Add to playlist"
-                    className="rounded-full p-2 text-white/40 transition-colors hover:text-white active:scale-95"
+                    className="rounded-full p-2 text-foreground/40 transition-colors hover:text-foreground active:scale-95"
                   >
                     <Plus className="h-4 w-4" />
                   </DropdownMenuTrigger>

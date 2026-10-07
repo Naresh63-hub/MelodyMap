@@ -1,4 +1,5 @@
 import { Menu, Settings2, User } from "lucide-react";
+import { StreakBadge } from "@/components/music/ui/StreakBadge";
 
 type Props = {
   tab?: string;
@@ -44,14 +45,14 @@ export function MobileHeader({
   };
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between px-4 pb-3 header-safe-top glass-frosted border-b border-white/[0.08]">
+    <header className="sticky top-0 z-20 flex items-center justify-between px-4 pb-3 header-safe-top glass-frosted border-b border-hair-strong">
       <div className="flex items-center gap-2.5 min-w-0">
         {onOpenMenu && (
           <button
             type="button"
             onClick={onOpenMenu}
             aria-label="Open navigation menu"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/70 hover:text-white active:scale-95 transition-all"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip border border-hair-strong text-foreground/70 hover:text-foreground active:scale-95 transition-all"
           >
             <Menu className="h-4 w-4" />
           </button>
@@ -60,7 +61,7 @@ export function MobileHeader({
         <div className="min-w-0">
           <h1
             suppressHydrationWarning
-            className="text-base sm:text-lg font-semibold text-white/95 truncate leading-tight tracking-tight"
+            className="text-base sm:text-lg font-semibold text-foreground/95 truncate leading-tight tracking-tight"
           >
             {getTitle()}
           </h1>
@@ -73,12 +74,14 @@ export function MobileHeader({
       </div>
 
       <div className="flex items-center gap-1.5">
+        <StreakBadge />
+        
         {onOpenSettings && (
           <button
             type="button"
             onClick={onOpenSettings}
             aria-label="Settings"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/50 hover:text-white/90 hover:bg-white/[0.05] active:scale-95 transition-all"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 hover:text-foreground/90 hover:bg-chip active:scale-95 transition-all"
           >
             <Settings2 className="h-4 w-4" />
           </button>
@@ -96,9 +99,9 @@ export function MobileHeader({
             {userAvatar ? (
               <img src={userAvatar} alt="Profile" className="h-full w-full object-cover" />
             ) : userInitial ? (
-              <span className="text-xs font-medium text-white/90 font-bold tracking-wide">{userInitial}</span>
+              <span className="text-xs font-medium text-foreground/90 font-bold tracking-wide">{userInitial}</span>
             ) : (
-              <User className="h-3.5 w-3.5 text-white/70" />
+              <User className="h-3.5 w-3.5 text-foreground/70" />
             )}
           </button>
         )}

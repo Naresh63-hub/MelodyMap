@@ -25,9 +25,10 @@ import { cn } from "@/lib/utils";
 import { ScrubBar } from "@/components/music/ScrubBar";
 import { formatTime } from "@/lib/use-audio-player";
 import { useSleepTimer } from "@/hooks/useSleepTimer";
-import { useSwipeGestures, useDoubleTapSeek } from "@/hooks/use-gesture-controls";
+import { useDragToDismiss, useDoubleTapSeek, useSwipeGestures } from "@/hooks/use-gesture-controls";
 import type { Track } from "@/lib/library";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
+import AudioVisualizer from "./AudioVisualizer";
 
 type Props = {
   track: Track | null;
@@ -66,6 +67,7 @@ type Props = {
   canPrevious: boolean;
   isReplacementSource?: boolean;
   streamSource?: "youtube" | "audius" | "jamendo" | null;
+  getAnalyser?: () => AnalyserNode | null;
 };
 
 const SPEEDS = [1, 1.25, 1.5, 2];
@@ -107,18 +109,27 @@ export function FullScreenPlayer({
   canPrevious,
   isReplacementSource = false,
   streamSource,
+  getAnalyser,
 }: Props) {
   const { isActive: isSleepTimerActive, formattedRemaining: sleepTimerCountdown } = useSleepTimer();
 
-  // Gesture controls: swipe down to collapse, double-tap artwork to seek ±10s
-  const swipeProps = useSwipeGestures({ onSwipeDown: onClose, threshold: 80 });
+  // Gesture controls: drag down to dismiss (finger-following), double-tap artwork to seek ±10s, swipe left/right to skip
+  const { dragProps, dragY, dragging } = useDragToDismiss({ onDismiss: onClose });
   const { gestureProps: doubleTapProps, flash } = useDoubleTapSeek({
     onBackward: (s) => (onSkipBackward ? onSkipBackward(s) : onSeek(Math.max(0, position - s))),
     onForward: (s) => (onSkipForward ? onSkipForward(s) : onSeek(Math.min(duration, position + s))),
     seconds: 10,
   });
+  const { onTouchStart: swipeStart, onTouchEnd: swipeEnd } = useSwipeGestures({
+    onSwipeLeft: onNext,
+    onSwipeRight: onPrevious,
+    threshold: 80,
+  });
 
   if (!track) return null;
+
+  const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
+  const dismissProgress = Math.min(1, Math.abs(dragY) / (viewportH * 0.9));
 
   const cycleSpeed = () => {
     if (!onSpeedChange) return;
@@ -129,8 +140,15 @@ export function FullScreenPlayer({
 
   return (
     <div
-      {...swipeProps}
+      {...dragProps}
       className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-hidden animate-fade-in"
+      style={{
+        transform: dragY ? `translateY(${dragY}px)` : undefined,
+        opacity: dragY ? 1 - dismissProgress * 0.85 : undefined,
+        transition: dragging
+          ? "none"
+          : "transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease",
+      }}
     >
       {/* Soft ambient background art glow */}
       <div
@@ -149,7 +167,7 @@ export function FullScreenPlayer({
             type="button"
             onClick={onClose}
             aria-label="Collapse player"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.04] border border-white/[0.06] text-[#A1A1A1] hover:bg-white/[0.08] hover:text-[#F5F5F5] transition-all active:scale-95"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-chip border border-hair text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all active:scale-95"
           >
             <ChevronDown className="h-5 w-5" />
           </button>
@@ -158,7 +176,7 @@ export function FullScreenPlayer({
             <p className="text-[10px] font-medium tracking-[0.08em] uppercase text-muted-foreground">
               PLAYING FROM
             </p>
-            <p className="text-xs font-normal text-[#A1A1A1] truncate max-w-[200px] mt-0.5">
+            <p className="text-xs font-normal text-secondary-foreground truncate max-w-[200px] mt-0.5">
               {playlistName}
             </p>
           </div>
@@ -167,7 +185,7 @@ export function FullScreenPlayer({
             type="button"
             onClick={() => onOpenOptions?.(track)}
             aria-label="Song options"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.04] border border-white/[0.06] text-[#A1A1A1] hover:bg-white/[0.08] hover:text-[#F5F5F5] transition-all active:scale-95"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-chip border border-hair text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all active:scale-95"
           >
             <MoreVertical className="h-4 w-4" />
           </button>
@@ -177,6 +195,8 @@ export function FullScreenPlayer({
         <div className="flex flex-col items-center justify-center my-auto w-full py-4">
           <div
             {...doubleTapProps}
+            onTouchStart={swipeStart}
+            onTouchEnd={swipeEnd}
             className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border touch-manipulation select-none"
           >
             <img
@@ -203,14 +223,14 @@ export function FullScreenPlayer({
           {/* Track Info Row */}
           <div className="flex items-center justify-between w-full mt-6 px-1">
             <div className="min-w-0 flex-1 pr-4">
-              <h2 className="text-lg sm:text-xl font-semibold text-[#F5F5F5] truncate tracking-[-0.01em]">
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground truncate tracking-[-0.01em]">
                 {track.title}
               </h2>
-              <p className="text-sm font-normal text-[#A1A1A1] truncate mt-0.5">
+              <p className="text-sm font-normal text-secondary-foreground truncate mt-0.5">
                 {track.artist}
               </p>
               {(track.album || track.year) && (
-                <p className="text-xs text-[#737373] truncate mt-0.5">
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
                   {[track.album, track.year].filter(Boolean).join(" • ")}
                 </p>
               )}
@@ -233,7 +253,7 @@ export function FullScreenPlayer({
                   type="button"
                   onClick={() => onAddToPlaylist(track)}
                   aria-label="Add to playlist"
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-[#737373] hover:text-[#F5F5F5] active:scale-90 transition-all"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:text-foreground active:scale-90 transition-all"
                 >
                   <Plus className="h-6 w-6" />
                 </button>
@@ -244,6 +264,8 @@ export function FullScreenPlayer({
 
         {/* Bottom Controls Area */}
         <div className="w-full space-y-4">
+          {/* Real-time frequency bars (auto-hidden for engines without an FFT tap) */}
+          <AudioVisualizer getAnalyser={getAnalyser} active={isPlaying} className="h-10 sm:h-12" />
           {/* Seek Scrubber Bar */}
           <div className="space-y-1">
             <ScrubBar
@@ -253,7 +275,7 @@ export function FullScreenPlayer({
               onSeek={onSeek}
               className="w-full"
             />
-            <div className="flex justify-between text-[11px] font-normal tabular-nums text-[#737373]">
+            <div className="flex justify-between text-[11px] font-normal tabular-nums text-muted-foreground">
               <span>{formatTime(position)}</span>
               <span>{formatTime(duration)}</span>
             </div>
@@ -266,7 +288,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onToggleShuffle}
               className={cn(
-                "p-2 text-[#737373] hover:text-[#F5F5F5] transition-colors active:scale-95",
+                "p-2 text-muted-foreground hover:text-foreground transition-colors active:scale-95",
                 shuffle && "text-primary"
               )}
               aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
@@ -280,7 +302,7 @@ export function FullScreenPlayer({
               <button
                 type="button"
                 onClick={() => onSkipBackward(5)}
-                className="p-1.5 text-[#737373] hover:text-[#A1A1A1] active:scale-95 transition-all"
+                className="p-1.5 text-muted-foreground hover:text-secondary-foreground active:scale-95 transition-all"
                 title="Rewind 5 seconds"
               >
                 <RotateCcw className="h-4.5 w-4.5" />
@@ -292,7 +314,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onPrevious}
               disabled={!canPrevious}
-              className="p-2 text-[#F5F5F5] hover:text-white disabled:opacity-30 active:scale-95 transition-all"
+              className="p-2 text-foreground hover:text-foreground disabled:opacity-30 active:scale-95 transition-all"
               aria-label="Previous track"
             >
               <SkipBack className="h-6 w-6 fill-current" />
@@ -320,7 +342,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onNext}
               disabled={!canNext}
-              className="p-2 text-[#F5F5F5] hover:text-white disabled:opacity-30 active:scale-95 transition-all"
+              className="p-2 text-foreground hover:text-foreground disabled:opacity-30 active:scale-95 transition-all"
               aria-label="Next track"
             >
               <SkipForward className="h-6 w-6 fill-current" />
@@ -331,7 +353,7 @@ export function FullScreenPlayer({
               <button
                 type="button"
                 onClick={() => onSkipForward(5)}
-                className="p-1.5 text-[#737373] hover:text-[#A1A1A1] active:scale-95 transition-all"
+                className="p-1.5 text-muted-foreground hover:text-secondary-foreground active:scale-95 transition-all"
                 title="Forward 5 seconds"
               >
                 <RotateCw className="h-4.5 w-4.5" />
@@ -343,7 +365,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onToggleRepeat}
               className={cn(
-                "relative p-2 text-[#737373] hover:text-[#F5F5F5] transition-colors active:scale-95",
+                "relative p-2 text-muted-foreground hover:text-foreground transition-colors active:scale-95",
                 repeatMode !== "off" && "text-primary"
               )}
               aria-label={`Repeat mode: ${repeatMode}`}
@@ -364,15 +386,15 @@ export function FullScreenPlayer({
           </div>
 
           {/* Bottom Toolbar Row: Speed, EQ, PiP, Shortcuts, Lyrics, Queue */}
-          <div className="flex items-center justify-between pt-3 border-t border-white/[0.06] text-[#737373]">
+          <div className="flex items-center justify-between pt-3 border-t border-hair text-muted-foreground">
             {/* Left group: Speed Badge & Equalizer */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={cycleSpeed}
-                className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.06] px-2.5 py-1 text-xs font-normal text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.08] transition-all"
+                className="flex items-center gap-1.5 rounded-full bg-chip border border-hair px-2.5 py-1 text-xs font-normal text-secondary-foreground hover:text-foreground hover:bg-chip-strong transition-all"
               >
-                <Gauge className="h-3.5 w-3.5 text-[#737373]" />
+                <Gauge className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>{playbackSpeed}x</span>
               </button>
 
@@ -382,9 +404,9 @@ export function FullScreenPlayer({
                   onClick={onOpenEqualizer}
                   aria-label="Equalizer & FX"
                   title="Equalizer & FX"
-                  className="flex items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.06] px-2.5 py-1 text-xs font-normal text-[#A1A1A1] hover:bg-white/[0.08] hover:text-[#F5F5F5] transition-all"
+                  className="flex items-center gap-1.5 rounded-full bg-chip border border-hair px-2.5 py-1 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all"
                 >
-                  <Sliders className="h-3.5 w-3.5 text-[#737373]" />
+                  <Sliders className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="hidden sm:inline">EQ</span>
                 </button>
               )}
@@ -399,10 +421,10 @@ export function FullScreenPlayer({
                     "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-normal transition-all",
                     isSleepTimerActive
                       ? "border-primary/40 bg-primary/15 text-primary shadow-sm font-mono font-medium"
-                      : "border-white/[0.06] bg-white/[0.04] text-[#A1A1A1] hover:bg-white/[0.08] hover:text-[#F5F5F5]"
+                      : "border-hair bg-chip text-secondary-foreground hover:bg-chip-strong hover:text-foreground"
                   )}
                 >
-                  <Moon className={cn("h-3.5 w-3.5", isSleepTimerActive ? "text-primary" : "text-[#737373]")} />
+                  <Moon className={cn("h-3.5 w-3.5", isSleepTimerActive ? "text-primary" : "text-muted-foreground")} />
                   <span>{isSleepTimerActive ? sleepTimerCountdown : "Timer"}</span>
                 </button>
               )}
@@ -416,7 +438,7 @@ export function FullScreenPlayer({
                   onClick={onOpenPip}
                   aria-label="Picture-in-Picture"
                   title="Mini Floating Player"
-                  className="p-2 text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.04] rounded-full transition-colors"
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-chip rounded-full transition-colors"
                 >
                   <PictureInPicture2 className="h-5 w-5" />
                 </button>
@@ -428,7 +450,7 @@ export function FullScreenPlayer({
                   onClick={onOpenShortcuts}
                   aria-label="Keyboard Shortcuts"
                   title="Keyboard Shortcuts (?)"
-                  className="p-2 text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.04] rounded-full transition-colors"
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-chip rounded-full transition-colors"
                 >
                   <HelpCircle className="h-5 w-5" />
                 </button>
@@ -440,7 +462,7 @@ export function FullScreenPlayer({
                   onClick={onOpenLyrics}
                   aria-label="Lyrics"
                   title="Lyrics"
-                  className="p-2 text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.04] rounded-full transition-colors"
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-chip rounded-full transition-colors"
                 >
                   <MessageSquare className="h-5 w-5" />
                 </button>
@@ -459,7 +481,7 @@ export function FullScreenPlayer({
                     "flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-95",
                     isQueueOpen
                       ? "text-primary bg-primary/15"
-                      : "text-[#737373] hover:text-[#F5F5F5] hover:bg-white/[0.06]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-chip"
                   )}
                 >
                   <ListMusic className="h-5 w-5" />

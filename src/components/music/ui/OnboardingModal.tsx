@@ -90,9 +90,9 @@ export function OnboardingModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto border-white/10 bg-[#0d0d17]/95 p-0 text-white backdrop-blur-2xl shadow-2xl rounded-3xl scrollbar-hide">
+      <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto border-hair-strong bg-[#0d0d17]/95 p-0 text-foreground backdrop-blur-2xl shadow-2xl rounded-3xl scrollbar-hide">
         {/* Header with gradient banner */}
-        <div className="relative overflow-hidden border-b border-white/10 bg-gradient-to-b from-purple-900/30 via-purple-900/10 to-transparent p-6 sm:p-7 text-center">
+        <div className="relative overflow-hidden border-b border-hair-strong bg-gradient-to-b from-purple-900/30 via-purple-900/10 to-transparent p-6 sm:p-7 text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-cyan-400 p-0.5 shadow-lg shadow-purple-500/25">
             <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-[#0d0a1a]">
               <Sparkles className="h-6 w-6 text-pink-400 animate-pulse" />
@@ -114,13 +114,13 @@ export function OnboardingModal({
                 "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all",
                 step === 1
                   ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
-                  : "bg-white/5 text-white/50 hover:bg-white/10",
+                  : "bg-chip text-foreground/50 hover:bg-chip-strong",
               )}
             >
               <Globe2 className="h-3.5 w-3.5" />
               1. Song Languages
               {selectedLanguages.length > 0 && (
-                <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                <span className="ml-1 rounded-full bg-chip-strong px-1.5 py-0.2 text-[10px]">
                   {selectedLanguages.length}
                 </span>
               )}
@@ -132,13 +132,13 @@ export function OnboardingModal({
                 "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all",
                 step === 2
                   ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
-                  : "bg-white/5 text-white/50 hover:bg-white/10",
+                  : "bg-chip text-foreground/50 hover:bg-chip-strong",
               )}
             >
               <Music2 className="h-3.5 w-3.5" />
               2. Favorite Artists
               {selectedArtists.length > 0 && (
-                <span className="ml-1 rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                <span className="ml-1 rounded-full bg-chip-strong px-1.5 py-0.2 text-[10px]">
                   {selectedArtists.length}
                 </span>
               )}
@@ -153,7 +153,7 @@ export function OnboardingModal({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-white">What languages do you listen to?</h3>
-                  <p className="text-xs text-white/40">Select all the languages you want in your music feed</p>
+                  <p className="text-xs text-foreground/40">Select all the languages you want in your music feed</p>
                 </div>
                 <span className="text-xs font-medium text-purple-300">
                   {selectedLanguages.length} selected
@@ -173,7 +173,7 @@ export function OnboardingModal({
                         "flex items-center justify-between rounded-xl p-3 text-xs font-medium transition-all text-left border",
                         isSelected
                           ? "border-purple-500 bg-purple-500/20 text-white shadow-md shadow-purple-500/15"
-                          : "border-white/10 bg-white/[0.03] text-white/70 hover:border-white/20 hover:bg-white/[0.06] hover:text-white",
+                          : "border-hair-strong bg-chip-subtle text-foreground/70 hover:border-hair-strong hover:bg-chip hover:text-foreground",
                       )}
                     >
                       <span>{lang}</span>
@@ -182,7 +182,7 @@ export function OnboardingModal({
                           "flex h-5 w-5 items-center justify-center rounded-full border transition-colors",
                           isSelected
                             ? "border-purple-400 bg-purple-500 text-white"
-                            : "border-white/20 bg-transparent text-transparent",
+                            : "border-hair-strong bg-transparent text-transparent",
                         )}
                       >
                         <Check className="h-3 w-3" />
@@ -209,7 +209,7 @@ export function OnboardingModal({
             <div className="space-y-4 animate-in fade-in duration-200">
               <div>
                 <h3 className="text-sm font-semibold text-white">Who are your favorite artists &amp; singers?</h3>
-                <p className="text-xs text-white/40">We'll prioritize their top tracks and related recommendations</p>
+                <p className="text-xs text-foreground/40">We'll prioritize their top tracks and related recommendations</p>
               </div>
 
               {/* Input for custom artist */}
@@ -224,7 +224,7 @@ export function OnboardingModal({
                     }
                   }}
                   placeholder="Type an artist or singer name..."
-                  className="h-10 rounded-xl border-white/10 bg-white/[0.04] text-xs text-white placeholder:text-white/30 focus:border-purple-500/50"
+                  className="h-10 rounded-xl border-hair-strong bg-chip text-xs text-foreground placeholder:text-foreground/30 focus:border-purple-500/50"
                 />
                 <Button
                   type="button"
@@ -240,8 +240,8 @@ export function OnboardingModal({
               {/* Selected Artists Chips */}
               {selectedArtists.length > 0 && (
                 <div className="space-y-1.5">
-                  <span className="text-[11px] font-medium text-white/50">Your Selected Artists:</span>
-                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1 rounded-xl bg-white/[0.02] border border-white/5">
+                  <span className="text-[11px] font-medium text-foreground/50">Your Selected Artists:</span>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1 rounded-xl bg-chip-subtle border border-hair">
                     {selectedArtists.map((artist) => (
                       <span
                         key={artist}
@@ -251,7 +251,7 @@ export function OnboardingModal({
                         <button
                           type="button"
                           onClick={() => removeArtist(artist)}
-                          className="text-white/40 hover:text-pink-400 transition-colors"
+                          className="text-foreground/40 hover:text-pink-400 transition-colors"
                           aria-label={`Remove ${artist}`}
                         >
                           <X className="h-3 w-3" />
@@ -264,16 +264,16 @@ export function OnboardingModal({
 
               {/* Popular Suggestions */}
               <div className="space-y-2 pt-1">
-                <span className="text-[11px] font-medium text-white/50">Suggested Artists:</span>
+                <span className="text-[11px] font-medium text-foreground/50">Suggested Artists:</span>
                 <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1 scrollbar-hide">
                   {suggestedUnselected.slice(0, 24).map((artist) => (
                     <button
                       key={artist}
                       type="button"
                       onClick={() => addArtist(artist)}
-                      className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/70 hover:border-purple-500/40 hover:bg-purple-500/10 hover:text-purple-200 transition-colors"
+                      className="inline-flex items-center gap-1 rounded-full border border-hair-strong bg-chip-subtle px-2.5 py-1 text-xs text-foreground/70 hover:border-purple-500/40 hover:bg-purple-500/10 hover:text-purple-200 transition-colors"
                     >
-                      <Plus className="h-3 w-3 text-white/40" />
+                      <Plus className="h-3 w-3 text-foreground/40" />
                       {artist}
                     </button>
                   ))}
@@ -283,16 +283,16 @@ export function OnboardingModal({
           )}
 
           {/* Bottom Settings note & actions */}
-          <div className="border-t border-white/10 pt-4 space-y-3">
-            <div className="flex items-center justify-between text-xs text-white/40">
+          <div className="border-t border-hair-strong pt-4 space-y-3">
+            <div className="flex items-center justify-between text-xs text-foreground/40">
               <span className="inline-flex items-center gap-1.5 text-[11px]">
                 <Sliders className="h-3.5 w-3.5 text-purple-400" />
-                You can edit these anytime in <strong className="text-white/70">Settings</strong>
+                You can edit these anytime in <strong className="text-foreground/70">Settings</strong>
               </span>
               <button
                 type="button"
                 onClick={handleSkip}
-                className="text-[11px] text-white/40 hover:text-white underline underline-offset-2 transition-colors"
+                className="text-[11px] text-foreground/40 hover:text-foreground underline underline-offset-2 transition-colors"
               >
                 Skip for now
               </button>

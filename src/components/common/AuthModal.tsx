@@ -253,7 +253,7 @@ export function AuthModal({
             {mode === "profile" && "Account Profile"}
             {mode === "forgot" && "Reset Password"}
           </DialogTitle>
-          <DialogDescription className="text-xs text-white/50">
+          <DialogDescription className="text-xs text-foreground/50">
             {mode === "signin" && "Sign in with Google or email to sync your favourites & history."}
             {mode === "signup" && "Create an account to securely save playlists and music preferences."}
             {mode === "profile" && "Manage your display name and active account."}
@@ -263,7 +263,7 @@ export function AuthModal({
 
         {/* Tab Switcher for Sign In / Sign Up */}
         {mode !== "profile" && mode !== "forgot" && (
-          <div className="flex rounded-xl bg-white/[0.04] p-1 border border-white/5">
+          <div className="flex rounded-xl bg-chip p-1 border border-hair">
             <button
               type="button"
               onClick={() => {
@@ -274,7 +274,7 @@ export function AuthModal({
               className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                 mode === "signin"
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "text-white/60 hover:text-white"
+                  : "text-foreground/60 hover:text-foreground"
               }`}
             >
               Sign In
@@ -289,7 +289,7 @@ export function AuthModal({
               className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                 mode === "signup"
                   ? "bg-primary text-primary-foreground shadow-md"
-                  : "text-white/60 hover:text-white"
+                  : "text-foreground/60 hover:text-foreground"
               }`}
             >
               Create Account
@@ -343,8 +343,8 @@ export function AuthModal({
             </Button>
 
             <div className="relative flex items-center justify-center">
-              <div className="border-t border-white/10 w-full" />
-              <span className="bg-background px-2 text-[10px] text-white/40 uppercase tracking-widest font-mono">
+              <div className="border-t border-hair-strong w-full" />
+              <span className="bg-background px-2 text-[10px] text-foreground/40 uppercase tracking-widest font-mono">
                 or with email
               </span>
             </div>
@@ -355,16 +355,16 @@ export function AuthModal({
           {/* Display Name Input */}
           {(mode === "signup" || mode === "profile") && (
             <div className="space-y-1.5">
-              <Label className="text-xs text-white/70 font-medium">Display Name</Label>
+              <Label className="text-xs text-foreground/70 font-medium">Display Name</Label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                 <Input
                   type="text"
                   placeholder="Your Name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={busy}
-                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="pl-9 bg-chip border-hair-strong text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
                   required
                 />
               </div>
@@ -374,16 +374,16 @@ export function AuthModal({
           {/* Email Input */}
           {mode !== "profile" && (
             <div className="space-y-1.5">
-              <Label className="text-xs text-white/70 font-medium">Email Address</Label>
+              <Label className="text-xs text-foreground/70 font-medium">Email Address</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                 <Input
                   type="email"
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={busy}
-                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="pl-9 bg-chip border-hair-strong text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
                   required
                 />
               </div>
@@ -394,7 +394,7 @@ export function AuthModal({
           {mode !== "profile" && mode !== "forgot" && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs text-white/70 font-medium">Password</Label>
+                <Label className="text-xs text-foreground/70 font-medium">Password</Label>
                 {mode === "signin" && (
                   <button
                     type="button"
@@ -410,20 +410,20 @@ export function AuthModal({
                 )}
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                 <Input
                   type={showPassword ? "text" : "password"}
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={busy}
-                  className="pl-9 pr-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="pl-9 pr-9 bg-chip border-hair-strong text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -434,16 +434,16 @@ export function AuthModal({
           {/* Confirm Password (only for Sign Up) */}
           {mode === "signup" && (
             <div className="space-y-1.5">
-              <Label className="text-xs text-white/70 font-medium">Confirm Password</Label>
+              <Label className="text-xs text-foreground/70 font-medium">Confirm Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                 <Input
                   type="password"
                   placeholder="Re-enter password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   disabled={busy}
-                  className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="pl-9 bg-chip border-hair-strong text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary focus:ring-1 focus:ring-primary"
                   required
                 />
               </div>
@@ -476,7 +476,7 @@ export function AuthModal({
                 variant="outline"
                 disabled={busy}
                 onClick={handleSignOut}
-                className="w-full h-10 rounded-xl bg-white/[0.03] hover:bg-red-500/10 text-white/80 hover:text-red-400 border-white/10 hover:border-red-500/30 transition-all text-xs font-normal"
+                className="w-full h-10 rounded-xl bg-chip-subtle hover:bg-red-500/10 text-foreground/80 hover:text-red-400 border-hair-strong hover:border-red-500/30 transition-all text-xs font-normal"
               >
                 <LogOut className="h-3.5 w-3.5 mr-2" />
                 Sign Out / Switch Account
@@ -488,7 +488,7 @@ export function AuthModal({
                 type="button"
                 variant="ghost"
                 onClick={() => setMode("signin")}
-                className="w-full h-9 rounded-xl text-xs text-white/60 hover:text-white hover:bg-white/[0.05]"
+                className="w-full h-9 rounded-xl text-xs text-foreground/60 hover:text-foreground hover:bg-chip"
               >
                 Back to Sign In
               </Button>

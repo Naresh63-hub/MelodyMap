@@ -126,14 +126,14 @@ export function LanguageArtistPicker({
             {artists.map((artist) => (
               <span
                 key={artist}
-                className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs text-white/90"
+                className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs text-foreground/90"
               >
                 {artist}
                 <button
                   type="button"
                   onClick={() => removeArtist(artist)}
                   aria-label={`Remove ${artist}`}
-                  className="text-white/40 transition-colors hover:text-pink-400"
+                  className="text-foreground/40 transition-colors hover:text-pink-400"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -152,13 +152,13 @@ export function LanguageArtistPicker({
               }
             }}
             placeholder="Add an artist or singer…"
-            className="h-8 min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.04] px-3 text-xs text-white placeholder:text-white/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
+            className="h-8 min-w-0 flex-1 rounded-full border border-hair-strong bg-chip px-3 text-xs text-foreground placeholder:text-foreground/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
           />
           <button
             type="button"
             onClick={() => addArtist(artistDraft)}
             aria-label="Add artist"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:border-purple-500/40 hover:text-white button-press"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-hair-strong bg-chip text-foreground/60 transition-colors hover:border-purple-500/40 hover:text-foreground button-press"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -170,7 +170,7 @@ export function LanguageArtistPicker({
                 key={a}
                 type="button"
                 onClick={() => addArtist(a)}
-                className="rounded-full border border-white/5 bg-white/[0.03] px-2.5 py-0.5 text-[11px] text-white/40 transition-colors hover:border-purple-500/30 hover:text-white/80"
+                className="rounded-full border border-hair bg-chip-subtle px-2.5 py-0.5 text-[11px] text-foreground/40 transition-colors hover:border-purple-500/30 hover:text-foreground/80"
               >
                 + {a}
               </button>
@@ -181,7 +181,7 @@ export function LanguageArtistPicker({
 
       {/* Preview Section */}
       {(languages.length > 0 || artists.length > 0) && (
-        <div className="mt-6 border-t border-white/10 pt-4">
+        <div className="mt-6 border-t border-hair-strong pt-4">
           <p className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {loading ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -206,8 +206,8 @@ export function LanguageArtistPicker({
               </div>
             </HorizontalScroll>
           ) : (
-            <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/[0.02]">
-              <p className="text-xs text-white/40">
+            <div className="flex h-24 items-center justify-center rounded-xl border border-dashed border-hair-strong bg-chip-subtle">
+              <p className="text-xs text-foreground/40">
                 {loading ? "Finding songs..." : "No songs found for these selections."}
               </p>
             </div>

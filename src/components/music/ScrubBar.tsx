@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { formatTime } from "@/lib/use-audio-player";
 import { cn } from "@/lib/utils";
+import { triggerHaptic } from "@/lib/haptics";
 
 type Props = {
   position: number;
@@ -36,6 +37,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {}
     setIsDragging(true);
+    triggerHaptic('light');
     const ratio = getRatio(e.clientX);
     const targetSeconds = ratio * duration;
     setDragPosition(targetSeconds);
@@ -132,7 +134,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
               loading="lazy"
             />
           )}
-          <p className="mt-1 text-center text-[11px] tabular-nums font-medium text-white/90">
+          <p className="mt-1 text-center text-[11px] tabular-nums font-medium text-foreground/90">
             {formatTime(hoverTime)}
           </p>
         </div>
@@ -154,7 +156,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
       >
-        <div className="relative h-1 w-full overflow-visible rounded-full bg-white/20 transition-all group-hover:h-1.5">
+        <div className="relative h-1 w-full overflow-visible rounded-full bg-chip-strong transition-all group-hover:h-1.5">
           {/* Progress bar fill */}
           <div
             className={cn(

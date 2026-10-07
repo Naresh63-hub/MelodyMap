@@ -47,20 +47,20 @@ export function AddToPlaylistModal({
       />
 
       {/* Sheet / Dialog */}
-      <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-surface border border-white/[0.06] p-5 shadow-2xl shadow-black/80 z-10 animate-slide-up space-y-4">
+      <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-surface border border-hair p-5 shadow-2xl shadow-black/80 z-10 animate-slide-up space-y-4">
         {/* Grab bar on mobile */}
-        <div className="mx-auto h-1 w-12 rounded-full bg-white/20 sm:hidden" />
+        <div className="mx-auto h-1 w-12 rounded-full bg-chip-strong sm:hidden" />
 
         {/* Header */}
         <div className="flex items-center justify-between pb-1">
           <div className="flex items-center gap-2">
             <ListMusic className="h-5 w-5 text-primary" />
-            <h2 className="text-base font-bold text-[#F5F5F5]">Add to Playlist</h2>
+            <h2 className="text-base font-bold text-foreground">Add to Playlist</h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/40 hover:bg-white/[0.06] hover:text-white transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/40 hover:bg-chip hover:text-foreground transition-colors"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -68,15 +68,15 @@ export function AddToPlaylistModal({
         </div>
 
         {/* Track preview */}
-        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-card border border-white/[0.06]">
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-card border border-hair">
           <img
             src={track.thumbnail}
             alt=""
-            className="h-11 w-11 rounded-lg object-cover bg-white/[0.04]"
+            className="h-11 w-11 rounded-lg object-cover bg-chip"
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-[#F5F5F5]">{track.title}</p>
-            <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{track.artist}</p>
+            <p className="truncate text-sm font-semibold text-foreground">{track.title}</p>
+            <p className="truncate text-xs text-secondary-foreground mt-0.5">{track.artist}</p>
           </div>
         </div>
 
@@ -84,7 +84,7 @@ export function AddToPlaylistModal({
         <form onSubmit={handleCreate} className="space-y-2">
           <label
             htmlFor="new-playlist-input"
-            className="block text-[11px] font-medium uppercase tracking-[0.12em] text-[#737373] px-1"
+            className="block text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground px-1"
           >
             Create New Playlist
           </label>
@@ -95,7 +95,7 @@ export function AddToPlaylistModal({
               value={newPlaylistName}
               onChange={(e) => setNewPlaylistName(e.target.value)}
               placeholder="Playlist name..."
-              className="flex-1 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] px-3.5 text-sm text-[#F5F5F5] placeholder:text-[#737373] focus:border-white/20 focus:ring-1 focus:ring-white/10 focus:outline-none transition-all"
+              className="flex-1 h-10 rounded-xl bg-chip border border-hair-strong px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-chip-strong focus:outline-none transition-all"
               autoFocus
             />
             <button
@@ -111,12 +111,12 @@ export function AddToPlaylistModal({
 
         {/* Existing playlists list */}
         <div className="space-y-1.5 pt-1">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[#737373] px-1">
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground px-1">
             Existing Playlists
           </p>
 
           {playlists.length === 0 ? (
-            <p className="py-4 text-center text-xs text-[#737373]">
+            <p className="py-4 text-center text-xs text-muted-foreground">
               No playlists yet. Type a name above to create your first one!
             </p>
           ) : (
@@ -132,17 +132,17 @@ export function AddToPlaylistModal({
                     className={cn(
                       "flex w-full items-center justify-between p-2.5 rounded-xl border text-left transition-all",
                       alreadyContains
-                        ? "bg-white/[0.02] border-transparent opacity-60 cursor-default"
-                        : "bg-card hover:bg-popover border-white/[0.04] active:scale-[0.99]"
+                        ? "bg-chip-subtle border-transparent opacity-60 cursor-default"
+                        : "bg-card hover:bg-popover border-hair active:scale-[0.99]"
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] text-[#A1A1A1]">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip text-secondary-foreground">
                         <ListMusic className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[#F5F5F5]">{pl.name}</p>
-                        <p className="text-xs text-[#737373] mt-0.5">
+                        <p className="truncate text-sm font-semibold text-foreground">{pl.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {pl.tracks.length} song{pl.tracks.length === 1 ? "" : "s"}
                         </p>
                       </div>
@@ -154,7 +154,7 @@ export function AddToPlaylistModal({
                         Added
                       </span>
                     ) : (
-                      <Plus className="h-4 w-4 text-[#737373] shrink-0" />
+                      <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
                     )}
                   </button>
                 );

@@ -137,7 +137,7 @@ export function VoiceSearchButton({
           "relative flex h-8 w-8 items-center justify-center rounded-full transition-all focus:outline-none focus:ring-1 focus:ring-white/20 active:scale-95",
           isListening
             ? "bg-primary/20 text-primary ring-2 ring-primary/50 shadow-[0_0_12px_rgba(56,189,248,0.4)]"
-            : "text-white/40 hover:text-white/80 hover:bg-white/[0.06]",
+            : "text-foreground/40 hover:text-foreground/80 hover:bg-chip",
           className,
         )}
       >
@@ -155,7 +155,7 @@ export function VoiceSearchButton({
 
       {/* Floating feedback badge while listening or on result */}
       {feedback && (
-        <div className="absolute -bottom-8 right-0 z-30 whitespace-nowrap rounded-md bg-[#1a1a1a] px-2.5 py-1 text-[11px] font-medium text-white/90 shadow-lg border border-white/[0.08] backdrop-blur-md animate-in fade-in zoom-in-95 pointer-events-none">
+        <div className="absolute -bottom-8 right-0 z-30 whitespace-nowrap rounded-md bg-[#1a1a1a] px-2.5 py-1 text-[11px] font-medium text-foreground/90 shadow-lg border border-hair-strong backdrop-blur-md animate-in fade-in zoom-in-95 pointer-events-none">
           <div className="flex items-center gap-1.5">
             {isListening && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
             <span>{feedback}</span>

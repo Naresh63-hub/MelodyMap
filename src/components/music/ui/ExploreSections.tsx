@@ -47,9 +47,9 @@ function HorizontalScrollRow({
         return (
           <div
             key={track.id}
-            className="group relative w-[132px] shrink-0 snap-start text-left transition-transform p-1.5 rounded-xl hover:bg-white/[0.04]"
+            className="group relative w-[132px] shrink-0 snap-start text-left transition-transform p-1.5 rounded-xl hover:bg-chip"
           >
-            <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06]">
+            <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair">
               <button
                 type="button"
                 onClick={() => onPlayTrack(track, tracks, i)}
@@ -105,7 +105,7 @@ function HorizontalScrollRow({
               <p
                 className={cn(
                   "truncate text-xs font-medium leading-tight",
-                  active ? "text-primary" : "text-white/90 group-hover:text-white",
+                  active ? "text-primary" : "text-foreground/90 group-hover:text-foreground",
                 )}
               >
                 {track.title}
@@ -149,14 +149,14 @@ function VerticalSongList({
             key={track.id}
             className={cn(
               "flex items-center gap-3 rounded-lg p-2 transition-colors",
-              active ? "bg-white/[0.08]" : "hover:bg-white/[0.03]",
+              active ? "bg-chip-strong" : "hover:bg-chip-subtle",
             )}
           >
             {/* Thumbnail + Play Action */}
             <button
               type="button"
               onClick={() => onPlayTrack(track, tracks, i)}
-              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card border border-white/[0.05]"
+              className="relative h-11 w-11 shrink-0 overflow-hidden rounded-md bg-card border border-hair"
             >
               <img
                 src={track.thumbnail}
@@ -179,7 +179,7 @@ function VerticalSongList({
               <p
                 className={cn(
                   "truncate text-[13px] font-medium leading-tight",
-                  active ? "text-primary" : "text-white/90",
+                  active ? "text-primary" : "text-foreground/90",
                 )}
               >
                 {track.title}
@@ -204,7 +204,7 @@ function VerticalSongList({
                 type="button"
                 onClick={() => onOpenOptions(track)}
                 aria-label="Track options"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-white transition-colors"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-foreground transition-colors"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -229,7 +229,7 @@ function SectionHeader({
     <div className="flex items-center justify-between mb-2.5 px-0.5">
       <div className="flex items-center gap-2">
         {Icon && <Icon className="h-4 w-4 text-neutral-400" />}
-        <h2 className="text-sm font-semibold tracking-normal text-white/90">{title}</h2>
+        <h2 className="text-sm font-semibold tracking-normal text-foreground/90">{title}</h2>
       </div>
       {subtitle && (
         <span className="text-[11px] font-normal text-neutral-400">
@@ -261,7 +261,7 @@ export function ExploreSections({
             <div className="flex gap-3 overflow-hidden">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="w-[132px] shrink-0 space-y-2">
-                  <div className="aspect-square w-full rounded-lg bg-card border border-white/[0.04] animate-pulse" />
+                  <div className="aspect-square w-full rounded-lg bg-card border border-hair animate-pulse" />
                   <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
                   <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
                 </div>

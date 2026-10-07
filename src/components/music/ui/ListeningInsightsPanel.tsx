@@ -195,7 +195,7 @@ export function ListeningInsightsPanel() {
                     {pct}% <span className="font-normal text-muted-foreground font-mono">({rawVal.toFixed(2)})</span>
                   </span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                <div className="h-2 w-full overflow-hidden rounded-full bg-chip">
                   <div
                     className="h-full rounded-full bg-primary transition-all duration-500"
                     style={{ width: `${pct}%` }}

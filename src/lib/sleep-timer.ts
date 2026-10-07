@@ -60,7 +60,7 @@ class SleepTimerService {
   public init() {
     // 1. Restore state from localStorage
     try {
-      if (typeof localStorage !== "undefined") {
+      if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
         const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE) === "true";
         const savedDuration = localStorage.getItem(STORAGE_KEY_DURATION);
         const savedTarget = localStorage.getItem(STORAGE_KEY_TARGET);
@@ -265,7 +265,7 @@ class SleepTimerService {
   }
 
   private saveStorage(minutes: number, targetMs: number) {
-    if (typeof localStorage === "undefined") return;
+    if (typeof window === "undefined" || typeof localStorage === "undefined") return;
     try {
       localStorage.setItem(STORAGE_KEY_ACTIVE, "true");
       localStorage.setItem(STORAGE_KEY_DURATION, String(minutes));
@@ -274,7 +274,7 @@ class SleepTimerService {
   }
 
   private clearStorage() {
-    if (typeof localStorage === "undefined") return;
+    if (typeof window === "undefined" || typeof localStorage === "undefined") return;
     try {
       localStorage.removeItem(STORAGE_KEY_ACTIVE);
       localStorage.removeItem(STORAGE_KEY_TARGET);

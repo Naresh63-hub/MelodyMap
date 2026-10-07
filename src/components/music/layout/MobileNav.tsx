@@ -1,6 +1,7 @@
 import { Compass, Home, Mic, Library as LibraryIcon, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavTab } from "./Sidebar";
+import { triggerHaptic } from "@/lib/haptics";
 
 /** Mobile bottom navigation tabs. */
 export const MOBILE_TABS: Array<{ id: NavTab; label: string; icon: typeof Home }> = [
@@ -20,7 +21,7 @@ type Props = {
 export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props) {
   return (
     <nav
-      className="fixed z-40 flex items-stretch justify-around border-t border-white/[0.08] glass-frosted safe-bottom max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 bottom-0"
+      className="fixed z-40 flex items-stretch justify-around border-t border-hair-strong glass-frosted safe-bottom max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 bottom-0"
       style={{ height: "var(--mobile-nav-height, 56px)" }}
       aria-label="Mobile navigation"
     >
@@ -30,10 +31,13 @@ export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props)
           <button
             key={id}
             type="button"
-            onClick={() => onNavigate(id)}
+            onClick={() => {
+              triggerHaptic('selection');
+              onNavigate(id);
+            }}
             className={cn(
               "relative flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-medium transition-colors active:scale-95",
-              active ? "text-[#F5F5F5] font-semibold" : "text-[#737373] hover:text-[#A1A1A1]"
+              active ? "text-foreground font-semibold" : "text-muted-foreground hover:text-secondary-foreground"
             )}
             aria-label={label}
             aria-current={active ? "page" : undefined}
@@ -41,14 +45,14 @@ export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props)
             <Icon
               className={cn(
                 "h-5 w-5 transition-transform",
-                active ? "text-primary" : "text-[#737373]"
+                active ? "text-primary" : "text-muted-foreground"
               )}
               strokeWidth={active ? 2.2 : 1.7}
             />
             <span
               className={cn(
                 "truncate max-w-[64px]",
-                active ? "font-semibold text-[#F5F5F5]" : ""
+                active ? "font-semibold text-foreground" : ""
               )}
             >
               {label}

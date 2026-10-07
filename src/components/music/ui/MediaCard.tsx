@@ -1,7 +1,8 @@
-import { useState, memo } from "react";
+import { useState, memo, useRef, useCallback } from "react";
 import { MoreHorizontal, Music2, Pause, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HeartLikeButton } from "./HeartLikeButton";
+import { triggerHaptic } from "@/lib/haptics";
 
 type Props = {
   title: string;
@@ -39,12 +40,44 @@ export function MediaCard({
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [isLongPressing, setIsLongPressing] = useState(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTouchStart = useCallback(() => {
+    if (!onMore) return;
+    setIsLongPressing(true);
+    longPressTimerRef.current = setTimeout(() => {
+      triggerHaptic('medium');
+      onMore();
+      setIsLongPressing(false);
+    }, 800);
+  }, [onMore]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsLongPressing(false);
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback(() => {
+    setIsLongPressing(false);
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
 
   return (
     <div
       style={style}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchMove={handleTouchMove}
       className={cn(
-        "group/card shrink-0 cursor-pointer p-2 rounded-xl transition-colors bg-card/60 hover:bg-popover border border-white/[0.04] hover:border-white/[0.08] card-modern-lift card-glow-border",
+        "group/card shrink-0 cursor-pointer p-2 rounded-xl transition-colors bg-card/60 hover:bg-popover border border-hair hover:border-hair-strong card-modern-lift card-glow-border",
+        isLongPressing && "scale-95 opacity-80",
         dims,
         className,
       )}
@@ -53,7 +86,7 @@ export function MediaCard({
         type="button"
         onClick={onPlay}
         className={cn(
-          "relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06] transition-all duration-200 button-press focus-visible:ring-2 focus-visible:ring-primary",
+          "relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair transition-all duration-200 button-press focus-visible:ring-2 focus-visible:ring-primary",
           active && "ring-1 ring-primary",
         )}
       >
@@ -71,7 +104,7 @@ export function MediaCard({
             )}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-card text-[#737373]">
+          <div className="flex h-full w-full items-center justify-center bg-card text-muted-foreground">
             <Music2 className="h-7 w-7 opacity-50" />
           </div>
         )}
@@ -101,13 +134,13 @@ export function MediaCard({
           <p
             className={cn(
               "truncate text-[13px] font-medium leading-snug transition-colors",
-              active ? "text-primary" : "text-[#F5F5F5] group-hover/card:text-white",
+              active ? "text-primary" : "text-foreground group-hover/card:text-white",
             )}
           >
             {title}
           </p>
           {subtitle && (
-            <p className="mt-0.5 truncate text-xs text-[#A1A1A1] group-hover/card:text-[#F5F5F5]">
+            <p className="mt-0.5 truncate text-xs text-secondary-foreground group-hover/card:text-foreground">
               {subtitle}
             </p>
           )}
@@ -129,7 +162,7 @@ export function MediaCard({
                 onMore();
               }}
               aria-label="More options"
-              className="rounded-full p-1 text-[#737373] hover:text-[#F5F5F5] transition-colors"
+              className="rounded-full p-1 text-muted-foreground hover:text-foreground transition-colors"
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>

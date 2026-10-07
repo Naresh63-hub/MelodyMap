@@ -63,7 +63,7 @@ export function MiniPlayer({
   return (
     <div
       {...swipeProps}
-      className="fixed z-40 border-t border-white/[0.08] glass-frosted shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between safe-bottom"
+      className="fixed z-40 border-t border-hair-strong glass-frosted shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between safe-bottom"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
       {/* 2px Hairline Progress Indicator at Top */}
@@ -75,7 +75,7 @@ export function MiniPlayer({
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         onClick={handleBarClick}
-        className="relative w-full h-[2px] bg-white/[0.06] cursor-pointer"
+        className="relative w-full h-[2px] bg-chip cursor-pointer"
       >
         <div
           className="h-full bg-primary transition-all duration-150 ease-linear"
@@ -105,7 +105,7 @@ export function MiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs sm:text-[13px] font-medium text-white/95 leading-tight">
+            <p className="truncate text-xs sm:text-[13px] font-medium text-foreground/95 leading-tight">
               {track?.title ?? "No track"}
             </p>
             <p className="truncate text-[11px] text-neutral-400 font-normal leading-tight mt-0.5">
@@ -133,8 +133,11 @@ export function MiniPlayer({
           {onPrevious && (
             <button
               type="button"
-              onClick={onPrevious}
-              className="p-1.5 text-[#737373] hover:text-[#F5F5F5] transition-colors"
+              onClick={() => {
+                triggerHaptic('light');
+                onPrevious();
+              }}
+              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Previous track"
             >
               <SkipBack className="h-4 w-4" />
@@ -144,7 +147,10 @@ export function MiniPlayer({
           {/* Primary Play/Pause Button */}
           <button
             type="button"
-            onClick={onTogglePlay}
+            onClick={() => {
+              triggerHaptic('medium');
+              onTogglePlay();
+            }}
             disabled={isLoading}
             className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-[#F5F5F5] text-black hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
             aria-label={isPlaying ? "Pause" : "Play"}
@@ -160,8 +166,11 @@ export function MiniPlayer({
 
           <button
             type="button"
-            onClick={onNext}
-            className="p-1.5 text-[#737373] hover:text-[#F5F5F5] transition-colors"
+            onClick={() => {
+              triggerHaptic('light');
+              onNext();
+            }}
+            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Next track"
           >
             <SkipForward className="h-4 w-4" />

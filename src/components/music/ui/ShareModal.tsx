@@ -69,31 +69,31 @@ export function ShareModal({ open, track, onClose }: Props) {
       />
 
       {/* Sheet Panel */}
-      <div className="relative w-full max-w-lg rounded-t-3xl bg-surface border-t border-white/[0.06] p-5 shadow-2xl z-10 animate-slide-up">
+      <div className="relative w-full max-w-lg rounded-t-3xl bg-surface border-t border-hair p-5 shadow-2xl z-10 animate-slide-up">
         {/* Grab bar */}
-        <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-white/20" />
+        <div className="mx-auto mb-4 h-1 w-12 rounded-full bg-chip-strong" />
 
         <div className="flex items-center justify-between pb-3">
-          <h2 className="text-base font-semibold text-[#F5F5F5]">Share Song</h2>
+          <h2 className="text-base font-semibold text-foreground">Share Song</h2>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-white/40 hover:bg-white/[0.06] hover:text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/40 hover:bg-chip hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Track Preview Card */}
-        <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-card border border-white/[0.06] mb-5">
+        <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-card border border-hair mb-5">
           <img
             src={track.thumbnail}
             alt=""
             className="h-12 w-12 rounded-xl object-cover shadow-md"
           />
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-sm font-medium text-[#F5F5F5]">{track.title}</h3>
-            <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{track.artist}</p>
+            <h3 className="truncate text-sm font-medium text-foreground">{track.title}</h3>
+            <p className="truncate text-xs text-secondary-foreground mt-0.5">{track.artist}</p>
           </div>
         </div>
 
@@ -106,7 +106,7 @@ export function ShareModal({ open, track, onClose }: Props) {
                 key={svc.name}
                 type="button"
                 onClick={svc.action}
-                className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.06] transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-chip-subtle border border-hair hover:bg-chip transition-all active:scale-95"
               >
                 <div
                   className={cn(
@@ -116,7 +116,7 @@ export function ShareModal({ open, track, onClose }: Props) {
                 >
                   <Icon className="h-5 w-5" />
                 </div>
-                <span className="text-[11px] font-medium text-white/70">{svc.name}</span>
+                <span className="text-[11px] font-medium text-foreground/70">{svc.name}</span>
               </button>
             );
           })}
@@ -126,7 +126,7 @@ export function ShareModal({ open, track, onClose }: Props) {
         <button
           type="button"
           onClick={handleCopy}
-          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-white/[0.06] border border-white/10 py-3.5 text-sm font-medium text-[#F5F5F5] hover:bg-white/10 transition-all active:scale-[0.99] mb-2"
+          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-chip border border-hair-strong py-3.5 text-sm font-medium text-foreground hover:bg-chip-strong transition-all active:scale-[0.99] mb-2"
         >
           {copied ? (
             <>
@@ -135,7 +135,7 @@ export function ShareModal({ open, track, onClose }: Props) {
             </>
           ) : (
             <>
-              <Copy className="h-4 w-4 text-[#A1A1A1]" />
+              <Copy className="h-4 w-4 text-secondary-foreground" />
               <span>Copy Link</span>
             </>
           )}
@@ -145,7 +145,7 @@ export function ShareModal({ open, track, onClose }: Props) {
         <button
           type="button"
           onClick={onClose}
-          className="w-full py-3 text-xs font-semibold text-white/40 hover:text-white transition-colors"
+          className="w-full py-3 text-xs font-semibold text-foreground/40 hover:text-foreground transition-colors"
         >
           Cancel
         </button>

@@ -97,7 +97,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex shrink-0 flex-col border-r border-white/[0.06] bg-surface sidebar-transition",
+        "flex shrink-0 flex-col border-r border-hair bg-surface sidebar-transition",
         collapsed ? "w-[72px]" : "w-[260px]",
       )}
       style={{ minWidth: collapsed ? 72 : 260 }}
@@ -105,7 +105,7 @@ export function Sidebar({
       {/* Brand */}
       <div
         className={cn(
-          "flex items-center gap-3 border-b border-white/[0.06] px-5 pb-4 pt-5",
+          "flex items-center gap-3 border-b border-hair px-5 pb-4 pt-5",
           collapsed && "justify-center px-2",
         )}
       >
@@ -119,10 +119,10 @@ export function Sidebar({
         {!collapsed && (
           <div className="min-w-0 animate-fade-in-up">
             <p className="truncate text-base font-semibold tracking-tight">
-              <span className="text-[#F5F5F5]">Melody</span>
+              <span className="text-foreground">Melody</span>
               <span className="text-primary">Map</span>
             </p>
-            <p className="text-[10px] uppercase tracking-[0.12em] text-[#737373] font-normal">
+            <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-normal">
               Music player
             </p>
           </div>
@@ -134,7 +134,7 @@ export function Sidebar({
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             {!collapsed && (
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#737373]">
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {section.label}
               </p>
             )}
@@ -151,8 +151,8 @@ export function Sidebar({
                       "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors",
                       collapsed && "justify-center px-2",
                       active
-                        ? "bg-white/[0.06] text-[#F5F5F5] font-semibold"
-                        : "text-[#A1A1A1] font-medium hover:bg-white/[0.03] hover:text-[#F5F5F5]",
+                        ? "bg-chip text-foreground font-semibold"
+                        : "text-secondary-foreground font-medium hover:bg-chip-subtle hover:text-foreground",
                     )}
                   >
                     {/* Active indicator bar */}
@@ -165,14 +165,14 @@ export function Sidebar({
                         "h-[18px] w-[18px] shrink-0 transition-colors",
                         active
                           ? "text-primary"
-                          : "text-[#737373] group-hover:text-[#A1A1A1]",
+                          : "text-muted-foreground group-hover:text-secondary-foreground",
                       )}
                     />
                     {!collapsed && (
                       <>
                         <span className="flex-1 text-left truncate">{label}</span>
                         {shortcut && (
-                          <span className="hidden group-hover:inline text-[10px] tabular-nums text-[#737373] font-mono">
+                          <span className="hidden group-hover:inline text-[10px] tabular-nums text-muted-foreground font-mono">
                             {shortcut}
                           </span>
                         )}
@@ -188,10 +188,10 @@ export function Sidebar({
 
       {/* Mini-player (collapsed only) */}
       {collapsed && currentTitle && (
-        <div className="border-t border-white/[0.06] p-2">
+        <div className="border-t border-hair p-2">
           <div className="flex flex-col items-center gap-2">
             {/* Album art */}
-            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10 shadow-lg shadow-black/40">
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg ring-1 ring-chip-strong shadow-lg shadow-black/40">
               {currentThumbnail ? (
                 <img
                   src={currentThumbnail}
@@ -199,8 +199,8 @@ export function Sidebar({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-card border border-white/[0.06]">
-                  <Disc3 className="h-5 w-5 text-[#737373]" />
+                <div className="flex h-full w-full items-center justify-center bg-card border border-hair">
+                  <Disc3 className="h-5 w-5 text-muted-foreground" />
                 </div>
               )}
               {/* Playing indicator overlay */}
@@ -224,7 +224,7 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={onPlayPause}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.08] text-white/80 hover:bg-white/[0.12] hover:text-white transition-all button-press"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-chip-strong text-foreground/80 hover:bg-chip-strong hover:text-foreground transition-all button-press"
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? (
@@ -236,7 +236,7 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={onNext}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-white/40 hover:bg-white/[0.06] hover:text-white/70 transition-all button-press"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/40 hover:bg-chip hover:text-foreground/70 transition-all button-press"
                 aria-label="Next"
               >
                 <SkipForward className="h-3.5 w-3.5" />
@@ -244,7 +244,7 @@ export function Sidebar({
             </div>
 
             {/* Truncated title */}
-            <p className="w-full text-center text-[9px] text-white/40 truncate leading-tight px-1">
+            <p className="w-full text-center text-[9px] text-foreground/40 truncate leading-tight px-1">
               {currentTitle}
             </p>
           </div>
@@ -252,33 +252,33 @@ export function Sidebar({
       )}
 
       {/* Footer */}
-      <div className="border-t border-white/[0.06] p-3">
+      <div className="border-t border-hair p-3">
         {/* User card (expanded only) */}
         {!collapsed && (
-          <div className="mb-3 flex items-center gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3.5 py-2.5 hover:bg-white/[0.04] transition-colors cursor-default group/user">
+          <div className="mb-3 flex items-center gap-3 rounded-lg border border-hair bg-chip-subtle px-3.5 py-2.5 hover:bg-chip transition-colors cursor-default group/user">
             <div className="relative shrink-0">
               {isPlaying && (
                 <div className="playing-ring-conic animate-avatar-ring absolute -inset-[2.5px] rounded-full opacity-90" />
               )}
               <div
                 className={cn(
-                  "relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-popover text-xs font-semibold text-white border border-white/10",
+                  "relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-popover text-xs font-semibold text-foreground border border-hair-strong",
                   isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
                 )}
               >
                 {userAvatar ? (
                   <img src={userAvatar} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <User className="h-4 w-4 text-white/70" />
+                  <User className="h-4 w-4 text-foreground/70" />
                 )}
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className={cn("truncate text-xs font-semibold text-white/90", isPlaying && "animate-name-glow")}>
+              <p className={cn("truncate text-xs font-semibold text-foreground/90", isPlaying && "animate-name-glow")}>
                 {userName ?? "Listener"}
               </p>
-              <p className="truncate text-[10px] text-white/40">
+              <p className="truncate text-[10px] text-foreground/40">
                 {isSynced ? "Synced to cloud" : "Local mode"}
               </p>
             </div>
@@ -288,7 +288,7 @@ export function Sidebar({
         {/* Collapse toggle */}
         <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
           {!collapsed && (
-            <p className="px-1 text-[10px] text-white/20 font-medium">
+            <p className="px-1 text-[10px] text-foreground/20 font-medium">
               MelodyMap v1.0
             </p>
           )}
@@ -296,7 +296,7 @@ export function Sidebar({
             type="button"
             onClick={onToggleCollapse}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/30 transition-all duration-200 hover:bg-white/[0.06] hover:text-white/60 button-press focus-ring-neon"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/30 transition-all duration-200 hover:bg-chip hover:text-foreground/60 button-press focus-ring-neon"
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4" />

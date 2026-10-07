@@ -41,28 +41,28 @@ export function MobileLibrary({
       label: "Favourites",
       icon: Heart,
       detail: `${likes.length} songs`,
-      iconBg: "bg-white/[0.06] text-primary border border-white/10",
+      iconBg: "bg-chip text-primary border border-hair-strong",
     },
     {
       id: "history" as const,
       label: "History",
       icon: Clock,
       detail: "Recently played",
-      iconBg: "bg-white/[0.06] text-white/70 border border-white/10",
+      iconBg: "bg-chip text-foreground/70 border border-hair-strong",
     },
     {
       id: "playlists" as const,
       label: "Playlists",
       icon: ListMusic,
       detail: `${playlists.length} playlists`,
-      iconBg: "bg-white/[0.06] text-white/70 border border-white/10",
+      iconBg: "bg-chip text-foreground/70 border border-hair-strong",
     },
     {
       id: "downloads" as const,
       label: "Downloads",
       icon: Download,
       detail: `${downloads.length} songs`,
-      iconBg: "bg-white/[0.06] text-white/70 border border-white/10",
+      iconBg: "bg-chip text-foreground/70 border border-hair-strong",
     },
   ];
 
@@ -77,7 +77,7 @@ export function MobileLibrary({
               key={section.id}
               type="button"
               onClick={() => onNavigateSection(section.id)}
-              className="flex w-full items-center gap-3.5 rounded-lg bg-[#141414] border border-white/[0.04] p-3 text-left transition-colors hover:bg-white/[0.04] active:scale-[0.99]"
+              className="flex w-full items-center gap-3.5 rounded-lg bg-[#141414] border border-hair p-3 text-left transition-colors hover:bg-chip active:scale-[0.99]"
             >
               <div
                 className={cn(
@@ -89,11 +89,11 @@ export function MobileLibrary({
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white">{section.label}</p>
-                <p className="text-xs text-white/50 mt-0.5">{section.detail}</p>
+                <p className="text-sm font-semibold text-foreground">{section.label}</p>
+                <p className="text-xs text-foreground/50 mt-0.5">{section.detail}</p>
               </div>
 
-              <ChevronRight className="h-4 w-4 text-white/30" />
+              <ChevronRight className="h-4 w-4 text-foreground/30" />
             </button>
           );
         })}
@@ -103,7 +103,7 @@ export function MobileLibrary({
       {history.length > 0 && (
         <section className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm sm:text-base font-bold text-white">Recently Played</h2>
+            <h2 className="text-sm sm:text-base font-bold text-foreground">Recently Played</h2>
             <button
               type="button"
               onClick={() => onNavigateSection("history")}
@@ -122,8 +122,8 @@ export function MobileLibrary({
                   className={cn(
                     "flex items-center gap-3 rounded-lg p-2 transition-colors",
                     active
-                      ? "bg-white/[0.08]"
-                      : "hover:bg-white/[0.04]"
+                      ? "bg-chip-strong"
+                      : "hover:bg-chip"
                   )}
                 >
                   <button
@@ -151,12 +151,12 @@ export function MobileLibrary({
                     <p
                       className={cn(
                         "truncate text-sm font-semibold leading-tight",
-                        active ? "text-primary" : "text-white"
+                        active ? "text-primary" : "text-foreground"
                       )}
                     >
                       {track.title}
                     </p>
-                    <p className="truncate text-xs text-white/50 leading-tight mt-0.5">
+                    <p className="truncate text-xs text-foreground/50 leading-tight mt-0.5">
                       {track.artist}
                     </p>
                   </button>
@@ -166,7 +166,7 @@ export function MobileLibrary({
                       type="button"
                       onClick={() => onOpenOptions(track)}
                       aria-label="Options"
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-white/40 hover:text-white hover:bg-white/[0.08] active:scale-90 transition-all"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/40 hover:text-foreground hover:bg-chip-strong active:scale-90 transition-all"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </button>

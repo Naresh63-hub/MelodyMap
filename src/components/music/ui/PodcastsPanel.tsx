@@ -223,19 +223,19 @@ export function PodcastsPanel({
           <button
             type="button"
             onClick={handleBackToShows}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-white/70 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-foreground/70 hover:text-foreground bg-chip hover:bg-chip-strong border border-hair-strong transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>All Shows</span>
           </button>
-          <span className="text-xs px-2.5 py-1 rounded-full bg-white/[0.06] text-white/60 font-medium">
+          <span className="text-xs px-2.5 py-1 rounded-full bg-chip text-foreground/60 font-medium">
             {selectedLanguage}
           </span>
         </div>
 
         {/* Show Header Card */}
-        <div className="p-5 md:p-6 rounded-2xl bg-background border border-white/[0.08] flex flex-col md:flex-row gap-5 items-start">
-          <div className="relative shrink-0 w-32 h-32 md:w-44 md:h-44 rounded-xl overflow-hidden bg-card border border-white/[0.08] shadow-lg">
+        <div className="p-5 md:p-6 rounded-2xl bg-background border border-hair-strong flex flex-col md:flex-row gap-5 items-start">
+          <div className="relative shrink-0 w-32 h-32 md:w-44 md:h-44 rounded-xl overflow-hidden bg-card border border-hair-strong shadow-lg">
             {selectedShow.artworkUrl ? (
               <img
                 src={selectedShow.artworkUrl}
@@ -243,7 +243,7 @@ export function PodcastsPanel({
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-white/30">
+              <div className="flex h-full w-full items-center justify-center text-foreground/30">
                 <Mic className="h-12 w-12" />
               </div>
             )}
@@ -251,11 +251,11 @@ export function PodcastsPanel({
 
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/[0.08] text-white/70">
+              <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-chip-strong text-foreground/70">
                 {selectedShow.category || "Podcast"}
               </span>
               {selectedShow.language && (
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/[0.05] text-white/60">
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-chip text-foreground/60">
                   {selectedShow.language}
                 </span>
               )}
@@ -264,13 +264,13 @@ export function PodcastsPanel({
             <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white tracking-tight leading-tight">
               {selectedShow.title}
             </h1>
-            <p className="text-sm text-white/60 mt-1 font-medium">{selectedShow.publisher}</p>
+            <p className="text-sm text-foreground/60 mt-1 font-medium">{selectedShow.publisher}</p>
 
             {selectedShow.description && (
               <div className="mt-3">
                 <p
                   className={cn(
-                    "text-xs md:text-sm text-white/70 leading-relaxed",
+                    "text-xs md:text-sm text-foreground/70 leading-relaxed",
                     !showFullDescription && "line-clamp-2 md:line-clamp-3",
                   )}
                 >
@@ -280,7 +280,7 @@ export function PodcastsPanel({
                   <button
                     type="button"
                     onClick={() => setShowFullDescription((prev) => !prev)}
-                    className="text-xs text-white/40 hover:text-white mt-1 underline underline-offset-2"
+                    className="text-xs text-foreground/40 hover:text-foreground mt-1 underline underline-offset-2"
                   >
                     {showFullDescription ? "Show less" : "Read more"}
                   </button>
@@ -289,7 +289,7 @@ export function PodcastsPanel({
             )}
 
             {episodes.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center gap-3">
+              <div className="mt-4 pt-4 border-t border-hair flex items-center gap-3">
                 <Button
                   onClick={() => {
                     const firstEp = episodes[0];
@@ -315,7 +315,7 @@ export function PodcastsPanel({
                     </>
                   )}
                 </Button>
-                <span className="text-xs text-white/50">{episodes.length} episodes available</span>
+                <span className="text-xs text-foreground/50">{episodes.length} episodes available</span>
               </div>
             )}
           </div>
@@ -323,18 +323,18 @@ export function PodcastsPanel({
 
         {/* Episodes Section */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
-            <h2 className="text-base font-semibold text-white">Episodes</h2>
-            <span className="text-xs text-white/40">{episodes.length} episodes</span>
+          <div className="flex items-center justify-between pb-2 border-b border-hair-strong">
+            <h2 className="text-base font-semibold text-foreground">Episodes</h2>
+            <span className="text-xs text-foreground/40">{episodes.length} episodes</span>
           </div>
 
           {loadingEpisodes ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-white/40">
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-foreground/40">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <p className="text-xs">Loading episodes…</p>
             </div>
           ) : episodesError ? (
-            <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.08] text-center space-y-2">
+            <div className="p-6 rounded-xl bg-chip-subtle border border-hair-strong text-center space-y-2">
               <p className="text-xs text-rose-400">{episodesError}</p>
               <Button
                 size="sm"
@@ -346,12 +346,12 @@ export function PodcastsPanel({
               </Button>
             </div>
           ) : episodes.length === 0 ? (
-            <div className="py-12 text-center text-white/40 space-y-1">
+            <div className="py-12 text-center text-foreground/40 space-y-1">
               <p className="text-sm font-medium">No playable episodes found for this show.</p>
-              <p className="text-xs text-white/30">Please try another show from the catalogue.</p>
+              <p className="text-xs text-foreground/30">Please try another show from the catalogue.</p>
             </div>
           ) : (
-            <div className="divide-y divide-white/[0.04]">
+            <div className="divide-y divide-hair">
               {episodes.map((ep, idx) => {
                 const isCurrentEp = currentTrackId === ep.id;
                 const isThisPlaying = isCurrentEp && isPlaying;
@@ -363,8 +363,8 @@ export function PodcastsPanel({
                     className={cn(
                       "group p-3 md:p-4 rounded-xl transition-colors flex items-start gap-3.5",
                       isCurrentEp
-                        ? "bg-white/[0.06] border border-primary/30"
-                        : "hover:bg-white/[0.03] border border-transparent",
+                        ? "bg-chip border border-primary/30"
+                        : "hover:bg-chip-subtle border border-transparent",
                     )}
                   >
                     {/* Play / Status Control */}
@@ -384,7 +384,7 @@ export function PodcastsPanel({
                           ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
                           : isCurrentEp
                             ? "bg-white text-black"
-                            : "bg-white/[0.08] text-white hover:bg-primary hover:text-primary-foreground",
+                            : "bg-chip-strong text-foreground hover:bg-primary hover:text-primary-foreground",
                       )}
                       title={isThisPlaying ? "Pause" : "Play"}
                     >
@@ -401,7 +401,7 @@ export function PodcastsPanel({
                         <h3
                           className={cn(
                             "text-sm font-medium leading-snug line-clamp-1",
-                            isCurrentEp ? "text-primary" : "text-white group-hover:text-white",
+                            isCurrentEp ? "text-primary" : "text-foreground group-hover:text-foreground",
                           )}
                         >
                           {ep.title}
@@ -416,12 +416,12 @@ export function PodcastsPanel({
                       </div>
 
                       {ep.description && (
-                        <p className="text-xs text-white/50 line-clamp-2 mt-1 leading-relaxed">
+                        <p className="text-xs text-foreground/50 line-clamp-2 mt-1 leading-relaxed">
                           {ep.description}
                         </p>
                       )}
 
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-white/40">
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-foreground/40">
                         {dateLabel && (
                           <span className="inline-flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
@@ -452,10 +452,10 @@ export function PodcastsPanel({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Podcasts</h1>
-          <p className="text-xs text-white/50 mt-0.5">
+          <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">Podcasts</h1>
+          <p className="text-xs text-foreground/50 mt-0.5">
             Discover audio shows and series in{" "}
-            <span className="text-white font-medium">{selectedLanguage}</span>
+            <span className="text-foreground font-medium">{selectedLanguage}</span>
           </p>
         </div>
 
@@ -465,7 +465,7 @@ export function PodcastsPanel({
               variant="secondary"
               size="sm"
               onClick={onOpenSettings}
-              className="rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white border-white/[0.08] text-xs h-8"
+              className="rounded-full bg-chip hover:bg-chip-strong text-foreground/70 hover:text-foreground border-hair-strong text-xs h-8"
             >
               Topics
             </Button>
@@ -475,7 +475,7 @@ export function PodcastsPanel({
             size="sm"
             onClick={() => void fetchShows(selectedLanguage, debouncedQuery, selectedTopic)}
             disabled={loadingShows}
-            className="rounded-full bg-white/[0.04] hover:bg-white/[0.08] text-white/70 hover:text-white border-white/[0.08] text-xs h-8"
+            className="rounded-full bg-chip hover:bg-chip-strong text-foreground/70 hover:text-foreground border-hair-strong text-xs h-8"
           >
             {loadingShows ? (
               <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -489,7 +489,7 @@ export function PodcastsPanel({
 
       {/* Language Filter Pills */}
       <div className="space-y-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
           Language
         </span>
         <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-hide">
@@ -504,7 +504,7 @@ export function PodcastsPanel({
                   "shrink-0 rounded-full border px-3 py-1 text-xs transition-colors font-medium",
                   isActive
                     ? "border-primary/50 bg-primary/15 text-primary"
-                    : "border-white/[0.08] bg-white/[0.03] text-white/60 hover:bg-white/[0.06] hover:text-white",
+                    : "border-hair-strong bg-chip-subtle text-foreground/60 hover:bg-chip hover:text-foreground",
                 )}
               >
                 {lang}
@@ -516,23 +516,23 @@ export function PodcastsPanel({
 
       {/* Debounced Search Bar */}
       <div className="relative flex items-center w-full">
-        <Search className="absolute left-3.5 h-4 w-4 text-white/40 pointer-events-none" />
+        <Search className="absolute left-3.5 h-4 w-4 text-foreground/40 pointer-events-none" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={`Search ${selectedLanguage} podcasts, creators, or topics…`}
-          className="w-full rounded-xl bg-white/[0.04] border border-white/[0.08] pl-10 pr-10 py-2.5 text-sm text-white placeholder-white/40 focus:border-primary/60 focus:bg-white/[0.06] focus:outline-none transition-all"
+          className="w-full rounded-xl bg-chip border border-hair-strong pl-10 pr-10 py-2.5 text-sm text-foreground placeholder-foreground/40 focus:border-primary/60 focus:bg-chip focus:outline-none transition-all"
         />
         <div className="absolute right-2.5 flex items-center gap-1.5">
           {loadingShows && debouncedQuery && (
-            <Loader2 className="h-4 w-4 text-white/40 animate-spin" />
+            <Loader2 className="h-4 w-4 text-foreground/40 animate-spin" />
           )}
           {searchQuery && (
             <button
               type="button"
               onClick={handleClearSearch}
-              className="p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+              className="p-1 rounded-full text-foreground/40 hover:text-foreground hover:bg-chip-strong transition-colors"
               title="Clear search"
             >
               <X className="h-3.5 w-3.5" />
@@ -554,8 +554,8 @@ export function PodcastsPanel({
                 className={cn(
                   "shrink-0 rounded-full border px-3 py-1 text-xs transition-colors",
                   isActive
-                    ? "border-white/30 bg-white/10 text-white font-medium"
-                    : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:bg-white/[0.05] hover:text-white/80",
+                    ? "border-white/30 bg-chip-strong text-foreground font-medium"
+                    : "border-hair bg-chip-subtle text-foreground/50 hover:bg-chip hover:text-foreground/80",
                 )}
               >
                 {topic}
@@ -569,14 +569,14 @@ export function PodcastsPanel({
       {!debouncedQuery && podcastHistory.length > 0 && (
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-white/50 flex items-center gap-1.5">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground/50 flex items-center gap-1.5">
               <Headphones className="h-3.5 w-3.5 text-primary" />
               Continue Listening
             </h2>
             <button
               type="button"
               onClick={onClearPodcastHistory}
-              className="text-[11px] text-white/40 hover:text-white/70 transition-colors"
+              className="text-[11px] text-foreground/40 hover:text-foreground/70 transition-colors"
             >
               Clear
             </button>
@@ -597,9 +597,9 @@ export function PodcastsPanel({
                       onPlayHistoryTrack(ep, podcastHistory, idx);
                     }
                   }}
-                  className="w-36 shrink-0 snap-start text-left group p-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] transition-colors"
+                  className="w-36 shrink-0 snap-start text-left group p-2 rounded-xl bg-chip-subtle hover:bg-chip border border-hair transition-colors"
                 >
-                  <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06]">
+                  <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair">
                     {ep.thumbnail ? (
                       <img
                         src={ep.thumbnail}
@@ -608,7 +608,7 @@ export function PodcastsPanel({
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center">
-                        <Mic className="h-6 w-6 text-white/20" />
+                        <Mic className="h-6 w-6 text-foreground/20" />
                       </div>
                     )}
                     {isCurrent && isPlaying && (
@@ -621,10 +621,10 @@ export function PodcastsPanel({
                       </div>
                     )}
                   </div>
-                  <p className="truncate text-xs font-medium text-white group-hover:text-primary transition-colors">
+                  <p className="truncate text-xs font-medium text-foreground group-hover:text-primary transition-colors">
                     {ep.title}
                   </p>
-                  <p className="truncate text-[11px] text-white/40 mt-0.5">{ep.artist}</p>
+                  <p className="truncate text-[11px] text-foreground/40 mt-0.5">{ep.artist}</p>
                 </button>
               );
             })}
@@ -635,14 +635,14 @@ export function PodcastsPanel({
       {/* Shows Grid */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white">
+          <h2 className="text-sm font-semibold text-foreground">
             {debouncedQuery
               ? `Results for “${debouncedQuery}” in ${selectedLanguage}`
               : selectedTopic !== "All"
                 ? `${selectedTopic} Shows in ${selectedLanguage}`
                 : `Top Shows in ${selectedLanguage}`}
           </h2>
-          <span className="text-xs text-white/40 font-medium">{shows.length} shows</span>
+          <span className="text-xs text-foreground/40 font-medium">{shows.length} shows</span>
         </div>
 
         {loadingShows && shows.length === 0 ? (
@@ -650,18 +650,18 @@ export function PodcastsPanel({
             {Array.from({ length: 10 }).map((_, i) => (
               <div
                 key={i}
-                className="animate-pulse p-2 rounded-xl bg-white/[0.02] border border-white/[0.04] space-y-2"
+                className="animate-pulse p-2 rounded-xl bg-chip-subtle border border-hair space-y-2"
               >
-                <div className="aspect-square w-full rounded-lg bg-white/[0.05]" />
-                <div className="h-3 w-3/4 rounded bg-white/[0.05]" />
-                <div className="h-2.5 w-1/2 rounded bg-white/[0.03]" />
+                <div className="aspect-square w-full rounded-lg bg-chip" />
+                <div className="h-3 w-3/4 rounded bg-chip" />
+                <div className="h-2.5 w-1/2 rounded bg-chip-subtle" />
               </div>
             ))}
           </div>
         ) : showsError ? (
-          <div className="p-8 rounded-2xl bg-white/[0.02] border border-white/[0.08] text-center space-y-3">
-            <Mic className="h-10 w-10 text-white/20 mx-auto" />
-            <p className="text-sm text-white/60">{showsError}</p>
+          <div className="p-8 rounded-2xl bg-chip-subtle border border-hair-strong text-center space-y-3">
+            <Mic className="h-10 w-10 text-foreground/20 mx-auto" />
+            <p className="text-sm text-foreground/60">{showsError}</p>
             <Button
               size="sm"
               variant="secondary"
@@ -672,13 +672,13 @@ export function PodcastsPanel({
             </Button>
           </div>
         ) : shows.length === 0 ? (
-          <div className="p-10 rounded-2xl bg-white/[0.02] border border-white/[0.08] text-center space-y-2">
-            <Mic className="h-10 w-10 text-white/20 mx-auto" />
-            <h3 className="text-sm font-medium text-white/80">
+          <div className="p-10 rounded-2xl bg-chip-subtle border border-hair-strong text-center space-y-2">
+            <Mic className="h-10 w-10 text-foreground/20 mx-auto" />
+            <h3 className="text-sm font-medium text-foreground/80">
               No {selectedLanguage} podcasts found
               {debouncedQuery ? ` for “${debouncedQuery}”` : ""}
             </h3>
-            <p className="text-xs text-white/40 max-w-sm mx-auto">
+            <p className="text-xs text-foreground/40 max-w-sm mx-auto">
               {debouncedQuery
                 ? "Try searching with broader terms or choose another language."
                 : `No shows currently discovered under ${selectedLanguage} ${selectedTopic !== "All" ? `for ${selectedTopic}` : ""}. Select another language or topic above.`}
@@ -701,9 +701,9 @@ export function PodcastsPanel({
                 key={show.id}
                 type="button"
                 onClick={() => void handleSelectShow(show)}
-                className="group text-left p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/[0.06] hover:border-white/[0.12] transition-all flex flex-col"
+                className="group text-left p-2.5 rounded-xl bg-chip-subtle hover:bg-chip border border-hair hover:border-hair-strong transition-all flex flex-col"
               >
-                <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-white/[0.06]">
+                <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair">
                   {show.artworkUrl ? (
                     <img
                       src={show.artworkUrl}
@@ -712,23 +712,23 @@ export function PodcastsPanel({
                       className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
                     />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-white/20">
+                    <div className="flex h-full w-full items-center justify-center text-foreground/20">
                       <Mic className="h-8 w-8" />
                     </div>
                   )}
                   {show.category && (
-                    <span className="absolute bottom-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-sm text-white/75 font-medium line-clamp-1 max-w-[85%]">
+                    <span className="absolute bottom-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-sm text-foreground/75 font-medium line-clamp-1 max-w-[85%]">
                       {show.category}
                     </span>
                   )}
                 </div>
 
-                <h3 className="text-xs font-semibold text-white leading-tight line-clamp-1 group-hover:text-primary transition-colors">
+                <h3 className="text-xs font-semibold text-foreground leading-tight line-clamp-1 group-hover:text-primary transition-colors">
                   {show.title}
                 </h3>
-                <p className="text-[11px] text-white/50 line-clamp-1 mt-0.5">{show.publisher}</p>
+                <p className="text-[11px] text-foreground/50 line-clamp-1 mt-0.5">{show.publisher}</p>
                 {show.episodeCount !== undefined && show.episodeCount > 0 && (
-                  <span className="text-[10px] text-white/35 mt-1">
+                  <span className="text-[10px] text-foreground/35 mt-1">
                     {show.episodeCount} episodes
                   </span>
                 )}

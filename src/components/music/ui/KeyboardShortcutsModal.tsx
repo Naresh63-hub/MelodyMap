@@ -71,7 +71,7 @@ export function KeyboardShortcutsModal({ open, onOpenChange }: Props) {
                     className="flex items-center justify-between py-2 px-3 text-xs sm:text-sm hover:bg-surface-hover-strong transition-colors"
                   >
                     <span className="text-muted-foreground font-medium">{item.description}</span>
-                    <kbd className="px-2.5 py-1 text-[11px] font-mono font-medium text-foreground bg-white/[0.06] border border-border rounded-md">
+                    <kbd className="px-2.5 py-1 text-[11px] font-mono font-medium text-foreground bg-chip border border-border rounded-md">
                       {item.key}
                     </kbd>
                   </div>

@@ -34,7 +34,7 @@ export function HomeSections({
   /** Skeleton placeholder card with neutral shimmer. */
   const SkeletonCard = () => (
     <div className="space-y-2">
-      <div className="aspect-square w-full rounded-lg bg-card border border-white/[0.04] animate-pulse" />
+      <div className="aspect-square w-full rounded-lg bg-card border border-hair animate-pulse" />
       <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
       <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
     </div>
@@ -79,9 +79,9 @@ export function HomeSections({
     return (
       <section className="mb-8 animate-page-in">
         <div className="mb-3.5 flex items-center justify-between px-1">
-          <h2 className="text-lg font-semibold tracking-tight text-[#F5F5F5]">{title}</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
           {showMore && (
-            <button className="text-xs font-medium text-[#737373] hover:text-[#F5F5F5] transition-colors">
+            <button className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
               See all
             </button>
           )}
@@ -113,7 +113,7 @@ export function HomeSections({
       {!hasAnyContent && (
         <div className="flex flex-col items-center justify-center py-20 text-center animate-page-in">
           <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
-          <h3 className="text-base font-semibold text-white/80 mb-1">Nothing here yet</h3>
+          <h3 className="text-base font-semibold text-foreground/80 mb-1">Nothing here yet</h3>
           <p className="text-xs text-neutral-400 max-w-xs">
             Search for a song, pick a genre, or tune your feed to get personalized picks.
           </p>

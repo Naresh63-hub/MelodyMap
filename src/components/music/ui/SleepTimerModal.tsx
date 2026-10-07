@@ -112,8 +112,8 @@ export function SleepTimerModal({
               <Moon className="h-4 w-4" />
             </div>
             <div className="text-left">
-              <h2 className="text-sm font-semibold text-[#F5F5F5] leading-tight">Sleep Timer</h2>
-              <p className="text-[11px] text-[#737373] leading-none mt-0.5">
+              <h2 className="text-sm font-semibold text-foreground leading-tight">Sleep Timer</h2>
+              <p className="text-[11px] text-muted-foreground leading-none mt-0.5">
                 {isActive
                   ? "Active • Automatically stops playback"
                   : isExpired
@@ -141,7 +141,7 @@ export function SleepTimerModal({
                 ? "border-primary shadow-[0_0_24px_rgba(56,189,248,0.25)]"
                 : isExpired
                 ? "border-amber-500/50"
-                : "border-white/10"
+                : "border-hair-strong"
             )}
           >
             <div className="flex flex-col items-center">
@@ -156,10 +156,10 @@ export function SleepTimerModal({
                   Expired
                 </span>
               )}
-              <span className="font-mono text-3xl font-bold tracking-tight text-[#F5F5F5] tabular-nums">
+              <span className="font-mono text-3xl font-bold tracking-tight text-foreground tabular-nums">
                 {formatDisplayMinutes()}
               </span>
-              <span className="text-[11px] text-[#737373] mt-0.5">
+              <span className="text-[11px] text-muted-foreground mt-0.5">
                 {isActive ? "until stop" : isCustomMode ? "custom duration" : "preset duration"}
               </span>
             </div>
@@ -169,7 +169,7 @@ export function SleepTimerModal({
         {/* Preset Chips */}
         <div className="space-y-2 mb-5">
           <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-medium text-[#737373] uppercase tracking-[0.06em]">
+            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-[0.06em]">
               {isActive ? "Change Duration" : "Select Duration"}
             </span>
             <button
@@ -177,7 +177,7 @@ export function SleepTimerModal({
               onClick={() => setIsCustomMode(!isCustomMode)}
               className={cn(
                 "text-[11px] font-semibold transition-colors flex items-center gap-1",
-                isCustomMode ? "text-primary" : "text-[#737373] hover:text-[#F5F5F5]"
+                isCustomMode ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Sliders className="h-3 w-3" />
@@ -198,7 +198,7 @@ export function SleepTimerModal({
                       "rounded-xl border py-2 px-1 text-xs font-semibold transition-all text-center",
                       isSelected
                         ? "border-primary bg-primary/15 text-primary shadow-sm"
-                        : "border-border bg-surface-hover text-[#A1A1A1] hover:bg-surface-hover-strong hover:text-[#F5F5F5]"
+                        : "border-border bg-surface-hover text-secondary-foreground hover:bg-surface-hover-strong hover:text-foreground"
                     )}
                   >
                     {p.label}
@@ -209,7 +209,7 @@ export function SleepTimerModal({
           ) : (
             <div className="rounded-xl border border-border bg-surface-hover p-3 text-left">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-[#A1A1A1]">Minutes:</span>
+                <span className="text-xs font-medium text-secondary-foreground">Minutes:</span>
                 <span className="text-sm font-bold text-primary tabular-nums">
                   {customInput} min
                 </span>
@@ -226,7 +226,7 @@ export function SleepTimerModal({
                 }}
                 className="w-full accent-primary cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] font-medium text-[#737373] mt-1">
+              <div className="flex justify-between text-[10px] font-medium text-muted-foreground mt-1">
                 <span>5m</span>
                 <span>60m (1h)</span>
                 <span>120m (2h)</span>
@@ -280,7 +280,7 @@ export function SleepTimerModal({
                   resetExpired();
                   handleStart(isCustomMode ? customInput : selectedMinutes);
                 }}
-                className="rounded-2xl border border-white/10 bg-white/[0.05] py-3 px-4 text-xs font-semibold text-white hover:bg-white/10 transition-all"
+                className="rounded-2xl border border-hair-strong bg-chip py-3 px-4 text-xs font-semibold text-foreground hover:bg-chip-strong transition-all"
               >
                 New
               </button>

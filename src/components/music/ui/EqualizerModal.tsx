@@ -171,7 +171,7 @@ export function EqualizerModal({
                           value={gain}
                           onChange={(e) => onBandGainChange(idx, Number(e.target.value))}
                           aria-label={`${band.label} Gain`}
-                          className="w-28 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary -rotate-90"
+                          className="w-28 h-2 bg-chip-strong rounded-lg appearance-none cursor-pointer accent-primary -rotate-90"
                         />
                       </div>
 
@@ -215,7 +215,7 @@ export function EqualizerModal({
                 step="1"
                 value={settings.crossfade}
                 onChange={(e) => onCrossfadeChange(Number(e.target.value))}
-                className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                className="w-full h-2 bg-chip-strong rounded-lg appearance-none cursor-pointer accent-primary"
               />
               <div className="flex justify-between text-[10px] text-muted-foreground">
                 <span>0s (Gapless)</span>

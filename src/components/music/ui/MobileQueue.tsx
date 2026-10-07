@@ -43,19 +43,19 @@ export function MobileQueue({
     >
       {/* Sheet */}
       <div
-        className="relative max-h-[82vh] w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto flex flex-col rounded-t-3xl bg-background border-t border-white/10 shadow-2xl animate-slide-up"
+        className="relative max-h-[82vh] w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto flex flex-col rounded-t-3xl bg-background border-t border-hair-strong shadow-2xl animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
-          <div className="h-1 w-10 rounded-full bg-white/20" />
+          <div className="h-1 w-10 rounded-full bg-chip-strong" />
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-2 border-b border-white/[0.06]">
-          <h3 className="text-base font-bold text-[#F5F5F5]">Queue</h3>
+        <div className="flex items-center justify-between px-5 py-2 border-b border-hair">
+          <h3 className="text-base font-bold text-foreground">Queue</h3>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-[#737373]">
+            <span className="text-xs text-muted-foreground">
               {tracks.length} track{tracks.length === 1 ? "" : "s"}
             </span>
             <Button
@@ -63,7 +63,7 @@ export function MobileQueue({
               size="sm"
               onClick={onClear}
               disabled={tracks.length === 0}
-              className="text-[#737373] hover:text-[#F5F5F5] text-xs"
+              className="text-muted-foreground hover:text-foreground text-xs"
             >
               <Trash2 className="h-3.5 w-3.5 mr-1" />
               Clear
@@ -71,7 +71,7 @@ export function MobileQueue({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-[#737373] active:bg-white/[0.06]"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground active:bg-chip"
               aria-label="Close queue"
             >
               <X className="h-4 w-4" />
@@ -93,8 +93,8 @@ export function MobileQueue({
                   {current.thumbnail ? (
                     <img src={current.thumbnail} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex h-full items-center justify-center bg-white/[0.05]">
-                      <Music2 className="h-5 w-5 text-white/20" />
+                    <div className="flex h-full items-center justify-center bg-chip">
+                      <Music2 className="h-5 w-5 text-foreground/20" />
                     </div>
                   )}
                   {isPlaying && (
@@ -112,8 +112,8 @@ export function MobileQueue({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[#F5F5F5]">{current.title}</p>
-                  <p className="truncate text-xs text-[#A1A1A1] mt-0.5">{current.artist}</p>
+                  <p className="truncate text-sm font-semibold text-foreground">{current.title}</p>
+                  <p className="truncate text-xs text-secondary-foreground mt-0.5">{current.artist}</p>
                 </div>
                 <Equalizer active={isPlaying} className="h-4 w-4 text-primary shrink-0" />
               </div>
@@ -123,7 +123,7 @@ export function MobileQueue({
           {/* Upcoming */}
           {upcoming.length > 0 && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-[#737373] mb-2 px-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-1">
                 Next Up
               </p>
               <div className="space-y-1">
@@ -154,13 +154,13 @@ export function MobileQueue({
                       }}
                       className={cn(
                         "flex items-center gap-3 rounded-xl p-2.5 transition-all",
-                        isDragging ? "opacity-40 scale-95 bg-white/[0.06]" : "active:bg-white/[0.04]",
+                        isDragging ? "opacity-40 scale-95 bg-chip" : "active:bg-chip",
                         isOver && dragIndex !== null && dragIndex !== realIndex
-                          ? "ring-1 ring-white/20 bg-white/[0.08]"
+                          ? "ring-1 ring-white/20 bg-chip-strong"
                           : "",
                       )}
                     >
-                      <span className="cursor-grab active:cursor-grabbing p-1 text-[#737373] hover:text-[#F5F5F5] transition-colors">
+                      <span className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground transition-colors">
                         <GripVertical className="h-4 w-4 shrink-0" />
                       </span>
                       <button
@@ -168,27 +168,27 @@ export function MobileQueue({
                         onClick={() => onJump(realIndex)}
                         className="flex min-w-0 flex-1 items-center gap-3"
                       >
-                        <span className="w-5 text-center text-[10px] text-[#737373] tabular-nums shrink-0">
+                        <span className="w-5 text-center text-[10px] text-muted-foreground tabular-nums shrink-0">
                           {realIndex + 1}
                         </span>
                         <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md bg-card">
                           {track.thumbnail ? (
                             <img src={track.thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" />
                           ) : (
-                            <div className="flex h-full items-center justify-center bg-white/[0.05]">
-                              <Music2 className="h-3.5 w-3.5 text-white/15" />
+                            <div className="flex h-full items-center justify-center bg-chip">
+                              <Music2 className="h-3.5 w-3.5 text-foreground/15" />
                             </div>
                           )}
                         </div>
                         <div className="min-w-0 flex-1 text-left">
-                          <p className="truncate text-[13px] font-semibold text-[#F5F5F5]">{track.title}</p>
-                          <p className="truncate text-[11px] text-[#A1A1A1] mt-0.5">{track.artist}</p>
+                          <p className="truncate text-[13px] font-semibold text-foreground">{track.title}</p>
+                          <p className="truncate text-[11px] text-secondary-foreground mt-0.5">{track.artist}</p>
                         </div>
                       </button>
                       <button
                         type="button"
                         onClick={() => onRemove(realIndex)}
-                        className="h-11 w-11 shrink-0 flex items-center justify-center rounded-full text-[#737373] active:text-destructive"
+                        className="h-11 w-11 shrink-0 flex items-center justify-center rounded-full text-muted-foreground active:text-destructive"
                         aria-label={`Remove ${track.title} from queue`}
                       >
                         <X className="h-3.5 w-3.5" />
@@ -203,17 +203,17 @@ export function MobileQueue({
           {/* Empty upcoming state */}
           {current && upcoming.length === 0 && (
             <div className="py-8 text-center">
-              <p className="text-xs text-[#737373]">No more songs in queue</p>
-              <p className="text-[11px] text-[#737373]/60 mt-1">Select any song or album to add to Up Next</p>
+              <p className="text-xs text-muted-foreground">No more songs in queue</p>
+              <p className="text-[11px] text-muted-foreground/60 mt-1">Select any song or album to add to Up Next</p>
             </div>
           )}
 
           {/* Empty state */}
           {tracks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Music2 className="h-10 w-10 text-white/15 mb-3" />
-              <p className="text-sm text-[#737373]">Queue is empty</p>
-              <p className="text-xs text-[#737373]/60 mt-1">Add songs to build your queue</p>
+              <Music2 className="h-10 w-10 text-foreground/15 mb-3" />
+              <p className="text-sm text-muted-foreground">Queue is empty</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">Add songs to build your queue</p>
             </div>
           )}
         </div>

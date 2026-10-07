@@ -21,10 +21,14 @@ import {
   HardDrive,
   Activity,
   Disc,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import { loadEqualizerSettings, saveEqualizerSettings } from "@/lib/equalizer";
 import { useNavigate } from "@tanstack/react-router";
 import { isLowNetworkModeEnabled, setLowNetworkMode } from "@/lib/network-mode";
+import { useTheme } from "@/hooks/use-theme";
 import { ListeningInsightsPanel } from "./ListeningInsightsPanel";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -33,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
 import { LanguageArtistPicker } from "@/components/music/ui/LanguageArtistPicker";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
   exportLibraryData,
   importLibraryData,
@@ -105,7 +110,8 @@ export function SettingsModal({
   onLibraryRestored,
 }: Props) {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "insights">("account");
+  const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "appearance" | "insights">("account");
+  const { mode: theme, setMode: setTheme } = useTheme();
   const [sponsorBlockOn, setSponsorBlockOn] = useState<boolean>(getSponsorBlockEnabled);
   const [lowNetworkOn, setLowNetworkOn] = useState<boolean>(isLowNetworkModeEnabled);
   const [internalCrossfade, setInternalCrossfade] = useState<number>(() => {
@@ -271,7 +277,7 @@ export function SettingsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-0 text-foreground glass-heavy rounded-2xl scrollbar-hide">
         {/* Header - Native App Style */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/[0.08] glass-frosted px-6 py-4">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-hair-strong glass-frosted px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
               <Sliders className="h-4 w-4 text-primary" />
@@ -300,7 +306,7 @@ export function SettingsModal({
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "account"
               ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
+                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
             )}
           >
             <User className="h-3.5 w-3.5 text-primary" />
@@ -313,7 +319,7 @@ export function SettingsModal({
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "languages"
               ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
+                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
             )}
           >
             <Globe2 className="h-3.5 w-3.5 text-primary" />
@@ -326,7 +332,7 @@ export function SettingsModal({
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "picks"
               ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
+                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
             )}
           >
             <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -339,7 +345,7 @@ export function SettingsModal({
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "playback"
               ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
+                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
             )}
           >
             <Volume2 className="h-3.5 w-3.5 text-primary" />
@@ -352,11 +358,24 @@ export function SettingsModal({
               "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
               activeSection === "insights"
               ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-white/50 hover:bg-white/[0.04] hover:text-white/80"
+                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
             )}
           >
             <Activity className="h-3.5 w-3.5 text-primary" />
             Listening Insights
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("appearance")}
+            className={cn(
+              "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
+              activeSection === "appearance"
+              ? "bg-primary/15 text-primary border border-primary/30"
+                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
+            )}
+          >
+            <Sun className="h-3.5 w-3.5 text-primary" />
+            Appearance
           </button>
         </div>
 
@@ -406,7 +425,7 @@ export function SettingsModal({
                     </div>
 
                     <div className="space-y-1">
-                      <Label htmlFor="displayNameInput" className="text-[11px] text-white/50 font-medium">
+                      <Label htmlFor="displayNameInput" className="text-[11px] text-foreground/50 font-medium">
                         Display Name
                       </Label>
                       <div className="flex items-center gap-2 max-w-md">
@@ -435,7 +454,7 @@ export function SettingsModal({
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-white/40 truncate">
+                    <p className="text-[11px] text-foreground/40 truncate">
                       {userEmail || "Signed in locally (guest mode). Your playlists & favorites stay on this device."}
                     </p>
                   </div>
@@ -443,13 +462,13 @@ export function SettingsModal({
 
                 {/* Avatar Picker Accordion */}
                 {isEditingAvatar && (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3 animate-in fade-in">
+                  <div className="rounded-2xl border border-hair-strong bg-chip-subtle p-4 space-y-3 animate-in fade-in">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-semibold text-white">Choose a Music Avatar Persona</h4>
+                      <h4 className="text-xs font-semibold text-foreground">Choose a Music Avatar Persona</h4>
                       <button
                         type="button"
                         onClick={() => setIsEditingAvatar(false)}
-                        className="text-[11px] text-white/40 hover:text-white"
+                        className="text-[11px] text-foreground/40 hover:text-foreground"
                       >
                         Done
                       </button>
@@ -467,7 +486,7 @@ export function SettingsModal({
                             "flex flex-col items-center gap-1.5 rounded-xl p-2 border transition-all cursor-pointer",
                             avatarUrl === p.url
                               ? "border-primary bg-primary/15 ring-2 ring-primary/30"
-                              : "border-border bg-surface-hover hover:border-white/20 hover:bg-surface-hover-strong"
+                              : "border-border bg-surface-hover hover:border-hair-strong hover:bg-surface-hover-strong"
                           )}
                         >
                           <img
@@ -475,13 +494,13 @@ export function SettingsModal({
                             alt={p.label}
                             className="h-10 w-10 rounded-full object-cover shadow-sm"
                           />
-                          <span className="text-[10px] text-white/70 truncate w-full text-center">{p.label}</span>
+                          <span className="text-[10px] text-foreground/70 truncate w-full text-center">{p.label}</span>
                         </button>
                       ))}
                     </div>
 
                     <div className="pt-2 space-y-1">
-                      <Label htmlFor="customAvatarInput" className="text-[10px] text-white/40">
+                      <Label htmlFor="customAvatarInput" className="text-[10px] text-foreground/40">
                         Or paste image URL:
                       </Label>
                       <Input
@@ -489,7 +508,7 @@ export function SettingsModal({
                         value={avatarUrl}
                         onChange={(e) => setAvatarUrl(e.target.value)}
                         placeholder="https://example.com/avatar.jpg"
-                        className="h-8 rounded-lg border-white/10 bg-white/[0.02] text-xs text-white placeholder:text-white/20"
+                        className="h-8 rounded-lg border-hair-strong bg-chip-subtle text-xs text-foreground placeholder:text-foreground/20"
                       />
                     </div>
                   </div>
@@ -517,50 +536,50 @@ export function SettingsModal({
 
               {/* Password & Security Card (For Logged-in Users) */}
               {userId && (
-                <div className="rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5 space-y-4 shadow-lg backdrop-blur-md">
+                <div className="rounded-3xl border border-hair-strong bg-chip-subtle p-5 space-y-4 shadow-lg backdrop-blur-md">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-300">
                         <KeyRound className="h-4 w-4" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-semibold text-white">Password &amp; Security</h4>
-                        <p className="text-xs text-white/40">Update your account login password</p>
+                        <h4 className="text-sm font-semibold text-foreground">Password &amp; Security</h4>
+                        <p className="text-xs text-foreground/40">Update your account login password</p>
                       </div>
                     </div>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setIsChangingPassword((v) => !v)}
-                      className="rounded-xl border-white/10 bg-white/[0.04] text-xs text-white/80 hover:bg-white/10 cursor-pointer"
+                      className="rounded-xl border-hair-strong bg-chip text-xs text-foreground/80 hover:bg-chip-strong cursor-pointer"
                     >
                       {isChangingPassword ? "Cancel" : "Change Password"}
                     </Button>
                   </div>
 
                   {isChangingPassword && (
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 space-y-3 animate-in fade-in">
+                    <div className="rounded-2xl border border-hair-strong bg-chip-subtle p-4 space-y-3 animate-in fade-in">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <Label htmlFor="newPassInput" className="text-xs text-white/60">New Password</Label>
+                          <Label htmlFor="newPassInput" className="text-xs text-foreground/60">New Password</Label>
                           <Input
                             id="newPassInput"
                             type="password"
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             placeholder="At least 6 characters"
-                            className="h-9 rounded-xl border-white/10 bg-white/[0.04] text-xs text-white placeholder:text-white/30"
+                            className="h-9 rounded-xl border-hair-strong bg-chip text-xs text-foreground placeholder:text-foreground/30"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="confirmPassInput" className="text-xs text-white/60">Confirm New Password</Label>
+                          <Label htmlFor="confirmPassInput" className="text-xs text-foreground/60">Confirm New Password</Label>
                           <Input
                             id="confirmPassInput"
                             type="password"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             placeholder="Re-type password"
-                            className="h-9 rounded-xl border-white/10 bg-white/[0.04] text-xs text-white placeholder:text-white/30"
+                            className="h-9 rounded-xl border-hair-strong bg-chip text-xs text-foreground placeholder:text-foreground/30"
                           />
                         </div>
                       </div>
@@ -603,14 +622,14 @@ export function SettingsModal({
               )}
 
               {/* Library Backup & Restore Card */}
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5 space-y-4 shadow-lg backdrop-blur-md">
+              <div className="rounded-3xl border border-hair-strong bg-chip-subtle p-5 space-y-4 shadow-lg backdrop-blur-md">
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-300">
                     <HardDrive className="h-4 w-4" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-white">Library Backup &amp; Portability</h4>
-                    <p className="text-xs text-white/40">1-Click export and import of all playlists, likes, and history</p>
+                    <h4 className="text-sm font-semibold text-foreground">Library Backup &amp; Portability</h4>
+                    <p className="text-xs text-foreground/40">1-Click export and import of all playlists, likes, and history</p>
                   </div>
                 </div>
 
@@ -628,7 +647,7 @@ export function SettingsModal({
                     variant="outline"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-xl border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/10 text-xs font-medium cursor-pointer"
+                    className="rounded-xl border-hair-strong bg-chip text-foreground/80 hover:bg-chip-strong text-xs font-medium cursor-pointer"
                   >
                     <Upload className="mr-1.5 h-3.5 w-3.5" />
                     Import Backup JSON
@@ -643,7 +662,7 @@ export function SettingsModal({
                 </div>
 
                 {backupStatus && (
-                  <div className="flex items-center gap-2 rounded-xl bg-white/[0.04] px-3.5 py-2 text-xs text-purple-300 animate-in fade-in">
+                  <div className="flex items-center gap-2 rounded-xl bg-chip px-3.5 py-2 text-xs text-purple-300 animate-in fade-in">
                     {backupStatus.includes("fail") ? (
                       <AlertCircle className="h-3.5 w-3.5 text-rose-400" />
                     ) : (
@@ -656,7 +675,7 @@ export function SettingsModal({
 
               {/* Footer Session Action */}
               <div className="flex items-center justify-between pt-2 px-1">
-                <span className="text-xs text-white/30 font-mono">MelodyMap Native v2.0</span>
+                <span className="text-xs text-foreground/30 font-mono">MelodyMap Native v2.0</span>
                 {userId && onSignOut ? (
                   <Button
                     variant="destructive"
@@ -689,15 +708,15 @@ export function SettingsModal({
           {/* 2. LANGUAGES & ARTISTS SECTION */}
           {activeSection === "languages" && (
             <div className="space-y-4">
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6 space-y-4 shadow-lg backdrop-blur-md">
+              <div className="rounded-3xl border border-hair-strong bg-chip-subtle p-5 sm:p-6 space-y-4 shadow-lg backdrop-blur-md">
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Song Languages &amp; Favorite Artists</h3>
-                  <p className="text-xs text-white/40 mt-0.5">
+                  <h3 className="text-sm font-semibold text-foreground">Song Languages &amp; Favorite Artists</h3>
+                  <p className="text-xs text-foreground/40 mt-0.5">
                     Select the languages and artists you listen to. MelodyMap customizes your daily mixes, charts, and recommendations based on these preferences.
                   </p>
                 </div>
 
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-chip" />
 
                 <LanguageArtistPicker
                   languages={settings.languages}
@@ -710,10 +729,10 @@ export function SettingsModal({
                   }}
                 />
 
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-chip" />
 
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                  <span className="text-[11px] text-white/40">
+                  <span className="text-[11px] text-foreground/40">
                     {settings.languages.length} language(s), {settings.artists.length} artist(s) selected
                   </span>
                   <Button
@@ -754,28 +773,28 @@ export function SettingsModal({
           {/* 4. AUDIO & PLAYBACK HARDWARE SECTION */}
           {activeSection === "playback" && (
             <div className="space-y-4">
-              <div className="rounded-3xl border border-white/[0.08] bg-white/[0.03] p-5 sm:p-6 space-y-5 shadow-lg backdrop-blur-md">
+              <div className="rounded-3xl border border-hair-strong bg-chip-subtle p-5 sm:p-6 space-y-5 shadow-lg backdrop-blur-md">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">Continuous Queue Auto-Play</h3>
-                    <p className="text-xs text-white/40 mt-0.5">
+                    <h3 className="text-sm font-semibold text-foreground">Continuous Queue Auto-Play</h3>
+                    <p className="text-xs text-foreground/40 mt-0.5">
                       Automatically queue and stream similar songs when current playback concludes
                     </p>
                   </div>
                   <Switch checked={continuous} onCheckedChange={onContinuousChange} />
                 </div>
 
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-chip" />
 
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-white">Low Network Mode (Data Saver)</h3>
+                      <h3 className="text-sm font-semibold text-foreground">Low Network Mode (Data Saver)</h3>
                       <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-semibold text-cyan-300 border border-cyan-500/30">
                         Saver
                       </span>
                     </div>
-                    <p className="text-xs text-white/40 mt-0.5">
+                    <p className="text-xs text-foreground/40 mt-0.5">
                       Stream in data-saver quality, optimize thumbnails, and reduce cellular data usage
                     </p>
                   </div>
@@ -788,27 +807,27 @@ export function SettingsModal({
                   />
                 </div>
 
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-chip" />
 
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-white">SponsorBlock Auto-Skip</h3>
+                      <h3 className="text-sm font-semibold text-foreground">SponsorBlock Auto-Skip</h3>
                       <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-500/30">
                         Pro
                       </span>
                     </div>
-                    <p className="text-xs text-white/40 mt-0.5">
+                    <p className="text-xs text-foreground/40 mt-0.5">
                       Automatically bypass intros, sponsorship pitches, and silent outros in YouTube streams &amp; podcasts
                     </p>
                   </div>
                   <Switch checked={sponsorBlockOn} onCheckedChange={handleToggleSponsorBlock} />
                 </div>
 
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-chip" />
 
                 {/* Gapless Playback & Smart Crossfade */}
-                <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-4 space-y-3.5">
+                <div className="rounded-2xl bg-chip-subtle border border-hair p-4 space-y-3.5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
@@ -816,12 +835,12 @@ export function SettingsModal({
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-sm font-semibold text-white">Gapless Playback &amp; Smart Crossfade</h3>
+                          <h3 className="text-sm font-semibold text-foreground">Gapless Playback &amp; Smart Crossfade</h3>
                           <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary border border-primary/25">
                             Studio
                           </span>
                         </div>
-                        <p className="text-xs text-white/40 mt-0.5">
+                        <p className="text-xs text-foreground/40 mt-0.5">
                           Smoothly blends the end of one track into the beginning of the next
                         </p>
                       </div>
@@ -839,9 +858,9 @@ export function SettingsModal({
                       step="1"
                       value={currentCrossfade}
                       onChange={(e) => handleCrossfadeChange(Number(e.target.value))}
-                      className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-primary"
+                      className="w-full h-1.5 bg-chip-strong rounded-lg appearance-none cursor-pointer accent-primary"
                     />
-                    <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                    <div className="flex justify-between text-[10px] text-foreground/40 font-mono">
                       <span>0s (Gapless)</span>
                       <span>2s</span>
                       <span>4s</span>
@@ -865,7 +884,7 @@ export function SettingsModal({
                         className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all text-center border ${
                           currentCrossfade === p.seconds
                             ? "bg-primary/20 border-primary/40 text-primary"
-                            : "bg-white/[0.03] border-white/[0.06] text-white/60 hover:text-white hover:bg-white/[0.06]"
+                            : "bg-chip-subtle border-hair text-foreground/60 hover:text-foreground hover:bg-chip"
                         }`}
                       >
                         {p.label}
@@ -874,12 +893,12 @@ export function SettingsModal({
                   </div>
                 </div>
 
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-chip" />
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">10-Band Hardware Equalizer &amp; Crossfader</h3>
-                    <p className="text-xs text-white/40 mt-0.5">
+                    <h3 className="text-sm font-semibold text-foreground">10-Band Hardware Equalizer &amp; Crossfader</h3>
+                    <p className="text-xs text-foreground/40 mt-0.5">
                       Fine-tune 32Hz–16kHz frequencies, loudness compression &amp; seamless crossfade
                     </p>
                   </div>
@@ -899,12 +918,12 @@ export function SettingsModal({
                   )}
                 </div>
 
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-chip" />
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">Sleep Timer</h3>
-                    <p className="text-xs text-white/40 mt-0.5">
+                    <h3 className="text-sm font-semibold text-foreground">Sleep Timer</h3>
+                    <p className="text-xs text-foreground/40 mt-0.5">
                       Schedule music to fade out gently after a preset duration
                     </p>
                   </div>
@@ -916,7 +935,7 @@ export function SettingsModal({
                         onOpenChange(false);
                         onOpenSleepTimer();
                       }}
-                      className="rounded-xl border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/10 text-xs cursor-pointer"
+                      className="rounded-xl border-hair-strong bg-chip text-foreground/80 hover:bg-chip-strong text-xs cursor-pointer"
                     >
                       <Clock className="mr-1.5 h-3.5 w-3.5" />
                       Set Sleep Timer
@@ -924,12 +943,12 @@ export function SettingsModal({
                   )}
                 </div>
 
-                <div className="h-px bg-white/[0.06]" />
+                <div className="h-px bg-chip" />
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">Keyboard Shortcuts</h3>
-                    <p className="text-xs text-white/40 mt-0.5">
+                    <h3 className="text-sm font-semibold text-foreground">Keyboard Shortcuts</h3>
+                    <p className="text-xs text-foreground/40 mt-0.5">
                       View hotkeys for playback, scrub, volume, and queue navigation
                     </p>
                   </div>
@@ -941,7 +960,7 @@ export function SettingsModal({
                         onOpenChange(false);
                         onOpenShortcuts();
                       }}
-                      className="rounded-xl border-white/10 bg-white/[0.04] text-white/80 hover:bg-white/10 text-xs cursor-pointer"
+                      className="rounded-xl border-hair-strong bg-chip text-foreground/80 hover:bg-chip-strong text-xs cursor-pointer"
                     >
                       <Keyboard className="mr-1.5 h-3.5 w-3.5" />
                       View Hotkeys
@@ -952,7 +971,23 @@ export function SettingsModal({
             </div>
           )}
 
-          {/* 5. LISTENING INSIGHTS & AI RADAR SECTION */}
+          {/* 5. APPEARANCE SECTION */}
+          {activeSection === "appearance" && (
+            <div className="rounded-3xl border border-hair-strong bg-chip-subtle p-5 sm:p-6 space-y-5 shadow-lg backdrop-blur-md">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Appearance</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Pick a look for MelodyMap. “System” follows your device’s light/dark setting automatically.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center">
+                <ThemeToggle theme={theme} onChange={setTheme} />
+              </div>
+            </div>
+          )}
+
+          {/* 6. LISTENING INSIGHTS & AI RADAR SECTION */}
           {activeSection === "insights" && (
             <ListeningInsightsPanel />
           )}

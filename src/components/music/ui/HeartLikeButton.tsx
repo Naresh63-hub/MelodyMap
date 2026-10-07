@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { triggerHaptic } from "@/lib/haptics";
 
 interface HeartLikeButtonProps {
   liked: boolean;
@@ -28,13 +29,16 @@ export function HeartLikeButton({
       e.stopPropagation();
       e.preventDefault();
 
+      // Trigger haptic feedback
+      triggerHaptic(liked ? 'light' : 'success');
+
       // Trigger scale-up bounce animation
       setIsBouncing(true);
       setTimeout(() => setIsBouncing(false), 300);
 
       onToggle(e);
     },
-    [onToggle],
+    [onToggle, liked],
   );
 
   const iconSizes = {
@@ -61,7 +65,7 @@ export function HeartLikeButton({
         buttonSizes[size],
         liked
           ? "text-primary hover:text-[#7dd3fc]"
-          : "text-white/40 hover:text-white/80 hover:bg-white/[0.04]",
+          : "text-foreground/40 hover:text-foreground/80 hover:bg-chip",
         className,
       )}
     >

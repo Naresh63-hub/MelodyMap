@@ -83,9 +83,9 @@ export function MobileDrawer({
       />
 
       {/* Drawer panel */}
-      <div className="relative flex w-4/5 max-w-xs flex-1 flex-col glass-medium border-r border-white/[0.08] shadow-lift z-10 animate-slide-in">
+      <div className="relative flex w-4/5 max-w-xs flex-1 flex-col glass-medium border-r border-hair-strong shadow-lift z-10 animate-slide-in">
         {/* Header with guaranteed clearance below Android status bar and camera cutouts */}
-        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-white/[0.08] glass-light">
+        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-hair-strong glass-light">
           <div className="flex items-center gap-2.5">
             <img
               src="/brand/app-icon.png"
@@ -118,7 +118,7 @@ export function MobileDrawer({
                   onSignIn();
                 }
               }}
-              className="flex items-center justify-between gap-3 px-5 py-3.5 glass-light border-b border-white/[0.08] cursor-pointer transition-colors hover:bg-white/[0.05]"
+              className="flex items-center justify-between gap-3 px-5 py-3.5 glass-light border-b border-hair-strong cursor-pointer transition-colors hover:bg-chip"
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="relative shrink-0">
@@ -146,10 +146,10 @@ export function MobileDrawer({
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={cn("truncate text-sm font-semibold text-white", isPlaying && "animate-name-glow")}>
+                  <p className={cn("truncate text-sm font-semibold text-foreground", isPlaying && "animate-name-glow")}>
                     {displayUserName}
                   </p>
-                  <p className="text-[11px] text-white/50">
+                  <p className="text-[11px] text-foreground/50">
                     {isSynced ? "Synced Account • Tap to edit" : "Tap to sign in / manage"}
                   </p>
                 </div>
@@ -162,7 +162,7 @@ export function MobileDrawer({
                   onClose();
                   if (onSignIn) onSignIn();
                 }}
-                className="shrink-0 rounded-full bg-white/[0.08] border border-white/10 px-3 py-1 text-xs font-semibold text-white/90 hover:bg-white/[0.15] transition-colors"
+                className="shrink-0 rounded-full bg-chip-strong border border-hair-strong px-3 py-1 text-xs font-semibold text-foreground/90 hover:bg-chip-strong transition-colors"
               >
                 {isSynced ? "Manage" : "Sign In"}
               </button>
@@ -174,7 +174,7 @@ export function MobileDrawer({
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 scrollbar-hide">
           {navGroups.map((group) => (
             <div key={group.title}>
-              <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1.5">
+              <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-foreground/30 mb-1.5">
                 {group.title}
               </p>
               <div className="space-y-0.5">
@@ -189,14 +189,14 @@ export function MobileDrawer({
                       className={cn(
                         "flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors text-left",
                         active
-                          ? "bg-white/[0.08] text-white font-semibold"
-                          : "text-white/60 hover:bg-white/[0.04] hover:text-white"
+                          ? "bg-chip-strong text-foreground font-semibold"
+                          : "text-foreground/60 hover:bg-chip hover:text-foreground"
                       )}
                     >
                       <Icon
                         className={cn(
                           "h-4 w-4 shrink-0",
-                          active ? "text-primary" : "text-white/40"
+                          active ? "text-primary" : "text-foreground/40"
                         )}
                       />
                       <span>{item.label}</span>
@@ -209,16 +209,16 @@ export function MobileDrawer({
         </div>
 
         {/* Bottom Actions */}
-        <div className="p-3 border-t border-white/10 space-y-1">
+        <div className="p-3 border-t border-hair-strong space-y-1">
           <button
             type="button"
             onClick={() => {
               onClose();
               onOpenSettings();
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium text-white/60 hover:bg-white/[0.04] hover:text-white text-left transition-colors"
+            className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground/60 hover:bg-chip hover:text-foreground text-left transition-colors"
           >
-            <Settings2 className="h-4 w-4 text-white/40" />
+            <Settings2 className="h-4 w-4 text-foreground/40" />
             <span>Settings</span>
           </button>
 
@@ -242,9 +242,9 @@ export function MobileDrawer({
                   onClose();
                   onSignIn();
                 }}
-                className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium text-white/80 hover:bg-white/[0.06] hover:text-white text-left transition-colors"
+                className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium text-foreground/80 hover:bg-chip hover:text-foreground text-left transition-colors"
               >
-                <LogIn className="h-4 w-4 text-white/60" />
+                <LogIn className="h-4 w-4 text-foreground/60" />
                 <span>Sign In</span>
               </button>
             )

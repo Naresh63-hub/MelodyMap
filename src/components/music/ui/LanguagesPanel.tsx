@@ -98,25 +98,25 @@ export function LanguagesPanel({
   return (
     <div className="animate-page-in">
       <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-pink-500/20 via-purple-500/20 to-cyan-500/20 ring-1 ring-white/10">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-pink-500/20 via-purple-500/20 to-cyan-500/20 ring-1 ring-chip-strong">
           <Globe2 className="h-5 w-5 text-pink-400 icon-glow" />
         </div>
         <div className="min-w-0">
-          <h2 className="text-lg font-bold text-white">Languages</h2>
-          <p className="truncate text-xs text-white/40">
+          <h2 className="text-lg font-bold text-foreground">Languages</h2>
+          <p className="truncate text-xs text-foreground/40">
             Songs in your languages, from your favourite artists &amp; singers.
           </p>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          <div className="flex rounded-full border border-white/10 bg-white/[0.04] p-0.5">
+          <div className="flex rounded-full border border-hair-strong bg-chip p-0.5">
             <button
               type="button"
               onClick={() => setView("picks")}
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors button-press",
                 view === "picks"
-                  ? "bg-white/10 text-white shadow-sm"
-                  : "text-white/50 hover:text-white",
+                  ? "bg-chip-strong text-foreground shadow-sm"
+                  : "text-foreground/50 hover:text-foreground",
               )}
             >
               <Sparkles className="h-3.5 w-3.5" />
@@ -128,8 +128,8 @@ export function LanguagesPanel({
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors button-press",
                 view === "charts"
-                  ? "bg-white/10 text-white shadow-sm"
-                  : "text-white/50 hover:text-white",
+                  ? "bg-chip-strong text-foreground shadow-sm"
+                  : "text-foreground/50 hover:text-foreground",
               )}
             >
               <BarChart3 className="h-3.5 w-3.5" />
@@ -139,7 +139,7 @@ export function LanguagesPanel({
           <Button
             variant="secondary"
             size="sm"
-            className="rounded-full bg-white/[0.06] text-white/70 hover:bg-white/10 hover:text-white border-white/10 button-press"
+            className="rounded-full bg-chip text-foreground/70 hover:bg-chip-strong hover:text-foreground border-hair-strong button-press"
             onClick={() => void load()}
             disabled={loading}
           >
@@ -158,7 +158,7 @@ export function LanguagesPanel({
         </div>
       </div>
 
-      <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+      <div className="mb-6 rounded-2xl border border-hair-strong bg-chip-subtle p-4 sm:p-5">
         <LanguageArtistPicker
           languages={settings.languages}
           artists={settings.artists}
@@ -167,13 +167,13 @@ export function LanguagesPanel({
       </div>
 
       {loading && tracks.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 py-16 text-white/30">
+        <div className="flex flex-col items-center gap-3 py-16 text-foreground/30">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
           <p className="text-sm">Finding songs in your languages…</p>
         </div>
       ) : error && tracks.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
-          <p className="text-sm text-white/40">{error}</p>
+          <p className="text-sm text-foreground/40">{error}</p>
           <Button variant="secondary" size="sm" onClick={() => void load()}>
             Try again
           </Button>

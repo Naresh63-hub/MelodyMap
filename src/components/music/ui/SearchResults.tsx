@@ -86,12 +86,12 @@ export function SearchResults(props: Props) {
         {Array.from({ length: 6 }).map((_, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 p-2 rounded-lg bg-card border border-white/[0.04] animate-pulse"
+            className="flex items-center gap-3 p-2 rounded-lg bg-card border border-hair animate-pulse"
           >
-            <div className="h-11 w-11 rounded-md bg-white/[0.06]" />
+            <div className="h-11 w-11 rounded-md bg-chip" />
             <div className="flex-1 space-y-2">
-              <div className="h-3.5 w-3/4 rounded bg-white/[0.06]" />
-              <div className="h-3 w-1/2 rounded bg-white/[0.04]" />
+              <div className="h-3.5 w-3/4 rounded bg-chip" />
+              <div className="h-3 w-1/2 rounded bg-chip" />
             </div>
           </div>
         ))}
@@ -111,7 +111,7 @@ export function SearchResults(props: Props) {
 
         {/* Browse By Category Cards */}
         <section className="space-y-2.5">
-          <h2 className="text-sm font-semibold text-white/90">Browse Categories</h2>
+          <h2 className="text-sm font-semibold text-foreground/90">Browse Categories</h2>
           <div className="grid grid-cols-2 gap-3">
             {[
               {
@@ -149,14 +149,14 @@ export function SearchResults(props: Props) {
                   key={cat.title}
                   type="button"
                   onClick={() => onSearch?.(cat.query, cat.type)}
-                  className="flex flex-col justify-between p-4 rounded-xl bg-card hover:bg-popover border border-white/[0.06] text-left transition-all active:scale-[0.98] h-28 group"
+                  className="flex flex-col justify-between p-4 rounded-xl bg-card hover:bg-popover border border-hair text-left transition-all active:scale-[0.98] h-28 group"
                 >
-                  <Icon className="h-5 w-5 text-[#A1A1A1] group-hover:text-primary transition-colors" />
+                  <Icon className="h-5 w-5 text-secondary-foreground group-hover:text-primary transition-colors" />
                   <div>
-                    <p className="text-xs font-semibold text-[#F5F5F5] leading-tight">
+                    <p className="text-xs font-semibold text-foreground leading-tight">
                       {cat.title}
                     </p>
-                    <p className="text-[10px] text-[#A1A1A1] leading-tight mt-0.5">
+                    <p className="text-[10px] text-secondary-foreground leading-tight mt-0.5">
                       {cat.subtitle}
                     </p>
                   </div>
@@ -187,7 +187,7 @@ export function SearchResults(props: Props) {
                 "rounded-full px-3.5 py-1 text-xs transition-all",
                 active
                   ? "bg-[#F5F5F5] text-black font-semibold"
-                  : "bg-white/[0.04] text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.08] border border-white/[0.06] font-medium"
+                  : "bg-chip text-secondary-foreground hover:text-foreground hover:bg-chip-strong border border-hair font-medium"
               )}
             >
               {opt.label}
@@ -199,20 +199,20 @@ export function SearchResults(props: Props) {
       {/* Results Song List or No Results */}
       {results.length === 0 ? (
         <div className="py-12 text-center space-y-3">
-          <p className="text-sm font-semibold text-[#F5F5F5]">No results found for &ldquo;{query}&rdquo;</p>
-          <p className="text-xs text-[#737373]">Check spelling or try searching for another artist or song</p>
+          <p className="text-sm font-semibold text-foreground">No results found for &ldquo;{query}&rdquo;</p>
+          <p className="text-xs text-muted-foreground">Check spelling or try searching for another artist or song</p>
           {recentSearches.length > 0 && (
             <div className="pt-4 max-w-xs mx-auto">
-              <p className="text-xs font-medium text-[#A1A1A1] mb-2">Or try a recent search:</p>
+              <p className="text-xs font-medium text-secondary-foreground mb-2">Or try a recent search:</p>
               <div className="flex flex-wrap justify-center gap-1.5">
                 {recentSearches.slice(0, 4).map((item) => (
                   <button
                     key={item.query}
                     type="button"
                     onClick={() => onSearch?.(item.query, "songs")}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-card border border-white/[0.06] px-3 py-1 text-xs text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-popover active:scale-95 transition-all"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-card border border-hair px-3 py-1 text-xs text-secondary-foreground hover:text-foreground hover:bg-popover active:scale-95 transition-all"
                   >
-                    <Clock className="h-3 w-3 text-[#737373]" />
+                    <Clock className="h-3 w-3 text-muted-foreground" />
                     <span>{item.query}</span>
                   </button>
                 ))}
@@ -231,7 +231,7 @@ export function SearchResults(props: Props) {
                 "group flex items-center gap-3 rounded-lg p-2 transition-colors",
                 active
                   ? "bg-popover"
-                  : "hover:bg-white/[0.03]"
+                  : "hover:bg-chip-subtle"
               )}
             >
               {/* Thumbnail + Play */}
@@ -261,12 +261,12 @@ export function SearchResults(props: Props) {
                 <p
                   className={cn(
                     "truncate text-sm font-semibold leading-tight",
-                    active ? "text-primary" : "text-[#F5F5F5]"
+                    active ? "text-primary" : "text-foreground"
                   )}
                 >
                   {track.title}
                 </p>
-                <p className="truncate text-xs text-[#A1A1A1] leading-tight mt-1 font-normal">
+                <p className="truncate text-xs text-secondary-foreground leading-tight mt-1 font-normal">
                   {track.artist}
                 </p>
               </button>
@@ -284,7 +284,7 @@ export function SearchResults(props: Props) {
                   type="button"
                   onClick={() => onOpenOptions(track)}
                   aria-label="Options"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-white/[0.06] active:scale-90 transition-all"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:text-foreground hover:bg-chip active:scale-90 transition-all"
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>
@@ -302,7 +302,7 @@ export function SearchResults(props: Props) {
             type="button"
             onClick={onLoadMore}
             disabled={loadingMore}
-            className="flex items-center gap-2 rounded-full border border-white/[0.06] bg-card px-5 py-2 text-xs font-medium text-[#F5F5F5] hover:bg-popover active:scale-95 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 rounded-full border border-hair bg-card px-5 py-2 text-xs font-medium text-foreground hover:bg-popover active:scale-95 transition-all disabled:opacity-50"
           >
             {loadingMore ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : null}
             {loadingMore ? "Loading more..." : "Load more results"}
