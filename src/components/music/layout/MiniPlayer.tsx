@@ -63,7 +63,7 @@ export function MiniPlayer({
   return (
     <div
       {...swipeProps}
-      className="fixed z-40 border-t border-hair-strong glass-frosted shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between safe-bottom"
+      className="fixed z-40 border-t border-hair-strong bg-surface shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between safe-bottom"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
       {/* 2px Hairline Progress Indicator at Top */}

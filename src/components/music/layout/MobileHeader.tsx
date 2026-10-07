@@ -45,7 +45,7 @@ export function MobileHeader({
   };
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between px-4 pb-3 header-safe-top glass-frosted border-b border-hair-strong">
+    <header className="sticky top-0 z-20 flex items-center justify-between px-4 pb-3 header-safe-top bg-surface border-b border-hair-strong">
       <div className="flex items-center gap-2.5 min-w-0">
         {onOpenMenu && (
           <button
