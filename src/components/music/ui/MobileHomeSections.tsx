@@ -371,7 +371,7 @@ export function MobileHomeSections({
       {visibleDailyMix.length > 0 && (
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-2.5 px-0.5">
-            <h2 className="text-sm font-semibold tracking-normal text-foreground/90">Daily Mix</h2>
+            <h2 className="text-sm font-semibold tracking-normal section-header-gradient">Daily Mix</h2>
             <span className="text-[11px] font-normal text-neutral-400">
               Updated today
             </span>

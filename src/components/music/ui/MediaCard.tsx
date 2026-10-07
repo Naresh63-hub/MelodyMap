@@ -76,7 +76,7 @@ export function MediaCard({
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
       className={cn(
-        "group/card shrink-0 cursor-pointer p-2 rounded-xl transition-colors bg-card/60 hover:bg-popover border border-hair hover:border-hair-strong card-modern-lift card-glow-border",
+        "group/card shrink-0 cursor-pointer p-2 rounded-xl transition-all bg-card/60 hover:bg-popover border border-hair hover:border-hair-strong card-modern-lift card-glow-border glass-card-gradient-border",
         isLongPressing && "scale-95 opacity-80",
         dims,
         className,

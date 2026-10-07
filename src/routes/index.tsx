@@ -26,6 +26,7 @@ import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { sleepTimerService } from "@/lib/sleep-timer";
+import { getGradientTheme, setGradientTheme, type GradientTheme } from "@/lib/theme";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
@@ -271,6 +272,17 @@ function MusicApp() {
   const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [gradientTheme, setGradientThemeState] = useState<GradientTheme>('vibrant');
+
+  // Apply gradient theme
+  useEffect(() => {
+    const theme = getGradientTheme();
+    setGradientThemeState(theme);
+    document.body.classList.add(`gradient-${theme}`);
+    return () => {
+      document.body.classList.remove(`gradient-${theme}`);
+    };
+  }, []);
 
   const { pullToRefreshProps, isPulling } = usePullToRefresh({
     onRefresh: async () => {
@@ -2577,7 +2589,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, []);
 
   return (
-    <div className="flex flex-col h-dvh bg-background text-foreground selection:bg-primary/20 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-white/[0.04]">
+    <div className="flex flex-col h-dvh bg-background text-foreground selection:bg-primary/20 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-white/[0.04] bg-gradient-overlay">
       {/* Slide-out Mobile Sidebar Drawer */}
       <MobileDrawer
         open={drawerOpen}

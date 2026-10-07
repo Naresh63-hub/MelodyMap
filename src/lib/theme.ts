@@ -1,6 +1,8 @@
 export type Theme = 'dark' | 'light' | 'auto';
+export type GradientTheme = 'vibrant' | 'neon' | 'sunset' | 'ocean';
 
 const THEME_KEY = 'melodymap-theme';
+const GRADIENT_KEY = 'melodymap-gradient';
 
 const THEME_COLORS = {
   dark: '#050b12',
@@ -80,4 +82,33 @@ export function subscribeTheme(listener: () => void): () => void {
   ensureSystemSubscription();
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+function isGradientTheme(value: string | null): value is GradientTheme {
+  return value === 'vibrant' || value === 'neon' || value === 'sunset' || value === 'ocean';
+}
+
+export function getGradientTheme(): GradientTheme {
+  if (typeof window === 'undefined') return 'vibrant';
+  try {
+    const stored = localStorage.getItem(GRADIENT_KEY);
+    if (isGradientTheme(stored)) return stored;
+  } catch {
+    /* private mode / unavailable storage */
+  }
+  return 'vibrant';
+}
+
+export function setGradientTheme(theme: GradientTheme): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  try {
+    localStorage.setItem(GRADIENT_KEY, theme);
+  } catch {
+    /* private mode / unavailable storage */
+  }
+  // Apply to body
+  document.body.className = document.body.className
+    .replace(/gradient-\w+/g, '')
+    .trim();
+  document.body.classList.add(`gradient-${theme}`);
 }

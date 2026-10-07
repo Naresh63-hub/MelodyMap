@@ -35,9 +35,9 @@ function FilterChip({
       disabled={disabled}
       onClick={() => onToggle(filter.id)}
       className={cn(
-        "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
+        "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press chip-gradient",
         active
-          ? "border border-primary/40 bg-primary/20 font-semibold text-white shadow-md"
+          ? "chip-gradient-active border border-primary/40 font-semibold text-white shadow-md"
           : "border border-white/[0.06] bg-white/[0.03] font-normal text-neutral-300 hover:bg-white/[0.08] hover:text-white",
         isEmpty && "opacity-45",
         disabled && "opacity-50",

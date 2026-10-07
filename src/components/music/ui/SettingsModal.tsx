@@ -24,10 +24,12 @@ import {
   Sun,
   Moon,
   Monitor,
+  Palette,
 } from "lucide-react";
 import { loadEqualizerSettings, saveEqualizerSettings } from "@/lib/equalizer";
 import { useNavigate } from "@tanstack/react-router";
 import { isLowNetworkModeEnabled, setLowNetworkMode } from "@/lib/network-mode";
+import { getGradientTheme, setGradientTheme, type GradientTheme } from "@/lib/theme";
 import { useTheme } from "@/hooks/use-theme";
 import { ListeningInsightsPanel } from "./ListeningInsightsPanel";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -112,6 +114,7 @@ export function SettingsModal({
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "appearance" | "insights">("account");
   const { mode: theme, setMode: setTheme } = useTheme();
+  const [gradientTheme, setGradientThemeState] = useState<GradientTheme>(getGradientTheme);
   const [sponsorBlockOn, setSponsorBlockOn] = useState<boolean>(getSponsorBlockEnabled);
   const [lowNetworkOn, setLowNetworkOn] = useState<boolean>(isLowNetworkModeEnabled);
   const [internalCrossfade, setInternalCrossfade] = useState<number>(() => {
@@ -983,6 +986,45 @@ export function SettingsModal({
 
               <div className="flex items-center justify-center">
                 <ThemeToggle theme={theme} onChange={setTheme} />
+              </div>
+
+              <div className="border-t border-hair-strong pt-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Palette className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Background Theme</h3>
+                </div>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Choose an animated gradient background style
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'vibrant' as GradientTheme, name: 'Vibrant', preview: 'linear-gradient(135deg, #1a0a2e 0%, #e94560 100%)' },
+                    { id: 'neon' as GradientTheme, name: 'Neon', preview: 'linear-gradient(135deg, #0d1b2a 0%, #778da9 100%)' },
+                    { id: 'sunset' as GradientTheme, name: 'Sunset', preview: 'linear-gradient(135deg, #2d1b4e 0%, #e94560 100%)' },
+                    { id: 'ocean' as GradientTheme, name: 'Ocean', preview: 'linear-gradient(135deg, #0c4a6e 0%, #38bdf8 100%)' },
+                  ].map((gt) => (
+                    <button
+                      key={gt.id}
+                      type="button"
+                      onClick={() => {
+                        setGradientThemeState(gt.id);
+                        setGradientTheme(gt.id);
+                      }}
+                      className={cn(
+                        "relative h-16 rounded-xl border-2 transition-all overflow-hidden",
+                        gradientTheme === gt.id ? "border-primary ring-2 ring-primary/30" : "border-hair hover:border-hair-strong"
+                      )}
+                    >
+                      <div 
+                        className="absolute inset-0 opacity-80"
+                        style={{ background: gt.preview }}
+                      />
+                      <span className="relative z-10 text-xs font-semibold text-white drop-shadow-md">
+                        {gt.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
