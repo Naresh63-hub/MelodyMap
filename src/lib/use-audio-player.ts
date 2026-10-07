@@ -584,7 +584,7 @@ export function useAudioPlayer(options: {
     if (!trackId || !wantPlayRef.current) return;
 
     const attempts = reconnectAttemptsRef.current;
-    if (attempts >= 6) {
+    if (attempts >= 3) {
       setIsReconnecting(false);
       const isExternalNonYt =
         trackId.startsWith("podcast:") ||
@@ -592,8 +592,8 @@ export function useAudioPlayer(options: {
         trackId.startsWith("audius:") ||
         trackId.startsWith("jamendo:") ||
         trackId.startsWith("archive:");
-      // Fallback to client-side YouTube player if proxy stream ever drops/fails on web
-      if (!isExternalNonYt && !isNativePlaybackEnv()) {
+      // Fallback to in-app YouTube player if proxy stream ever drops/fails
+      if (!isExternalNonYt) {
         console.info(`[MelodyMap] Reconnection threshold reached. Switching to YouTube playback engine for: ${trackId}`);
         const resumePos = lastValidPositionRef.current || 0;
         playViaYouTubeRef.current(trackId, resumePos, true);
@@ -874,14 +874,7 @@ export function useAudioPlayer(options: {
       ) {
         console.warn("[MelodyMap] Audio stream proxy error:", audio.error.code, audio.error.message);
 
-        // Network error (code 2 = MEDIA_ERR_NETWORK) or decode error mid-stream: trigger prompt reconnection
-        if (wantPlayRef.current && (audio.error.code === 2 || audio.error.code === 4)) {
-          console.warn("[MelodyMap] Audio network error detected, attempting mid-song stream reconnection.");
-          triggerReconnect();
-          return;
-        }
-
-        // Instant Fallback to Client YouTube Player on Vercel / server proxy block
+        // Instant Fallback to Client YouTube Player on server proxy block
         const activeId = currentTrackIdRef.current;
         const isExternalNonYt =
           Boolean(activeId) &&
@@ -891,12 +884,18 @@ export function useAudioPlayer(options: {
             activeId!.startsWith("jamendo:") ||
             activeId!.startsWith("archive:"));
 
-        // Native app: never fall back to the YouTube IFrame engine — it cannot
-        // survive screen-off/app-switch. Keep the proxy engine and surface the error.
-        if (activeId && !isExternalNonYt && !isNativePlaybackEnv()) {
-          console.info(`[MelodyMap] Falling back to direct client YouTube streaming for track: ${activeId}`);
+        // If server proxy cannot resolve this stream, fall back to in-app YouTube engine
+        if (activeId && !isExternalNonYt) {
+          console.info(`[MelodyMap] Proxy unresolvable, falling back to client YouTube engine for: ${activeId}`);
           const resumePos = audio.currentTime || 0;
           playViaYouTubeRef.current(activeId, resumePos, wantPlayRef.current);
+          return;
+        }
+
+        // Network error (code 2 = MEDIA_ERR_NETWORK) mid-stream: trigger prompt reconnection
+        if (wantPlayRef.current && (audio.error.code === 2 || audio.error.code === 4)) {
+          console.warn("[MelodyMap] Audio network error detected, attempting mid-song stream reconnection.");
+          triggerReconnect();
           return;
         }
 
@@ -1022,6 +1021,13 @@ export function useAudioPlayer(options: {
                 } catch {}
               } else if (event.data === 2) {
                 // 2 = Paused
+                // If the user did not explicitly request pause (e.g. Android screen off or visibility change), keep playing
+                if (wantPlayRef.current && isNativePlaybackEnv()) {
+                  try {
+                    event.target.playVideo();
+                    return;
+                  } catch {}
+                }
                 setIsPlaying(false);
                 setIsLoading(false);
               } else if (event.data === 3) {

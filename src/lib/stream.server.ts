@@ -30,6 +30,8 @@ const AUDIUS_MIN_SCORE = 1.2;
 /** Lowers case, strips bracketed tags/punctuation, returns word tokens. */
 function titleTokens(text: string | null | undefined): string[] {
   return (text || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/\(.*?\)|\[.*?\]/g, " ")
     .replace(/[^a-z0-9\s]/g, " ")
@@ -395,7 +397,9 @@ async function resolveWithYtDlp(
 // ─── InnerTube Player (Direct YouTube API with fallback) ───────────────────
 
 function cleanTrackTitle(title: string): string {
-  return title
+  return (title || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/\[.*?\]|\(.*?\)|\|.*/g, "")
     .replace(/(full\s+)?(video|audio|lyric|lyrical)\s+song/gi, "")
     .replace(/(official|original)\s+(music\s+)?(video|audio|track)/gi, "")
