@@ -93,12 +93,20 @@ export type PlaybackEngine = "html5" | "youtube";
  * Localhost environments with local yt-dlp binaries use the HTML5 proxy engine.
  * Direct audio sources (podcasts, provider streams, offline cache) always
  * automatically route through HTML5 via setStream().
+ *
+ * NATIVE TRADEOFF: the APK uses the in-app YouTube player because the deployed
+ * serverless backend (Vercel) cannot run yt-dlp, so its /api/stream proxy can't
+ * resolve YouTube tracks. The player streams from the phone's own connection,
+ * requiring no self-hosted server. The cost is that the YouTube IFrame pauses
+ * when the screen locks or the app is minimized, so YouTube tracks do not
+ * background-play. Direct sources (podcasts/Audius/Jamendo/offline) still use
+ * HTML5 and keep working in the background.
  */
 export function resolvePlaybackEngine(opts: {
   isNative: boolean;
   hostname: string;
 }): PlaybackEngine {
-  if (opts.isNative) return "html5";
+  if (opts.isNative) return "youtube";
   const host = (opts.hostname || "").toLowerCase();
   if (host === "localhost" || host === "127.0.0.1") return "html5";
   // In AI Studio and Cloud Run preview environments where YouTube iframe embeds are blocked
