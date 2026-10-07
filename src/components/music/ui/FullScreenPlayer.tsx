@@ -142,7 +142,7 @@ export function FullScreenPlayer({
       <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/90 to-background pointer-events-none" />
 
       {/* Main Container */}
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col justify-between px-6 py-6 pb-[calc(env(safe-area-inset-bottom,0px)+20px)] pt-[calc(env(safe-area-inset-top,0px)+16px)]">
+      <div className="relative z-10 flex h-full w-full max-w-md flex-col justify-between px-6 py-6 pb-[calc(var(--mm-inset-bottom)+20px)] pt-[calc(var(--mm-inset-top)+16px)]">
         {/* Top Header */}
         <div className="flex w-full items-center justify-between">
           <button

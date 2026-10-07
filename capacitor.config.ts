@@ -1,6 +1,6 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const isDev = process.env.NODE_ENV === 'development' || process.env.CAPACITOR_ENV === 'development';
+const isDev = process.env['NODE_ENV'] === 'development' || process.env['CAPACITOR_ENV'] === 'development';
 
 const config: CapacitorConfig = {
   appId: 'com.melodymap.music',
@@ -13,10 +13,33 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: isDev,
     backgroundColor: '#0a0a0f',
-    // targetSdk 36 → Android 15+ enforces edge-to-edge: the WebView draws
-    // under the status/navigation bars. 'auto' adjusts WebView margins at
-    // runtime (API 35+ only) so content sits between the system bars.
-    adjustMarginsForEdgeToEdge: 'auto',
+    // NOTE: `android.adjustMarginsForEdgeToEdge` is not a Capacitor option —
+    // it is absent from CapConfig.java and the CLI config type, so it was
+    // silently ignored and never kept the WebView out of the system bars.
+    // Edge-to-edge insets are handled by the built-in SystemBars plugin
+    // (configured below), which is what Android 15+ (targetSdk 36) requires.
+  },
+  plugins: {
+    /**
+     * Android 15+ enforces edge-to-edge for apps targeting SDK 35+, so the
+     * WebView draws underneath the status and navigation bars.
+     *
+     * SystemBars is registered automatically by the Capacitor 8 bridge and
+     * takes care of the insets: on Chromium < 140 it pads the WebView natively
+     * and reports `env(safe-area-inset-*)` as 0, and on Chromium >= 140 it lets
+     * `viewport-fit=cover` hand correct safe-area values to the page.
+     */
+    SystemBars: {
+      // "css" (default behaviour, pinned explicitly) = the native handling
+      // above plus injected `--safe-area-inset-*` CSS variables, which the web
+      // stylesheet consumes as a fallback next to `env()`.
+      insetsHandling: 'css',
+      // The document already declares `viewport-fit=cover`; declaring it here
+      // too removes the startup layout jump while Capacitor detects the tag.
+      initialViewportFitValueHint: 'cover',
+      // Dark UI -> light system-bar icons.
+      style: 'DARK',
+    },
   },
 };
 

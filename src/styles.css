@@ -49,6 +49,19 @@
   --radius: 0.625rem;
   --mobile-nav-height: 56px;
 
+  /*
+   * Safe-area insets. iOS and modern Android WebViews report these through
+   * `env(safe-area-inset-*)`. On Android the app runs edge-to-edge (enforced
+   * for targetSdk 35+), so Capacitor's SystemBars plugin additionally injects
+   * `--safe-area-inset-*` custom properties onto <html> — taking the larger of
+   * the two means the chrome clears the status/navigation bars whichever
+   * mechanism the device actually reports.
+   */
+  --mm-inset-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --mm-inset-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+  --mm-inset-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --mm-inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+
   /* Palette: refined midnight-sky theme */
   --bg-main: #050b12;
   --bg-secondary: #08111c;
@@ -368,24 +381,33 @@
 
 /* Safe area insets for mobile */
 @utility safe-bottom {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+  padding-bottom: max(var(--mm-inset-bottom), 16px);
 }
 
 @utility safe-top {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--mm-inset-top);
+}
+
+/* Raw inset paddings for full-bleed surfaces (e.g. the full-screen player) */
+@utility inset-top {
+  padding-top: var(--mm-inset-top);
+}
+
+@utility inset-bottom {
+  padding-bottom: var(--mm-inset-bottom);
 }
 
 @utility header-safe-top {
-  padding-top: max(calc(env(safe-area-inset-top, 0px) + 1rem), 3.5rem);
+  padding-top: max(calc(var(--mm-inset-top) + 1rem), 3.5rem);
 }
 
 @utility drawer-safe-top {
-  padding-top: max(calc(env(safe-area-inset-top, 0px) + 1rem), 3.25rem);
+  padding-top: max(calc(var(--mm-inset-top) + 1rem), 3.25rem);
 }
 
 /* Glass-safe variant for drawer header */
 @utility drawer-safe-top-glass {
-  padding-top: max(calc(env(safe-area-inset-top, 0px) + 1rem), 3.25rem);
+  padding-top: max(calc(var(--mm-inset-top) + 1rem), 3.25rem);
 }
 
 @utility overscroll-none {
