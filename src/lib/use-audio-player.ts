@@ -834,6 +834,25 @@ export function useAudioPlayer(options: {
             console.warn("[BackgroundPlayback] Synchronous next auto-play notice:", err);
           });
         }
+        // Restore WebAudio gain for the new track. The crossfade fade-out ramped
+        // mainGain toward 0 over the tail of the previous song, and this
+        // synchronous auto-advance path bypasses setStream (the only other place
+        // that resets gain), so without this the next track plays silently at
+        // gain ~0. Mirrors the fade-in logic in setStream.
+        if (audioCtxRef.current && mainGainRef.current) {
+          const ctx = audioCtxRef.current;
+          const mainGain = mainGainRef.current;
+          const fadeDur = equalizerSettingsRef.current.crossfade || 0;
+          try {
+            mainGain.gain.cancelScheduledValues(ctx.currentTime);
+            if (fadeDur > 0) {
+              const curve = createEqualPowerCurve("in", 32);
+              mainGain.gain.setValueCurveAtTime(curve, ctx.currentTime, Math.min(fadeDur, 4));
+            } else {
+              mainGain.gain.setValueAtTime(1, ctx.currentTime);
+            }
+          } catch {}
+        }
         didAutoAdvance = true;
       }
 
