@@ -85,7 +85,7 @@ export function MobileDrawer({
       {/* Drawer panel */}
       <div className="relative flex w-4/5 max-w-xs flex-1 flex-col glass-medium border-r border-hair-strong shadow-lift z-10 animate-slide-in">
         {/* Header with guaranteed clearance below Android status bar and camera cutouts */}
-        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-hair-strong drawer-gradient-header">
+        <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-hair-strong glass-light">
           <div className="flex items-center gap-2.5">
             <img
               src="/brand/app-icon.png"

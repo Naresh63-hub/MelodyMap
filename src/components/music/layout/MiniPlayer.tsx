@@ -108,7 +108,7 @@ export function MiniPlayer({
             <p className="truncate text-xs sm:text-[13px] font-medium text-foreground/95 leading-tight">
               {track?.title ?? "No track"}
             </p>
-            <p className="truncate text-[11px] text-neutral-400 font-normal leading-tight mt-0.5">
+            <p className="truncate text-[11px] text-muted-foreground font-normal leading-tight mt-0.5">
               {track?.artist ?? "—"}
             </p>
             {isReplacementSource && (
@@ -152,7 +152,7 @@ export function MiniPlayer({
               onTogglePlay();
             }}
             disabled={isLoading}
-            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-[#F5F5F5] text-black hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
+            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-foreground text-background hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isLoading ? (

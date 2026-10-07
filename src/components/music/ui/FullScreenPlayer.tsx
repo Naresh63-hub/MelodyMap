@@ -150,17 +150,6 @@ export function FullScreenPlayer({
           : "transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease",
       }}
     >
-      {/* Multi-layer gradient background */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: `
-            radial-gradient(circle at 30% 30%, rgba(56, 189, 248, 0.3) 0%, transparent 50%),
-            radial-gradient(circle at 70% 70%, rgba(233, 69, 96, 0.2) 0%, transparent 50%),
-            linear-gradient(135deg, #1a0a2e 0%, #16213e 100%)
-          `
-        }}
-      />
       {/* Soft ambient background art glow */}
       <div
         className="absolute inset-0 bg-cover bg-center blur-3xl opacity-15 scale-125 transition-all duration-700 pointer-events-none"
@@ -208,10 +197,7 @@ export function FullScreenPlayer({
             {...doubleTapProps}
             onTouchStart={swipeStart}
             onTouchEnd={swipeEnd}
-            className={cn(
-              "relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border touch-manipulation select-none",
-              isPlaying && "album-art-pulse"
-            )}
+            className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border touch-manipulation select-none"
           >
             <img
               src={track.thumbnail}

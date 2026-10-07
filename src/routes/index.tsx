@@ -26,7 +26,6 @@ import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { sleepTimerService } from "@/lib/sleep-timer";
-import { getGradientTheme, setGradientTheme, type GradientTheme } from "@/lib/theme";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 
@@ -272,17 +271,6 @@ function MusicApp() {
   const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [gradientTheme, setGradientThemeState] = useState<GradientTheme>('vibrant');
-
-  // Apply gradient theme
-  useEffect(() => {
-    const theme = getGradientTheme();
-    setGradientThemeState(theme);
-    document.body.classList.add(`gradient-${theme}`);
-    return () => {
-      document.body.classList.remove(`gradient-${theme}`);
-    };
-  }, []);
 
   const { pullToRefreshProps, isPulling } = usePullToRefresh({
     onRefresh: async () => {
@@ -2595,7 +2583,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, []);
 
   return (
-    <div className="flex flex-col h-dvh bg-background text-foreground selection:bg-primary/20 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-white/[0.04] bg-gradient-overlay">
+    <div className="flex flex-col h-dvh bg-background text-foreground selection:bg-primary/20 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-hair">
       {/* Slide-out Mobile Sidebar Drawer */}
       <MobileDrawer
         open={drawerOpen}
@@ -2658,19 +2646,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
         {/* Mobile search bar — on search tab */}
         {tab === "search" && (
-          <div className="sticky top-0 z-20 bg-[#0f0f0f]/90 backdrop-blur-xl border-b border-white/[0.05] header-safe-top">
+          <div className="sticky top-0 z-20 bg-surface/90 backdrop-blur-xl border-b border-hair header-safe-top">
             <div className="flex items-center gap-2 px-4 py-3">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
                 aria-label="Open menu"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/70 active:scale-95 transition-all"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip-subtle border border-hair text-secondary-foreground active:scale-95 transition-all"
               >
                 <Menu className="h-4 w-4" />
               </button>
               <form onSubmit={onSearch} className="relative flex-1 flex items-center gap-2">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     id="main-search-input"
                     type="search"
@@ -2679,7 +2667,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       setQuery(e.target.value);
                     }}
                     placeholder="Search songs, artists, podcasts..."
-                    className="h-10 w-full rounded-full border border-white/[0.08] bg-white/[0.04] pl-10 pr-16 text-sm text-white placeholder:text-white/30 focus:border-white/20 focus:ring-1 focus:ring-white/10 focus:outline-none"
+                    className="h-10 w-full rounded-full border border-hair bg-chip-subtle pl-10 pr-16 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-primary/20 focus:outline-none"
                     autoComplete="off"
                   />
                   <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -2698,7 +2686,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                           setResults([]);
                           setSearching(false);
                         }}
-                        className="text-white/30 hover:text-white/70 active:text-white p-1"
+                        className="text-muted-foreground hover:text-foreground active:text-foreground p-1"
                         aria-label="Clear search"
                       >
                         <X className="h-3.5 w-3.5" />
@@ -2720,12 +2708,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   type="submit"
                   aria-label="Search"
                   title="Search"
-                  className="flex h-10 px-3.5 shrink-0 items-center justify-center gap-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.08] text-xs font-medium text-white/90 active:scale-95 transition-all"
+                  className="flex h-10 px-3.5 shrink-0 items-center justify-center gap-1.5 rounded-full bg-chip hover:bg-chip-strong border border-hair text-xs font-medium text-secondary-foreground active:scale-95 transition-all"
                 >
                   {searching ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                   ) : (
-                    <Search className="h-3.5 w-3.5 text-white/70" />
+                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
                   <span className="hidden sm:inline">Search</span>
                 </button>
@@ -2734,7 +2722,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 type="button"
                 onClick={() => setShowSettings(true)}
                 aria-label="Settings"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/50 active:scale-95 transition-all hover:text-white"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip-subtle border border-hair text-muted-foreground active:scale-95 transition-all hover:text-foreground"
               >
                 <Settings2 className="h-4 w-4" />
               </button>
@@ -2750,14 +2738,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   aria-label="Account profile"
                   title="Account profile"
                   className={cn(
-                    "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.07] hover:bg-white/[0.12] border border-white/[0.1] text-white overflow-hidden active:scale-95 transition-all ring-1 ring-white/[0.04]",
+                    "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ring-1 ring-hair",
                     player.isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
                   )}
                 >
                   {auth.profile?.avatar_url ? (
                     <img src={auth.profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-xs font-medium text-white/90">
+                    <span className="text-xs font-medium text-foreground">
                       {(auth.profile?.display_name?.[0] || auth.email?.[0] || "U").toUpperCase()}
                     </span>
                   )}
@@ -2774,8 +2762,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   className={cn(
                     "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all",
                     tab === id
-                      ? "bg-[#F5F5F5] text-black font-medium border-transparent shadow-sm"
-                      : "border-white/[0.06] bg-transparent text-[#A1A1A1] hover:text-[#F5F5F5] hover:bg-white/[0.04]",
+                      ? "bg-foreground text-background font-medium border-transparent shadow-sm"
+                      : "border-hair bg-transparent text-secondary-foreground hover:text-foreground hover:bg-chip-subtle",
                   )}
                 >
                   {NAV_ITEMS.find((n) => n.id === id)?.label ?? id}
@@ -2801,8 +2789,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             <div className="relative w-full px-4 py-5 sm:px-6 pb-32">
               {message && (
                 <div className="pointer-events-auto fixed bottom-36 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  <div className="flex items-center gap-3 rounded-full border border-white/10 bg-card/95 px-5 py-2.5 shadow-2xl backdrop-blur-md">
-                    <p className="text-xs font-medium text-white/90">
+                  <div className="flex items-center gap-3 rounded-full border border-hair-strong bg-card/95 px-5 py-2.5 shadow-2xl backdrop-blur-md">
+                    <p className="text-xs font-medium text-card-foreground">
                       {message}
                     </p>
                     {undoLabel && (
@@ -2824,21 +2812,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   {/* Greeting & Moods */}
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <h1 suppressHydrationWarning className="text-xl sm:text-2xl font-semibold tracking-tight text-white/95">
+                      <h1 suppressHydrationWarning className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
                         Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, <span className="text-animated-gradient">{auth.profile?.display_name?.split(" ")[0] || "Listener"}</span>
                       </h1>
-                      <p className="text-xs text-neutral-400 font-normal mt-0.5">Recommended based on your recent listening</p>
+                      <p className="text-xs text-muted-foreground font-normal mt-0.5">Recommended based on your recent listening</p>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <Button
                         variant="secondary"
                         size="sm"
-                        className="rounded-full bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] hover:text-white border-white/[0.08] text-xs font-normal button-modern-hover"
+                        className="rounded-full bg-chip-subtle text-secondary-foreground hover:bg-chip-strong hover:text-foreground border-hair text-xs font-normal button-modern-hover"
                         onClick={() => void loadRecommendations()}
                         disabled={recLoading}
                       >
-                        {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-white/60" /> : null}
+                        {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
                         Refresh
                       </Button>
                     </div>
@@ -2901,7 +2889,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       size="sm"
                       onClick={() => void loadMoreRecommendations()}
                       disabled={loadingMoreRecs}
-                      className="rounded-full border-white/10 bg-white/[0.04] px-5 py-2 text-xs font-normal text-neutral-300 hover:bg-white/[0.08] hover:text-white transition-all shadow-md"
+                      className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
                     >
                       {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" /> : null}
                       Explore more songs
@@ -2916,10 +2904,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               <div className={cn("space-y-5 pt-1", tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
                 <div className="flex items-center justify-between pb-1">
                   <div>
-                    <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-white/95">
+                    <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
                       Explore & Discover
                     </h1>
-                    <p className="text-xs text-neutral-400 font-normal mt-0.5">
+                    <p className="text-xs text-muted-foreground font-normal mt-0.5">
                       Top charts, fresh releases & golden classics
                     </p>
                   </div>
@@ -2928,11 +2916,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="rounded-full bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] hover:text-white border-white/[0.08] text-xs font-normal"
+                      className="rounded-full bg-chip-subtle text-secondary-foreground hover:bg-chip-strong hover:text-foreground border-hair text-xs font-normal"
                       onClick={() => void loadRecommendations()}
                       disabled={recLoading}
                     >
-                      {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-white/60" /> : null}
+                      {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
                       Refresh
                     </Button>
                   </div>
@@ -3150,11 +3138,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               <div className={cn("space-y-4", tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold text-white">
+                    <h2 className="text-xl font-bold text-foreground">
                       {tab === "likes" ? "Your Favourites" : "Recently Played"}
                     </h2>
                     {tab === "history" && history.length > 0 && (
-                      <span className="text-xs text-white/40 font-medium">
+                      <span className="text-xs text-muted-foreground font-medium">
                         ({historyQuery ? `${filteredHistory.length} of ${history.length}` : `${history.length}`})
                       </span>
                     )}
@@ -3168,7 +3156,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                           clearHistory();
                         }
                       }}
-                      className="text-xs text-white/50 hover:text-white"
+                      className="text-xs text-muted-foreground hover:text-foreground"
                     >
                       Clear history
                     </Button>
@@ -3178,19 +3166,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 {/* History in-tab real-time search bar */}
                 {tab === "history" && history.length > 0 && (
                   <div className="relative flex items-center w-full">
-                    <Search className="absolute left-3.5 h-4 w-4 text-white/40 pointer-events-none" />
+                    <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <input
                       type="text"
                       value={historyQuery}
                       onChange={(e) => setHistoryQuery(e.target.value)}
                       placeholder="Search listening history..."
-                      className="w-full rounded-xl bg-white/[0.06] border border-white/10 pl-10 pr-9 py-2 text-sm text-white placeholder-white/40 focus:border-white/20 focus:ring-1 focus:ring-white/10 focus:bg-white/[0.08] focus:outline-none transition-all"
+                      className="w-full rounded-xl bg-chip border border-hair pl-10 pr-9 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-primary/20 focus:bg-chip-strong focus:outline-none transition-all"
                     />
                     {historyQuery && (
                       <button
                         type="button"
                         onClick={() => setHistoryQuery("")}
-                        className="absolute right-2.5 p-1 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                        className="absolute right-2.5 p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-chip transition-colors"
                         title="Clear history search"
                       >
                         <X className="h-3.5 w-3.5" />

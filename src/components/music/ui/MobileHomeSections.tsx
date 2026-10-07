@@ -75,7 +75,7 @@ function HorizontalScrollRow({
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-neutral-500">
+                  <div className="flex h-full items-center justify-center text-muted-foreground">
                     <Music2 className="h-7 w-7 opacity-40" />
                   </div>
                 )}
@@ -122,7 +122,7 @@ function HorizontalScrollRow({
               >
                 {track.title}
               </p>
-              <p className="truncate text-[11px] text-neutral-400 font-normal leading-tight mt-0.5">
+              <p className="truncate text-[11px] text-muted-foreground font-normal leading-tight mt-0.5">
                 {track.artist}
               </p>
             </button>
@@ -198,7 +198,7 @@ function VerticalSongList({
               >
                 {track.title}
               </p>
-              <p className="truncate text-xs text-neutral-400 font-normal leading-tight mt-0.5">
+              <p className="truncate text-xs text-muted-foreground font-normal leading-tight mt-0.5">
                 {track.artist}
               </p>
             </button>
@@ -218,7 +218,7 @@ function VerticalSongList({
                 type="button"
                 onClick={() => onOpenOptions(track)}
                 aria-label="Track options"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-foreground transition-colors"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -240,7 +240,7 @@ function SectionHeader({
   return (
     <div className="flex items-center justify-between mb-2.5 px-0.5">
       <div className="flex items-center gap-2">
-        {Icon && <Icon className="h-4 w-4 text-neutral-400" />}
+        {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
         <h2 className="text-sm font-semibold tracking-normal text-foreground/90">{title}</h2>
       </div>
     </div>
@@ -319,16 +319,16 @@ export function MobileHomeSections({
         {filterBar}
         {quickFilterIds.length > 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
-            <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
+            <Music2 className="h-10 w-10 text-muted-foreground mb-3" />
             <h3 className="text-sm font-semibold text-foreground/80 mb-1">No tracks match these filters</h3>
-            <p className="text-xs text-neutral-400 max-w-xs px-4">
+            <p className="text-xs text-muted-foreground max-w-xs px-4">
               Pick another genre or mood, or clear the filters to see your full feed.
             </p>
             {onClearQuickFilters && (
               <button
                 type="button"
                 onClick={onClearQuickFilters}
-                className="mt-3 rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-1.5 text-xs text-neutral-300 transition hover:bg-white/[0.08] hover:text-white"
+                className="mt-3 rounded-full border border-hair bg-chip px-4 py-1.5 text-xs text-secondary-foreground transition hover:bg-chip-strong hover:text-foreground"
               >
                 Clear filters
               </button>
@@ -336,9 +336,9 @@ export function MobileHomeSections({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center animate-fade-in">
-            <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
+            <Music2 className="h-10 w-10 text-muted-foreground mb-3" />
             <h3 className="text-sm font-semibold text-foreground/80 mb-1">Nothing here yet</h3>
-            <p className="text-xs text-neutral-400 max-w-xs px-4">
+            <p className="text-xs text-muted-foreground max-w-xs px-4">
               Search for your favorite songs or artists to start listening.
             </p>
           </div>
@@ -371,8 +371,8 @@ export function MobileHomeSections({
       {visibleDailyMix.length > 0 && (
         <section className="animate-fade-in">
           <div className="flex items-center justify-between mb-2.5 px-0.5">
-            <h2 className="text-sm font-semibold tracking-normal section-header-gradient">Daily Mix</h2>
-            <span className="text-[11px] font-normal text-neutral-400">
+            <h2 className="text-sm font-semibold tracking-normal text-foreground/90">Daily Mix</h2>
+            <span className="text-[11px] font-normal text-muted-foreground">
               Updated today
             </span>
           </div>
@@ -427,7 +427,7 @@ export function MobileHomeSections({
               <Disc3 className="h-4 w-4 text-amber-400/80" />
               <h2 className="text-sm font-semibold tracking-normal text-foreground/90">Old Classics</h2>
             </div>
-            <span className="text-[11px] font-normal text-neutral-400">
+            <span className="text-[11px] font-normal text-muted-foreground">
               Golden Era & Retro
             </span>
           </div>

@@ -35,17 +35,17 @@ function FilterChip({
       disabled={disabled}
       onClick={() => onToggle(filter.id)}
       className={cn(
-        "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press chip-gradient",
+        "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
         active
-          ? "chip-gradient-active border border-primary/40 font-semibold text-white shadow-md"
-          : "border border-white/[0.06] bg-white/[0.03] font-normal text-neutral-300 hover:bg-white/[0.08] hover:text-white",
+          ? "border border-primary/40 bg-chip-strong font-semibold text-primary shadow-md"
+          : "border border-hair bg-chip-subtle font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground",
         isEmpty && "opacity-45",
         disabled && "opacity-50",
       )}
     >
       {filter.label}
       {typeof count === "number" && count > 0 ? (
-        <span className={cn("ml-1.5 text-[10px] tabular-nums", active ? "text-white/80" : "text-neutral-500")}>
+        <span className={cn("ml-1.5 text-[10px] tabular-nums", active ? "text-primary/80" : "text-muted-foreground")}>
           {count}
         </span>
       ) : null}
@@ -91,15 +91,15 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
         className={cn(
           "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
           !hasActive
-            ? "border border-primary/40 bg-primary/20 font-semibold text-white shadow-md"
-            : "border border-white/[0.06] bg-white/[0.03] font-normal text-neutral-300 hover:bg-white/[0.08] hover:text-white",
+            ? "border border-primary/40 bg-primary/15 font-semibold text-primary shadow-md"
+            : "border border-hair bg-chip-subtle font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground",
           disabled && "opacity-50",
         )}
       >
         All
       </button>
 
-      <span aria-hidden="true" className="shrink-0 pl-1 pr-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+      <span aria-hidden="true" className="shrink-0 pl-1 pr-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Genre
       </span>
       {genres.map((filter) => (
@@ -113,7 +113,7 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
         />
       ))}
 
-      <span aria-hidden="true" className="shrink-0 pl-2 pr-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+      <span aria-hidden="true" className="shrink-0 pl-2 pr-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Mood
       </span>
       {moods.map((filter) => (
