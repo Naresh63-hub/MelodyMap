@@ -254,7 +254,7 @@ function MusicApp() {
 
   // Initial feed & settings states — always empty/default on SSR to prevent hydration mismatches
   const [tab, setTab] = useState<NavTab>("foryou");
-  const [prevTab, setPrevTab] = useState<NavTab>("foryou");
+  const prevTabRef = useRef<NavTab>("foryou");
   const [tabDirection, setTabDirection] = useState<'left' | 'right'>('right');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -1544,7 +1544,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } finally {
       setExtending(false);
     }
-  }, [extending, runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed]);
+  }, [extending, runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters]);
   extendQueueRef.current = extendQueue;
 
   const searchFor = useCallback(
@@ -2090,7 +2090,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   useEffect(() => {
     const tabOrder: NavTab[] = ['foryou', 'explore', 'search', 'podcasts', 'library', 'likes', 'history', 'mixes', 'languages', 'playlists'];
     const currentIndex = tabOrder.indexOf(tab);
-    const prevIndex = tabOrder.indexOf(prevTab);
+    const prevIndex = tabOrder.indexOf(prevTabRef.current);
     
     if (currentIndex > prevIndex) {
       setTabDirection('right');
@@ -2098,7 +2098,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setTabDirection('left');
     }
     
-    setPrevTab(tab);
+    prevTabRef.current = tab;
   }, [tab]);
 
 
@@ -2161,7 +2161,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } catch {
       setResumed(true);
     }
-  }, [player.ready, cue]);
+  }, [player.ready, cue, markFeedDisplayed]);
 
   // Listen for cloud playback synchronization (e.g. queue restored upon sign in from another device/browser)
   useEffect(() => {
@@ -2230,6 +2230,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
 
     void load(track.id, track.previewUrl);
+    // Intentionally keyed on current?.id: reload only when the track changes, not on every
+    // `current` object identity change (would interrupt active mobile playback).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id, player.ready, player.isPlaying, load, cue]);
 
   const isPlayingRef = useRef(player.isPlaying);
@@ -2314,6 +2317,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }, 1000);
 
     return () => window.clearInterval(iv);
+    // Intentionally keyed on current?.id: re-running on any `current` identity change would
+    // reset the 5s listen-accumulation timer and drop play-count events.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.id]);
 
   // Reset consecutive playback errors once audio successfully plays

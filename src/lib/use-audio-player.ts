@@ -228,6 +228,9 @@ export function useAudioPlayer(options: {
 
   const playbackSpeedRef = useRef(playbackSpeed);
   playbackSpeedRef.current = playbackSpeed;
+  /** Mirror of isPlaying so stable-identity callbacks (e.g. play()) read the current value instead of a stale closure. */
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
   const lastValidPositionRef = useRef(0);
   const seekRef = useRef<(seconds: number) => void>(() => {});
 
@@ -1052,7 +1055,8 @@ export function useAudioPlayer(options: {
         initYt();
       };
     }
-  }, []);
+    // setStream and streamUrl are stable useCallbacks (deps: [streamUrl] / []), so this stays a mount-once effect.
+  }, [setStream, streamUrl]);
 
   // Poll position and duration during YouTube player playback
   useEffect(() => {
@@ -1311,7 +1315,7 @@ export function useAudioPlayer(options: {
           audio &&
           (audio.src === expectedUrl || audio.src.includes(encodeURIComponent(id))) &&
           (!audio.paused || audio.readyState >= 1)) ||
-         (activeEngineRef.current === "youtube" && isPlaying))
+         (activeEngineRef.current === "youtube" && isPlayingRef.current))
       ) {
         return;
       }
