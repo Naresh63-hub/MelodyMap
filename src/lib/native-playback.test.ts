@@ -53,9 +53,9 @@ afterEach(() => {
 });
 
 describe("resolvePlaybackEngine", () => {
-  it("selects the youtube engine on the native app (in-app player, no server)", () => {
-    expect(resolvePlaybackEngine({ isNative: true, hostname: "melodymap-pi.vercel.app" })).toBe("youtube");
-    expect(resolvePlaybackEngine({ isNative: true, hostname: "localhost" })).toBe("youtube");
+  it("selects html5 on native app regardless of host for background playback", () => {
+    expect(resolvePlaybackEngine({ isNative: true, hostname: "melodymap-pi.vercel.app" })).toBe("html5");
+    expect(resolvePlaybackEngine({ isNative: true, hostname: "localhost" })).toBe("html5");
   });
 
   it("selects the youtube engine on deployed web hosts", () => {
