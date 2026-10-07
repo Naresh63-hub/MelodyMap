@@ -325,11 +325,11 @@ export function FullScreenPlayer({
               type="button"
               onClick={onTogglePlay}
               disabled={isLoading}
-              className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-[#F5F5F5] text-black shadow-lg shadow-black/50 hover:scale-105 active:scale-95 transition-transform disabled:opacity-70"
+              className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-foreground text-background shadow-lg shadow-black/50 hover:scale-105 active:scale-95 transition-transform disabled:opacity-70"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isLoading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-black" />
+                <Loader2 className="h-6 w-6 animate-spin" />
               ) : isPlaying ? (
                 <Pause className="h-6 w-6 fill-current" />
               ) : (

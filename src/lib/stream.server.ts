@@ -298,6 +298,58 @@ async function resolveWithPreset(
   return null;
 }
 
+/**
+ * Launch every extractor-client preset concurrently and resolve with the
+ * FIRST preset that yields a healthy stream. The losing presets keep running
+ * in the background (harmless) but never delay the winner. Only after every
+ * preset has failed or returned nothing does this resolve to null.
+ *
+ * Previously `resolveWithYtDlp` awaited ALL presets with `Promise.all`, so a
+ * single slow or bot-blocked client (e.g. web,mweb -> "Requested format is not
+ * available") gated the whole resolution behind the slowest preset. That made
+ * every track switch stall — worst on the next song, where gapless
+ * pre-buffering can't fire for duration-less webm/opus streams — leaving the
+ * player showing "playing" with no sound until the slowest preset settled.
+ */
+function raceFirstHealthyPreset(
+  videoId: string,
+  quality: StreamQuality,
+): Promise<StreamMeta | null> {
+  return new Promise((resolve) => {
+    const total = EXTRACTOR_CLIENT_PRESETS.length;
+    let settledCount = 0;
+    let done = false;
+    for (const extractorArgs of EXTRACTOR_CLIENT_PRESETS) {
+      resolveWithPreset(videoId, quality, extractorArgs)
+        .then((meta) => {
+          if (done) return;
+          if (meta) {
+            done = true;
+            resolve(meta);
+          } else {
+            settledCount++;
+            if (settledCount === total) {
+              done = true;
+              resolve(null);
+            }
+          }
+        })
+        .catch((presetErr) => {
+          if (done) return;
+          console.warn(
+            `[stream] yt-dlp preset (${extractorArgs ?? "default"}) failed for ${videoId}:`,
+            presetErr,
+          );
+          settledCount++;
+          if (settledCount === total) {
+            done = true;
+            resolve(null);
+          }
+        });
+    }
+  });
+}
+
 async function resolveWithYtDlp(
   videoId: string,
   quality: StreamQuality = "high",
@@ -305,17 +357,11 @@ async function resolveWithYtDlp(
   const youtubedl = await getYtDlpInstance();
   if (!youtubedl) return null;
 
-  // Run all client presets concurrently — each full extraction can take
-  // several seconds, and the previous sequential chain pushed cold starts
-  // past the proxy timeout on serverless.
-  const attempts = EXTRACTOR_CLIENT_PRESETS.map((extractorArgs) =>
-    resolveWithPreset(videoId, quality, extractorArgs).catch((presetErr) => {
-      console.warn(`[stream] yt-dlp preset (${extractorArgs ?? "default"}) failed for ${videoId}:`, presetErr);
-      return null;
-    }),
-  );
-  const settled = await Promise.all(attempts);
-  const firstHealthy = settled.find((meta): meta is StreamMeta => Boolean(meta));
+  // Race all client presets and hand back the first healthy stream. Each full
+  // extraction can take several seconds; awaiting every one (the old
+  // Promise.all) pushed cold starts and next-song switches past the player's
+  // patience even when a fast preset had already resolved.
+  const firstHealthy = await raceFirstHealthyPreset(videoId, quality);
   if (firstHealthy) return firstHealthy;
 
   // Last resort fallback across all formats (muxed with audio) if no audio-only format succeeded

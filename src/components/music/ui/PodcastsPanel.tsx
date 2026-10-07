@@ -383,7 +383,7 @@ export function PodcastsPanel({
                         isThisPlaying
                           ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
                           : isCurrentEp
-                            ? "bg-white text-black"
+                            ? "bg-foreground text-background"
                             : "bg-chip-strong text-foreground hover:bg-primary hover:text-primary-foreground",
                       )}
                       title={isThisPlaying ? "Pause" : "Play"}

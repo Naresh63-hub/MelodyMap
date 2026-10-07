@@ -283,7 +283,7 @@ export function FloatingMiniPlayer({
               type="button"
               onClick={onTogglePlay}
               disabled={isLoading}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F5F5F5] text-black shadow-md hover:scale-105 active:scale-95 transition-transform"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-background shadow-md hover:scale-105 active:scale-95 transition-transform"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (

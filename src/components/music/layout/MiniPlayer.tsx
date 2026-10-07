@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { AlertTriangle, Loader2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { useRef, useState } from "react";
+import { AlertTriangle, Loader2, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
@@ -45,6 +45,14 @@ export function MiniPlayer({
   onSeek,
 }: Props) {
   const barRef = useRef<HTMLDivElement | null>(null);
+  // Reset whenever the artwork source changes so a new track can attempt to load again.
+  const [thumbError, setThumbError] = useState(false);
+  const thumbSrc = track?.thumbnail ?? "";
+  const lastThumbRef = useRef(thumbSrc);
+  if (lastThumbRef.current !== thumbSrc) {
+    lastThumbRef.current = thumbSrc;
+    if (thumbError) setThumbError(false);
+  }
 
   // Swipe up anywhere on the dock expands the full-screen player
   const swipeProps = useSwipeGestures({ onSwipeUp: onOpenPlayer });
@@ -93,14 +101,17 @@ export function MiniPlayer({
           aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
           <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-card border border-border">
-            {track?.thumbnail ? (
+            {track?.thumbnail && !thumbError ? (
               <img
                 src={track.thumbnail}
                 alt=""
+                onError={() => setThumbError(true)}
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-card" />
+              <div className="flex h-full w-full items-center justify-center bg-card text-muted-foreground">
+                <Music2 className="h-4 w-4" />
+              </div>
             )}
           </div>
 
@@ -153,14 +164,14 @@ export function MiniPlayer({
             }}
             disabled={isLoading}
             className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-foreground text-background hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
-            aria-label={isPlaying ? "Pause" : "Play"}
+            aria-label={isLoading ? "Loading" : isPlaying ? "Pause" : "Play"}
           >
             {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-black" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : isPlaying ? (
-              <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-black text-black" />
+              <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
             ) : (
-              <Play className="ml-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 fill-black text-black" />
+              <Play className="ml-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
             )}
           </button>
 

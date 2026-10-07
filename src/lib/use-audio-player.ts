@@ -671,8 +671,12 @@ export function useAudioPlayer(options: {
       if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
         audioCtxRef.current.resume().catch(() => {});
       }
+      // 'play' fires the instant play() is called, BEFORE any audio bytes have
+      // arrived. Do NOT clear isLoading here: a cold stream can buffer for many
+      // seconds, and clearing it made the dock show a "playing" pause glyph with
+      // no sound. Keep the honest loading state until 'canplay'/'playing'/a real
+      // timeupdate clears it.
       setIsPlaying(true);
-      setIsLoading(false);
       applyPendingSeek();
     };
     const onPlaying = () => {

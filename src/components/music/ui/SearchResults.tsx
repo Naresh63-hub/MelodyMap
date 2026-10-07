@@ -186,7 +186,7 @@ export function SearchResults(props: Props) {
               className={cn(
                 "rounded-full px-3.5 py-1 text-xs transition-all",
                 active
-                  ? "bg-[#F5F5F5] text-black font-semibold"
+                  ? "bg-foreground text-background font-semibold"
                   : "bg-chip text-secondary-foreground hover:text-foreground hover:bg-chip-strong border border-hair font-medium"
               )}
             >

@@ -122,9 +122,9 @@ export function MediaCard({
           )}
         >
           {playing ? (
-            <Pause className="h-4 w-4 fill-black text-black" />
+            <Pause className="h-4 w-4 fill-current" />
           ) : (
-            <Play className="ml-0.5 h-4 w-4 fill-black text-black" />
+            <Play className="ml-0.5 h-4 w-4 fill-current" />
           )}
         </span>
       </button>
