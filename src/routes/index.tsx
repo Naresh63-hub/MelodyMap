@@ -99,6 +99,7 @@ import {
   recommendTracks,
   searchTracks,
   getDailyMix,
+  newSongs,
   moodPicks,
 } from "@/lib/music.functions";
 import {
@@ -201,6 +202,7 @@ function MusicApp() {
   const runMix = useServerFn(buildMix);
   const runPrewarm = useServerFn(prewarmStreams);
   const runDailyMix = useServerFn(getDailyMix);
+  const runNewSongs = useServerFn(newSongs);
 
 
   const auth = useAuth();
@@ -273,13 +275,10 @@ function MusicApp() {
   const { pullToRefreshProps, isPulling } = usePullToRefresh({
     onRefresh: async () => {
       setRefreshing(true);
-      // Reload recommendations
+      // Reload the full discovery feed (recs, trending, new releases, old songs,
+      // daily mix) through the canonical, language-strict loaders.
       try {
-        const newRecs = await runRecommend({ data: { settings: settingsToBrief(settings) } });
-        setRecs(newRecs);
-        // Reload trending
-        const newTrending = await runTrending({ data: { limit: 20 } });
-        setTrendingList(newTrending);
+        await loadRecommendations();
       } catch (e) {
         console.error('Error refreshing:', e);
       } finally {
@@ -1023,8 +1022,57 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     });
   }, []);
 
+  /**
+   * Explore “New Release” feed. Serves ONLY genuinely fresh content by routing
+   * through the `newSongs` aggregator (this week's uploads, this year's latest,
+   * new drops from the listener's own artists and current trends), then drops
+   * any verified classic/retro leak and applies the strict language policy.
+   */
+  const loadNewReleases = useCallback(
+    async (_refreshNonce?: number | string) => {
+      setMixLoading(true);
+      try {
+        const artistList = topArtists(stats, likes);
+        const res = await runNewSongs({
+          data: { artists: artistList, languages: settings.languages, count: 20 },
+        });
+        if (res.tracks) {
+          const pool = res.tracks as Track[];
+          // Strict freshness + language consistency (belt-and-suspenders on top of the server filter).
+          let fresh = applyFeedFilters(pool.filter((t) => !isOldEraTrack(t)));
+          if (fresh.length < 8) {
+            const res2 = await runNewSongs({
+              data: { artists: artistList, languages: settings.languages, count: 20 },
+            });
+            if (res2.tracks) {
+              for (const t of res2.tracks as Track[]) {
+                if (!pool.some((existing) => sameSong(existing, t))) pool.push(t);
+              }
+              fresh = applyFeedFilters(pool.filter((t) => !isOldEraTrack(t)));
+            }
+          }
+          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+          setMixTracks((prev) => {
+            const next = { ...prev, newrelease: ranked };
+            writeHomeCache({ mixTracks: next });
+            return next;
+          });
+          markFeedDisplayed(ranked);
+        }
+      } finally {
+        setMixLoading(false);
+      }
+    },
+    [runNewSongs, stats, likes, settings.languages, getSessionContext, applyFeedFilters, markFeedDisplayed],
+  );
+
   const loadMix = useCallback(
     async (kind: "discover" | "newrelease" | "explore") => {
+      // New Release is language-strict and freshness-only: use the dedicated aggregator.
+      if (kind === "newrelease") {
+        await loadNewReleases();
+        return;
+      }
       setMixLoading(true);
       try {
         const res = await runMix({
@@ -1076,7 +1124,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setMixLoading(false);
       }
     },
-    [runMix, likes, history, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
+    [runMix, likes, history, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed, loadNewReleases],
   );
 
   const loadDailyMix = useCallback(
@@ -1214,31 +1262,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           })(),
           (async () => {
-            const res = await runMix({
-              data: {
-                kind: "newrelease",
-                liked: likes.slice(0, 15).map(trackLabel),
-                recent: history.slice(0, 15).map(trackLabel),
-                sequence: sequenceBrief(history, stats),
-                skipped: skippedLabels(stats),
-                artists: topArtists(stats, likes),
-                languages: settings.languages,
-                brief: settingsToBrief(settings),
-                count: 18,
-                refreshNonce: nonce,
-              },
-            });
-            if (res.tracks) {
-              const pureMusic = res.tracks as Track[];
-              const fresh = applyFeedFilters(pureMusic);
-              const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-              setMixTracks((prev) => {
-                const next = { ...prev, newrelease: ranked };
-                writeHomeCache({ mixTracks: next });
-                return next;
-              });
-              markFeedDisplayed(ranked);
-            }
+            await loadNewReleases(nonce);
           })(),
           (async () => {
             const res = await runOldSongs({
@@ -1266,7 +1290,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setRecLoading(false);
       }
     },
-    [runRecommend, runTrending, runOldSongs, runMix, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
+    [runRecommend, runTrending, runOldSongs, loadNewReleases, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
   /**

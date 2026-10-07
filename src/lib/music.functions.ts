@@ -1109,9 +1109,14 @@ export const getDailyMix = createServerFn({ method: "POST" })
       : seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
 
     const candidates = await runQueryBatch([...pickedNew, ...pickedOld], 10, true, bypassCache);
+    // Rigorous language consistency: drop any track that conflicts with the
+    // listener's selected languages before the daily mix is assembled.
+    const consistent = languages.length > 0
+      ? candidates.filter((t) => isLanguageConsistent(t, languages))
+      : candidates;
     const dailyTracks = data.refreshNonce
-      ? shuffleArray(candidates).slice(0, count)
-      : seededShuffleArray(candidates, `${dateSeed}-final`).slice(0, count);
+      ? shuffleArray(consistent).slice(0, count)
+      : seededShuffleArray(consistent, `${dateSeed}-final`).slice(0, count);
     return { tracks: dailyTracks, dateSeed, error: null };
   });
 
@@ -1202,7 +1207,12 @@ export const newSongs = createServerFn({ method: "POST" })
     }
     // Top up with what people are listening to right now.
     await add(trendQueries, count);
-    return { tracks: out.slice(0, count), error: null };
+    // Strict policy: exclusively genuinely fresh (drop any verified classic/retro
+    // leak) and consistent with the listener's selected languages.
+    const fresh = out.filter(
+      (t) => !isOldEraTrack(t) && (data.languages.length === 0 || isLanguageConsistent(t, data.languages)),
+    );
+    return { tracks: fresh.slice(0, count), error: null };
   });
 
 
@@ -1268,7 +1278,12 @@ export const languagePicks = createServerFn({ method: "POST" })
         : ["trending songs this week"];
     await add(langQueries, count);
 
-    return { tracks: out.slice(0, count), error: null };
+    // Strict policy: only serve tracks consistent with the selected languages
+    // so the Language picks never leak cross-language contamination.
+    const picks = data.languages.length > 0
+      ? out.filter((t) => isLanguageConsistent(t, data.languages))
+      : out;
+    return { tracks: picks.slice(0, count), error: null };
   });
 
 
