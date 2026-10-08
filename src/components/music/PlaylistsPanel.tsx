@@ -246,7 +246,7 @@ export function PlaylistsPanel({
                           setOverIndex(null);
                         }}
                         className={cn(
-                          "relative group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors",
+                          "group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors",
                           active ? "bg-surface shadow-lift" : "hover:bg-surface/60",
                           dragIndex === index && "opacity-50",
                           overIndex === index && dragIndex !== null && dragIndex !== index
@@ -254,14 +254,6 @@ export function PlaylistsPanel({
                             : "",
                         )}
                       >
-                        {/* Left gradient bar for active song */}
-                        {active && (
-                          <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
-                        )}
-                        {/* Right gradient bar for active song */}
-                        {active && (
-                          <div className="absolute right-0 top-0 bottom-0 w-0.5 rounded-r-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
-                        )}
                         <Checkbox
                           checked={selected.includes(track.id)}
                           onCheckedChange={() => toggleSelected(track.id)}

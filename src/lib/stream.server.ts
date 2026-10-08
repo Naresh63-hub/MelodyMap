@@ -214,11 +214,40 @@ export async function resolveWithInnerTubePlayer(
     }
   } catch {}
 
-  const cleanId = videoId.replace(/^saavn:/, "");
-
-  // Strategy 1: Direct JioSaavn metadata resolution (fast, stable 160kbps stream)
+  // Resolve a trustworthy human-readable title/artist for this track id BEFORE
+  // touching any catalog provider. We deliberately do NOT search by the raw id:
+  // an id is not a song title, and querying JioSaavn/Audius/Jamendo with it makes
+  // them return unrelated top results — that is what played the wrong song on tap.
+  let cleanTitle = "";
+  let rawAuthor = "";
   try {
-    const saavnMatch = await resolveSaavnByMeta(cleanId).catch(() => null);
+    const oembedRes = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { headers: { "User-Agent": BROWSER_UA } },
+    ).catch(() => null);
+    if (oembedRes && oembedRes.ok) {
+      const oembed = (await oembedRes.json()) as any;
+      cleanTitle = cleanTrackTitle(oembed?.title || "");
+      rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
+    }
+  } catch {}
+
+  // Without a verified title, refuse to fuzzy-match against a meaningless id.
+  // Returning null triggers the per-track backoff/auto-skip instead of serving a
+  // random unrelated recording that does not match the track shown on screen.
+  if (!cleanTitle) return null;
+
+  const queriesToTry = [`${cleanTitle} ${rawAuthor}`.trim(), cleanTitle].filter(
+    (q): q is string => Boolean(q && q.length > 0),
+  );
+
+  // Strategy 1: JioSaavn full-length match on the verified title & artist
+  try {
+    const saavnMatch = await resolveSaavnByMeta(
+      cleanTitle,
+      rawAuthor,
+      lastSeenDurations.get(videoId) ?? null,
+    ).catch(() => null);
     if (saavnMatch?.url) {
       return {
         url: saavnMatch.url,
@@ -229,41 +258,6 @@ export async function resolveWithInnerTubePlayer(
       };
     }
   } catch {}
-
-  // Strategy 2: Title and author resolution if metadata is present
-  let cleanTitle = cleanTrackTitle(cleanId);
-  let rawAuthor = "";
-  try {
-    const oembedRes = await fetch(
-      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
-      { headers: { "User-Agent": BROWSER_UA } },
-    ).catch(() => null);
-    if (oembedRes && oembedRes.ok) {
-      const oembed = (await oembedRes.json()) as any;
-      cleanTitle = cleanTrackTitle(oembed?.title || cleanId);
-      rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
-    }
-  } catch {}
-
-  const queriesToTry = [`${cleanTitle} ${rawAuthor}`.trim(), cleanTitle].filter(
-    (q): q is string => Boolean(q && q.length > 0),
-  );
-
-  // Strategy 3: JioSaavn search with extracted title & artist
-  if (queriesToTry.length > 0) {
-    try {
-      const saavnMatch = await resolveSaavnByMeta(cleanTitle, rawAuthor, lastSeenDurations.get(videoId) ?? null).catch(() => null);
-      if (saavnMatch?.url) {
-        return {
-          url: saavnMatch.url,
-          mimeType: saavnMatch.mimeType || "audio/mp4",
-          contentLength: null,
-          audioBitrate: 160000,
-          source: "saavn",
-        };
-      }
-    } catch {}
-  }
 
   // Strategy 4: Audius full-length catalog match
   for (const q of queriesToTry) {

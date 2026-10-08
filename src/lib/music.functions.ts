@@ -764,6 +764,14 @@ export const recommendTracks = createServerFn({ method: "POST" })
       const batch = await Promise.all(
         chunk.map(async (p) => {
           try {
+            const { searchSaavn } = await import("./providers/saavn");
+            const saavnHits = await searchSaavn(`${p.artist} ${p.title}`, { limit: 3 });
+            if (saavnHits.length > 0) {
+              const target = { id: "", title: p.title ?? "", artist: p.artist ?? "", duration: 0 };
+              const track = saavnHits.find((candidate) => areSameTrack(candidate, target)) ?? saavnHits[0];
+              return track ? ({ ...track, reason: p.reason ?? "" } as Track) : null;
+            }
+            const { searchYouTube } = await import("./music.server");
             const found = await searchYouTube(`${p.artist} ${p.title} audio`, 3, true, undefined, true);
             if (found.length === 0) return null;
             const target = { id: "", title: p.title ?? "", artist: p.artist ?? "", duration: 0 };
@@ -871,8 +879,8 @@ export const buildMix = createServerFn({ method: "POST" })
 
     const key = process.env["AI_API_KEY"];
     if (!key) {
-      // No AI key — use YouTube search for discover mix with randomized discovery queries
-      const { searchYouTube } = await import("./music.server");
+      // No AI key — use JioSaavn search for discover mix with randomized discovery queries
+      const { searchSaavn } = await import("./providers/saavn");
       const out: Track[] = [];
       const seen = new Set<string>();
       const discoverQueries = shuffleArray(
@@ -901,7 +909,13 @@ export const buildMix = createServerFn({ method: "POST" })
       for (const q of discoverQueries) {
         if (out.length >= count) break;
         try {
-          const tracks = await searchYouTube(q, 8);
+          const saavnHits = await searchSaavn(q, { limit: 8 });
+          const tracks: Track[] = saavnHits.length > 0
+            ? (saavnHits as Track[])
+            : await (async () => {
+                const { searchYouTube } = await import("./music.server");
+                return await searchYouTube(q, 8);
+              })();
           for (const t of tracks) {
             if (out.length >= count) break;
             if (seen.has(t.id) || data.artists.some((a) => t.artist.toLowerCase().includes(a.toLowerCase()))) continue;
@@ -969,6 +983,14 @@ export const buildMix = createServerFn({ method: "POST" })
       const batch = await Promise.all(
         chunk.map(async (p) => {
           try {
+            const { searchSaavn } = await import("./providers/saavn");
+            const saavnHits = await searchSaavn(`${p.artist} ${p.title}`, { limit: 3 });
+            if (saavnHits.length > 0) {
+              const target = { id: "", title: p.title ?? "", artist: p.artist ?? "", duration: 0 };
+              const track = saavnHits.find((candidate) => areSameTrack(candidate, target)) ?? saavnHits[0];
+              return track ? ({ ...track, reason: p.reason ?? "" } as Track) : null;
+            }
+            const { searchYouTube } = await import("./music.server");
             const found = await searchYouTube(`${p.artist} ${p.title} audio`, 3);
             if (found.length === 0) return null;
             const target = { id: "", title: p.title ?? "", artist: p.artist ?? "", duration: 0 };
@@ -1011,6 +1033,10 @@ export const newDrops = createServerFn({ method: "POST" })
     const batches = await Promise.all(
       artists.map(async (artist) => {
         try {
+          const { searchSaavn } = await import("./providers/saavn");
+          const saavnHits = await searchSaavn(`${artist} new song`, { limit: 5 });
+          if (saavnHits.length > 0) return saavnHits as Track[];
+          const { searchYouTube } = await import("./music.server");
           return await searchYouTube(`${artist} new song`, 5, true, "week");
         } catch {
           return [];
@@ -1197,7 +1223,14 @@ export const newSongs = createServerFn({ method: "POST" })
         if (out.length >= count) return;
         let tracks: Track[] = [];
         try {
-          tracks = await searchYouTube(query, per + 6, true, upload);
+          const { searchSaavn } = await import("./providers/saavn");
+          const saavnHits = await searchSaavn(query, { limit: per + 6 });
+          if (saavnHits.length > 0) {
+            tracks = saavnHits as Track[];
+          } else {
+            const { searchYouTube } = await import("./music.server");
+            tracks = await searchYouTube(query, per + 6, true, upload);
+          }
         } catch {
           continue;
         }
@@ -1268,7 +1301,14 @@ export const languagePicks = createServerFn({ method: "POST" })
         if (out.length >= count) return;
         let tracks: Track[] = [];
         try {
-          tracks = await searchYouTube(query, per + 6, true);
+          const { searchSaavn } = await import("./providers/saavn");
+          const saavnHits = await searchSaavn(query, { limit: per + 6 });
+          if (saavnHits.length > 0) {
+            tracks = saavnHits as Track[];
+          } else {
+            const { searchYouTube } = await import("./music.server");
+            tracks = await searchYouTube(query, per + 6, true);
+          }
         } catch {
           continue;
         }
@@ -1337,7 +1377,14 @@ export const languageCharts = createServerFn({ method: "POST" })
       if (out.length >= count) break;
       let tracks: Track[] = [];
       try {
-        tracks = await searchYouTube(`top ${lang} songs this week`, per + 6, true);
+        const { searchSaavn } = await import("./providers/saavn");
+        const saavnHits = await searchSaavn(`top ${lang} songs this week`, { limit: per + 6 });
+        if (saavnHits.length > 0) {
+          tracks = saavnHits as Track[];
+        } else {
+          const { searchYouTube } = await import("./music.server");
+          tracks = await searchYouTube(`top ${lang} songs this week`, per + 6, true);
+        }
       } catch {
         continue;
       }
@@ -1590,9 +1637,12 @@ const MOOD_QUERIES: Record<string, string> = {
 export const moodPicks = createServerFn({ method: "POST" })
   .validator((input: unknown) => MoodPicksInput.parse(input))
   .handler(async ({ data }) => {
-    const { searchYouTube } = await import("./music.server");
     const query = MOOD_QUERIES[data.mood] ?? `${data.mood} songs`;
     try {
+      const { searchSaavn } = await import("./providers/saavn");
+      const saavnHits = await searchSaavn(query, { limit: 30 });
+      if (saavnHits.length > 0) return { tracks: saavnHits as Track[], error: null };
+      const { searchYouTube } = await import("./music.server");
       return { tracks: await searchYouTube(query, 30), error: null };
     } catch {
       return { tracks: [], error: "Could not build that mood radio. Try again." };

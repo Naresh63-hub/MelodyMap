@@ -115,7 +115,7 @@ import { useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
 import { listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
 import { cn } from "@/lib/utils";
-import { trackExistsIn, dedupeTracks, type TrackLike } from "@/lib/track-dedup";
+import { trackExistsIn, dedupeTracks, cleanTrackDisplayMetadata, type TrackLike } from "@/lib/track-dedup";
 import { resolveRestorablePlayback, resolveRestoreStartSeconds } from "@/lib/playback-restore";
 import {
   installMediaCommandHandler,
@@ -514,11 +514,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const applyFeedFilters = useCallback(
     (pool: Track[]) => {
+      const sanitizedPool = pool.map((t) => (t ? cleanTrackDisplayMetadata(t) : t));
       const recentIds = new Set<string>();
       for (const h of history) {
         if (h?.id) recentIds.add(h.id);
       }
-      const filtered = filterFeedCandidates(pool, {
+      const filtered = filterFeedCandidates(sanitizedPool, {
         previouslyDisplayedIds: previouslyDisplayedIdsRef.current,
         likedIds,
         recentlyPlayedIds: recentIds,
@@ -2442,14 +2443,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     const userLangs = settings.languages || [];
     const filterCached = (list?: Track[]) => {
       if (!list) return [];
-      return list.filter((t) => {
-        if (!t || !t.id) return false;
-        // Strictly eliminate 30-second Deezer preview tracks
-        if (t.source === "deezer" || t.id.startsWith("deezer:")) return false;
-        // Strictly enforce language consistency if user has selected languages
-        if (userLangs.length > 0 && !isLanguageConsistent(t, userLangs)) return false;
-        return true;
-      });
+      return list
+        .map((t) => (t ? cleanTrackDisplayMetadata(t) : t))
+        .filter((t) => {
+          if (!t || !t.id) return false;
+          // Strictly eliminate 30-second Deezer preview tracks
+          if (t.source === "deezer" || t.id.startsWith("deezer:")) return false;
+          // Strictly enforce language consistency if user has selected languages
+          if (userLangs.length > 0 && !isLanguageConsistent(t, userLangs)) return false;
+          return true;
+        });
     };
 
     const cleanRecs = filterCached(cachedFeed.recs);

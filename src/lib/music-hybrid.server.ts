@@ -1,5 +1,5 @@
 /**
- * Hybrid music search — multi-provider primary, YouTube fallback.
+ * Hybrid music search — YouTube primary, multi-provider fallback.
  *
  * YouTube gives full songs but many are restricted from streaming.
  * Deezer contributes commercial metadata only — never 30-second samples.
@@ -7,7 +7,7 @@
  * Strategy:
  * 1. Search YouTube first (full songs)
  * 2. If YouTube returns results, use them
- * 3. If YouTube fails or returns nothing, search Deezer
+ * 3. If YouTube fails or returns nothing, search JioSaavn
  * 4. Playback is resolved later by the stream proxy (full-length only)
  */
 
@@ -21,7 +21,7 @@ export type HybridSearchResult = {
 };
 
 /**
- * Search with YouTube primary, Deezer fallback.
+ * Search with YouTube primary, Saavn fallback.
  * Always returns something playable and supports InnerTube pagination and category filters.
  */
 export async function searchHybrid(
@@ -45,7 +45,19 @@ export async function searchHybrid(
     }
   }
 
-  // JioSaavn First Strategy:
+  // YouTube First Strategy:
+  // Query YouTube for full songs directly
+  try {
+    const { searchYouTubePaginated } = await import("./music.server");
+    const ytRes = await searchYouTubePaginated(query, filter, undefined, limit);
+    if (ytRes.tracks.length > 0) {
+      return ytRes;
+    }
+  } catch (err) {
+    console.warn("[MelodyMap] YouTube primary search notice:", err);
+  }
+
+  // JioSaavn Fallback:
   // Query JioSaavn for clean metadata (song title, real artist/composer, movie/album)
   // and direct crystal-clear 160kbps/320kbps streams.
   try {
@@ -55,12 +67,11 @@ export async function searchHybrid(
       return { tracks: saavnRes as HybridTrack[] };
     }
   } catch (err) {
-    console.warn("[MelodyMap] Saavn primary search notice:", err);
+    console.warn("[MelodyMap] Saavn fallback search notice:", err);
   }
 
-  // Multi-Provider Strategy:
-  // Query Audius, Jamendo, Deezer, and Internet Archive concurrently,
-  // falling back to YouTube only when needed.
+  // Multi-Provider Fallback:
+  // Query Audius, Jamendo, Deezer, and Internet Archive concurrently.
   try {
     const { searchMultiProvider } = await import("./providers/multi-search");
     const multiRes = await searchMultiProvider(query, { limit });
@@ -68,18 +79,7 @@ export async function searchHybrid(
       return { tracks: multiRes.tracks as HybridTrack[] };
     }
   } catch (err) {
-    console.warn("[MelodyMap] Multi-provider search notice:", err);
-  }
-
-  // Direct YouTube fallback
-  try {
-    const { searchYouTubePaginated } = await import("./music.server");
-    const ytRes = await searchYouTubePaginated(query, filter, undefined, limit);
-    if (ytRes.tracks.length > 0) {
-      return ytRes;
-    }
-  } catch (err) {
-    console.warn("[MelodyMap] Direct YouTube fallback failed:", err);
+    console.warn("[MelodyMap] Multi-provider fallback search notice:", err);
   }
 
   return { tracks: [] };

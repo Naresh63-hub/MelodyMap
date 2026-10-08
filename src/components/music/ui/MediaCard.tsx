@@ -76,20 +76,12 @@ export function MediaCard({
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
       className={cn(
-        "relative group/card shrink-0 cursor-pointer p-2 rounded-xl transition-all bg-card/60 hover:bg-popover border border-hair hover:border-hair-strong card-modern-lift card-glow-border",
+        "group/card shrink-0 cursor-pointer p-2 rounded-xl transition-all bg-card/60 hover:bg-popover border border-hair hover:border-hair-strong card-modern-lift card-glow-border",
         isLongPressing && "scale-95 opacity-80",
         dims,
         className,
       )}
     >
-      {/* Left gradient bar for active card */}
-      {active && (
-        <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
-      )}
-      {/* Right gradient bar for active card */}
-      {active && (
-        <div className="absolute right-0 top-0 bottom-0 w-0.5 rounded-r-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
-      )}
       <button
         type="button"
         onClick={onPlay}

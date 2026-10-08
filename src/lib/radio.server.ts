@@ -1,10 +1,10 @@
 /**
- * Fetches song radio / similar tracks using JioSaavn catalog.
- * Delivers licensed, full-length tracks with rich metadata and smart artist/album diversity.
+ * Fetches song radio / similar tracks using YouTube catalog.
+ * Delivers full-length tracks with rich metadata and smart artist/album diversity.
  */
 
 import type { Track } from "./music.server";
-import { searchSaavn } from "./providers/saavn";
+import { searchYouTubePaginated } from "./music.server";
 import { LANGUAGE_ARTISTS } from "./language-artists";
 import { norm } from "./track-dedup";
 
@@ -91,9 +91,9 @@ export async function getRadioTracks(
       }
     }
 
-    // Fetch queries concurrently on JioSaavn with timeout protection
+    // Fetch queries concurrently on YouTube with timeout protection
     const searchPromises = queries.slice(0, 3).map((q) =>
-      searchSaavn(q, { limit: Math.min(limit, 12) }).catch(() => []),
+      searchYouTubePaginated(q, "songs", undefined, Math.min(limit, 12)).then(r => r.tracks).catch(() => []),
     );
     const searchResults = await Promise.all(searchPromises);
 
@@ -132,8 +132,7 @@ export async function getRadioTracks(
           artist: t.artist,
           duration: t.duration,
           thumbnail: t.thumbnail,
-          album: t.album,
-          previewUrl: t.previewUrl,
+          ...(t.album ? { album: t.album } : {}),
         });
 
         if (tracks.length >= limit) break;

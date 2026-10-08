@@ -184,3 +184,106 @@ export function appendIfNew<T extends TrackLike>(collection: T[], track: T): T[]
   if (trackExistsIn(collection, track)) return collection;
   return [...collection, track];
 }
+
+/**
+ * Cleans YouTube video titles and channel names to yield clean song titles, real artist names, and album names.
+ * Strips record labels (e.g. SonyMusicSouthVEVO, Aditya Music, T-Series) and video junk (e.g. Video Song, 4K, Official Video).
+ */
+export function cleanYouTubeTrackMetadata(
+  rawTitle: string,
+  rawArtist: string,
+): { title: string; artist: string; album?: string } {
+  let title = (rawTitle || "").trim();
+  let artist = (rawArtist || "").trim();
+  let album: string | undefined = undefined;
+
+  const LABEL_PATTERNS = [
+    /vevo$/i,
+    /-\s*topic$/i,
+    /\b(music|records|recordings|series|company|official|audio|entertainment|films|studios|production|media)\b/i,
+    /\b(t-series|saregama|lahari|yrf|tips|aditya|sony|zee|speed\s*records|eros|geetha\s*arts|think\s*music|mango|madhura|times\s*music)\b/i,
+  ];
+  const isLabelArtist = LABEL_PATTERNS.some((p) => p.test(artist));
+
+  // Extract '(From "Album/Movie")' if present
+  const fromMatch = title.match(/\((?:From\s+["']?([^"')]+)["']?)\)/i);
+  if (fromMatch && fromMatch[1]) {
+    album = fromMatch[1].trim();
+  }
+
+  // Strip typical video noise tags
+  let cleaned = title
+    .replace(/\s*\[[^\]]*\b(official|video|song|lyric|audio|4k|hd|remastered)\b[^\]]*\]/gi, "")
+    .replace(/\s*\([^)]*\b(official|video|song|lyric|audio|4k|hd|remastered)\b[^)]*\)/gi, "")
+    .replace(/\s*\|\s*(official\s*(music\s*)?video|video\s*song|lyric(al)?\s*video|full\s*(video\s*)?song|audio\s*song|audio|4k|hd|remastered).*/gi, "")
+    .replace(/\s*\|\s*$/g, "")
+    .trim();
+
+  // Split by pipe '|'
+  const pipeParts = cleaned.split(/\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
+
+  if (pipeParts.length > 1 && pipeParts[0]) {
+    const dashInFirst = pipeParts[0].split(/\s+-\s+/);
+    if (dashInFirst.length === 2 && dashInFirst[0] && dashInFirst[1]) {
+      if (!album) album = dashInFirst[0].trim();
+      title = dashInFirst[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+    } else {
+      title = pipeParts[0].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+      if (!album && pipeParts[1]) {
+        album = pipeParts[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+      }
+    }
+
+    if (isLabelArtist) {
+      const cand = pipeParts[pipeParts.length - 1];
+      if (cand && cand !== title && cand !== album) {
+        artist = cand;
+      } else if (pipeParts[2] && pipeParts[2] !== title && pipeParts[2] !== album) {
+        artist = pipeParts[2];
+      }
+    }
+  } else {
+    // Single or no pipe, check dash 'Artist - Title'
+    const dashParts = cleaned.split(/\s+-\s+/);
+    if (dashParts.length === 2 && dashParts[0] && dashParts[1]) {
+      artist = dashParts[0].trim();
+      title = dashParts[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+    } else {
+      title = cleaned.replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+    }
+  }
+
+  // Remove (From ...) from title once captured in album
+  title = title.replace(/\s*\((?:From\s+["']?[^"')]+["']?)\)/gi, "").trim();
+
+  // Clean trailing punctuation
+  title = title.replace(/^[-–—:\s|]+|[-–—:\s|]+$/g, "").trim();
+  artist = artist.replace(/^[-–—:\s|]+|[-–—:\s|]+$/g, "").trim();
+  if (album) {
+    album = album.replace(/^[-–—:\s|]+|[-–—:\s|]+$/g, "").trim();
+  }
+
+  // If artist still ends in VEVO or - Topic, strip it and split CamelCase if needed
+  if (/VEVO$/i.test(artist)) {
+    artist = artist.replace(/VEVO$/i, "").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
+  }
+  artist = artist.replace(/\s*-\s*Topic$/i, "").trim();
+
+  return {
+    title: title || rawTitle,
+    artist: artist || rawArtist,
+    ...(album ? { album } : {}),
+  };
+}
+
+/** Sanitizes any track's title and artist for UI display */
+export function cleanTrackDisplayMetadata<T extends TrackLike>(track: T): T {
+  if (!track || !track.title) return track;
+  const { title, artist, album } = cleanYouTubeTrackMetadata(track.title, track.artist);
+  return {
+    ...track,
+    title,
+    artist,
+    ...((album && !(track as any).album) ? { album } : {}),
+  };
+}
