@@ -164,10 +164,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
               isDragging ? "bg-primary" : "bg-white group-hover:bg-primary"
             )}
             style={{ 
-              width: `${pct}%`,
-              background: isDragging 
-                ? 'linear-gradient(90deg, #38bdf8 0%, #e94560 100%)'
-                : 'linear-gradient(90deg, #38bdf8 0%, #e94560 100%)'
+              width: `${pct}%`
             }}
           />
           {/* Thumb handle */}

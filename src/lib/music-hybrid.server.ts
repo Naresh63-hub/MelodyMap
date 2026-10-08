@@ -1,14 +1,13 @@
 /**
- * Hybrid music search — YouTube primary, multi-provider fallback.
+ * Hybrid music search — Saavn primary, multi-provider fallback.
  *
- * YouTube gives full songs but many are restricted from streaming.
- * Deezer contributes commercial metadata only — never 30-second samples.
+ * JioSaavn delivers licensed, full-length tracks with clean metadata.
+ * No YouTube dependency - pure streaming experience.
  *
  * Strategy:
- * 1. Search YouTube first (full songs)
- * 2. If YouTube returns results, use them
- * 3. If YouTube fails or returns nothing, search JioSaavn
- * 4. Playback is resolved later by the stream proxy (full-length only)
+ * 1. Search JioSaavn first (full songs, clean metadata)
+ * 2. If Saavn fails or returns nothing, search multi-provider
+ * 3. Playback is resolved later by the stream proxy (full-length only)
  */
 
 import type { Track, SearchFilter } from "./music.server";
@@ -21,8 +20,8 @@ export type HybridSearchResult = {
 };
 
 /**
- * Search with YouTube primary, Saavn fallback.
- * Always returns something playable and supports InnerTube pagination and category filters.
+ * Search with Saavn primary, multi-provider fallback.
+ * Always returns something playable.
  */
 export async function searchHybrid(
   query: string,
@@ -32,32 +31,7 @@ export async function searchHybrid(
   offset?: number,
   page?: number,
 ): Promise<HybridSearchResult> {
-  // If continuation token provided, paginate YouTube directly
-  if (continuation) {
-    try {
-      const { searchYouTubePaginated } = await import("./music.server");
-      const res = await searchYouTubePaginated(query, filter, continuation, limit);
-      if (res.tracks.length > 0) {
-        return res;
-      }
-    } catch (err) {
-      console.warn("[MelodyMap] YouTube continuation search failed:", err);
-    }
-  }
-
-  // YouTube First Strategy:
-  // Query YouTube for full songs directly
-  try {
-    const { searchYouTubePaginated } = await import("./music.server");
-    const ytRes = await searchYouTubePaginated(query, filter, undefined, limit);
-    if (ytRes.tracks.length > 0) {
-      return ytRes;
-    }
-  } catch (err) {
-    console.warn("[MelodyMap] YouTube primary search notice:", err);
-  }
-
-  // JioSaavn Fallback:
+  // JioSaavn First Strategy:
   // Query JioSaavn for clean metadata (song title, real artist/composer, movie/album)
   // and direct crystal-clear 160kbps/320kbps streams.
   try {
@@ -67,7 +41,7 @@ export async function searchHybrid(
       return { tracks: saavnRes as HybridTrack[] };
     }
   } catch (err) {
-    console.warn("[MelodyMap] Saavn fallback search notice:", err);
+    console.warn("[MelodyMap] Saavn primary search notice:", err);
   }
 
   // Multi-Provider Fallback:

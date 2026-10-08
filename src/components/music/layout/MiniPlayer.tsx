@@ -86,10 +86,9 @@ export function MiniPlayer({
         className="relative w-full h-[2.5px] bg-chip cursor-pointer overflow-hidden"
       >
         <div
-          className="h-full transition-all duration-150 ease-linear rounded-r-full"
+          className="h-full transition-all duration-150 ease-linear rounded-r-full bg-primary"
           style={{
             width: `${progressPct}%`,
-            background: "linear-gradient(90deg, #38bdf8 0%, #e94560 100%)",
           }}
         />
       </div>
