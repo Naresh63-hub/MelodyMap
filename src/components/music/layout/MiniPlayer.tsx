@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { AlertTriangle, Loader2, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { Loader2, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
@@ -13,7 +13,6 @@ type Props = {
   liked?: boolean;
   position: number;
   duration: number;
-  isReplacementSource?: boolean;
   onTogglePlay: () => void;
   onToggleLike?: () => void;
   onNext: () => void;
@@ -35,7 +34,6 @@ export function MiniPlayer({
   liked = false,
   position,
   duration,
-  isReplacementSource = false,
   onTogglePlay,
   onToggleLike,
   onNext,
@@ -86,9 +84,10 @@ export function MiniPlayer({
         className="relative w-full h-[2.5px] bg-chip cursor-pointer overflow-hidden"
       >
         <div
-          className="h-full transition-all duration-150 ease-linear rounded-r-full bg-primary"
+          className="h-full transition-all duration-150 ease-linear rounded-r-full"
           style={{
             width: `${progressPct}%`,
+            background: "linear-gradient(90deg, #38bdf8 0%, #e94560 100%)",
           }}
         />
       </div>
@@ -124,12 +123,6 @@ export function MiniPlayer({
             <p className="truncate text-[11px] text-muted-foreground font-normal leading-tight mt-0.5">
               {track?.artist ?? "—"}
             </p>
-            {isReplacementSource && (
-              <span className="inline-flex items-center gap-1 mt-0.5 text-[10px] font-medium text-amber-400/90 bg-amber-400/10 rounded px-1.5 py-0.5">
-                <AlertTriangle className="h-2.5 w-2.5" />
-                Replacement recording
-              </span>
-            )}
           </div>
         </button>
 

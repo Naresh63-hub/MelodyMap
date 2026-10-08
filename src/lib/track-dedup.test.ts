@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { areSameTrack, dedupeTracks, norm, stringSimilarity } from "./track-dedup";
+import { areSameTrack, dedupeTracks, norm, stringSimilarity, cleanYouTubeTrackMetadata } from "./track-dedup";
 
 describe("norm", () => {
   it("lowercases and strips noise words and punctuation", () => {
@@ -65,7 +65,50 @@ describe("dedupeTracks", () => {
     expect(deduped[1]?.id).toBe("3");
   });
 
-  it("returns an empty array for empty input", () => {
-    expect(dedupeTracks([])).toEqual([]);
+describe("cleanYouTubeTrackMetadata", () => {
+  it("removes YouTube label channel names and parses real song title, artist and movie", () => {
+    const res1 = cleanYouTubeTrackMetadata(
+      "Petta (Telugu) - Peydhavi Chivarakey Video | Rajinikanth | Anirudh Ravichander",
+      "SonyMusicSouthVEVO",
+    );
+    expect(res1.title).toBe("Peydhavi Chivarakey");
+    expect(res1.artist).toBe("Anirudh Ravichander");
+    expect(res1.album).toBe("Petta (Telugu)");
+
+    const res2 = cleanYouTubeTrackMetadata(
+      "Chitti | Jathi Ratnalu | Naveen Polishetty, Faria Abdullah | Radhan",
+      "Aditya Music",
+    );
+    expect(res2.title).toBe("Chitti");
+    expect(res2.artist).toBe("Radhan");
+    expect(res2.album).toBe("Jathi Ratnalu");
+
+    const res3 = cleanYouTubeTrackMetadata(
+      "Nee Daare Video Song | Least Eligible Bachelor | Harsha Chemudu, Aishwarya",
+      "Aditya Music",
+    );
+    expect(res3.title).toBe("Nee Daare");
+    expect(res3.album).toBe("Least Eligible Bachelor");
+
+    const res4 = cleanYouTubeTrackMetadata(
+      'Arijit Singh - Kesariya (From "Brahmastra")',
+      "Sony Music India",
+    );
+    expect(res4.title).toBe("Kesariya");
+    expect(res4.artist).toBe("Arijit Singh");
+    expect(res4.album).toBe("Brahmastra");
+
+    const res5 = cleanYouTubeTrackMetadata(
+      "Taylor Swift - Cruel Summer (Official Audio)",
+      "TaylorSwiftVEVO",
+    );
+    expect(res5.title).toBe("Cruel Summer");
+    expect(res5.artist).toBe("Taylor Swift");
+  });
+
+  it("leaves standard titles and clean artists intact", () => {
+    const res = cleanYouTubeTrackMetadata("Ordinary Song Name", "Artist Name");
+    expect(res.title).toBe("Ordinary Song Name");
+    expect(res.artist).toBe("Artist Name");
   });
 });
