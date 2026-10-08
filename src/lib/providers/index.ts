@@ -6,7 +6,6 @@ export * from "./jamendo";
 export * from "./deezer";
 export * from "./archive";
 export * from "./musicbrainz";
-export * from "./youtube";
 export * from "./dedup";
 export * from "./multi-search";
 

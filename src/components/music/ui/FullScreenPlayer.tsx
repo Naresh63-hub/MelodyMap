@@ -66,7 +66,7 @@ type Props = {
   canNext: boolean;
   canPrevious: boolean;
   isReplacementSource?: boolean;
-  streamSource?: "youtube" | "audius" | "jamendo" | null;
+  streamSource?: "saavn" | "audius" | "jamendo" | null;
   getAnalyser?: () => AnalyserNode | null;
 };
 

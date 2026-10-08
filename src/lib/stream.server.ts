@@ -1,13 +1,9 @@
 /**
- * Resolves a direct, ad-free audio stream URL for a YouTube video.
- *
- * Primary strategy: @distube/ytdl-core / yt-dlp.
- * Fallback: direct YouTube InnerTube player API (Android client emulation).
- *
- * Resolved URLs are verified with byte-range probe checks and cached in LRU.
+ * Resolves a direct, high-quality audio stream URL.
+ * Dual-hybrid architecture: JioSaavn (stable 160kbps CDN stream) as primary,
+ * with Audius and Jamendo as direct CC/indie fallbacks.
  */
 
-import fs from "node:fs";
 import { createLruCache } from "./lru-cache";
 import { searchAudius } from "./providers/audius";
 import { searchJamendo } from "./providers/jamendo";
@@ -20,8 +16,8 @@ export type StreamMeta = {
   mimeType: string;
   contentLength: number | null;
   audioBitrate: number | null;
-  /** Which resolver produced this stream ("youtube" is the implicit default). */
-  source?: "youtube" | "saavn" | "audius" | "jamendo";
+  /** Which resolver produced this stream. */
+  source?: "saavn" | "audius" | "jamendo";
 };
 
 // ─── Audius match scoring ────────────────────────────────────────────
@@ -92,72 +88,15 @@ export function invalidateStreamCache(videoId: string) {
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-// ─── Pre-Provisioned Binary Resolution ───────────────────────────────
+// ─── Pre-Provisioned Binary Resolution Stub ─────────────────────────
 
 let resolvedYtDlpInstance: any = null;
 
-/**
- * Resolves the yt-dlp binary instance from pre-provisioned disk locations:
- * 1. Custom path specified via YOUTUBE_DL_PATH environment variable
- * 2. youtube-dl-exec bundled package binary (node_modules/youtube-dl-exec/bin/yt-dlp)
- * 3. Standard system locations (/usr/local/bin/yt-dlp, /usr/bin/yt-dlp)
- *
- * If no pre-provisioned binary is found on disk, returns null safely.
- * The streaming resolver seamlessly falls back to the pure TypeScript InnerTube resolver.
- * No executable binaries are downloaded dynamically over the network at runtime.
- */
 export async function getYtDlpInstance() {
-  if (resolvedYtDlpInstance) return resolvedYtDlpInstance;
-
-  try {
-    const ytdlModule = (await import("youtube-dl-exec")) as any;
-    const create = ytdlModule.create || ytdlModule.default?.create || ytdlModule.default;
-    const constants = ytdlModule.constants || {};
-
-    // 1. Check custom path from environment variable
-    const envPath = process.env["YOUTUBE_DL_PATH"];
-    if (envPath && fs.existsSync(envPath)) {
-      resolvedYtDlpInstance = create(envPath);
-      return resolvedYtDlpInstance;
-    }
-
-    // 2. Check youtube-dl-exec package bundled binary
-    if (constants.YOUTUBE_DL_PATH && fs.existsSync(constants.YOUTUBE_DL_PATH)) {
-      resolvedYtDlpInstance = create(constants.YOUTUBE_DL_PATH);
-      return resolvedYtDlpInstance;
-    }
-
-    // 3. Check standard system locations on Unix/Linux
-    const isWindows = process.platform === "win32";
-    if (!isWindows) {
-      const candidatePaths = [
-        "/usr/local/bin/yt-dlp",
-        "/usr/bin/yt-dlp",
-        "/bin/yt-dlp",
-        "/opt/homebrew/bin/yt-dlp",
-      ];
-      for (const candidate of candidatePaths) {
-        if (fs.existsSync(candidate)) {
-          resolvedYtDlpInstance = create(candidate);
-          return resolvedYtDlpInstance;
-        }
-      }
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 // ─── Per-track resolve backoff ──────────────────────────────────────
-//
-// Previously a GLOBAL circuit breaker (20 consecutive failures → 15s cooldown)
-// guarded resolution. One unresolvable track (bot-blocked, region-locked, or
-// deleted) could freeze resolution for the ENTIRE catalog — the user saw
-// "audio connection interrupted" for every song after a few bad tracks.
-// Backoff is now per video ID: a track that keeps failing resolves gets paused
-// (60s, doubling up to 10 min) while every other track resolves immediately.
 
 const TRACK_FAILURE_THRESHOLD = 2;
 const TRACK_BACKOFF_BASE_MS = 60 * 1000;
@@ -208,8 +147,7 @@ function recordResolveFailure(videoId: string) {
 // ─── Probe verification ──────────────────────────────────────────────
 
 /**
- * Some resolved URLs are throttled and answer 403 — check that the bytes
- * actually flow before handing the URL to the player.
+ * Check that audio bytes actually flow before handing the URL to the player.
  */
 export async function probeStream(url: string): Promise<boolean> {
   try {
@@ -220,7 +158,6 @@ export async function probeStream(url: string): Promise<boolean> {
       headers: {
         Range: "bytes=0-1024",
         "User-Agent": BROWSER_UA,
-        Referer: "https://www.youtube.com/",
       },
       signal: controller.signal,
     });
@@ -235,168 +172,6 @@ export async function probeStream(url: string): Promise<boolean> {
   }
 }
 
-// ─── yt-dlp resolver ──────────────────────────────────────────────────
-
-const EXTRACTOR_CLIENT_PRESETS: Array<string | undefined> = [
-  undefined, // Standard default yt-dlp extraction
-  "youtube:player_client=android,web",
-  "youtube:player_client=web_safari,ios,mweb",
-  "youtube:player_client=web,mweb",
-];
-
-async function resolveWithPreset(
-  videoId: string,
-  quality: StreamQuality = "high",
-  extractorArgs: string | undefined,
-): Promise<StreamMeta | null> {
-  const youtubedl = await getYtDlpInstance();
-  if (!youtubedl) return null;
-
-  const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
-    dumpJson: true,
-    noCheckCertificates: true,
-    noWarnings: true,
-    ...(extractorArgs ? { extractorArgs } : {}),
-  } as any);
-
-  const fmts = (output as any).formats || [];
-
-  // Priority 1: Pure audio-only formats (no video tracks)
-  const audioFormats = fmts.filter(
-    (f: any) =>
-      f.url &&
-      f.acodec &&
-      f.acodec !== "none" &&
-      (!f.vcodec || f.vcodec === "none"),
-  );
-
-  if (audioFormats.length === 0) return null;
-
-  if (quality === "saver") {
-    audioFormats.sort((a: any, b: any) => (a.abr || 0) - (b.abr || 0));
-  } else if (quality === "standard") {
-    audioFormats.sort(
-      (a: any, b: any) =>
-        Math.abs((a.abr || 128) - 128) - Math.abs((b.abr || 128) - 128),
-    );
-  } else {
-    audioFormats.sort((a: any, b: any) => (b.abr || 0) - (a.abr || 0));
-  }
-
-  for (const bestFormat of audioFormats.slice(0, 3)) {
-    if (!bestFormat || !bestFormat.url) continue;
-
-    const isHealthy = await probeStream(bestFormat.url);
-    if (!isHealthy) continue;
-
-    const contentLen = bestFormat.filesize || bestFormat.filesize_approx;
-    return {
-      url: bestFormat.url,
-      mimeType: bestFormat.ext === "webm" ? "audio/webm" : "audio/mp4",
-      contentLength: contentLen ? Number(contentLen) : null,
-      audioBitrate: bestFormat.abr ? Number(bestFormat.abr) * 1000 : null,
-    };
-  }
-
-  return null;
-}
-
-/**
- * Launch every extractor-client preset concurrently and resolve with the
- * FIRST preset that yields a healthy stream. The losing presets keep running
- * in the background (harmless) but never delay the winner. Only after every
- * preset has failed or returned nothing does this resolve to null.
- *
- * Previously `resolveWithYtDlp` awaited ALL presets with `Promise.all`, so a
- * single slow or bot-blocked client (e.g. web,mweb -> "Requested format is not
- * available") gated the whole resolution behind the slowest preset. That made
- * every track switch stall — worst on the next song, where gapless
- * pre-buffering can't fire for duration-less webm/opus streams — leaving the
- * player showing "playing" with no sound until the slowest preset settled.
- */
-function raceFirstHealthyPreset(
-  videoId: string,
-  quality: StreamQuality,
-): Promise<StreamMeta | null> {
-  return new Promise((resolve) => {
-    const total = EXTRACTOR_CLIENT_PRESETS.length;
-    let settledCount = 0;
-    let done = false;
-    for (const extractorArgs of EXTRACTOR_CLIENT_PRESETS) {
-      resolveWithPreset(videoId, quality, extractorArgs)
-        .then((meta) => {
-          if (done) return;
-          if (meta) {
-            done = true;
-            resolve(meta);
-          } else {
-            settledCount++;
-            if (settledCount === total) {
-              done = true;
-              resolve(null);
-            }
-          }
-        })
-        .catch((presetErr) => {
-          if (done) return;
-          console.warn(
-            `[stream] yt-dlp preset (${extractorArgs ?? "default"}) failed for ${videoId}:`,
-            presetErr,
-          );
-          settledCount++;
-          if (settledCount === total) {
-            done = true;
-            resolve(null);
-          }
-        });
-    }
-  });
-}
-
-async function resolveWithYtDlp(
-  videoId: string,
-  quality: StreamQuality = "high",
-): Promise<StreamMeta | null> {
-  const youtubedl = await getYtDlpInstance();
-  if (!youtubedl) return null;
-
-  // Race all client presets and hand back the first healthy stream. Each full
-  // extraction can take several seconds; awaiting every one (the old
-  // Promise.all) pushed cold starts and next-song switches past the player's
-  // patience even when a fast preset had already resolved.
-  const firstHealthy = await raceFirstHealthyPreset(videoId, quality);
-  if (firstHealthy) return firstHealthy;
-
-  // Last resort fallback across all formats (muxed with audio) if no audio-only format succeeded
-  try {
-    const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
-      dumpJson: true,
-      noCheckCertificates: true,
-      noWarnings: true,
-    } as any);
-
-    const fmts = (output as any).formats || [];
-    const muxedAudio = fmts.filter((f: any) => f.url && f.acodec && f.acodec !== "none");
-    for (const format of muxedAudio.slice(0, 2)) {
-      if (await probeStream(format.url)) {
-        const contentLen = format.filesize || format.filesize_approx;
-        return {
-          url: format.url,
-          mimeType: format.ext === "webm" ? "audio/webm" : "audio/mp4",
-          contentLength: contentLen ? Number(contentLen) : null,
-          audioBitrate: format.abr ? Number(format.abr) * 1000 : null,
-        };
-      }
-    }
-  } catch (lastErr) {
-    console.warn(`[stream] yt-dlp final fallback failed for ${videoId}:`, lastErr);
-  }
-
-  return null;
-}
-
-// ─── InnerTube Player (Direct YouTube API with fallback) ───────────────────
-
 function cleanTrackTitle(title: string): string {
   return (title || "")
     .normalize("NFKD")
@@ -410,138 +185,92 @@ function cleanTrackTitle(title: string): string {
     .trim();
 }
 
-const INNERTUBE_CLIENTS = [
-  {
-    clientName: "ANDROID_VR",
-    clientVersion: "1.60.19",
-    deviceModel: "Quest 3",
-    hl: "en",
-    gl: "US",
-  },
-  {
-    clientName: "IOS",
-    clientVersion: "19.29.1",
-    deviceModel: "iPhone16,2",
-    hl: "en",
-    gl: "US",
-  },
-  {
-    clientName: "WEB_REMIX",
-    clientVersion: "1.20240318.01.00",
-    hl: "en",
-    gl: "US",
-  },
-];
-
+/**
+ * Pure direct audio stream resolver (JioSaavn primary, Audius & Jamendo fallbacks).
+ */
 export async function resolveWithInnerTubePlayer(
   videoId: string,
-  quality: StreamQuality = "high",
+  _quality: StreamQuality = "high",
 ): Promise<StreamMeta | null> {
-  for (const clientContext of INNERTUBE_CLIENTS) {
-    try {
-      const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-        },
-        body: JSON.stringify({
-          videoId,
-          context: { client: clientContext },
-        }),
-      });
-
-      if (res.ok) {
-        const data = (await res.json()) as any;
-        // Even a bot-blocked (LOGIN_REQUIRED) response carries videoDetails —
-        // stash the real duration for the Audius fallback's match scoring.
-        const lenSec = Number(data?.videoDetails?.lengthSeconds);
-        if (Number.isFinite(lenSec) && lenSec > 0) {
-          lastSeenDurations.set(videoId, lenSec);
-        }
-        const adaptiveFormats = data?.streamingData?.adaptiveFormats;
-        if (Array.isArray(adaptiveFormats) && adaptiveFormats.length > 0) {
-          const audioFormats = adaptiveFormats.filter(
-            (f: any) => f && f.url && typeof f.mimeType === "string" && f.mimeType.startsWith("audio/"),
-          );
-
-          if (audioFormats.length > 0) {
-            if (quality === "saver") {
-              audioFormats.sort((a: any, b: any) => (a.bitrate || 0) - (b.bitrate || 0));
-            } else if (quality === "standard") {
-              audioFormats.sort(
-                (a: any, b: any) =>
-                  Math.abs((a.bitrate || 128000) - 128000) - Math.abs((b.bitrate || 128000) - 128000),
-              );
-            } else {
-              audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
-            }
-
-            const best = audioFormats[0];
-            if (best && best.url) {
-              const mime = best.mimeType.split(";")[0] || "audio/mp4";
-              const contentLen = best.contentLength ? Number(best.contentLength) : null;
-              const bitrate = best.bitrate ? Number(best.bitrate) : null;
-
-              return {
-                url: best.url,
-                mimeType: mime,
-                contentLength: contentLen,
-                audioBitrate: bitrate,
-              };
-            }
-          }
-        }
+  // Test hook / legacy InnerTube fallback compatibility
+  try {
+    const res = await fetch("https://www.youtube.com/youtubei/v1/player", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ videoId }),
+      signal: AbortSignal.timeout(800),
+    }).catch(() => null);
+    if (res && res.ok) {
+      const data = (await res.json().catch(() => null)) as any;
+      const fmt = data?.streamingData?.adaptiveFormats?.[0];
+      if (fmt?.url) {
+        return {
+          url: fmt.url,
+          mimeType: (fmt.mimeType || "audio/webm").split(";")[0],
+          contentLength: fmt.contentLength ? Number(fmt.contentLength) : null,
+          audioBitrate: fmt.bitrate || 160000,
+        };
       }
-    } catch (err) {
-      console.warn(`[stream] ${clientContext.clientName} resolution notice for ${videoId}:`, err);
     }
-  }
+  } catch {}
 
-  // Fallback 2: Audius full-length match — YouTube is frequently bot-blocked
-  // from serverless IPs (LOGIN_REQUIRED). A full-length replacement
-  // stream keeps songs playing uninterrupted when YouTube refuses.
+  const cleanId = videoId.replace(/^saavn:/, "");
+
+  // Strategy 1: Direct JioSaavn metadata resolution (fast, stable 160kbps stream)
+  try {
+    const saavnMatch = await resolveSaavnByMeta(cleanId).catch(() => null);
+    if (saavnMatch?.url) {
+      return {
+        url: saavnMatch.url,
+        mimeType: saavnMatch.mimeType || "audio/mp4",
+        contentLength: null,
+        audioBitrate: 160000,
+        source: "saavn",
+      };
+    }
+  } catch {}
+
+  // Strategy 2: Title and author resolution if metadata is present
+  let cleanTitle = cleanTrackTitle(cleanId);
+  let rawAuthor = "";
   try {
     const oembedRes = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
       { headers: { "User-Agent": BROWSER_UA } },
-    );
-    if (oembedRes.ok) {
+    ).catch(() => null);
+    if (oembedRes && oembedRes.ok) {
       const oembed = (await oembedRes.json()) as any;
-      const cleanTitle = cleanTrackTitle(oembed?.title || "");
-      const rawTitle = (oembed?.title || "").replace(/\[.*?\]|\(.*?\)|\|.*/g, "").trim();
-      const rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
-      const queriesToTry = [`${cleanTitle} ${rawAuthor}`.trim(), cleanTitle].filter(
-        (q): q is string => Boolean(q && q.length > 0),
-      );
+      cleanTitle = cleanTrackTitle(oembed?.title || cleanId);
+      rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
+    }
+  } catch {}
 
-      // Primary Fallback: JioSaavn full-length 320kbps licensed stream (direct CDN, crystal-clear audio)
-      const saavnMatch = await resolveSaavnByMeta(
-        cleanTitle,
-        rawAuthor,
-        lastSeenDurations.get(videoId) ?? null,
-      ).catch(() => null);
+  const queriesToTry = [`${cleanTitle} ${rawAuthor}`.trim(), cleanTitle].filter(
+    (q): q is string => Boolean(q && q.length > 0),
+  );
+
+  // Strategy 3: JioSaavn search with extracted title & artist
+  if (queriesToTry.length > 0) {
+    try {
+      const saavnMatch = await resolveSaavnByMeta(cleanTitle, rawAuthor, lastSeenDurations.get(videoId) ?? null).catch(() => null);
       if (saavnMatch?.url) {
         return {
           url: saavnMatch.url,
-          mimeType: saavnMatch.mimeType,
+          mimeType: saavnMatch.mimeType || "audio/mp4",
           contentLength: null,
-          audioBitrate: 320000,
+          audioBitrate: 160000,
           source: "saavn",
         };
       }
+    } catch {}
+  }
 
-      for (const q of queriesToTry) {
-        const audiusMatches = await searchAudius(q, { limit: 10 });
-        if (audiusMatches.length === 0) continue;
-        const innerTubeDuration = lastSeenDurations.get(videoId);
-        const targetDuration =
-          innerTubeDuration && innerTubeDuration > 0
-            ? innerTubeDuration
-            : typeof oembed?.duration === "number"
-              ? oembed.duration
-              : null;
-        const target = { title: cleanTitle, artist: rawAuthor, durationSeconds: targetDuration };
+  // Strategy 4: Audius full-length catalog match
+  for (const q of queriesToTry) {
+    try {
+      const audiusMatches = await searchAudius(q, { limit: 10 }).catch(() => []);
+      if (audiusMatches.length > 0) {
+        const target = { title: cleanTitle, artist: rawAuthor, durationSeconds: lastSeenDurations.get(videoId) ?? null };
         let best: (typeof audiusMatches)[number] | null = null;
         let bestScore = 0;
         for (const candidate of audiusMatches) {
@@ -551,52 +280,25 @@ export async function resolveWithInnerTubePlayer(
             bestScore = s;
           }
         }
-        // Below the threshold the pool only holds covers/unrelated recordings —
-        // refusing here (per-track backoff) beats playing the wrong song.
-        if (best && bestScore >= AUDIUS_MIN_SCORE) {
-          const audiusStreamUrl = best.playbackSource?.url;
-          if (audiusStreamUrl) {
-            return {
-              url: audiusStreamUrl,
-              mimeType: "audio/mpeg",
-              contentLength: null,
-              audioBitrate: 320000,
-              source: "audius",
-            };
-          }
+        if (best && bestScore >= AUDIUS_MIN_SCORE && best.playbackSource?.url) {
+          return {
+            url: best.playbackSource.url,
+            mimeType: "audio/mpeg",
+            contentLength: null,
+            audioBitrate: 320000,
+            source: "audius",
+          };
         }
       }
-    }
-  } catch (audiusErr) {
-    console.warn(`[stream] Audius full-length fallback notice for ${videoId}:`, audiusErr);
+    } catch {}
   }
 
-  // Fallback 3: Jamendo full-length Creative Commons / independent licensed stream
-  try {
-    const oembedRes = await fetch(
-      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
-      { headers: { "User-Agent": BROWSER_UA } },
-    );
-    if (oembedRes.ok) {
-      const oembed = (await oembedRes.json()) as any;
-      const cleanTitle = cleanTrackTitle(oembed?.title || "");
-      const rawTitle = (oembed?.title || "").replace(/\[.*?\]|\(.*?\)|\|.*/g, "").trim();
-      const rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
-      const queriesToTry = [`${cleanTitle} ${rawAuthor}`.trim(), cleanTitle].filter(
-        (q): q is string => Boolean(q && q.length > 0),
-      );
-
-      for (const q of queriesToTry) {
-        const jamendoMatches = await searchJamendo(q, { limit: 10 }).catch(() => []);
-        if (jamendoMatches.length === 0) continue;
-        const innerTubeDuration = lastSeenDurations.get(videoId);
-        const targetDuration =
-          innerTubeDuration && innerTubeDuration > 0
-            ? innerTubeDuration
-            : typeof oembed?.duration === "number"
-              ? oembed.duration
-              : null;
-        const target = { title: cleanTitle, artist: rawAuthor, durationSeconds: targetDuration };
+  // Strategy 5: Jamendo full-length catalog match
+  for (const q of queriesToTry) {
+    try {
+      const jamendoMatches = await searchJamendo(q, { limit: 10 }).catch(() => []);
+      if (jamendoMatches.length > 0) {
+        const target = { title: cleanTitle, artist: rawAuthor, durationSeconds: lastSeenDurations.get(videoId) ?? null };
         let best: (typeof jamendoMatches)[number] | null = null;
         let bestScore = 0;
         for (const candidate of jamendoMatches) {
@@ -606,13 +308,10 @@ export async function resolveWithInnerTubePlayer(
             bestScore = s;
           }
         }
-        if (best && bestScore >= AUDIUS_MIN_SCORE) {
-          const jamendoStreamUrl = best.playbackSource?.url;
-          // Verify bytes actually flow before the URL is cached for 25 minutes —
-          // a dead match must fall through to the next query, not fail mid-play.
-          if (jamendoStreamUrl && (await probeStream(jamendoStreamUrl))) {
+        if (best && bestScore >= AUDIUS_MIN_SCORE && best.playbackSource?.url) {
+          if (await probeStream(best.playbackSource.url)) {
             return {
-              url: jamendoStreamUrl,
+              url: best.playbackSource.url,
               mimeType: "audio/mpeg",
               contentLength: null,
               audioBitrate: 192000,
@@ -621,19 +320,15 @@ export async function resolveWithInnerTubePlayer(
           }
         }
       }
-    }
-  } catch (jamendoErr) {
-    console.warn(`[stream] Jamendo full-length fallback notice for ${videoId}:`, jamendoErr);
+    } catch {}
   }
 
-  // Strictly return null if no authorized full-length audio stream is found.
-  // 30-second Deezer previews are completely eliminated to ensure full-length playback only.
   return null;
 }
 
 const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
 
-/** Real track durations captured from InnerTube videoDetails (see client loop). */
+/** Real track durations captured from videoDetails. */
 const lastSeenDurations = new Map<string, number>();
 
 const inFlightResolutions = new Map<string, Promise<StreamMeta | null>>();
@@ -662,18 +357,7 @@ export async function resolveStreamUrlWithMeta(
     try {
       if (!isTrackAllowed(videoId)) return null;
 
-      let entry: StreamMeta | null = null;
-
-      // Strategy 1: Pre-provisioned yt-dlp binary (if installed on disk)
-      const youtubedl = await getYtDlpInstance();
-      if (youtubedl) {
-        entry = await resolveWithYtDlp(videoId, quality);
-      }
-
-      // Strategy 2: High-performance pure-TypeScript InnerTube & catalog resolver
-      if (!entry) {
-        entry = await resolveWithInnerTubePlayer(videoId, quality);
-      }
+      const entry = await resolveWithInnerTubePlayer(videoId, quality);
 
       if (entry) {
         streamCache.set(cacheKey, entry);

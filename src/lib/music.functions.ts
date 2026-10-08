@@ -141,15 +141,24 @@ const RadioInput = z.object({
   videoId: z.string().min(1),
   limit: z.number().optional(),
   continuation: z.string().optional(),
+  title: z.string().optional(),
+  artist: z.string().optional(),
+  album: z.string().optional(),
+  languages: z.array(z.string()).optional(),
 });
 
-/** Fetches YouTube native RD song radio */
+/** Fetches song radio / next queue recommendations using JioSaavn */
 export const getSongRadio = createServerFn({ method: "POST" })
   .validator((input: unknown) => RadioInput.parse(input))
   .handler(async ({ data }) => {
     const { getRadioTracks } = await import("./radio.server");
     try {
-      const res = await getRadioTracks(data.videoId, data.limit ?? 20, data.continuation);
+      const res = await getRadioTracks(data.videoId, data.limit ?? 20, data.continuation, {
+        title: data.title,
+        artist: data.artist,
+        album: data.album,
+        languages: data.languages,
+      });
       return { tracks: res.tracks, continuation: res.continuation, error: null };
     } catch {
       return { tracks: [], error: "Radio unavailable" };

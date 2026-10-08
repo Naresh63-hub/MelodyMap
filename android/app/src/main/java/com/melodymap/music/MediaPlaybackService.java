@@ -98,7 +98,6 @@ public class MediaPlaybackService extends Service {
         super.onCreate();
         createNotificationChannel();
         initMediaSession();
-        requestAudioFocus();
         registerNoisyReceiver();
     }
 
@@ -381,75 +380,11 @@ public class MediaPlaybackService extends Service {
     }
 
     // ─── Audio focus ─────────────────────────────────────────────────────
-
-    private void requestAudioFocus() {
-        try {
-            audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-            if (audioManager == null) return;
-
-            focusChangeListener = focusChange -> {
-                switch (focusChange) {
-                    case AudioManager.AUDIOFOCUS_LOSS:
-                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK: {
-                        // Chromium's own MediaSession can request focus concurrently;
-                        // rapid duplicate loss callbacks caused pause/play ping-pong.
-                        long now = SystemClock.elapsedRealtime();
-                        if (now - lastFocusLossAt < FOCUS_LOSS_DEBOUNCE_MS) {
-                            break;
-                        }
-                        lastFocusLossAt = now;
-
-                        boolean wasPlaying = isJsPlaying;
-                        if (wasPlaying) {
-                            dispatchMediaCommand("pause");
-                        }
-                        // Clears resumeOnFocusGain — set the transient flag AFTER,
-                        // so only genuine transient losses auto-resume on GAIN.
-                        handlePause();
-                        resumeOnFocusGain =
-                                wasPlaying && focusChange != AudioManager.AUDIOFOCUS_LOSS;
-                        break;
-                    }
-                    case AudioManager.AUDIOFOCUS_GAIN:
-                        if (resumeOnFocusGain) {
-                            resumeOnFocusGain = false;
-                            dispatchMediaCommand("play");
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            };
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                AudioAttributes playbackAttributes = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build();
-                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                        .setAudioAttributes(playbackAttributes)
-                        .setAcceptsDelayedFocusGain(true)
-                        .setOnAudioFocusChangeListener(focusChangeListener)
-                        .build();
-                audioManager.requestAudioFocus(audioFocusRequest);
-            } else {
-                audioManager.requestAudioFocus(
-                        focusChangeListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-            }
-        } catch (Exception ignored) {}
-    }
+    // Chromium WebView (CapacitorWebView) manages its own native AudioFocus on STREAM_MUSIC.
+    // Handling focus here caused duplicate intra-process focus collisions and premature pauses.
 
     private void abandonAudioFocus() {
-        try {
-            if (audioManager == null) return;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && audioFocusRequest != null) {
-                audioManager.abandonAudioFocusRequest(audioFocusRequest);
-                audioFocusRequest = null;
-            } else if (focusChangeListener != null) {
-                audioManager.abandonAudioFocus(focusChangeListener);
-            }
-        } catch (Exception ignored) {}
+        // Safe no-op: Chromium owns the underlying AudioTrack focus.
     }
 
     // ─── Noisy receiver (headphone unplug → pause) ───────────────────────

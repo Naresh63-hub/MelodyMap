@@ -1,121 +1,149 @@
 /**
- * Fetches YouTube's built-in song radio for a video ("RD" playlist —
- * the same engine behind "Start radio from a song" / the Up Next panel).
- * The similarity — same artist, same genre, same mood/feel — is decided
- * by YouTube's own recommendation algorithm, so no AI is needed.
+ * Fetches song radio / similar tracks using JioSaavn catalog.
+ * Delivers licensed, full-length tracks with rich metadata and smart artist/album diversity.
  */
 
 import type { Track } from "./music.server";
+import { searchSaavn } from "./providers/saavn";
+import { LANGUAGE_ARTISTS } from "./language-artists";
+import { norm } from "./track-dedup";
 
-type UnknownRecord = Record<string, unknown>;
-
-const WEB_CLIENT = { clientName: "WEB", clientVersion: "2.20240801.00.00" };
-
-function rendererText(node: unknown): string {
-  if (!node || typeof node !== "object") return "";
-  const obj = node as UnknownRecord;
-  if (typeof obj["simpleText"] === "string") return obj["simpleText"] as string;
-  const runs = obj["runs"];
-  if (Array.isArray(runs)) {
-    return runs.map((r) => (r as UnknownRecord)["text"] ?? "").join("");
-  }
-  return "";
+export interface RadioOptions {
+  title?: string | undefined;
+  artist?: string | undefined;
+  album?: string | undefined;
+  languages?: string[] | undefined;
 }
 
 export async function getRadioTracks(
   videoId: string,
   limit = 25,
-  continuation?: string,
+  _continuation?: string,
+  options?: RadioOptions,
 ): Promise<{ tracks: Track[]; continuation?: string }> {
-  let res: Response;
-  const bodyPayload: Record<string, unknown> = {
-    context: { client: WEB_CLIENT },
-  };
-  if (continuation) {
-    bodyPayload["continuation"] = continuation;
-  } else {
-    bodyPayload["videoId"] = videoId;
-    bodyPayload["playlistId"] = `RD${videoId}`;
-  }
-
   try {
-    res = await fetch("https://www.youtube.com/youtubei/v1/next?prettyPrint=false", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-      },
-      body: JSON.stringify(bodyPayload),
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch {
-    return { tracks: [] };
-  }
-  if (!res.ok) return { tracks: [] };
+    let title = options?.title?.trim() || "";
+    let artist = options?.artist?.trim() || "";
+    let album = options?.album?.trim() || "";
 
-  let data: unknown;
-  try {
-    data = await res.json();
-  } catch {
-    return { tracks: [] };
-  }
-
-  const contents = (data as UnknownRecord)?.["contents"] as UnknownRecord | undefined;
-  const twoColumn = contents?.["twoColumnWatchNextResults"] as UnknownRecord | undefined;
-  const playlist = twoColumn?.["playlist"] as UnknownRecord | undefined;
-  const panel = (playlist?.["playlist"] as UnknownRecord | undefined)?.["contents"] as
-    | unknown[]
-    | undefined;
-  const single = (contents?.["singleColumnWatchNextResults"] as UnknownRecord | undefined)?.[
-    "results"
-  ] as UnknownRecord | undefined;
-  const singlePanel = (single?.["results"] as UnknownRecord | undefined)?.["contents"] as
-    | unknown[]
-    | undefined;
-  const items = panel ?? singlePanel ?? [];
-
-  const out: Track[] = [];
-  const seen = new Set<string>([videoId]);
-  let nextContinuation: string | undefined;
-
-  for (const entry of items) {
-    const entryObj = entry as UnknownRecord;
-    // Check for continuation token
-    const contRenderer = entryObj?.["continuationItemRenderer"] as UnknownRecord | undefined;
-    if (contRenderer) {
-      const command = (contRenderer["continuationEndpoint"] as UnknownRecord | undefined)?.[
-        "continuationCommand"
-      ] as UnknownRecord | undefined;
-      if (typeof command?.["token"] === "string") {
-        nextContinuation = command["token"];
+    if (!title && videoId) {
+      const clean = videoId.replace(/^saavn:/, "").replace(/[-_]/g, " ").trim();
+      if (!/^\d+$/.test(clean)) {
+        title = clean;
       }
-      continue;
     }
 
-    const r = (entryObj?.["playlistPanelVideoRenderer"] ??
-      entryObj?.["compactVideoRenderer"]) as UnknownRecord | undefined;
-    if (!r) continue;
-    const id = r["videoId"];
-    if (typeof id !== "string" || seen.has(id)) continue;
-    const duration = rendererText(r["lengthText"]);
-    if (!duration) continue; // skip live streams / shorts
-    const thumbs = (r["thumbnail"] as UnknownRecord | undefined)?.["thumbnails"] as
-      | UnknownRecord[]
-      | undefined;
-    seen.add(id);
-    out.push({
-      id,
-      title: rendererText(r["title"]),
-      artist: rendererText(r["longBylineText"]) || "Unknown artist",
-      duration,
-      thumbnail:
-        (thumbs?.[thumbs.length - 1]?.["url"] as string | undefined) ??
-        `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-    });
-    if (out.length >= limit) break;
+    const cleanTitle = title
+      .replace(/\[.*?\]|\(.*?\)|\|.*/g, "")
+      .replace(/(full\s+)?(video|audio|lyric|lyrical)\s+song/gi, "")
+      .replace(/(official|original)\s+(music\s+)?(video|audio|track)/gi, "")
+      .replace(/\b(4k|hd|remix|feat|ft\.)\b/gi, "")
+      .trim();
+
+    const normalizedSeedTitle = norm(cleanTitle);
+
+    // Determine target languages: from options or inferred from artist
+    let languages = (options?.languages || []).map((l) => l.trim()).filter(Boolean);
+    if (languages.length === 0 && artist) {
+      for (const [lang, artists] of Object.entries(LANGUAGE_ARTISTS)) {
+        if (artists.some((a) => a.toLowerCase() === artist.toLowerCase())) {
+          languages = [lang];
+          break;
+        }
+      }
+    }
+
+    const primaryLang = languages[0] || "";
+
+    // Build 2–3 high-value queries on JioSaavn for smart queue progression
+    const queries: string[] = [];
+
+    // 1. Same artist top hits
+    if (artist) {
+      queries.push(`${artist} top hit songs`);
+      if (primaryLang) {
+        queries.push(`${artist} ${primaryLang} best songs`);
+      }
+    }
+
+    // 2. Same album/soundtrack hits (other songs from the same movie!)
+    if (album && album.length > 2 && norm(album) !== normalizedSeedTitle) {
+      queries.push(`${album} songs`);
+    }
+
+    // 3. Co-artists in the same language for natural musical progression
+    if (primaryLang && LANGUAGE_ARTISTS[primaryLang]) {
+      const coArtists = LANGUAGE_ARTISTS[primaryLang].filter(
+        (a) => a.toLowerCase() !== artist.toLowerCase(),
+      );
+      if (coArtists.length > 0) {
+        const randA = coArtists[Math.floor(Math.random() * coArtists.length)]!;
+        queries.push(`${randA} top songs`);
+      }
+    }
+
+    // Fallback query if no artist or album known
+    if (queries.length === 0) {
+      if (cleanTitle) {
+        queries.push(`${cleanTitle} song`);
+      } else {
+        queries.push(`${primaryLang || "top"} superhit songs`);
+      }
+    }
+
+    // Fetch queries concurrently on JioSaavn with timeout protection
+    const searchPromises = queries.slice(0, 3).map((q) =>
+      searchSaavn(q, { limit: Math.min(limit, 12) }).catch(() => []),
+    );
+    const searchResults = await Promise.all(searchPromises);
+
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+    if (normalizedSeedTitle) {
+      seenTitles.add(normalizedSeedTitle);
+    }
+
+    const tracks: Track[] = [];
+
+    for (const batch of searchResults) {
+      for (const t of batch) {
+        if (!t.id || seenIds.has(t.id)) continue;
+
+        const tTitleNorm = norm(t.title);
+        // Exclude the current song or any version/remix/cover of it
+        if (
+          normalizedSeedTitle &&
+          (tTitleNorm === normalizedSeedTitle ||
+            tTitleNorm.includes(normalizedSeedTitle) ||
+            normalizedSeedTitle.includes(tTitleNorm))
+        ) {
+          continue;
+        }
+
+        // Deduplicate across batch
+        if (seenTitles.has(tTitleNorm)) continue;
+
+        seenIds.add(t.id);
+        seenTitles.add(tTitleNorm);
+
+        tracks.push({
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          duration: t.duration,
+          thumbnail: t.thumbnail,
+          album: t.album,
+          previewUrl: t.previewUrl,
+        });
+
+        if (tracks.length >= limit) break;
+      }
+      if (tracks.length >= limit) break;
+    }
+
+    return { tracks };
+  } catch (err) {
+    console.warn("[getRadioTracks] Radio resolution notice:", err);
+    return { tracks: [] };
   }
-  return nextContinuation !== undefined
-    ? { tracks: out, continuation: nextContinuation }
-    : { tracks: out };
 }

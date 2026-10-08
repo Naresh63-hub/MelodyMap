@@ -141,7 +141,6 @@ function RootShell({ children }: { children: ReactNode }) {
               'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#f2f5fa";}}catch(e){}})();',
           }}
         />
-        <script src="https://www.youtube.com/iframe_api" async></script>
       </head>
       <body>
         {children}

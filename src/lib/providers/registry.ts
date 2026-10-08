@@ -97,19 +97,6 @@ export const PROVIDER_REGISTRY: Record<MusicProviderName, ProviderCapabilities> 
     description: "Open source listening history platform providing community listening insights. Metadata-only.",
     termsUrl: "https://listenbrainz.org/",
   },
-  youtube: {
-    name: "youtube",
-    displayName: "YouTube Music (Fallback)",
-    canDiscover: true,
-    canMetadata: true,
-    canPlayback: true,
-    playbackType: "full",
-    requiresAuth: false,
-    requiresApiKey: false,
-    rateLimitPerMin: 60,
-    description: "Secondary fallback provider utilized only when primary open and licensed catalogs cannot find a match.",
-    termsUrl: "https://www.youtube.com/t/terms",
-  },
 };
 
 /**

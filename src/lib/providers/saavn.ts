@@ -15,7 +15,7 @@ const DES_KEY = "38346591";
  */
 export function decryptSaavnMediaUrl(
   encryptedUrl: string,
-  quality: "saver" | "standard" | "high" = "high",
+  quality: "saver" | "standard" | "high" = "standard",
 ): string {
   if (!encryptedUrl) return "";
   try {
@@ -33,7 +33,8 @@ export function decryptSaavnMediaUrl(
 
     const suffix =
       quality === "saver" ? "_96.mp4" : quality === "standard" ? "_160.mp4" : "_320.mp4";
-    return rawUrl.replace(/_96\.mp4|_160\.mp4|_320\.mp4/, suffix);
+    const httpsUrl = rawUrl.replace(/^http:\/\//i, "https://");
+    return httpsUrl.replace(/_96\.mp4|_160\.mp4|_320\.mp4/, suffix);
   } catch (err) {
     console.warn("[Saavn] Failed to decrypt media URL:", err);
     return "";
@@ -80,7 +81,7 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
   const durationSeconds = Number(raw.more_info?.duration) || 0;
   const artwork = upgradeArtwork(raw.image);
   const encryptedUrl = raw.more_info?.encrypted_media_url;
-  const streamUrl = decryptSaavnMediaUrl(encryptedUrl, "high");
+  const streamUrl = decryptSaavnMediaUrl(encryptedUrl, "standard");
 
   return {
     id: `saavn:${songId}`,
@@ -104,7 +105,7 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
           providerTrackId: songId,
           url: streamUrl,
           type: "full",
-          bitrateKbps: 320,
+          bitrateKbps: 160,
           format: "mp4",
         }
       : undefined,

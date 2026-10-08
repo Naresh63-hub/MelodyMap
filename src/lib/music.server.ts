@@ -1,6 +1,7 @@
 import type { Track } from "./types";
 import { createLruCache } from "./lru-cache";
 import { getRequestClientIp } from "./request-context.server";
+import { resolveSaavnByMeta } from "./providers/saavn";
 import {
   isMusicTrack,
   isPodcastTrack,
@@ -599,38 +600,37 @@ export type TrackDetails = {
 };
 
 /**
- * Fetch detailed metadata for a YouTube video using ytdl-core's getBasicInfo.
+ * Fetch detailed metadata for a track using JioSaavn.
  */
 export async function getTrackDetails(videoId: string): Promise<TrackDetails | null> {
-  const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
-  if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
-    return null;
-  }
+  if (!videoId) return null;
   try {
-    const { default: youtubedl } = await import("youtube-dl-exec");
-    const output = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
-      dumpJson: true,
-      noCheckCertificates: true,
-      noWarnings: true,
-      skipDownload: true,
-      addHeader: [
-        "referer:youtube.com",
-        "user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      ],
-    });
-
-    const info = output as any;
+    const cleanId = videoId.replace(/^saavn:/, "").replace(/[-_]/g, " ").trim();
+    const saavnMatch = await resolveSaavnByMeta(cleanId).catch(() => null);
+    if (saavnMatch) {
+      return {
+        song: saavnMatch.title || cleanId,
+        artist: saavnMatch.artist || "Unknown artist",
+        album: null,
+        year: null,
+        licensedBy: "JioSaavn",
+        thumbnail: `/icons/icon-512.png`,
+        durationSeconds: saavnMatch.duration || 0,
+        isLive: false,
+        viewCount: "0",
+      };
+    }
 
     return {
-      song: info.track || info.title || null,
-      artist: info.artist || info.channel || info.uploader || "Unknown artist",
-      album: info.album || null,
-      year: info.release_year || null,
-      licensedBy: info.license || null,
-      thumbnail: info.thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-      durationSeconds: Number(info.duration) || 0,
-      isLive: Boolean(info.is_live),
-      viewCount: String(info.view_count || "0"),
+      song: cleanId,
+      artist: "Unknown artist",
+      album: null,
+      year: null,
+      licensedBy: null,
+      thumbnail: `/icons/icon-512.png`,
+      durationSeconds: 0,
+      isLive: false,
+      viewCount: "0",
     };
   } catch (err) {
     console.warn(`[music] Failed to fetch track details for ${videoId}:`, err);

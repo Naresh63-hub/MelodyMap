@@ -58,8 +58,8 @@ describe("resolvePlaybackEngine", () => {
     expect(resolvePlaybackEngine({ isNative: true, hostname: "localhost" })).toBe("html5");
   });
 
-  it("selects the youtube engine on deployed web hosts", () => {
-    expect(resolvePlaybackEngine({ isNative: false, hostname: "melodymap-pi.vercel.app" })).toBe("youtube");
+  it("selects the html5 engine on deployed web hosts", () => {
+    expect(resolvePlaybackEngine({ isNative: false, hostname: "melodymap-pi.vercel.app" })).toBe("html5");
   });
 
   it("selects html5 on localhost and 127.0.0.1 for non-native web", () => {
@@ -67,8 +67,8 @@ describe("resolvePlaybackEngine", () => {
     expect(resolvePlaybackEngine({ isNative: false, hostname: "127.0.0.1" })).toBe("html5");
   });
 
-  it("falls back to youtube for empty hostnames on the web", () => {
-    expect(resolvePlaybackEngine({ isNative: false, hostname: "" })).toBe("youtube");
+  it("selects html5 for empty hostnames on the web", () => {
+    expect(resolvePlaybackEngine({ isNative: false, hostname: "" })).toBe("html5");
   });
 });
 

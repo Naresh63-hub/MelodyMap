@@ -9,11 +9,10 @@ export type MusicProviderName =
   | "jamendo"
   | "deezer"
   | "archive"
-  | "youtube"
   | "musicbrainz"
   | "listenbrainz";
 
-export type PlaybackSourceType = "full" | "preview" | "stream_proxy" | "youtube_iframe";
+export type PlaybackSourceType = "full" | "preview" | "stream_proxy";
 
 /**
  * An authorized, playable audio source for a track.

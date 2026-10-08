@@ -7,7 +7,7 @@ export interface Track {
   album?: string;
   duration: number;
   thumbnail?: string;
-  source?: 'youtube' | 'deezer' | 'local';
+  source?: 'saavn' | 'audius' | 'jamendo' | 'deezer' | 'local';
 }
 
 export interface User {

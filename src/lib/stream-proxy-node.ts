@@ -75,7 +75,7 @@ export async function streamProxyMiddleware(
     res.setHeader("access-control-expose-headers", "Content-Range, Content-Length, Accept-Ranges, X-MelodyMap-Source");
     res.setHeader("content-type", result.mimeType);
     res.setHeader("accept-ranges", "bytes");
-    res.setHeader("x-melodymap-source", result.source ?? "youtube");
+    res.setHeader("x-melodymap-source", result.source ?? "saavn");
     res.end();
     return;
   }

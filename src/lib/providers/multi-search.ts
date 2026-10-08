@@ -21,7 +21,6 @@ import { searchAudius } from "./audius";
 import { searchJamendo } from "./jamendo";
 import { searchDeezerTracks } from "./deezer";
 import { searchInternetArchive } from "./archive";
-import { searchYouTubeFallback } from "./youtube";
 import { deduplicateMultiProviderTracks } from "./dedup";
 
 export interface MultiProviderSearchResponse {
@@ -85,26 +84,14 @@ export async function searchMultiProvider(
   ];
 
   const primaryResults = await Promise.all(primaryPromises);
-  let allRawTracks: UnifiedTrack[] = primaryResults.flat();
+  const allRawTracks: UnifiedTrack[] = primaryResults.flat();
 
-  // Stage 2: If primary open providers yielded fewer than 5 tracks,
-  // query YouTube fallback adapter to ensure rich coverage
-  if (allRawTracks.length < 5) {
-    try {
-      const ytTracks = await searchYouTubeFallback(clean, { limit });
-      sourcesConsulted.push("youtube");
-      allRawTracks = [...allRawTracks, ...ytTracks];
-    } catch {
-      // YouTube fallback failed gracefully, continue with whatever was gathered
-    }
-  }
-
-  // Stage 3: Enforce strict duration filter (0 < durationSeconds <= 600)
+  // Stage 2: Enforce strict duration filter (0 < durationSeconds <= 600)
   const durationFiltered = allRawTracks.filter(
     (t) => t.durationSeconds > 0 && t.durationSeconds <= 600,
   );
 
-  // Stage 4: Cross-provider duplicate elimination
+  // Stage 3: Cross-provider duplicate elimination
   // Collapses redundant recordings across providers into ONE unified track,
   // retaining other sources in availableAlternatives
   const deduplicated = deduplicateMultiProviderTracks(durationFiltered);

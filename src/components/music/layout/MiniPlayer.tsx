@@ -74,7 +74,7 @@ export function MiniPlayer({
       className="fixed z-40 border-t border-hair-strong bg-surface shadow-lift max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto left-0 right-0 h-14 sm:h-16 flex flex-col justify-between safe-bottom"
       style={{ bottom: "var(--mobile-nav-height, 56px)" }}
     >
-      {/* 2px Hairline Progress Indicator at Top */}
+      {/* 2.5px Progress Indicator at Top */}
       <div
         ref={barRef}
         role="slider"
@@ -83,11 +83,14 @@ export function MiniPlayer({
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         onClick={handleBarClick}
-        className="relative w-full h-[2px] bg-chip cursor-pointer"
+        className="relative w-full h-[2.5px] bg-chip cursor-pointer overflow-hidden"
       >
         <div
-          className="h-full bg-primary transition-all duration-150 ease-linear"
-          style={{ width: `${progressPct}%` }}
+          className="h-full transition-all duration-150 ease-linear rounded-r-full"
+          style={{
+            width: `${progressPct}%`,
+            background: "linear-gradient(90deg, #38bdf8 0%, #e94560 100%)",
+          }}
         />
       </div>
 

@@ -1449,13 +1449,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (seedTracks.length >= 3) break;
       }
 
-      // 1. Try YouTube RD Song Radio across recent seeds for continuous similar vibe
+      // 1. Try Song Radio across recent seeds for continuous similar vibe
       for (const seed of seedTracks) {
         if (!seed.id) continue;
         try {
           const radioRes = await getSongRadio({
             data: {
               videoId: seed.id,
+              title: seed.title,
+              artist: seed.artist,
+              album: seed.album,
+              languages: settings.languages,
               limit: 15,
               continuation: radioContinuationRef.current,
             },
@@ -2863,8 +2867,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     quickFilterIds={quickFilters}
                     onClearQuickFilters={handleClearQuickFilters}
                     onPlayTrack={(track, sectionTracks, i) => {
-                      if (current?.id === track.id && player.isPlaying) {
-                        pause();
+                      if (current?.id === track.id) {
+                        if (player.isPlaying) {
+                          setShowFullScreen(true);
+                        } else {
+                          play();
+                        }
                         return;
                       }
                       startQueue(sectionTracks, i);
@@ -2931,8 +2939,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   oldSongs={oldSongsList.filter(isOldEraTrack)}
                   newReleases={mixTracks.newrelease.slice(0, 12)}
                   onPlayTrack={(track, sectionTracks, i) => {
-                    if (current?.id === track.id && player.isPlaying) {
-                      pause();
+                    if (current?.id === track.id) {
+                      if (player.isPlaying) {
+                        setShowFullScreen(true);
+                      } else {
+                        play();
+                      }
                       return;
                     }
                     startQueue(sectionTracks, i);
@@ -2966,7 +2978,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onPlayTrack={(track, i) => {
                   if (current?.id === track.id) {
                     if (player.isPlaying) {
-                      pause();
+                      setShowFullScreen(true);
                     } else {
                       play();
                     }
@@ -3020,7 +3032,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onPlay={(track, i) => {
                   if (current?.id === track.id) {
                     if (player.isPlaying) {
-                      pause();
+                      setShowFullScreen(true);
                     } else {
                       play();
                     }
@@ -3121,7 +3133,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onPlayTrack={(tracks, i) => {
                   if (current?.id === tracks[i]?.id) {
                     if (player.isPlaying) {
-                      pause();
+                      setShowFullScreen(true);
                     } else {
                       play();
                     }
@@ -3200,7 +3212,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   onPlay={(track, i) => {
                     if (current?.id === track.id) {
                       if (player.isPlaying) {
-                        pause();
+                        setShowFullScreen(true);
                       } else {
                         play();
                       }

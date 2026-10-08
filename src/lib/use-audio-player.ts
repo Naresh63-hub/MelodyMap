@@ -31,22 +31,10 @@ export type NextTrackInfo = {
 export const SKIP_FORWARD_SECONDS = 5;
 export const SKIP_BACKWARD_SECONDS = 5;
 
-declare global {
-  interface Window {
-    YT?: any;
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-/** 1-second silent WAV loop to maintain native mobile OS audio focus & lockscreen session */
-const SILENT_AUDIO_URI =
-  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAP8A/w==";
-
 /**
  * HTML5-Audio + Web Audio API backed player with Spotify-like background playback,
  * screen-off & lockscreen continuous playback, 10-band hardware equalizer, sound presets,
- * gapless pre-buffering, speed adjustment, offline caching, and robust dual-engine streaming
- * with client-side YouTube IFrame fallback for zero-failure playback across all hosts (including Vercel).
+ * gapless pre-buffering, speed adjustment, and offline caching.
  */
 export function useAudioPlayer(options: {
   onEnded: (autoAdvanced?: boolean) => void;
@@ -64,24 +52,6 @@ export function useAudioPlayer(options: {
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const filterNodesRef = useRef<BiquadFilterNode[]>([]);
 
-  // Dual-engine playback state ("html5" or "youtube").
-  // NATIVE APP (APK): ALWAYS the HTML5 proxy engine. The YouTube IFrame player
-  // pauses itself whenever the WebView becomes invisible (screen off / app
-  // switch) and its cross-origin document cannot be patched from the parent
-  // page, so it can never deliver Spotify-like background playback inside the
-  // APK. The HTML5 <audio> element streams through our own /api/stream proxy
-  // and keeps playing behind the foreground media service.
-  // Deployed web keeps the YouTube engine for fast start; localhost keeps proxy.
-  const activeEngineRef = useRef<"html5" | "youtube">(
-    resolvePlaybackEngine({
-      isNative: isNativePlaybackEnv(),
-      hostname: typeof window !== "undefined" ? window.location.hostname : "localhost",
-    }),
-  );
-  const ytPlayerRef = useRef<any>(null);
-  const ytReadyRef = useRef<boolean>(false);
-  const ytTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pendingYtActionRef = useRef<{ id: string; startAt: number; autoPlay: boolean } | null>(null);
   const isSeekingRef = useRef<boolean>(false);
   const seekCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skippedSegmentsRef = useRef<Set<string>>(new Set());
@@ -111,13 +81,13 @@ export function useAudioPlayer(options: {
 
     fetch(url, { method: "HEAD", signal: controller.signal })
       .then((res) => {
-        const src = res.headers.get("X-MelodyMap-Source") as "youtube" | "audius" | "jamendo" | null;
+        const src = res.headers.get("X-MelodyMap-Source") as "saavn" | "audius" | "jamendo" | null;
         if (src) setStreamSource(src);
       })
       .catch(() => {/* probe failed; no indicator shown */});
   }, []);
 
-  // Initialize and attach core audio + prebuffer + YouTube iframe container to DOM.
+  // Initialize and attach core audio + prebuffer to DOM.
   // Must run in an effect, not during render: creating/appending DOM nodes is a
   // side effect and violates render purity (breaks under StrictMode re-renders
   // and can double-append during hydration).
@@ -170,25 +140,6 @@ export function useAudioPlayer(options: {
       prebufferAudioRef.current = pEl;
     }
 
-    if (!document.getElementById("melodymap-yt-wrapper")) {
-      const holder = document.createElement("div");
-      holder.id = "melodymap-yt-wrapper";
-      holder.style.position = "fixed";
-      holder.style.bottom = "-9999px";
-      holder.style.right = "-9999px";
-      holder.style.width = "200px";
-      holder.style.height = "200px";
-      holder.style.opacity = "0.01";
-      holder.style.pointerEvents = "none";
-      holder.style.zIndex = "-1";
-      holder.style.overflow = "hidden";
-      const iframeDiv = document.createElement("div");
-      iframeDiv.id = "melodymap-yt-iframe";
-      holder.appendChild(iframeDiv);
-      try {
-        document.body.appendChild(holder);
-      } catch {}
-    }
   }, []);
 
   const endedRef = useRef(options.onEnded);
@@ -213,7 +164,7 @@ export function useAudioPlayer(options: {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [streamSource, setStreamSource] = useState<"youtube" | "audius" | "jamendo" | null>(null);
+  const [streamSource, setStreamSource] = useState<"saavn" | "audius" | "jamendo" | null>(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
     try {
@@ -243,7 +194,6 @@ export function useAudioPlayer(options: {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
   const stalledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const playViaYouTubeRef = useRef<(id: string, startAt?: number, autoPlay?: boolean) => void>(() => {});
 
   /** Calculate equal-power trigonometric curve for smooth crossfading without volume drop */
   const createEqualPowerCurve = (type: "in" | "out", length = 32): Float32Array => {
@@ -461,7 +411,6 @@ export function useAudioPlayer(options: {
       // If the engine already synchronously transitioned to this exact URL, avoid tearing it down
       if (
         audio.src === url &&
-        activeEngineRef.current === "html5" &&
         (!audio.paused || wantPlayRef.current) &&
         Math.abs((audio.currentTime || 0) - startAt) < 2
       ) {
@@ -484,12 +433,6 @@ export function useAudioPlayer(options: {
         setPosition(0);
         setDuration(0);
       }
-
-      activeEngineRef.current = "html5";
-      try {
-        ytPlayerRef.current?.pauseVideo?.();
-        ytPlayerRef.current?.stopVideo?.();
-      } catch {}
 
       // Detect stream source from proxy header (replacement recording indicator)
       detectStreamSource(url);
@@ -586,20 +529,6 @@ export function useAudioPlayer(options: {
     const attempts = reconnectAttemptsRef.current;
     if (attempts >= 3) {
       setIsReconnecting(false);
-      const isExternalNonYt =
-        trackId.startsWith("saavn:") ||
-        trackId.startsWith("podcast:") ||
-        trackId.startsWith("deezer:") ||
-        trackId.startsWith("audius:") ||
-        trackId.startsWith("jamendo:") ||
-        trackId.startsWith("archive:");
-      // Fallback to in-app YouTube player if proxy stream ever drops/fails
-      if (!isExternalNonYt) {
-        console.info(`[MelodyMap] Reconnection threshold reached. Switching to YouTube playback engine for: ${trackId}`);
-        const resumePos = lastValidPositionRef.current || 0;
-        playViaYouTubeRef.current(trackId, resumePos, true);
-        return;
-      }
       onErrorRef.current?.("Audio connection interrupted. Tap play to retry.");
       return;
     }
@@ -666,7 +595,6 @@ export function useAudioPlayer(options: {
     };
 
     const onPlay = () => {
-      if (activeEngineRef.current !== "html5") return;
       audio.muted = false;
       initWebAudio();
       if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
@@ -681,7 +609,6 @@ export function useAudioPlayer(options: {
       applyPendingSeek();
     };
     const onPlaying = () => {
-      if (activeEngineRef.current !== "html5") return;
       if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
         audioCtxRef.current.resume().catch(() => {});
       }
@@ -696,7 +623,6 @@ export function useAudioPlayer(options: {
       applyPendingSeek();
     };
     const onWaiting = () => {
-      if (activeEngineRef.current !== "html5") return;
       if (wantPlayRef.current) {
         setIsLoading(true);
         if (!stalledTimerRef.current) {
@@ -711,7 +637,6 @@ export function useAudioPlayer(options: {
       }
     };
     const onStalled = () => {
-      if (activeEngineRef.current !== "html5") return;
       if (wantPlayRef.current && currentTrackIdRef.current) {
         if (!stalledTimerRef.current) {
           stalledTimerRef.current = setTimeout(() => {
@@ -725,22 +650,32 @@ export function useAudioPlayer(options: {
       }
     };
     const onCanPlay = () => {
-      if (activeEngineRef.current !== "html5") return;
       setIsLoading(false);
       applyPendingSeek();
     };
     const onLoadedMetadata = () => {
-      if (activeEngineRef.current !== "html5") return;
       applyPendingSeek();
       onTime();
     };
     const onPause = () => {
-      if (activeEngineRef.current !== "html5") return;
+      if (wantPlayRef.current && !isSeekingRef.current) {
+        // Paused unexpectedly (buffer underrun, transient network stall, or audio ducking).
+        // Maintain loading/buffering state and auto-resume once bytes are ready.
+        setIsLoading(true);
+        const el = audioRef.current;
+        if (el && el.paused && el.src && !el.src.startsWith("data:audio")) {
+          setTimeout(() => {
+            if (wantPlayRef.current && !isSeekingRef.current && el.paused) {
+              el.play().catch(() => {});
+            }
+          }, 300);
+        }
+        return;
+      }
       setIsPlaying(false);
       setIsLoading(false);
     };
     const onTime = () => {
-      if (activeEngineRef.current !== "html5") return;
       const cur = audio.currentTime || 0;
       const dur = Number.isFinite(audio.duration) ? audio.duration : 0;
       lastValidPositionRef.current = cur;
@@ -807,7 +742,6 @@ export function useAudioPlayer(options: {
     // When song ends with screen locked, synchronously switch .src & call .play()
     // inside the same event loop frame so mobile OS grants immediate autoplay permission!
     const onEnded = () => {
-      if (activeEngineRef.current !== "html5") return;
       setIsPlaying(false);
       setIsLoading(false);
 
@@ -862,7 +796,6 @@ export function useAudioPlayer(options: {
     };
 
     const onError = () => {
-      if (activeEngineRef.current !== "html5") return;
       setIsPlaying(false);
       setIsLoading(false);
       if (
@@ -875,24 +808,7 @@ export function useAudioPlayer(options: {
       ) {
         console.warn("[MelodyMap] Audio stream proxy error:", audio.error.code, audio.error.message);
 
-        // Instant Fallback to Client YouTube Player on server proxy block
         const activeId = currentTrackIdRef.current;
-        const isExternalNonYt =
-          Boolean(activeId) &&
-          (activeId!.startsWith("saavn:") ||
-            activeId!.startsWith("podcast:") ||
-            activeId!.startsWith("deezer:") ||
-            activeId!.startsWith("audius:") ||
-            activeId!.startsWith("jamendo:") ||
-            activeId!.startsWith("archive:"));
-
-        // If server proxy cannot resolve this stream, fall back to in-app YouTube engine
-        if (activeId && !isExternalNonYt) {
-          console.info(`[MelodyMap] Proxy unresolvable, falling back to client YouTube engine for: ${activeId}`);
-          const resumePos = audio.currentTime || 0;
-          playViaYouTubeRef.current(activeId, resumePos, wantPlayRef.current);
-          return;
-        }
 
         // Network error (code 2 = MEDIA_ERR_NETWORK) mid-stream: trigger prompt reconnection
         if (wantPlayRef.current && (audio.error.code === 2 || audio.error.code === 4)) {
@@ -967,251 +883,29 @@ export function useAudioPlayer(options: {
     };
   }, [initWebAudio, streamUrl, triggerReconnect]);
 
-  // Initialize YouTube IFrame Player API on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const initYt = () => {
-      if (ytPlayerRef.current || !window.YT || !window.YT.Player) return;
-      const targetEl = document.getElementById("melodymap-yt-iframe");
-      if (!targetEl) return;
-      try {
-        ytPlayerRef.current = new window.YT.Player("melodymap-yt-iframe", {
-          height: "200",
-          width: "200",
-          playerVars: {
-            autoplay: 1,
-            controls: 0,
-            disablekb: 1,
-            fs: 0,
-            playsinline: 1,
-            rel: 0,
-            enablejsapi: 1,
-            origin: window.location.origin,
-            widget_referrer: window.location.href,
-            suggestedQuality: "small",
-            vq: "small",
-          },
-          events: {
-            onReady: (event: any) => {
-              ytReadyRef.current = true;
-              try {
-                event.target.setVolume(80);
-                event.target.setPlaybackQuality?.("small");
-              } catch {}
-              if (pendingYtActionRef.current) {
-                const { id, startAt, autoPlay } = pendingYtActionRef.current;
-                pendingYtActionRef.current = null;
-                if (autoPlay) {
-                  event.target.loadVideoById(id, startAt);
-                  try {
-                    event.target.playVideo();
-                  } catch {}
-                } else {
-                  event.target.cueVideoById(id, startAt);
-                }
-              }
-            },
-            onStateChange: (event: any) => {
-              if (event.data === 1) {
-                // 1 = Playing
-                isSeekingRef.current = false;
-                setIsPlaying(true);
-                setIsLoading(false);
-                try {
-                  event.target.setPlaybackQuality?.("small");
-                } catch {}
-              } else if (event.data === 2) {
-                // 2 = Paused
-                // If the user did not explicitly request pause (e.g. Android screen off or visibility change), keep playing
-                if (wantPlayRef.current && isNativePlaybackEnv()) {
-                  try {
-                    event.target.playVideo();
-                    return;
-                  } catch {}
-                }
-                setIsPlaying(false);
-                setIsLoading(false);
-              } else if (event.data === 3) {
-                // 3 = Buffering
-                setIsLoading(true);
-              } else if (event.data === 0) {
-                // 0 = Ended
-                isSeekingRef.current = false;
-                setIsPlaying(false);
-                setIsLoading(false);
-                endedRef.current(false);
-              }
-            },
-            onError: (event: any) => {
-              console.warn("[MelodyMap] YouTube player API error:", event.data);
-              // Fatal unplayable error (100 = deleted/private, 101/150 = embed disallowed, 2 = invalid parameter)
-              if (event.data === 101 || event.data === 150 || event.data === 100 || event.data === 2) {
-                const curId = currentTrackIdRef.current;
-                // On web, attempt stream proxy fallback once
-                if (curId && !isNativePlaybackEnv()) {
-                  console.info("[MelodyMap] Web YouTube embed blocked or errored, attempting stream proxy fallback for:", curId);
-                  activeEngineRef.current = "html5";
-                  try {
-                    ytPlayerRef.current?.stopVideo?.();
-                  } catch {}
-                  setStream(streamUrl(curId), lastValidPositionRef.current);
-                  return;
-                }
-                // On native APK, gracefully inform and skip without entering a failing 404 proxy loop
-                onErrorRef.current?.("Audio stream unavailable, skipping to next track...");
-              } else {
-                console.warn("[MelodyMap] Non-fatal YouTube player error, ignoring transient code:", event.data);
-              }
-            },
-          },
-        });
-      } catch (err) {
-        console.warn("[MelodyMap] YouTube player init notice:", err);
-      }
-    };
-
-    if (window.YT && window.YT.Player) {
-      initYt();
-    } else {
-      const existingTag = document.getElementById("yt-iframe-api-script");
-      if (!existingTag) {
-        const tag = document.createElement("script");
-        tag.id = "yt-iframe-api-script";
-        tag.src = "https://www.youtube.com/iframe_api";
-        document.head.appendChild(tag);
-      }
-      const oldCallback = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => {
-        if (oldCallback) oldCallback();
-        initYt();
-      };
-    }
-    // setStream and streamUrl are stable useCallbacks (deps: [streamUrl] / []), so this stays a mount-once effect.
-  }, [setStream, streamUrl]);
-
-  // Poll position and duration during YouTube player playback
-  useEffect(() => {
-    if (isPlaying && activeEngineRef.current === "youtube") {
-      if (ytTimerRef.current) clearInterval(ytTimerRef.current);
-      ytTimerRef.current = setInterval(() => {
-        // Do not stomp local seek position with stale YouTube API time while seeking
-        if (isSeekingRef.current) return;
-
-        const p = ytPlayerRef.current;
-        if (p && typeof p.getCurrentTime === "function" && typeof p.getDuration === "function") {
-          try {
-            const cur = p.getCurrentTime() || 0;
-            const dur = p.getDuration() || 0;
-            if (dur > 0) setDuration(dur);
-
-            // Protect against transient backwards jumps from YouTube API buffer jitter during quality/tab adjustments
-            if (cur < lastValidPositionRef.current - 1.5 && lastValidPositionRef.current > 3 && cur > 0) {
-              // Maintain current stable position
-            } else {
-              lastValidPositionRef.current = cur;
-              setPosition(cur);
-            }
-
-            // SponsorBlock Auto-Skip: skip each matching segment exactly once
-            if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
-              for (const seg of sponsorSegmentsRef.current) {
-                const segKey = `${seg.start.toFixed(1)}-${seg.end.toFixed(1)}`;
-                if (skippedSegmentsRef.current.has(segKey)) continue;
-
-                if (cur >= seg.start - 0.05 && cur < seg.end - 0.2) {
-                  skippedSegmentsRef.current.add(segKey);
-                  const target = seg.end + 0.2;
-                  seekRef.current(target);
-                  onSponsorBlockSkippedRef.current?.(seg.category);
-                  break;
-                }
-              }
-            }
-
-            // Gapless Pre-buffering
-            if (dur > 0 && dur - cur <= 25 && prebufferAudioRef.current) {
-              const nextTrack = getNextTrackRef.current?.();
-              if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
-                prebufferedTrackIdRef.current = nextTrack.id;
-                const nextUrl =
-            nextTrack.previewUrl && hasFullLengthDirectSource(nextTrack.id)
-              ? nextTrack.previewUrl
-              : streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
-                prebufferAudioRef.current.src = nextUrl;
-                prebufferAudioRef.current.load();
-              }
-            }
-          } catch {}
-        }
-      }, 300);
-    } else {
-      if (ytTimerRef.current) {
-        clearInterval(ytTimerRef.current);
-        ytTimerRef.current = null;
-      }
-    }
-    return () => {
-      if (ytTimerRef.current) {
-        clearInterval(ytTimerRef.current);
-        ytTimerRef.current = null;
-      }
-    };
-  }, [isPlaying, streamUrl]);
-
   // Maintain uninterrupted playback across tab switches and app foreground/background
   useEffect(() => {
     if (typeof document === "undefined") return;
-    // Native APK: the foreground MediaPlaybackService owns background state
-    // (audio focus, lockscreen controls, OEM doze handling). A JS-side resume
-    // loop here would fight the OS — e.g. re-playing after an audio-focus pause
-    // causes the play/pause cycling and a "playing" animation with no sound.
-    if (isNativePlaybackEnv()) return;
     const onVisibilityChange = () => {
-      // Never pause, swap engines, or re-seek when tabs are switched or app is hidden.
-      // Audio must continue playing seamlessly in the background.
+      // Audio continues playing seamlessly in the background.
       if (!document.hidden && wantPlayRef.current) {
-        // App returned to foreground: ensure AudioContext is active if suspended
         if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
           audioCtxRef.current.resume().catch(() => {});
         }
-        // If native browser paused playback while in background, resume it
-        if (activeEngineRef.current === "youtube") {
-          const p = ytPlayerRef.current;
-          if (p && ytReadyRef.current && typeof p.getPlayerState === "function" && p.getPlayerState() === 2) {
-            try {
-              p.playVideo();
-            } catch {}
-          }
-        } else if (activeEngineRef.current === "html5") {
-          const audio = audioRef.current;
-          if (audio && audio.paused && audio.src && !audio.src.startsWith("data:audio")) {
-            audio.play().catch(() => {});
-          }
+        const audio = audioRef.current;
+        if (audio && audio.paused && audio.src && !audio.src.startsWith("data:audio")) {
+          audio.play().catch(() => {});
         }
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
-    // Background playback watchdog: auto-resume audio if paused by Android/browser lock screen
+    // Background playback watchdog: auto-resume audio if paused while app is active
     const watchdog = setInterval(() => {
       if (wantPlayRef.current && !isSeekingRef.current) {
-        if (activeEngineRef.current === "youtube") {
-          const p = ytPlayerRef.current;
-          if (p && ytReadyRef.current && typeof p.getPlayerState === "function") {
-            const s = p.getPlayerState();
-            // 2 = paused, 5 = cued
-            if (s === 2 || s === 5) {
-              try {
-                p.playVideo();
-              } catch {}
-            }
-          }
-        } else if (activeEngineRef.current === "html5") {
-          const audio = audioRef.current;
-          if (audio && audio.paused && audio.src && !audio.src.startsWith("data:audio")) {
-            audio.play().catch(() => {});
-          }
+        const audio = audioRef.current;
+        if (audio && audio.paused && audio.src && !audio.src.startsWith("data:audio")) {
+          audio.play().catch(() => {});
         }
       }
     }, 1000);
@@ -1222,53 +916,6 @@ export function useAudioPlayer(options: {
     };
   }, []);
 
-  /** Direct YouTube IFrame API play */
-  const playViaYouTube = useCallback(
-    (id: string, startAt = 0, autoPlay = true) => {
-      activeEngineRef.current = "youtube";
-      setIsLoading(true);
-      lastValidPositionRef.current = startAt;
-      setPosition(startAt);
-      setDuration(0);
-      // Play silent background audio loop to keep Android system audio focus and lockscreen controls active
-      if (audioRef.current) {
-        try {
-          audioRef.current.pause();
-          if (autoPlay) {
-            audioRef.current.src = SILENT_AUDIO_URI;
-            audioRef.current.loop = true;
-            audioRef.current.volume = 0.001;
-            const p = audioRef.current.play();
-            if (p !== undefined) p.catch(() => {});
-          }
-        } catch {}
-      }
-
-      const p = ytPlayerRef.current;
-      if (p && ytReadyRef.current && typeof p.loadVideoById === "function") {
-        if (autoPlay) {
-          p.loadVideoById(id, startAt);
-          try {
-            p.playVideo();
-          } catch {}
-        } else {
-          p.cueVideoById(id, startAt);
-        }
-        try {
-          const validSpeed =
-            Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0
-              ? playbackSpeedRef.current
-              : 1;
-          p.setPlaybackRate(validSpeed);
-          p.setPlaybackQuality?.("small");
-        } catch {}
-      } else {
-        pendingYtActionRef.current = { id, startAt, autoPlay };
-      }
-    },
-    [],
-  );
-
   /** Cleanup on unmount */
   useEffect(() => {
     return () => {
@@ -1278,14 +925,6 @@ export function useAudioPlayer(options: {
         audio.pause();
         audio.removeAttribute("src");
         audio.load();
-      }
-      if (ytPlayerRef.current && typeof ytPlayerRef.current.destroy === "function") {
-        try {
-          ytPlayerRef.current.destroy();
-        } catch {}
-      }
-      if (ytTimerRef.current) {
-        clearInterval(ytTimerRef.current);
       }
       if (objectUrlRef.current) {
         URL.revokeObjectURL(objectUrlRef.current);
@@ -1306,10 +945,6 @@ export function useAudioPlayer(options: {
         if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
         const url = URL.createObjectURL(blob);
         objectUrlRef.current = url;
-        activeEngineRef.current = "html5";
-        try {
-          ytPlayerRef.current?.stopVideo();
-        } catch {}
         setStream(url, startAt);
         return true;
       } catch (err) {
@@ -1322,10 +957,7 @@ export function useAudioPlayer(options: {
 
   /**
    * Direct URLs are only honored for providers whose streams are full-length
-   * (audius/jamendo/archive/podcast). Metadata-enriched catalog tracks carry
-   * a `previewUrl` that is not a full-length source — honoring it would bypass
-   * the proxy's full-length resolution chain, so it is dropped and the track
-   * streams via the proxy instead.
+   * (saavn/audius/jamendo/archive/podcast).
    */
   const sanitizeDirectUrl = (trackId: string, directUrl?: string): string | undefined =>
     directUrl && hasFullLengthDirectSource(trackId) ? directUrl : undefined;
@@ -1343,11 +975,9 @@ export function useAudioPlayer(options: {
       if (
         currentTrackIdRef.current === id &&
         startAt === 0 &&
-        ((activeEngineRef.current === "html5" &&
-          audio &&
-          (audio.src === expectedUrl || audio.src.includes(encodeURIComponent(id))) &&
-          (!audio.paused || audio.readyState >= 1)) ||
-         (activeEngineRef.current === "youtube" && isPlayingRef.current))
+        audio &&
+        (audio.src === expectedUrl || audio.src.includes(encodeURIComponent(id))) &&
+        (!audio.paused || audio.readyState >= 1)
       ) {
         return;
       }
@@ -1371,22 +1001,13 @@ export function useAudioPlayer(options: {
 
       if (await playOffline(id, startAt)) return;
       if (directUrl) {
-        activeEngineRef.current = "html5";
-        try {
-          ytPlayerRef.current?.stopVideo();
-        } catch {}
         setStream(directUrl, startAt);
-        return;
-      }
-
-      if (activeEngineRef.current === "youtube") {
-        playViaYouTube(id, startAt, true);
         return;
       }
 
       setStream(streamUrl(id), startAt);
     },
-    [setStream, playOffline, streamUrl, playViaYouTube],
+    [setStream, playOffline, streamUrl],
   );
 
   /** Cue a track at specific second without autoplay */
@@ -1413,49 +1034,17 @@ export function useAudioPlayer(options: {
 
       if (await playOffline(id, startSeconds)) return;
       if (directUrl) {
-        activeEngineRef.current = "html5";
-        try {
-          ytPlayerRef.current?.stopVideo();
-        } catch {}
         setStream(directUrl, startSeconds);
-        return;
-      }
-
-      if (activeEngineRef.current === "youtube") {
-        playViaYouTube(id, startSeconds, false);
         return;
       }
 
       setStream(streamUrl(id), startSeconds);
     },
-    [setStream, playOffline, streamUrl, playViaYouTube],
+    [setStream, playOffline, streamUrl],
   );
 
   const play = useCallback(() => {
     wantPlayRef.current = true;
-    if (activeEngineRef.current === "youtube") {
-      if (audioRef.current) {
-        try {
-          if (!audioRef.current.src || !audioRef.current.src.startsWith("data:audio")) {
-            audioRef.current.src = SILENT_AUDIO_URI;
-            audioRef.current.loop = true;
-            audioRef.current.volume = 0.001;
-          }
-          const p = audioRef.current.play();
-          if (p !== undefined) p.catch(() => {});
-        } catch {}
-      }
-      const curId = currentTrackIdRef.current;
-      const p = ytPlayerRef.current;
-      if (p && ytReadyRef.current && typeof p.playVideo === "function") {
-        try {
-          p.playVideo();
-        } catch {}
-      } else if (curId) {
-        playViaYouTube(curId, lastValidPositionRef.current, true);
-      }
-      return;
-    }
     initWebAudio();
     if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
       audioCtxRef.current.resume().catch(() => {});
@@ -1472,7 +1061,7 @@ export function useAudioPlayer(options: {
         });
       }
     }
-  }, [initWebAudio, playViaYouTube]);
+  }, [initWebAudio]);
 
   const pause = useCallback(() => {
     wantPlayRef.current = false;
@@ -1481,9 +1070,6 @@ export function useAudioPlayer(options: {
       clearTimeout(seekCooldownTimerRef.current);
       seekCooldownTimerRef.current = null;
     }
-    try {
-      ytPlayerRef.current?.pauseVideo();
-    } catch {}
     try {
       audioRef.current?.pause();
     } catch {}
@@ -1494,26 +1080,6 @@ export function useAudioPlayer(options: {
     const target = Math.max(0, seconds);
     lastValidPositionRef.current = target;
     setPosition(target);
-
-    if (activeEngineRef.current === "youtube") {
-      const p = ytPlayerRef.current;
-      if (p && typeof p.seekTo === "function") {
-        isSeekingRef.current = true;
-        if (seekCooldownTimerRef.current) clearTimeout(seekCooldownTimerRef.current);
-        // Protect position from stale polling ticks while YouTube buffers at target
-        seekCooldownTimerRef.current = setTimeout(() => {
-          isSeekingRef.current = false;
-        }, 1200);
-
-        p.seekTo(target, true);
-        if (wantPlayRef.current) {
-          try {
-            p.playVideo();
-          } catch {}
-        }
-      }
-      return;
-    }
 
     const audio = audioRef.current;
     if (!audio) return;
@@ -1548,11 +1114,6 @@ export function useAudioPlayer(options: {
         localStorage.setItem("melodymap.playback_speed.v1", String(clamped));
       } catch {}
     }
-    if (activeEngineRef.current === "youtube") {
-      try {
-        ytPlayerRef.current?.setPlaybackRate(clamped);
-      } catch {}
-    }
     const audio = audioRef.current;
     if (audio) {
       audio.playbackRate = clamped;
@@ -1563,15 +1124,10 @@ export function useAudioPlayer(options: {
     const clamped = Math.max(0, Math.min(100, v));
     const audio = audioRef.current;
     if (audio) audio.volume = clamped / 100;
-    try {
-      ytPlayerRef.current?.setVolume(clamped);
-    } catch {}
   }, []);
 
-  playViaYouTubeRef.current = playViaYouTube;
-
-  /** True when the stream is a replacement recording (non-YouTube source). */
-  const isReplacementSource = streamSource !== null && streamSource !== "youtube";
+  /** True when the stream is a replacement recording (non-original catalog source). */
+  const isReplacementSource = streamSource !== null;
 
   return {
     ready,

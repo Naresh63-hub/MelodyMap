@@ -204,7 +204,6 @@ export async function fetchUpstreamAudio(options: {
   const effectiveRange = normalizeUpstreamRange(rangeHeader);
   const upstreamHeaders: Record<string, string> = {
     "User-Agent": UPSTREAM_UA,
-    Referer: "https://www.youtube.com/",
     Range: effectiveRange,
   };
 
@@ -244,7 +243,7 @@ export async function fetchUpstreamAudio(options: {
       ok: true,
       upstream: upstreamRes,
       mimeType: resolveAudioMimeType(stream?.mimeType, upstreamRes.headers.get("content-type")),
-      source: stream?.source ?? "youtube",
+      source: stream?.source ?? "saavn",
     };
   } catch (err: unknown) {
     if (err instanceof Error && err.name === "AbortError") {

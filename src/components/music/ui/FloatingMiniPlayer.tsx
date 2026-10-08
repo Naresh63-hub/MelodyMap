@@ -179,8 +179,11 @@ export function FloatingMiniPlayer({
         onPointerCancel={handleScrubPointerCancel}
       >
         <div
-          className="h-1 w-full bg-white group-hover:bg-primary transition-all rounded-full"
-          style={{ width: `${progressPct}%` }}
+          className="h-1 rounded-full transition-all"
+          style={{
+            width: `${progressPct}%`,
+            background: "linear-gradient(90deg, #38bdf8 0%, #e94560 100%)",
+          }}
         />
         <span
           className={cn(
