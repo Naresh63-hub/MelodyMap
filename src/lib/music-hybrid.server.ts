@@ -45,7 +45,20 @@ export async function searchHybrid(
     }
   }
 
-  // Multi-Provider First Strategy:
+  // JioSaavn First Strategy:
+  // Query JioSaavn for clean metadata (song title, real artist/composer, movie/album)
+  // and direct crystal-clear 160kbps/320kbps streams.
+  try {
+    const { searchSaavn } = await import("./providers/saavn");
+    const saavnRes = await searchSaavn(query, { limit });
+    if (saavnRes.length > 0) {
+      return { tracks: saavnRes as HybridTrack[] };
+    }
+  } catch (err) {
+    console.warn("[MelodyMap] Saavn primary search notice:", err);
+  }
+
+  // Multi-Provider Strategy:
   // Query Audius, Jamendo, Deezer, and Internet Archive concurrently,
   // falling back to YouTube only when needed.
   try {

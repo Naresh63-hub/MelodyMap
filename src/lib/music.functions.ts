@@ -84,8 +84,8 @@ export const searchTracks = createServerFn({ method: "POST" })
     }
 
     try {
-      const { searchYouTubePaginated } = await import("./music.server");
-      const res = await searchYouTubePaginated(data.query, "songs", data.continuation, limit);
+      const { searchHybrid } = await import("./music-hybrid.server");
+      const res = await searchHybrid(data.query, limit, data.continuation, "songs", data.offset, data.page);
       return { tracks: res.tracks, continuation: res.continuation, error: null };
     } catch (error) {
       console.error("Search failed:", error);
@@ -315,14 +315,14 @@ function shuffleArray<T>(array: T[]): T[] {
   return arr;
 }
 
-/** Helper to execute and deduplicate multi-query search batches */
+/** Helper to execute and deduplicate multi-query search batches using JioSaavn & multi-provider primary */
 export async function runQueryBatch(
   queries: string[],
   perQueryLimit = 10,
   musicOnly = true,
   bypassCache = false,
 ): Promise<Track[]> {
-  const { searchYouTube } = await import("./music.server");
+  const { searchSaavn } = await import("./providers/saavn");
   const seenIds = new Set<string>();
   const seenKeys = new Set<string>();
   const results: Track[] = [];
@@ -330,6 +330,18 @@ export async function runQueryBatch(
   const batchResults = await Promise.allSettled(
     queries.map(async (q) => {
       try {
+        const saavnRes = await searchSaavn(q, { limit: perQueryLimit });
+        if (saavnRes.length > 0) return saavnRes as Track[];
+      } catch {}
+
+      try {
+        const { searchMultiProvider } = await import("./providers/multi-search");
+        const multi = await searchMultiProvider(q, { limit: perQueryLimit });
+        if (multi.tracks.length > 0) return multi.tracks as Track[];
+      } catch {}
+
+      try {
+        const { searchYouTube } = await import("./music.server");
         return await searchYouTube(q, perQueryLimit, musicOnly, undefined, bypassCache);
       } catch {
         return [];

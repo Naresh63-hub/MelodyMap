@@ -187,6 +187,122 @@ function extractContinuation(node: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * Cleans YouTube video titles and channel names to yield clean song titles, real artist names, and album names.
+ * Strips record labels (e.g. SonyMusicSouthVEVO, Aditya Music, T-Series) and video junk (e.g. Video Song, 4K, Official Video).
+ */
+export function cleanYouTubeTrackMetadata(
+  rawTitle: string,
+  rawArtist: string,
+): { title: string; artist: string; album?: string } {
+  let title = (rawTitle || "").trim();
+  let artist = (rawArtist || "").trim();
+  let album: string | undefined = undefined;
+
+  const LABEL_PATTERNS = [
+    /vevo$/i,
+    /-\s*topic$/i,
+    /\b(music|records|recordings|series|company|official|audio|entertainment|films|studios|production|media)\b/i,
+    /\b(t-series|saregama|lahari|yrf|tips|aditya|sony|zee|speed\s*records|eros|geetha\s*arts|think\s*music|mango|madhura|times\s*music|wapking|djmaza|pagalworld|mr-jatt)\b/i,
+    /\b(channel|official|world|videos|songs|audio|bollywood|hollywood|tollywood|kollywood)\b/i,
+  ];
+  const isLabelArtist = LABEL_PATTERNS.some((p) => p.test(artist));
+
+  // Extract '(From "Album/Movie")' if present
+  const fromMatch = title.match(/\((?:From\s+["']?([^"')]+)["']?)\)/i);
+  if (fromMatch && fromMatch[1]) {
+    album = fromMatch[1].trim();
+  }
+
+  // Also extract movie name from patterns like "Song Name | Movie Name" or "Movie Name - Song Name"
+  const movieMatch = title.match(/(?:\|\s*|\s+-\s*)([^|]+?)(?:\s*(?:Song|Video|Audio|Track|Official)?\s*$)/i);
+  if (movieMatch && movieMatch[1] && !album) {
+    const potentialMovie = movieMatch[1].trim();
+    // Heuristic: if it doesn't look like typical video noise, treat as album/movie
+    if (!/^(official|video|song|audio|lyric|hd|4k|remix|full)$/i.test(potentialMovie)) {
+      album = potentialMovie;
+    }
+  }
+
+  // Strip typical video noise tags
+  let cleaned = title
+    .replace(/\s*\[[^\]]*\b(official|video|song|lyric|audio|4k|hd|remastered)\b[^\]]*\]/gi, "")
+    .replace(/\s*\([^)]*\b(official|video|song|lyric|audio|4k|hd|remastered)\b[^)]*\)/gi, "")
+    .replace(/\s*\|\s*(official\s*(music\s*)?video|video\s*song|lyric(al)?\s*video|full\s*(video\s*)?song|audio\s*song|audio|4k|hd|remastered).*/gi, "")
+    .replace(/\s*\|\s*$/g, "")
+    .trim();
+
+  // Split by pipe '|'
+  const pipeParts = cleaned.split(/\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
+
+  if (pipeParts.length > 1) {
+    const dashInFirst = pipeParts[0].split(/\s+-\s+/);
+    if (dashInFirst.length === 2) {
+      if (!album) album = dashInFirst[0].trim();
+      title = dashInFirst[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+    } else {
+      title = pipeParts[0].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+      if (!album && pipeParts[1]) {
+        album = pipeParts[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+      }
+    }
+
+    if (isLabelArtist) {
+      const cand = pipeParts[pipeParts.length - 1];
+      if (cand && cand !== title && cand !== album) {
+        artist = cand;
+      } else if (pipeParts[2] && pipeParts[2] !== title && pipeParts[2] !== album) {
+        artist = pipeParts[2];
+      }
+    }
+  } else {
+    // Single or no pipe, check dash 'Artist - Title'
+    const dashParts = cleaned.split(/\s+-\s+/);
+    if (dashParts.length === 2) {
+      artist = dashParts[0].trim();
+      title = dashParts[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+    } else {
+      title = cleaned.replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+    }
+  }
+
+  // Remove (From ...) from title once captured in album
+  title = title.replace(/\s*\((?:From\s+["']?[^"')]+)["']?\)/gi, "").trim();
+
+  // Clean trailing punctuation
+  title = title.replace(/^[-–—:\s|]+|[-–—:\s|]+$/g, "").trim();
+  artist = artist.replace(/^[-–—:\s|]+|[-–—:\s|]+$/g, "").trim();
+  if (album) {
+    album = album.replace(/^[-–—:\s|]+|[-–—:\s|]+$/g, "").trim();
+  }
+
+  // If artist still ends in VEVO or - Topic, strip it and split CamelCase if needed
+  if (/VEVO$/i.test(artist)) {
+    artist = artist.replace(/VEVO$/i, "").replace(/([a-z])([A-Z])/g, "$1 $2").trim();
+  }
+  artist = artist.replace(/\s*-\s*Topic$/i, "").trim();
+
+  // Additional channel name cleanup - common patterns
+  artist = artist
+    .replace(/\b(Channel|Official|Videos|Songs|Music|World|Audio|Records|Studios|Entertainment|Media|Films|Production)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // If artist is still empty or just a label, try to extract from title's first part
+  if (!artist || isLabelArtist) {
+    const firstPart = title.split(/\s+[-–|]\s+/)[0];
+    if (firstPart && firstPart !== title && firstPart.length < 50) {
+      artist = firstPart.trim();
+    }
+  }
+
+  return {
+    title: title || rawTitle,
+    artist: artist || rawArtist,
+    ...(album ? { album } : {}),
+  };
+}
+
 /** Shared conversion loop from raw video/channel/playlist renderers to validated Track items */
 function renderersToTracks(
   renderers: AnyRecord[],
@@ -249,15 +365,16 @@ function renderersToTracks(
     const id = r["videoId"] as string | undefined;
     if (!id || seen.has(id)) continue;
 
-    const title = text(r["title"]).trim();
-    const artist =
+    const rawTitle = text(r["title"]).trim();
+    const rawArtist =
       text(r["ownerText"]).trim() ||
       text(r["shortBylineText"]).trim() ||
       text(r["longBylineText"]).trim() ||
       "";
     const duration = text(r["lengthText"]).trim();
-    if (!title) continue;
+    if (!rawTitle) continue;
 
+    const { title, artist, album } = cleanYouTubeTrackMetadata(rawTitle, rawArtist);
     const candidateTrack = { title, artist, duration };
 
     if (
@@ -285,6 +402,7 @@ function renderersToTracks(
       thumbnail:
         (thumbs[thumbs.length - 1]?.["url"] as string | undefined) ??
         `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      ...(album ? { album } : {}),
     });
   }
 }

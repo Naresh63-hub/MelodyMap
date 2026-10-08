@@ -228,12 +228,20 @@ export function SearchResults(props: Props) {
             <div
               key={`${track.id}-${i}`}
               className={cn(
-                "group flex items-center gap-3 rounded-lg p-2 transition-colors",
+                "relative group flex items-center gap-3 rounded-lg p-2 transition-colors",
                 active
                   ? "bg-popover"
                   : "hover:bg-chip-subtle"
               )}
             >
+              {/* Left gradient bar for active song */}
+              {active && (
+                <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
+              )}
+              {/* Right gradient bar for active song */}
+              {active && (
+                <div className="absolute right-0 top-0 bottom-0 w-0.5 rounded-r-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
+              )}
               {/* Thumbnail + Play */}
               <button
                 type="button"

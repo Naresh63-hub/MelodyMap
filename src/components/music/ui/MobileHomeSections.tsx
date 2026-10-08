@@ -61,6 +61,14 @@ function HorizontalScrollRow({
             key={track.id}
             className="group relative w-[132px] shrink-0 snap-start text-left transition-transform p-1.5 rounded-xl hover:bg-chip"
           >
+            {/* Left gradient bar for active card */}
+            {active && (
+              <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
+            )}
+            {/* Right gradient bar for active card */}
+            {active && (
+              <div className="absolute right-0 top-0 bottom-0 w-0.5 rounded-r-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
+            )}
             <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair">
               <button
                 type="button"
@@ -160,12 +168,20 @@ function VerticalSongList({
           <div
             key={track.id}
             className={cn(
-              "flex items-center gap-3 rounded-lg p-2 transition-colors",
+              "relative flex items-center gap-3 rounded-lg p-2 transition-colors",
               active
                 ? "bg-chip-strong"
                 : "hover:bg-chip-subtle",
             )}
           >
+            {/* Left gradient bar for active song */}
+            {active && (
+              <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
+            )}
+            {/* Right gradient bar for active song */}
+            {active && (
+              <div className="absolute right-0 top-0 bottom-0 w-0.5 rounded-r-lg bg-gradient-to-b from-[#38bdf8] to-[#e94560]" />
+            )}
             {/* Thumbnail + Play Action */}
             <button
               type="button"
