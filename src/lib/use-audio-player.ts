@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
-import { getBlob } from "@/lib/offline";
 import {
   EQUALIZER_FREQUENCIES,
   EQUALIZER_PRESETS,
@@ -936,23 +935,13 @@ export function useAudioPlayer(options: {
     };
   }, []);
 
-  /** Use downloaded blob when available */
+  /** Use downloaded blob when available - DISABLED to ensure only original songs play */
   const playOffline = useCallback(
-    async (id: string, startAt = 0): Promise<boolean> => {
-      try {
-        const blob = await getBlob(id);
-        if (!blob) return false;
-        if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
-        const url = URL.createObjectURL(blob);
-        objectUrlRef.current = url;
-        setStream(url, startAt);
-        return true;
-      } catch (err) {
-        console.warn("[MelodyMap] Offline playback failed:", err);
-        return false;
-      }
+    async (_id: string, _startAt = 0): Promise<boolean> => {
+      // Disabled - always return false to force streaming from Saavn
+      return false;
     },
-    [setStream],
+    [],
   );
 
   /**
@@ -1007,7 +996,7 @@ export function useAudioPlayer(options: {
 
       setStream(streamUrl(id), startAt);
     },
-    [setStream, playOffline, streamUrl],
+    [setStream, streamUrl],
   );
 
   /** Cue a track at specific second without autoplay */
@@ -1040,7 +1029,7 @@ export function useAudioPlayer(options: {
 
       setStream(streamUrl(id), startSeconds);
     },
-    [setStream, playOffline, streamUrl],
+    [setStream, streamUrl],
   );
 
   const play = useCallback(() => {
