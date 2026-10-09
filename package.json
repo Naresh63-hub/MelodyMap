@@ -23,7 +23,7 @@
     "android:open": "cap open android"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^3.0.20",
+    "@ai-sdk/openai-compatible": "^3.0.63",
     "@capacitor/android": "^8.5.2",
     "@capacitor/app": "^8.1.2",
     "@capacitor/cli": "^8.5.2",
