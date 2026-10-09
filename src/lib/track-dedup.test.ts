@@ -64,6 +64,7 @@ describe("dedupeTracks", () => {
     expect(deduped[0]?.id).toBe("1");
     expect(deduped[1]?.id).toBe("3");
   });
+});
 
 describe("cleanYouTubeTrackMetadata", () => {
   it("removes YouTube label channel names and parses real song title, artist and movie", () => {
