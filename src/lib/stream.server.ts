@@ -7,7 +7,7 @@
 import { createLruCache } from "./lru-cache";
 import { searchAudius } from "./providers/audius";
 import { searchJamendo } from "./providers/jamendo";
-import { resolveSaavnByMeta } from "./providers/saavn";
+import { resolveSaavnByMeta, resolveSaavnById } from "./providers/saavn";
 
 export type StreamQuality = "saver" | "standard" | "high";
 
@@ -192,6 +192,20 @@ export async function resolveWithInnerTubePlayer(
   videoId: string,
   _quality: StreamQuality = "high",
 ): Promise<StreamMeta | null> {
+  // If the ID is an explicit JioSaavn track ID, resolve directly from Saavn
+  if (videoId.startsWith("saavn:")) {
+    const saavnDirect = await resolveSaavnById(videoId, _quality);
+    if (saavnDirect?.url) {
+      return {
+        url: saavnDirect.url,
+        mimeType: saavnDirect.mimeType || "audio/mp4",
+        contentLength: null,
+        audioBitrate: _quality === "saver" ? 96000 : _quality === "standard" ? 160000 : 320000,
+        source: "saavn",
+      };
+    }
+  }
+
   // Test hook / legacy InnerTube fallback compatibility
   try {
     const res = await fetch("https://www.youtube.com/youtubei/v1/player", {
@@ -320,7 +334,7 @@ export async function resolveWithInnerTubePlayer(
   return null;
 }
 
-const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
+const VIDEO_ID_REGEX = /^(?:saavn:)?[a-zA-Z0-9_-]{1,32}$/;
 
 /** Real track durations captured from videoDetails. */
 const lastSeenDurations = new Map<string, number>();

@@ -11,6 +11,7 @@
  */
 
 import type { Track, SearchFilter } from "./music.server";
+import { isOriginalSong } from "./track-filters";
 
 export type HybridTrack = Track;
 
@@ -21,7 +22,7 @@ export type HybridSearchResult = {
 
 /**
  * Search with Saavn primary, multi-provider fallback.
- * Always returns something playable.
+ * Strictly guarantees only original songs (no remixes, covers, or mixes).
  */
 export async function searchHybrid(
   query: string,
@@ -37,8 +38,9 @@ export async function searchHybrid(
   try {
     const { searchSaavn } = await import("./providers/saavn");
     const saavnRes = await searchSaavn(query, { limit });
-    if (saavnRes.length > 0) {
-      return { tracks: saavnRes as HybridTrack[] };
+    const originalTracks = saavnRes.filter(isOriginalSong);
+    if (originalTracks.length > 0) {
+      return { tracks: originalTracks as HybridTrack[] };
     }
   } catch (err) {
     console.warn("[MelodyMap] Saavn primary search notice:", err);
@@ -49,8 +51,9 @@ export async function searchHybrid(
   try {
     const { searchMultiProvider } = await import("./providers/multi-search");
     const multiRes = await searchMultiProvider(query, { limit });
-    if (multiRes.tracks.length > 0) {
-      return { tracks: multiRes.tracks as HybridTrack[] };
+    const originalFallback = multiRes.tracks.filter(isOriginalSong);
+    if (originalFallback.length > 0) {
+      return { tracks: originalFallback as HybridTrack[] };
     }
   } catch (err) {
     console.warn("[MelodyMap] Multi-provider fallback search notice:", err);

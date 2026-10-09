@@ -83,6 +83,7 @@ import {
   sequenceBrief,
   isMusicTrack,
   isPodcastTrack,
+  isOriginalSong,
   isOldEraTrack,
   isLanguageConsistent,
   parseDurationSeconds,
@@ -1586,7 +1587,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (res.error) setMessage(res.error);
         if (res.tracks) {
           const raw = res.tracks as Track[];
-          let filtered = t === "songs" ? raw : raw.filter(isPodcastTrack);
+          let filtered = t === "songs" ? raw.filter(isOriginalSong) : raw.filter(isPodcastTrack);
           if (t === "songs" && settings.languages && settings.languages.length > 0) {
             const queryLower = q.toLowerCase();
             const queryHasExplicitLang = LANGUAGES.some((l) => queryLower.includes(l.toLowerCase()));
@@ -1662,7 +1663,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       if (res.tracks && res.tracks.length > 0) {
         searchPageRef.current = nextPage;
         const raw = res.tracks as Track[];
-        let incoming = raw;
+        let incoming = tab === "podcasts" ? raw.filter(isPodcastTrack) : raw.filter(isOriginalSong);
         if (settings.languages && settings.languages.length > 0) {
           const queryLower = query.toLowerCase();
           const queryHasExplicitLang = LANGUAGES.some((l) => queryLower.includes(l.toLowerCase()));
@@ -3346,7 +3347,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             onAddToPlaylist={(t) => setCreatePlaylistTrack(t)}
             canNext={canNext}
             canPrevious={canPrev}
-            streamSource={player.streamSource}
           />
         )}
 

@@ -64,7 +64,6 @@ type Props = {
   onAddToPlaylist?: (track: Track) => void;
   canNext: boolean;
   canPrevious: boolean;
-  streamSource?: "saavn" | "audius" | "jamendo" | null;
   getAnalyser?: () => AnalyserNode | null;
 };
 
@@ -105,7 +104,6 @@ export function FullScreenPlayer({
   onAddToPlaylist,
   canNext,
   canPrevious,
-  streamSource,
   getAnalyser,
 }: Props) {
   const { isActive: isSleepTimerActive, formattedRemaining: sleepTimerCountdown } = useSleepTimer();

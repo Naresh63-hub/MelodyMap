@@ -19,6 +19,11 @@ describe("VIDEO_ID_REGEX", () => {
     expect(VIDEO_ID_REGEX.test("a-b_c-d_e1")).toBe(true);
   });
 
+  it("accepts JioSaavn song ids with saavn: prefix", () => {
+    expect(VIDEO_ID_REGEX.test("saavn:rjkrTnma")).toBe(true);
+    expect(VIDEO_ID_REGEX.test("saavn:3404128")).toBe(true);
+  });
+
   it("rejects empty, oversized, or malicious ids", () => {
     expect(VIDEO_ID_REGEX.test("")).toBe(false);
     expect(VIDEO_ID_REGEX.test("../../etc/passwd")).toBe(false);

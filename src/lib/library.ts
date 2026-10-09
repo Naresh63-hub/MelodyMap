@@ -201,11 +201,13 @@ import {
   COMPILATION_KEYWORDS,
   JUNK_MEDIA_KEYWORDS,
   PODCAST_POSITIVE_KEYWORDS,
+  isOriginalSong,
 } from "./track-filters";
 
 export {
   isMusicTrack,
   isPodcastTrack,
+  isOriginalSong,
   parseDurationSeconds,
   parseDurationSecs,
   NON_MUSIC_KEYWORDS,

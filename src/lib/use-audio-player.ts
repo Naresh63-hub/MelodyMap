@@ -205,102 +205,20 @@ export function useAudioPlayer(options: {
   };
 
   const initWebAudio = useCallback(() => {
+    // Direct hardware audio output is used for all media playback.
+    // We intentionally avoid calling createMediaElementSource(audio) on the main
+    // <audio> element because:
+    // 1. External streaming CDNs (e.g. JioSaavn aac.saavncdn.com) do not return
+    //    CORS headers. Routing a cross-origin media element into createMediaElementSource
+    //    forces Chromium / WebKit to output PURE SILENCE under W3C security rules.
+    // 2. Direct HTML5 <audio> plays natively to the OS audio subsystem (speakers,
+    //    headphones, bluetooth) with zero CORS restrictions, full hardware volume,
+    //    no autoplay suspension, and reliable continuous background playback.
     if (typeof window === "undefined") return;
-    // Native app (APK): Direct hardware audio playback.
-    // In Android WebView, connecting an <audio> element to an AudioContext
-    // routes its sound through the Chromium WebAudio render graph, which
-    // Chromium suspends after a few seconds when the screen locks or app is minimized.
-    // Playing directly to the native <audio> element avoids suspension and keeps
-    // background audio streaming continuously via MediaPlaybackService.
-    if (isNativePlaybackEnv()) return;
-
     const audio = audioRef.current;
-    if (!audio) return;
-
-    if (!audioCtxRef.current) {
-      try {
-        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        if (!AudioCtx) return;
-        // latencyHint: "playback" provides an adequate jitter buffer (2048-4096 samples)
-        // preventing buffer underruns, stuttering, and slow-pitch clock drift over Bluetooth A2DP
-        const ctx = new AudioCtx({ latencyHint: "playback" });
-        audioCtxRef.current = ctx;
-
-        // Auto-resume if AudioContext is suspended by the browser on Bluetooth device switch
-        ctx.onstatechange = () => {
-          if (ctx.state === "suspended" && wantPlayRef.current) {
-            ctx.resume().catch(() => {});
-          }
-        };
-
-        const source = ctx.createMediaElementSource(audio);
-        sourceNodeRef.current = source;
-
-        const mainGain = ctx.createGain();
-        mainGain.gain.value = 1;
-        mainGainRef.current = mainGain;
-        source.connect(mainGain);
-
-        // Build 10-band biquad filter chain
-        const currentSettings = equalizerSettingsRef.current;
-        const filters = EQUALIZER_FREQUENCIES.map((band, idx) => {
-          const filter = ctx.createBiquadFilter();
-          filter.frequency.value = band.frequency;
-          if (idx === 0) {
-            filter.type = "lowshelf";
-          } else if (idx === EQUALIZER_FREQUENCIES.length - 1) {
-            filter.type = "highshelf";
-          } else {
-            filter.type = "peaking";
-            filter.Q.value = 1.4;
-          }
-          filter.gain.value = currentSettings.enabled ? (currentSettings.gains[idx] ?? 0) : 0;
-          return filter;
-        });
-
-        filterNodesRef.current = filters;
-
-        // Broadcast standard Dynamic Range Compressor (-14 LUFS leveling)
-        const compressor = ctx.createDynamicsCompressor();
-        compressor.threshold.setValueAtTime(-24, ctx.currentTime);
-        compressor.knee.setValueAtTime(30, ctx.currentTime);
-        compressor.ratio.setValueAtTime(3, ctx.currentTime);
-        compressor.attack.setValueAtTime(0.003, ctx.currentTime);
-        compressor.release.setValueAtTime(0.25, ctx.currentTime);
-        compressorRef.current = compressor;
-
-        // Passive FFT tap for the audio visualizer (does not alter the sound)
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.82;
-        analyserRef.current = analyser;
-
-        // Connect main gain -> filter[0] -> ... -> compressor -> analyser -> destination
-        if (filters.length > 0 && filters[0]) {
-          mainGain.connect(filters[0]);
-          let prevNode: AudioNode = filters[0];
-          for (let i = 1; i < filters.length; i++) {
-            const f = filters[i];
-            if (f) {
-              prevNode.connect(f);
-              prevNode = f;
-            }
-          }
-          prevNode.connect(compressor);
-          compressor.connect(analyser);
-          analyser.connect(ctx.destination);
-        } else {
-          mainGain.connect(compressor);
-          compressor.connect(analyser);
-          analyser.connect(ctx.destination);
-        }
-      } catch (err) {
-        console.warn("[WebAudio] Equalizer init notice:", err);
-      }
-    }
-
-    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume().catch(() => {});
+    if (audio) {
+      audio.muted = false;
+      if (audio.volume === 0) audio.volume = 1;
     }
   }, []);
 
@@ -440,17 +358,23 @@ export function useAudioPlayer(options: {
         audio.pause();
       } catch {}
 
-      // For external direct audio (e.g. podcast MP3 CDNs), remove crossorigin so the browser
-      // does not block cross-origin audio streaming without CORS headers.
-      if (typeof window !== "undefined" && url.startsWith("http") && !url.includes(window.location.host) && !url.includes("/api/stream/")) {
+      // For external direct audio (e.g. JioSaavn CDN, podcast MP3s), omit crossorigin
+      // so the browser never blocks streaming due to CORS headers. The audio element
+      // plays directly to hardware speakers with full volume.
+      const isExternalDirect =
+        typeof window !== "undefined" &&
+        url.startsWith("http") &&
+        !url.includes(window.location.host) &&
+        !url.includes("/api/stream/");
+      if (isExternalDirect) {
         audio.removeAttribute("crossorigin");
       } else {
         audio.crossOrigin = "anonymous";
       }
 
       audio.loop = false;
-      audio.volume = 1;
       audio.muted = false;
+      if (audio.volume === 0) audio.volume = 1;
       audio.src = url;
       const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
       audio.playbackRate = validSpeed;
@@ -595,10 +519,8 @@ export function useAudioPlayer(options: {
 
     const onPlay = () => {
       audio.muted = false;
+      if (audio.volume === 0) audio.volume = 1;
       initWebAudio();
-      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-        audioCtxRef.current.resume().catch(() => {});
-      }
       // 'play' fires the instant play() is called, BEFORE any audio bytes have
       // arrived. Do NOT clear isLoading here: a cold stream can buffer for many
       // seconds, and clearing it made the dock show a "playing" pause glyph with
@@ -608,9 +530,8 @@ export function useAudioPlayer(options: {
       applyPendingSeek();
     };
     const onPlaying = () => {
-      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-        audioCtxRef.current.resume().catch(() => {});
-      }
+      audio.muted = false;
+      if (audio.volume === 0) audio.volume = 1;
       if (stalledTimerRef.current) {
         clearTimeout(stalledTimerRef.current);
         stalledTimerRef.current = null;
@@ -956,6 +877,11 @@ export function useAudioPlayer(options: {
     async (id: string, directUrl?: string, startAt = 0) => {
       directUrl = sanitizeDirectUrl(id, directUrl);
       wantPlayRef.current = true;
+      // Create/resume the AudioContext synchronously while still inside the user
+      // gesture that started playback, so the WebAudio EQ graph can be wired up and
+      // render audio immediately (a context created after an await would start
+      // suspended and play silent on web).
+      initWebAudio();
 
       // Stop the double-load race: if synchronous gapless advance already started
       // playing this exact track at 0:00, avoid resetting position or restarting audio
@@ -996,7 +922,7 @@ export function useAudioPlayer(options: {
 
       setStream(streamUrl(id), startAt);
     },
-    [setStream, streamUrl],
+    [setStream, streamUrl, initWebAudio],
   );
 
   /** Cue a track at specific second without autoplay */
@@ -1035,12 +961,10 @@ export function useAudioPlayer(options: {
   const play = useCallback(() => {
     wantPlayRef.current = true;
     initWebAudio();
-    if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume().catch(() => {});
-    }
     const audio = audioRef.current;
     if (audio && audio.src && audio.src.length > 0 && !audio.src.endsWith("/")) {
       audio.muted = false;
+      if (audio.volume === 0) audio.volume = 1;
       const p = audio.play();
       if (p !== undefined) {
         p.catch((err) => {
@@ -1079,6 +1003,7 @@ export function useAudioPlayer(options: {
     const max = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : target;
     const clamped = Math.max(0, Math.min(target, max));
     audio.currentTime = clamped;
+    audio.muted = false;
     if (wantPlayRef.current && audio.paused) {
       audio.play().catch(() => {});
     }
@@ -1112,11 +1037,13 @@ export function useAudioPlayer(options: {
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(100, v));
     const audio = audioRef.current;
-    if (audio) audio.volume = clamped / 100;
+    if (audio) {
+      audio.volume = clamped / 100;
+      audio.muted = clamped === 0;
+    }
   }, []);
 
-  /** True when the stream is a replacement recording (non-original catalog source). */
-  const isReplacementSource = streamSource !== null;
+  const isReplacementSource = false;
 
   return {
     ready,

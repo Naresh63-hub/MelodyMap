@@ -6,6 +6,7 @@
 
 import CryptoJS from "crypto-js";
 import type { UnifiedTrack, ProviderSearchOptions } from "./types";
+import { isOriginalSong } from "../track-filters";
 
 const DES_KEY = "38346591";
 
@@ -123,7 +124,8 @@ export async function searchSaavn(
   if (!clean) return [];
 
   const limit = Math.min(options.limit ?? 20, 30);
-  const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=${encodeURIComponent(clean)}&p=1&n=${limit}`;
+  const fetchLimit = Math.min(Math.max(limit * 2, 30), 50);
+  const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=${encodeURIComponent(clean)}&p=1&n=${fetchLimit}`;
 
   try {
     const res = await fetch(url, {
@@ -142,14 +144,70 @@ export async function searchSaavn(
     const tracks: UnifiedTrack[] = [];
     for (const raw of rawResults) {
       const unified = mapSaavnSongToUnified(raw);
-      if (unified && unified.playbackSource) {
+      if (unified && unified.playbackSource && isOriginalSong(unified)) {
         tracks.push(unified);
       }
     }
-    return tracks;
+    return tracks.slice(0, limit);
   } catch (err) {
     console.warn(`[Saavn] Search failed for query "${query}":`, err);
     return [];
+  }
+}
+
+/**
+ * Resolves a direct official 320kbps/160kbps/96kbps JioSaavn stream URL for a Saavn song ID.
+ */
+export async function resolveSaavnById(
+  songId: string,
+  quality: "saver" | "standard" | "high" = "high",
+): Promise<{
+  url: string;
+  mimeType: string;
+  source: "saavn";
+  title: string;
+  artist: string;
+  duration: number;
+} | null> {
+  const cleanId = songId.replace(/^saavn:/, "").trim();
+  if (!cleanId) return null;
+
+  const url = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=${encodeURIComponent(cleanId)}`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as any;
+    const raw = data?.[cleanId];
+    if (!raw) return null;
+
+    const encryptedUrl = raw.encrypted_media_url || raw.more_info?.encrypted_media_url;
+    if (!encryptedUrl) return null;
+
+    const mediaUrl = decryptSaavnMediaUrl(encryptedUrl, quality);
+    if (!mediaUrl) return null;
+
+    const title = cleanHtmlEntities(raw.song || raw.title);
+    const artist = cleanHtmlEntities(raw.primary_artists || raw.singers || raw.music || "");
+    const duration = Number(raw.duration) || 0;
+
+    return {
+      url: mediaUrl,
+      mimeType: "audio/mp4",
+      source: "saavn",
+      title,
+      artist,
+      duration,
+    };
+  } catch (err) {
+    console.warn(`[Saavn] Failed to resolve song ID "${cleanId}":`, err);
+    return null;
   }
 }
 
@@ -179,14 +237,15 @@ export async function resolveSaavnByMeta(
     .trim();
 
   const searchQuery = artist ? `${cleanTitle} ${artist}`.trim() : cleanTitle;
-  const candidates = await searchSaavn(searchQuery, { limit: 5 });
-  if (candidates.length === 0) return null;
+  const candidates = await searchSaavn(searchQuery, { limit: 10 });
+  const validCandidates = candidates.filter(isOriginalSong);
+  if (validCandidates.length === 0) return null;
 
   // Find best match based on duration proximity and title similarity
-  let best = candidates[0];
+  let best = validCandidates[0];
   if (targetDurationSeconds && targetDurationSeconds > 0) {
     let bestDiff = Infinity;
-    for (const cand of candidates) {
+    for (const cand of validCandidates) {
       const diff = Math.abs(cand.durationSeconds - targetDurationSeconds);
       if (diff < bestDiff) {
         bestDiff = diff;

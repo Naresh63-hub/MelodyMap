@@ -4,7 +4,7 @@
  * SSR server entry — previously this logic was duplicated in all three places.
  */
 
-export const VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{1,32}$/;
+export const VIDEO_ID_REGEX = /^(?:saavn:)?[a-zA-Z0-9_-]{1,32}$/;
 
 export type StreamQualityParam = "saver" | "standard" | "high";
 

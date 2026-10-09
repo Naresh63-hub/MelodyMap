@@ -7,6 +7,7 @@ import { norm, areSameTrack } from "./track-dedup";
 import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext } from "./context-engine";
 import { isLanguageConsistent, isOldEraTrack } from "./library";
+import { isOriginalSong } from "./track-filters";
 
 /** Normalizes user-provided strings for AI context inclusion while preserving real song/artist names */
 export function sanitizePromptInput(str: string | undefined): string {
@@ -55,7 +56,8 @@ export const searchTracks = createServerFn({ method: "POST" })
           data.offset,
           data.page,
         );
-        return { tracks: res.tracks, continuation: res.continuation, error: null };
+        const originalTracks = res.tracks.filter(isOriginalSong);
+        return { tracks: originalTracks, continuation: res.continuation, error: null };
       } catch (error) {
         console.error("Search failed:", error);
         return { tracks: [], continuation: undefined, error: "Could not reach the catalog. Try again." };
@@ -353,6 +355,7 @@ export async function runQueryBatch(
     if (r.status === "fulfilled" && Array.isArray(r.value)) {
       for (const t of r.value) {
         if (!t || !t.id || seenIds.has(t.id)) continue;
+        if (!isOriginalSong(t)) continue;
         const key = getTrackDedupeKey(t.title, t.artist);
         if (key && seenKeys.has(key)) continue;
         if (key) seenKeys.add(key);

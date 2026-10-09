@@ -146,6 +146,37 @@ export function parseDurationSeconds(dur: string | number | undefined | null): n
 }
 
 /**
+ * Regex for non-original music keywords: remixes, covers, mixes, mashups, lofi, etc.
+ * Uses word boundaries so legitimate titles like "Matrix", "Six", "Reminisce" are untouched.
+ */
+export const NON_ORIGINAL_TRACK_REGEX =
+  /\b(remix|remixes|remixed|cover|covers|mix|mixes|mixed|mashup|mashups|instrumental|instrumentals|karaoke|acoustic|unplugged|tribute|recreation|lofi|lo-fi|lo fi|flip|bootleg|rework|reimagined|medley|slowed|reverb|bass boosted|sped up|speed up|club mix|dj mix|dance mix|chill mix|party mix|retro mix|extended mix|radio edit)\b/i;
+
+export const NON_ORIGINAL_ARTIST_REGEX =
+  /\b(cover|covers|instrumental|instrumentals|karaoke|tribute|lofi|lo-fi|slowed|reverb)\b/i;
+
+/**
+ * Strict validator to guarantee a track is an original song.
+ * Rejects remixes, covers, mixes, mashups, instrumentals, acoustic cuts, lofi, etc.
+ */
+export function isOriginalSong(track: {
+  title?: string | undefined;
+  artist?: string | undefined;
+  album?: string | undefined;
+} | null | undefined): boolean {
+  if (!track || !track.title) return false;
+  const title = track.title;
+  const artist = track.artist || "";
+  const album = track.album || "";
+
+  if (NON_ORIGINAL_TRACK_REGEX.test(title)) return false;
+  if (album && NON_ORIGINAL_TRACK_REGEX.test(album)) return false;
+  if (artist && (NON_ORIGINAL_TRACK_REGEX.test(artist) || NON_ORIGINAL_ARTIST_REGEX.test(artist))) return false;
+
+  return true;
+}
+
+/**
  * Strict validator to guarantee a track is a single, pure musical song.
  * Hard rule: only tracks <= 600s (10 min) are playable recommendations.
  * Unknown/invalid durations are rejected (parseDurationSeconds returns 0).
@@ -153,13 +184,16 @@ export function parseDurationSeconds(dur: string | number | undefined | null): n
 export const MAX_TRACK_DURATION_SECONDS = 600;
 
 export function isMusicTrack(
-  track: { title?: string | undefined; artist?: string | undefined; duration?: string | number | undefined } | null | undefined,
+  track: { title?: string | undefined; artist?: string | undefined; album?: string | undefined; duration?: string | number | undefined } | null | undefined,
   allowLong?: boolean | unknown,
   allowUnknownDuration?: boolean | unknown,
 ): boolean {
   if (!track || !track.title) return false;
   const isAllowLong = typeof allowLong === "boolean" ? allowLong : false;
   const isAllowUnknown = typeof allowUnknownDuration === "boolean" ? allowUnknownDuration : false;
+
+  if (!isOriginalSong(track)) return false;
+
   const title = track.title.toLowerCase();
   const artist = (track.artist || "").toLowerCase();
 

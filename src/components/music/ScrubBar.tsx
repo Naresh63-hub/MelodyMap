@@ -159,13 +159,10 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
         <div className="relative h-1 w-full overflow-visible rounded-full bg-chip-strong transition-all group-hover:h-1.5">
           {/* Progress bar fill */}
           <div
-            className={cn(
-              "absolute inset-y-0 left-0 rounded-full transition-colors",
-              isDragging ? "bg-primary" : "bg-white group-hover:bg-primary"
-            )}
+            className="absolute inset-y-0 left-0 rounded-full"
             style={{ 
               width: `${pct}%`,
-              background: 'linear-gradient(90deg, #38bdf8 0%, #e94560 100%)'
+              background: "linear-gradient(90deg, #38bdf8 0%, #e94560 100%)",
             }}
           />
           {/* Thumb handle */}
