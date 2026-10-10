@@ -672,7 +672,7 @@ export function useLibrary(userId?: string | null) {
     (id: string, track: Track) =>
       savePlaylists((prev) =>
         prev.map((p) =>
-          p.id === id && !trackExistsIn(p.tracks, track as TrackLike)
+          p.id === id && !p.tracks.some((t) => t.id === track.id)
             ? { ...p, tracks: [...p.tracks, track] }
             : p,
         ),

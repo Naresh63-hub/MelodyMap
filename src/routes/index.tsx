@@ -935,17 +935,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       // 1. Reset progress and seek position for clean single-track start
       player.seek(0);
       progressTrackerRef.current.reset(track.id);
+      currentRef.current = track;
 
       // 2. Set up queue of independent tracks
       if (surroundingQueue && surroundingQueue.length > 0) {
-        const dq = dedupeTracks(surroundingQueue);
-        const targetIdx = dq.findIndex((t) => t.id === track.id);
+        const targetIdx = surroundingQueue.findIndex((t) => t.id === track.id);
         if (targetIdx !== -1) {
-          setQueue(dq);
+          setQueue(surroundingQueue);
           setIndex(targetIdx);
           indexRef.current = targetIdx;
         } else {
-          const newQueue = [track, ...dq.filter((t) => t.id !== track.id)];
+          const newQueue = [track, ...surroundingQueue.filter((t) => t.id !== track.id)];
           setQueue(newQueue);
           setIndex(0);
           indexRef.current = 0;

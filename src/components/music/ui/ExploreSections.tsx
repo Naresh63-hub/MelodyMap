@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
+import { trackSubtitle } from "@/lib/track-metadata";
 
 type Props = {
   trending: Track[];
@@ -111,7 +112,7 @@ function HorizontalScrollRow({
                 {track.title}
               </p>
               <p className="truncate text-[11px] text-neutral-400 font-normal leading-tight mt-0.5">
-                {track.artist}
+                {trackSubtitle(track)}
               </p>
             </button>
           </div>
@@ -185,7 +186,7 @@ function VerticalSongList({
                 {track.title}
               </p>
               <p className="truncate text-xs text-neutral-400 font-normal leading-tight mt-0.5">
-                {track.artist}
+                {trackSubtitle(track)}
               </p>
             </button>
 

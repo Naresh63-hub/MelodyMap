@@ -22,7 +22,7 @@ export type StreamMeta = {
 
 // ─── Audius match scoring ────────────────────────────────────────────
 
-const AUDIUS_MIN_SCORE = 1.2;
+const AUDIUS_MIN_SCORE = 2.0;
 
 /** Lowers case, strips bracketed tags/punctuation, returns word tokens. */
 function titleTokens(text: string | null | undefined): string[] {
@@ -52,11 +52,14 @@ export function scoreAudiusCandidate(
 
   const candTitle = new Set(titleTokens(candidate.title));
   const targetTitle = titleTokens(target.title);
+  let overlap = 0;
   if (targetTitle.length > 0 && candTitle.size > 0) {
-    let overlap = 0;
     for (const tok of targetTitle) if (candTitle.has(tok)) overlap++;
     score += (overlap / targetTitle.length) * 2;
   }
+
+  // Strict check: if there is no title word overlap at all, it's a completely different track
+  if (overlap === 0) return 0;
 
   const candArtist = titleTokens(candidate.artist).join(" ");
   const targetArtist = titleTokens(target.artist);

@@ -7,6 +7,7 @@
 import CryptoJS from "crypto-js";
 import type { UnifiedTrack, ProviderSearchOptions } from "./types";
 import { isOriginalSong } from "../track-filters";
+import { cleanAlbumName, cleanMovieName, cleanSongTitle } from "../track-metadata";
 
 const DES_KEY = "38346591";
 
@@ -72,7 +73,13 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
   const songId = raw.id;
   if (!songId) return null;
 
-  const title = cleanHtmlEntities(raw.title);
+  // JioSaavn titles arrive as `Song (From "Movie") (Telugu)` and the album field
+  // mirrors that whole string, so both are normalised here: the card gets a clean
+  // song name, and `album` becomes the movie name a listener recognises.
+  const rawTitle = cleanHtmlEntities(raw.title);
+  const title = cleanSongTitle(rawTitle) || rawTitle;
+  const rawAlbum = cleanHtmlEntities(raw.more_info?.album || raw.album);
+  const movie = cleanMovieName(rawAlbum, rawTitle);
   const artistMap = raw.more_info?.artistMap;
   const artists =
     artistMap?.primary_artists?.map((a: any) => cleanHtmlEntities(a.name)).filter(Boolean) || [];
@@ -89,7 +96,7 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
     canonicalTrackId: `saavn:${songId}`,
     title,
     artist,
-    album: cleanHtmlEntities(raw.more_info?.album || raw.album),
+    album: movie || cleanAlbumName(rawAlbum) || undefined,
     duration: formatDuration(durationSeconds),
     durationSeconds,
     thumbnail: artwork,
@@ -211,9 +218,12 @@ export async function resolveSaavnById(
   }
 }
 
+import { stringSimilarity, norm } from "../track-dedup";
+
 /**
  * Resolves a full-length 320kbps JioSaavn stream URL for an existing track
- * by matching title and artist.
+ * by matching title and artist with strict similarity scoring.
+ * Never returns an unrelated song.
  */
 export async function resolveSaavnByMeta(
   title: string,
@@ -236,25 +246,57 @@ export async function resolveSaavnByMeta(
     .replace(/\s+/g, " ")
     .trim();
 
+  if (!cleanTitle) return null;
+
   const searchQuery = artist ? `${cleanTitle} ${artist}`.trim() : cleanTitle;
   const candidates = await searchSaavn(searchQuery, { limit: 10 });
   const validCandidates = candidates.filter(isOriginalSong);
   if (validCandidates.length === 0) return null;
 
-  // Find best match based on duration proximity and title similarity
-  let best = validCandidates[0];
-  if (targetDurationSeconds && targetDurationSeconds > 0) {
-    let bestDiff = Infinity;
-    for (const cand of validCandidates) {
+  const normTargetTitle = norm(cleanTitle);
+  const targetWords = normTargetTitle.split(" ").filter((w) => w.length > 2);
+
+  let best: (typeof validCandidates)[0] | null = null;
+  let bestScore = 0;
+
+  for (const cand of validCandidates) {
+    const normCandTitle = norm(cand.title);
+    const titleSim = stringSimilarity(cleanTitle, cand.title);
+
+    // Check if key words from target title appear in candidate title (e.g. "Kesariya")
+    const wordOverlap =
+      targetWords.length > 0
+        ? targetWords.filter((w) => normCandTitle.includes(w)).length / targetWords.length
+        : 0;
+
+    // Strict safety guard: candidate title MUST match target title
+    // Either high fuzzy similarity OR strong keyword overlap
+    if (titleSim < 0.55 && wordOverlap < 0.5) {
+      continue; // Completely different song, ignore!
+    }
+
+    let score = titleSim * 0.5 + wordOverlap * 0.3;
+
+    if (artist && cand.artist) {
+      const artSim = stringSimilarity(artist, cand.artist);
+      score += artSim * 0.2;
+    }
+
+    if (targetDurationSeconds && targetDurationSeconds > 0 && cand.durationSeconds > 0) {
       const diff = Math.abs(cand.durationSeconds - targetDurationSeconds);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        best = cand;
-      }
+      if (diff <= 5) score += 0.15;
+      else if (diff <= 15) score += 0.08;
+      else if (diff > 60) score -= 0.2;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = cand;
     }
   }
 
-  if (best?.playbackSource?.url) {
+  // Only accept if bestScore meets confidence threshold and has direct playback source
+  if (best && bestScore >= 0.55 && best.playbackSource?.url) {
     return {
       url: best.playbackSource.url,
       mimeType: "audio/mp4",

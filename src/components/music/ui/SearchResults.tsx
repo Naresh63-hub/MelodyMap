@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
+import { trackSubtitle } from "@/lib/track-metadata";
 import { useSearchHistory, type RecentSearchItem } from "@/lib/search-history";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
@@ -267,7 +268,7 @@ export function SearchResults(props: Props) {
                   {track.title}
                 </p>
                 <p className="truncate text-xs text-secondary-foreground leading-tight mt-1 font-normal">
-                  {track.artist}
+                  {trackSubtitle(track)}
                 </p>
               </button>
 

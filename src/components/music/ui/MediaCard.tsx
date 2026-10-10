@@ -20,7 +20,12 @@ type Props = {
 };
 
 /**
- * Editorial music card with restrained 8px radius, subtle scale, and solid emerald play control.
+ * Official JioSaavn-styled square media card:
+ * - Square artwork with subtle rounded corners
+ * - Center circular play button on hover/active
+ * - Bottom-left heart button on artwork overlay
+ * - Bottom-right 3-dots options menu on artwork overlay
+ * - Bold title & subtle artist subtitle below artwork
  */
 export function MediaCard({
   title,
@@ -36,7 +41,7 @@ export function MediaCard({
   className,
   style,
 }: Props) {
-  const dims = size === "sm" ? "w-32" : size === "lg" ? "w-48" : "w-40";
+  const dims = size === "sm" ? "w-32" : size === "lg" ? "w-48" : "w-[140px] sm:w-[160px]";
 
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -47,7 +52,7 @@ export function MediaCard({
     if (!onMore) return;
     setIsLongPressing(true);
     longPressTimerRef.current = setTimeout(() => {
-      triggerHaptic('medium');
+      triggerHaptic("medium");
       onMore();
       setIsLongPressing(false);
     }, 800);
@@ -76,85 +81,85 @@ export function MediaCard({
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
       className={cn(
-        "group/card shrink-0 cursor-pointer p-2 rounded-xl transition-all bg-card/60 hover:bg-popover border border-hair hover:border-hair-strong card-modern-lift card-glow-border",
+        "group/card shrink-0 cursor-pointer p-1.5 sm:p-2 rounded-xl transition-all bg-card/40 hover:bg-card border border-hair hover:border-hair-strong card-modern-lift",
         isLongPressing && "scale-95 opacity-80",
         dims,
         className,
       )}
     >
-      <button
-        type="button"
-        onClick={onPlay}
-        className={cn(
-          "relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair transition-all duration-200 button-press focus-visible:ring-2 focus-visible:ring-primary",
-          active && "ring-1 ring-primary",
-        )}
-      >
-        {image && !imageError ? (
-          <img
-            src={image}
-            alt=""
-            loading="lazy"
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
+      {/* Artwork Container */}
+      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg sm:rounded-xl bg-card border border-hair">
+        <button
+          type="button"
+          onClick={onPlay}
+          className="h-full w-full block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          {image && !imageError ? (
+            <img
+              src={image}
+              alt={title}
+              loading="lazy"
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+              className={cn(
+                "h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105",
+                !imageLoaded && "opacity-0",
+                imageLoaded && "opacity-100",
+              )}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-card text-muted-foreground">
+              <Music2 className="h-8 w-8 opacity-40" />
+            </div>
+          )}
+
+          {/* JioSaavn Dark Gradient Hover/Playing Overlay */}
+          <div
             className={cn(
-              "h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-[1.02]",
-              !imageLoaded && "opacity-0",
-              imageLoaded && "opacity-100",
+              "absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30 transition-opacity duration-200",
+              playing || active ? "opacity-100" : "opacity-0 group-hover/card:opacity-100",
             )}
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-card text-muted-foreground">
-            <Music2 className="h-7 w-7 opacity-50" />
-          </div>
-        )}
 
-        {/* Subtle hover overlay */}
-        <div className="absolute inset-0 bg-black/20 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100" />
-
-        {/* Clean Circular Play Button */}
-        <span
-          className={cn(
-            "absolute bottom-2.5 right-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-black/40 transition-all duration-200",
-            playing
-              ? "scale-100 opacity-100"
-              : "scale-90 opacity-0 group-hover/card:scale-100 group-hover/card:opacity-100 hover:scale-105 active:scale-95",
-          )}
-        >
-          {playing ? (
-            <Pause className="h-4 w-4 fill-current" />
-          ) : (
-            <Play className="ml-0.5 h-4 w-4 fill-current" />
-          )}
-        </span>
-      </button>
-
-      <div className="flex items-start justify-between gap-1 px-0.5">
-        <div className="min-w-0 flex-1">
-          <p
+          {/* Center Circular Play Button */}
+          <div
             className={cn(
-              "truncate text-[13px] font-medium leading-snug transition-colors",
-              active ? "text-primary" : "text-foreground group-hover/card:text-primary",
+              "absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-200",
+              playing
+                ? "opacity-100 scale-100"
+                : "opacity-0 scale-90 group-hover/card:opacity-100 group-hover/card:scale-100",
             )}
           >
-            {title}
-          </p>
-          {subtitle && (
-            <p className="mt-0.5 truncate text-xs text-secondary-foreground group-hover/card:text-foreground">
-              {subtitle}
-            </p>
-          )}
-        </div>
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-xl transition-transform hover:scale-110 active:scale-95">
+              {playing ? (
+                <Pause className="h-5 w-5 fill-current" />
+              ) : (
+                <Play className="ml-0.5 h-5 w-5 fill-current" />
+              )}
+            </span>
+          </div>
+        </button>
 
-        <div className={cn("flex shrink-0 items-center gap-0.5 transition-opacity duration-150", liked ? "opacity-100" : "opacity-0 group-hover/card:opacity-100")}>
-          {onToggleLike && (
+        {/* Bottom-Left Heart Button (Inside Artwork Overlay) */}
+        {onToggleLike && (
+          <div
+            className={cn(
+              "absolute bottom-1.5 left-1.5 z-10 transition-opacity duration-150",
+              liked ? "opacity-100" : "opacity-0 group-hover/card:opacity-100",
+            )}
+          >
             <HeartLikeButton
               liked={Boolean(liked)}
               onToggle={() => onToggleLike()}
               size="sm"
+              className="bg-black/50 backdrop-blur-md hover:bg-black/70 shadow-sm"
             />
-          )}
-          {onMore && (
+          </div>
+        )}
+
+        {/* Bottom-Right 3-Dots Options Menu (Inside Artwork Overlay) */}
+        {onMore && (
+          <div className="absolute bottom-1.5 right-1.5 z-10 opacity-0 group-hover/card:opacity-100 transition-opacity duration-150">
             <button
               type="button"
               onClick={(e) => {
@@ -162,13 +167,34 @@ export function MediaCard({
                 onMore();
               }}
               aria-label="More options"
-              className="rounded-full p-1 text-muted-foreground hover:text-foreground transition-colors"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-black/50 backdrop-blur-md hover:bg-black/70 text-white/90 hover:text-white transition-colors shadow-sm"
             >
-              <MoreHorizontal className="h-3.5 w-3.5" />
+              <MoreHorizontal className="h-4 w-4" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      {/* Track Metadata (Below Artwork) */}
+      <button
+        type="button"
+        onClick={onPlay}
+        className="text-left w-full block focus:outline-none px-0.5"
+      >
+        <p
+          className={cn(
+            "truncate text-xs sm:text-sm font-semibold leading-tight transition-colors",
+            active ? "text-primary" : "text-foreground group-hover/card:text-primary",
+          )}
+        >
+          {title}
+        </p>
+        {subtitle && (
+          <p className="truncate text-[11px] sm:text-xs text-muted-foreground font-normal leading-tight mt-0.5">
+            {subtitle}
+          </p>
+        )}
+      </button>
     </div>
   );
 }

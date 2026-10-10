@@ -10,6 +10,7 @@
  */
 
 import { parseDurationSeconds } from "./track-filters";
+import { cleanMovieName, cleanSongTitle } from "./track-metadata";
 
 /** Minimal track shape used for identity and comparison. */
 export interface TrackLike {
@@ -276,14 +277,24 @@ export function cleanYouTubeTrackMetadata(
   };
 }
 
-/** Sanitizes any track's title and artist for UI display */
+/**
+ * Sanitises any track's title and artist for UI display.
+ *
+ * Beyond the YouTube-specific cleanup this also normalises catalog metadata:
+ * plugin titles keep the `(From "Movie")` clause and JioSaavn mirrors that whole
+ * polluted string into `album`, so the movie name was never shown and the junk
+ * leaked into every card. The derived movie name now REPLACES a polluted album
+ * (previously it was only set when the album was missing, so it was discarded).
+ */
 export function cleanTrackDisplayMetadata<T extends TrackLike>(track: T): T {
   if (!track || !track.title) return track;
-  const { title, artist, album } = cleanYouTubeTrackMetadata(track.title, track.artist);
+  const { title, artist } = cleanYouTubeTrackMetadata(track.title, track.artist);
+  const cleanTitle = cleanSongTitle(title) || title;
+  const movie = cleanMovieName((track as any).album, track.title);
   return {
     ...track,
-    title,
+    title: cleanTitle,
     artist,
-    ...((album && !(track as any).album) ? { album } : {}),
+    ...(movie ? { album: movie } : {}),
   };
 }

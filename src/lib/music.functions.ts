@@ -342,12 +342,7 @@ export async function runQueryBatch(
         if (multi.tracks.length > 0) return multi.tracks as Track[];
       } catch {}
 
-      try {
-        const { searchYouTube } = await import("./music.server");
-        return await searchYouTube(q, perQueryLimit, musicOnly, undefined, bypassCache);
-      } catch {
-        return [];
-      }
+      return [];
     }),
   );
 

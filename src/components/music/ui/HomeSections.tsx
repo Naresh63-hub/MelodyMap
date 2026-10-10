@@ -2,6 +2,7 @@ import { Music2 } from "lucide-react";
 import { MediaCard } from "./MediaCard";
 import { CardGrid } from "@/components/common/CardGrid";
 import type { Track } from "@/lib/library";
+import { trackSubtitle } from "@/lib/track-metadata";
 
 type Props = {
   recentlyPlayed?: Track[] | undefined;
@@ -92,7 +93,7 @@ export function HomeSections({
             <MediaCard
               key={track.id}
               title={track.title}
-              subtitle={track.artist}
+              subtitle={trackSubtitle(track)}
               image={track.thumbnail}
               playing={currentId === track.id && isPlaying}
               active={currentId === track.id}
