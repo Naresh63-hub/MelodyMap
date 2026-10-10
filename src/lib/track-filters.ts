@@ -158,8 +158,28 @@ export const NON_ORIGINAL_ARTIST_REGEX =
   /\b(cover|covers|instrumental|instrumentals|karaoke|tribute|lofi|lo-fi|slowed|reverb|orchestra|jhankar|dj\s|remix|acoustic)\b/i;
 
 /**
+ * Strict filters for cheap local compilations, generic repackaged CDs, and festival holiday tracks.
+ * Enforces pure Spotify-quality catalog integrity (original soundtracks & official singles only).
+ */
+export const LOCAL_COMPILATION_REGEX =
+  /\b(classics\s+of|classic\s+telugu|classic\s+hindi|classic\s+tamil|ultimate\s+blockbuster|ultimate\s+hits|blockbuster\s+hits|blockbuster\s+tollywood|tollywood\s+ugadi|holi\s+special|bhaje\s+bhaje|rose\s+day|valentine\s+hits|valentines?\s+day|kuchi\s+kuchi|top\s+90s|top\s+80s|top\s+70s|best\s+of\s+tollywood|best\s+of\s+bollywood|all\s+time\s+hits|evergreen\s+hits|non\s*stop\s*hits|jani\s+master|hits\s+collection|songs\s+jukebox|audio\s+playlist|full\s+album\s+jukebox)\b/i;
+
+/**
+ * Rejects devotional, temple, religious chants, hymns, pooja, bhajans, keerthanas, and village paatalu.
+ */
+export const DEVOTIONAL_REGEX =
+  /\b(devotional|bhajan|bhajans|keerthana|keerthanas|keerthanalu|stotram|stotrams|sloka|slokas|chalisa|aarti|pooja|puja|mantra|mantras|paatalu|suprabhatam|devatha|swamy|ayyappa|shiva|govinda|venkateswara|hanuman|ganesh|sai\s*baba|krishna|rama|namam|satsang|bhakthi|bhakti|annamayya|akkadevathala|keerthanam|dhyanam|harikatha)\b/i;
+
+/**
+ * Rejects speeches, discourses, web series, dialogues, scenes, and promos.
+ */
+export const SPOKEN_AND_PROMO_REGEX =
+  /\b(speech|speeches|pravachanam|pravachan|discourse|web\s*series|kadapa|short\s*film|promo|first\s*look|motion\s*poster|glimpse|press\s*meet|audio\s*launch|dialogue\s*promo|dialogue|interview|scene|scenes)\b/i;
+
+/**
  * Strict validator to guarantee a track is an original song.
- * Rejects remixes, covers, mixes, mashups, instrumentals, acoustic cuts, lofi, etc.
+ * Rejects remixes, covers, mixes, mashups, instrumentals, acoustic cuts, lofi,
+ * cheap local compilations, devotional hymns, and spoken-word promos.
  */
 export function isOriginalSong(track: {
   title?: string | undefined;
@@ -173,10 +193,27 @@ export function isOriginalSong(track: {
   const album = track.album || "";
   const subtitle = track.subtitle || "";
 
+  // 1. Remixes, covers, mixes, mashups, karaoke, lofi
   if (NON_ORIGINAL_TRACK_REGEX.test(title)) return false;
   if (album && NON_ORIGINAL_TRACK_REGEX.test(album)) return false;
   if (subtitle && NON_ORIGINAL_TRACK_REGEX.test(subtitle)) return false;
   if (artist && (NON_ORIGINAL_TRACK_REGEX.test(artist) || NON_ORIGINAL_ARTIST_REGEX.test(artist))) return false;
+
+  // 2. Reject cheap local compilations & holiday festival CDs
+  if (LOCAL_COMPILATION_REGEX.test(title)) return false;
+  if (album && LOCAL_COMPILATION_REGEX.test(album)) return false;
+  if (subtitle && LOCAL_COMPILATION_REGEX.test(subtitle)) return false;
+
+  // 3. Reject devotional / religious temple chants & hymns
+  if (DEVOTIONAL_REGEX.test(title)) return false;
+  if (album && DEVOTIONAL_REGEX.test(album)) return false;
+  if (subtitle && DEVOTIONAL_REGEX.test(subtitle)) return false;
+  if (artist && DEVOTIONAL_REGEX.test(artist)) return false;
+
+  // 4. Reject speeches, web series, dialogues, promo snippets
+  if (SPOKEN_AND_PROMO_REGEX.test(title)) return false;
+  if (album && SPOKEN_AND_PROMO_REGEX.test(album)) return false;
+  if (subtitle && SPOKEN_AND_PROMO_REGEX.test(subtitle)) return false;
 
   return true;
 }

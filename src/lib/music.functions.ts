@@ -191,17 +191,13 @@ const CURRENT_YEAR = new Date().getFullYear();
 const PREV_YEAR = CURRENT_YEAR - 1;
 
 const DIVERSE_THEMES = [
-  `latest romantic melody songs ${CURRENT_YEAR}`,
-  `mass high energy dance party hits ${CURRENT_YEAR}`,
-  "soulful emotional melody hits",
-  `top blockbuster movie songs ${CURRENT_YEAR}`,
-  "all time golden evergreen melodies",
-  "90s classic superhit songs",
-  "2000s nostalgic romantic hits",
-  "evergreen vintage melodies",
-  `top movie chartbuster songs ${PREV_YEAR} ${CURRENT_YEAR}`,
-  "popular radio superhit tracks",
-  "timeless cinema classic hits",
+  `top songs ${CURRENT_YEAR}`,
+  `popular songs ${CURRENT_YEAR}`,
+  `latest songs ${CURRENT_YEAR}`,
+  `trending hits ${CURRENT_YEAR}`,
+  `chartbusters ${CURRENT_YEAR}`,
+  `movie songs ${CURRENT_YEAR}`,
+  `top tracks`,
 ];
 
 function getDynamicQueries(
@@ -252,12 +248,11 @@ function getDynamicQueries(
   const langQualifier = primaryLang ? ` ${primaryLang}` : "";
   if (priorityArtists.length > 0) {
     for (const art of priorityArtists.slice(0, 6)) {
-      userNewQ.push(`${art}${langQualifier} latest songs ${CURRENT_YEAR}`);
-      userNewQ.push(`${art}${langQualifier} top hit songs`);
-      userNewQ.push(`${art}${langQualifier} popular tracks`);
-      userOldQ.push(`${art}${langQualifier} best melody hits`);
-      userOldQ.push(`${art}${langQualifier} all time classics`);
-      userOldQ.push(`${art}${langQualifier} evergreen songs`);
+      userNewQ.push(art);
+      userNewQ.push(`${art}${langQualifier} songs`);
+      userNewQ.push(`${art} hits`);
+      userOldQ.push(art);
+      userOldQ.push(`${art} songs`);
     }
   }
 
@@ -265,41 +260,34 @@ function getDynamicQueries(
   const discovery = options?.discovery ?? 40;
   if (discovery > 30 && filteredRelatedArtists.length > 0) {
     for (const art of filteredRelatedArtists.slice(0, 4)) {
-      generalNewQ.push(`${art}${langQualifier} top songs ${CURRENT_YEAR}`);
-      generalNewQ.push(`${art}${langQualifier} viral hit songs`);
-      generalOldQ.push(`${art}${langQualifier} best hits`);
+      generalNewQ.push(art);
+      generalNewQ.push(`${art} songs`);
+      generalOldQ.push(art);
+      generalOldQ.push(`${art} hits`);
     }
   }
 
-  // 3. Circadian temporal queries
+  // 3. Circadian temporal queries (clean studio hits)
   const temporalCtx = getTemporalContext(options?.clientHour);
   for (const theme of temporalCtx.queryThemes) {
     for (const lang of langs.slice(0, 2)) {
-      if (theme.includes("evergreen") || theme.includes("classic")) {
-        generalOldQ.push(`${lang} ${theme}`);
-      } else {
-        generalNewQ.push(`${lang} ${theme}`);
-      }
+      generalNewQ.push(`${lang} ${theme}`);
     }
   }
 
-  // 4. Supplementary queries across active languages
+  // 4. Supplementary queries across active languages (pure artist & soundtrack searches)
   const otherArtists = shuffleArray(langArtistPool.filter((a) => !priorityArtists.includes(a)));
   for (const lang of langs.slice(0, 3)) {
     const langPrefix = `${lang} `;
     for (const art of otherArtists.slice(0, 3)) {
-      generalNewQ.push(`${art} ${langPrefix}latest new hit songs ${CURRENT_YEAR}`);
-      generalNewQ.push(`${art} ${langPrefix}top songs`);
-      generalOldQ.push(`${art} ${langPrefix}all time classic evergreen hits`);
-      generalOldQ.push(`${art} ${langPrefix}best melody songs`);
+      generalNewQ.push(art);
+      generalNewQ.push(`${art} ${langPrefix}songs`);
+      generalOldQ.push(art);
+      generalOldQ.push(`${art} hits`);
     }
 
-    for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 3)) {
-      if (theme.includes("classic") || theme.includes("90s") || theme.includes("2000s") || theme.includes("evergreen")) {
-        generalOldQ.push(`${langPrefix}${theme}`);
-      } else {
-        generalNewQ.push(`${langPrefix}${theme}`);
-      }
+    for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 2)) {
+      generalNewQ.push(`${langPrefix}${theme}`);
     }
   }
 
@@ -1177,7 +1165,7 @@ export const getDailyMix = createServerFn({ method: "POST" })
       ? shuffleArray(oldQueries).slice(0, 4)
       : seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
 
-    const [queryCandidates, trendingCandidates] = await Promise.all([
+    const [queryCandidates, trendingCandidates, newReleasesCandidates] = await Promise.all([
       runQueryBatch([...pickedNew, ...pickedOld], 10, true, bypassCache),
       (async () => {
         try {
@@ -1187,9 +1175,17 @@ export const getDailyMix = createServerFn({ method: "POST" })
           return [];
         }
       })(),
+      (async () => {
+        try {
+          const { getSaavnNewReleases } = await import("./providers/saavn");
+          return await getSaavnNewReleases(languages, 10);
+        } catch {
+          return [];
+        }
+      })(),
     ]);
 
-    const combined = [...queryCandidates, ...(trendingCandidates as Track[])];
+    const combined = [...queryCandidates, ...(trendingCandidates as Track[]), ...(newReleasesCandidates as Track[])];
     const seenIds = new Set<string>();
     const seenKeys = new Set<string>();
     const deduplicatedCandidates: Track[] = [];

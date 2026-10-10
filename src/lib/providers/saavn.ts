@@ -534,15 +534,15 @@ export async function getSaavnOldSongs(
   for (const lang of userLangs) {
     const l = lang.toLowerCase();
     if (l === "telugu") {
-      queries.push("Telugu golden evergreen melodies SPB Chitra", "Telugu 90s all time classic hit songs");
+      queries.push("S. P. Balasubrahmanyam hits", "K. S. Chithra Telugu hits", "Ilaiyaraaja Telugu hits");
     } else if (l === "hindi") {
-      queries.push("Kishore Kumar Lata Mangeshkar evergreen hits", "Bollywood 90s golden era evergreen classics");
+      queries.push("Kishore Kumar hits", "Lata Mangeshkar hits", "R. D. Burman hits");
     } else if (l === "tamil") {
-      queries.push("Ilaiyaraaja SPB classic hits Tamil", "Tamil 80s 90s golden melodies");
+      queries.push("Ilaiyaraaja Tamil hits", "S. P. Balasubrahmanyam Tamil hits");
     } else if (l === "punjabi") {
-      queries.push("Gurdas Maan evergreen Punjabi classics");
+      queries.push("Gurdas Maan hits");
     } else {
-      queries.push(`${lang} 80s 90s classic evergreen hits`);
+      queries.push(`${lang} top hits`);
     }
   }
 
