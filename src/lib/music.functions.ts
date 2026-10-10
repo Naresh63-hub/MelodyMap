@@ -192,17 +192,16 @@ const PREV_YEAR = CURRENT_YEAR - 1;
 
 const DIVERSE_THEMES = [
   `latest romantic melody songs ${CURRENT_YEAR}`,
-  "mass high energy dance party hits",
-  "soulful emotional love songs",
-  `viral reels trending songs ${CURRENT_YEAR}`,
-  "acoustic lo-fi chill vibes",
-  "all time golden evergreen hits",
+  `mass high energy dance party hits ${CURRENT_YEAR}`,
+  "soulful emotional melody hits",
+  `top blockbuster movie songs ${CURRENT_YEAR}`,
+  "all time golden evergreen melodies",
   "90s classic superhit songs",
   "2000s nostalgic romantic hits",
-  "unplugged live studio hits",
+  "evergreen vintage melodies",
   `top movie chartbuster songs ${PREV_YEAR} ${CURRENT_YEAR}`,
-  "folk fusion upbeat songs",
-  "indie new artist discovery",
+  "popular radio superhit tracks",
+  "timeless cinema classic hits",
 ];
 
 function getDynamicQueries(
@@ -244,7 +243,12 @@ function getDynamicQueries(
   const generalOldQ: string[] = [];
 
   // 1. High-priority queries for user's affinity + favorited artists
-  const priorityArtists = [...new Set([...filteredAffinityArtists, ...filteredUserArtists])];
+  // When user is starting fresh or has few artists, seed from the top language artists pool!
+  const effectiveUserArtists = filteredUserArtists.length > 0
+    ? filteredUserArtists
+    : langArtistPool.slice(0, 6);
+
+  const priorityArtists = [...new Set([...filteredAffinityArtists, ...effectiveUserArtists])];
   const langQualifier = primaryLang ? ` ${primaryLang}` : "";
   if (priorityArtists.length > 0) {
     for (const art of priorityArtists.slice(0, 6)) {
@@ -1173,12 +1177,37 @@ export const getDailyMix = createServerFn({ method: "POST" })
       ? shuffleArray(oldQueries).slice(0, 4)
       : seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
 
-    const candidates = await runQueryBatch([...pickedNew, ...pickedOld], 10, true, bypassCache);
+    const [queryCandidates, trendingCandidates] = await Promise.all([
+      runQueryBatch([...pickedNew, ...pickedOld], 10, true, bypassCache),
+      (async () => {
+        try {
+          const { getSaavnTrendingSongs } = await import("./providers/saavn");
+          return await getSaavnTrendingSongs(languages, 12);
+        } catch {
+          return [];
+        }
+      })(),
+    ]);
+
+    const combined = [...queryCandidates, ...(trendingCandidates as Track[])];
+    const seenIds = new Set<string>();
+    const seenKeys = new Set<string>();
+    const deduplicatedCandidates: Track[] = [];
+
+    for (const t of combined) {
+      if (!t || !t.id || seenIds.has(t.id)) continue;
+      const key = getTrackDedupeKey(t.title, t.artist);
+      if (key && seenKeys.has(key)) continue;
+      if (key) seenKeys.add(key);
+      seenIds.add(t.id);
+      deduplicatedCandidates.push(t);
+    }
+
     // Rigorous language consistency: drop any track that conflicts with the
     // listener's selected languages before the daily mix is assembled.
     const consistent = languages.length > 0
-      ? candidates.filter((t) => isLanguageConsistent(t, languages))
-      : candidates;
+      ? deduplicatedCandidates.filter((t) => isLanguageConsistent(t, languages) && isOriginalSong(t))
+      : deduplicatedCandidates.filter(isOriginalSong);
     const dailyTracks = data.refreshNonce
       ? shuffleArray(consistent).slice(0, count)
       : seededShuffleArray(consistent, `${dateSeed}-final`).slice(0, count);
