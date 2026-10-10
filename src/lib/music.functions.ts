@@ -413,9 +413,17 @@ async function getLocalPicks(data: {
   const pickedNew = shuffleArray(newQueries).slice(0, 5);
   const pickedOld = shuffleArray(oldQueries).slice(0, 5);
 
-  const [newCandidates, oldCandidates] = await Promise.all([
+  const [newCandidates, oldCandidates, trendingCandidates] = await Promise.all([
     runQueryBatch(pickedNew, 10, true, bypassCache),
     runQueryBatch(pickedOld, 10, true, bypassCache),
+    (async () => {
+      try {
+        const { getSaavnTrendingSongs } = await import("./providers/saavn");
+        return (await getSaavnTrendingSongs(languages, 12)) as Track[];
+      } catch {
+        return [] as Track[];
+      }
+    })(),
   ]);
 
   const newQuota = Math.ceil(count / 2);
@@ -429,10 +437,10 @@ async function getLocalPicks(data: {
     if (excludeSet.has(key) || excludeSet.has(titleKey)) return false;
     if (penalizedSet.has(artKey)) return false;
     if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
-    return true;
+    return isOriginalSong(t);
   };
 
-  const filteredNew = newCandidates.filter(isCandidateValid);
+  const filteredNew = [...newCandidates, ...trendingCandidates].filter(isCandidateValid);
   const filteredOld = oldCandidates.filter(isCandidateValid);
 
   // Draw 50% new releases
