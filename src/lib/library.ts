@@ -203,6 +203,7 @@ import {
   PODCAST_POSITIVE_KEYWORDS,
   isOriginalSong,
 } from "./track-filters";
+import { cleanTrackDisplayMetadata } from "./track-dedup";
 
 export {
   isMusicTrack,
@@ -376,9 +377,9 @@ export function useLibrary(userId?: string | null) {
   const pullingRef = useRef(false);
 
   useEffect(() => {
-    // 1. Sanitize likes: keep only pure music tracks without deleting unformatted tracks
+    // 1. Sanitize likes: keep only pure music tracks and clean display metadata
     const rawLikes = read<Track[]>(LIKES_KEY, []);
-    const musicLikes = rawLikes.filter((t) => isMusicTrack(t, true, true));
+    const musicLikes = rawLikes.filter((t) => isMusicTrack(t, true, true)).map(cleanTrackDisplayMetadata);
     setLikes(musicLikes);
     if (musicLikes.length !== rawLikes.length) {
       write(LIKES_KEY, musicLikes);
@@ -386,13 +387,13 @@ export function useLibrary(userId?: string | null) {
 
     setDislikes(read<Track[]>(DISLIKES_KEY, []));
 
-    // 2. Sanitize history: split into music vs podcast history
+    // 2. Sanitize history: split into music vs podcast history, clean display metadata
     const rawHistory = read<Track[]>(HISTORY_KEY, []);
-    const musicHistory = rawHistory.filter((t) => isMusicTrack(t, true, true));
+    const musicHistory = rawHistory.filter((t) => isMusicTrack(t, true, true)).map(cleanTrackDisplayMetadata);
     const extractedPodcasts = rawHistory.filter(isPodcastTrack);
 
     const rawPodcastHistory = read<Track[]>(PODCAST_HISTORY_KEY, []);
-    const combinedPodcasts = mergeById(rawPodcastHistory, extractedPodcasts, 200);
+    const combinedPodcasts = mergeById(rawPodcastHistory, extractedPodcasts, 200).filter(isPodcastTrack);
 
     setHistory(musicHistory);
     setPodcastHistory(combinedPodcasts);
@@ -402,7 +403,30 @@ export function useLibrary(userId?: string | null) {
 
     setPlaylists(read<Playlist[]>(PLAYLISTS_KEY, []));
     setSettings({ ...DEFAULT_SETTINGS, ...read<Partial<RecSettings>>(SETTINGS_KEY, {}) });
-    setStats(read<Stats>(STATS_KEY, {}));
+
+    // 3. Clean stats on hydration so legacy YouTube tracks have sanitized titles, movies, and artists
+    const rawStats = read<Stats>(STATS_KEY, {});
+    const cleanedStats: Stats = {};
+    let statsChanged = false;
+    for (const [id, s] of Object.entries(rawStats)) {
+      if (s && s.track) {
+        const cleanedTrack = cleanTrackDisplayMetadata(s.track);
+        if (
+          cleanedTrack.title !== s.track.title ||
+          cleanedTrack.artist !== s.track.artist ||
+          cleanedTrack.album !== s.track.album
+        ) {
+          statsChanged = true;
+        }
+        cleanedStats[id] = { ...s, track: cleanedTrack };
+      } else {
+        cleanedStats[id] = s;
+      }
+    }
+    setStats(cleanedStats);
+    if (statsChanged) {
+      write(STATS_KEY, cleanedStats);
+    }
     setHydrated(true);
   }, []);
 
@@ -633,6 +657,13 @@ export function useLibrary(userId?: string | null) {
   const clearHistory = useCallback(() => {
     setHistory([]);
     write(HISTORY_KEY, []);
+    setStats({});
+    write(STATS_KEY, {});
+  }, []);
+
+  const clearStats = useCallback(() => {
+    setStats({});
+    write(STATS_KEY, {});
   }, []);
 
   const clearPodcastHistory = useCallback(() => {
@@ -765,6 +796,7 @@ export function useLibrary(userId?: string | null) {
     logPlay,
 
     clearHistory,
+    clearStats,
     clearPodcastHistory,
     createPlaylist,
     renamePlaylist,
@@ -825,7 +857,7 @@ export function replayMix(stats: Stats, limit = 30): Track[] {
       return score(b) - score(a) || b.lastAt - a.lastAt;
     })
     .slice(0, limit)
-    .map((s) => s.track);
+    .map((s) => cleanTrackDisplayMetadata(s.track));
 }
 
 /** Artists you actually listen to, ranked by plays then likes. */

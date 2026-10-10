@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
+import { cleanSongTitle, trackSubtitle, isChannelOrLabelName } from "@/lib/track-metadata";
 
 type Props = {
   tracks: Track[];
@@ -119,36 +120,42 @@ export function TrackList({
               )}
             </button>
 
-            <div className="min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={() => onPlay(track, index)}
-                className="block w-full min-w-0 text-left"
-              >
-                <p
-                  className={cn(
-                    "truncate text-sm font-semibold transition-colors duration-150",
-                    active ? "text-primary" : "text-foreground group-hover:text-foreground",
-                  )}
-                >
-                  {track.title}
-                </p>
-              </button>
-              <p className="truncate text-xs text-secondary-foreground group-hover:text-foreground transition-colors duration-150 mt-0.5">
-                {onArtistClick ? (
+            {(() => {
+              const displayTitle = cleanSongTitle(track.title) || track.title;
+              const displaySubtitle = trackSubtitle(track) || (track.artist && !isChannelOrLabelName(track.artist) ? track.artist : "");
+              return (
+                <div className="min-w-0 flex-1">
                   <button
                     type="button"
-                    onClick={() => onArtistClick(track.artist)}
-                    className="hover:text-foreground hover:underline transition-colors"
+                    onClick={() => onPlay(track, index)}
+                    className="block w-full min-w-0 text-left"
                   >
-                    {track.artist}
+                    <p
+                      className={cn(
+                        "truncate text-sm font-semibold transition-colors duration-150",
+                        active ? "text-primary" : "text-foreground group-hover:text-foreground",
+                      )}
+                    >
+                      {displayTitle}
+                    </p>
                   </button>
-                ) : (
-                  track.artist
-                )}
-                {track.reason ? ` · ${track.reason}` : ""}
-              </p>
-            </div>
+                  <p className="truncate text-xs text-secondary-foreground group-hover:text-foreground transition-colors duration-150 mt-0.5">
+                    {onArtistClick && displaySubtitle ? (
+                      <button
+                        type="button"
+                        onClick={() => onArtistClick(displaySubtitle)}
+                        className="hover:text-foreground hover:underline transition-colors"
+                      >
+                        {displaySubtitle}
+                      </button>
+                    ) : (
+                      displaySubtitle
+                    )}
+                    {track.reason ? ` · ${track.reason}` : ""}
+                  </p>
+                </div>
+              );
+            })()}
 
             <span className="hidden text-xs tabular-nums text-muted-foreground group-hover:text-secondary-foreground transition-colors sm:block">
               {track.duration}

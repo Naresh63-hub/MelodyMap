@@ -10,7 +10,7 @@
  */
 
 import { parseDurationSeconds } from "./track-filters";
-import { cleanMovieName, cleanSongTitle } from "./track-metadata";
+import { cleanMovieName, cleanSongTitle, isChannelOrLabelName } from "./track-metadata";
 
 /** Minimal track shape used for identity and comparison. */
 export interface TrackLike {
@@ -202,9 +202,9 @@ export function cleanYouTubeTrackMetadata(
     /vevo$/i,
     /-\s*topic$/i,
     /\b(music|records|recordings|series|company|official|audio|entertainment|films|studios|production|media)\b/i,
-    /\b(t-series|saregama|lahari|yrf|tips|aditya|sony|zee|speed\s*records|eros|geetha\s*arts|think\s*music|mango|madhura|times\s*music)\b/i,
+    /\b(t-series|saregama|lahari|yrf|tips|aditya|sony|zee|speed\s*records|eros|geetha\s*arts|think\s*music|mango|madhura|times\s*music|volga|maa\s*paata)\b/i,
   ];
-  const isLabelArtist = LABEL_PATTERNS.some((p) => p.test(artist));
+  const isLabelArtist = isChannelOrLabelName(artist) || LABEL_PATTERNS.some((p) => p.test(artist));
 
   // Extract '(From "Album/Movie")' if present
   const fromMatch = title.match(/\((?:From\s+["']?([^"')]+)["']?)\)/i);
@@ -212,45 +212,112 @@ export function cleanYouTubeTrackMetadata(
     album = fromMatch[1].trim();
   }
 
-  // Strip typical video noise tags
+  // Normalize delimiters (double pipes || -> |, // -> |)
   let cleaned = title
-    .replace(/\s*\[[^\]]*\b(official|video|song|lyric|audio|4k|hd|remastered)\b[^\]]*\]/gi, "")
-    .replace(/\s*\([^)]*\b(official|video|song|lyric|audio|4k|hd|remastered)\b[^)]*\)/gi, "")
-    .replace(/\s*\|\s*(official\s*(music\s*)?video|video\s*song|lyric(al)?\s*video|full\s*(video\s*)?song|audio\s*song|audio|4k|hd|remastered).*/gi, "")
+    .replace(/\|\|+/g, " | ")
+    .replace(/\/\/+/g, " | ")
+    .trim();
+
+  // Strip typical video noise tags
+  cleaned = cleaned
+    .replace(/\s*\[[^\]]*\b(official|video|song|lyric|audio|4k|8k|hd|1080p|720p|1440p|remastered)\b[^\]]*\]/gi, "")
+    .replace(/\s*\([^)]*\b(official|video|song|lyric|audio|4k|8k|hd|1080p|720p|1440p|remastered)\b[^)]*\)/gi, "")
+    .replace(/\s*\|\s*(official\s*(music\s*)?video|video\s*song|lyric(al)?\s*video|full\s*(video\s*)?song|audio\s*song|audio|4k|8k|hd|1080p|remastered).*/gi, "")
     .replace(/\s*\|\s*$/g, "")
     .trim();
+
+  // Strip noise phrases commonly in Indian YouTube titles
+  cleaned = cleaned
+    .replace(/\b(8k|4k|1080p|720p|hd|uhd)\s+full\s+song\b/gi, "")
+    .replace(/\bwith\s*(?:telugu|hindi|tamil|english|kannada|malayalam)?\s*lyrics?\b/gi, "")
+    .replace(/\bfull\s*song\s*with\s*lyrics\b/gi, "")
+    .replace(/\b(full\s*song|video\s*song|lyric(al)?\s*song|audio\s*song)\b/gi, "")
+    .trim();
+
+  // Check colon pattern: "Movie: Song Name" (e.g. "Aashiqui 2: Tum Hi Ho")
+  const colonMatch = cleaned.match(/^([^:|]+?)\s*:\s*(.+)$/);
+  if (colonMatch && colonMatch[1] && colonMatch[2] && !colonMatch[1].includes(" - ")) {
+    if (!album) album = colonMatch[1].trim();
+    cleaned = colonMatch[2].trim();
+  }
+
+  const cleanPart = (str: string) =>
+    str
+      .replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio\s*song|audio|lyric(al)?)\b/gi, "")
+      .replace(/^[-–—:\s|]+|[-–—:\s|]+$/g, "")
+      .trim();
 
   // Split by pipe '|'
   const pipeParts = cleaned.split(/\s*\|\s*/).map((p) => p.trim()).filter(Boolean);
 
   if (pipeParts.length > 1 && pipeParts[0]) {
-    const dashInFirst = pipeParts[0].split(/\s+-\s+/);
-    if (dashInFirst.length === 2 && dashInFirst[0] && dashInFirst[1]) {
-      if (!album) album = dashInFirst[0].trim();
-      title = dashInFirst[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+    const movieIndicatorRe = /^(.+?)\s+(?:telugu|hindi|tamil|malayalam|kannada)?\s*(?:movie|film|cinema|songs?)$/i;
+
+    let candidateTitle = "";
+    let candidateAlbum = album;
+
+    const firstMovieMatch = pipeParts[0].match(movieIndicatorRe);
+    const secondMovieMatch = pipeParts[1]?.match(movieIndicatorRe);
+
+    if (firstMovieMatch && firstMovieMatch[1]) {
+      candidateAlbum = firstMovieMatch[1].trim();
+      candidateTitle = cleanPart(pipeParts[1] || "");
+    } else if (secondMovieMatch && secondMovieMatch[1]) {
+      candidateAlbum = secondMovieMatch[1].trim();
+      candidateTitle = cleanPart(pipeParts[0] || "");
     } else {
-      title = pipeParts[0].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
-      if (!album && pipeParts[1]) {
-        album = pipeParts[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+      const dashInFirst = pipeParts[0].split(/\s+-\s+/);
+      if (dashInFirst.length === 2 && dashInFirst[0] && dashInFirst[1]) {
+        const part0 = dashInFirst[0].trim();
+        const isPart0Movie =
+          /\b(movie|film|cinema)\b/i.test(part0) ||
+          /\((?:telugu|hindi|tamil|malayalam|kannada)\)/i.test(part0) ||
+          (isLabelArtist && pipeParts.length > 2);
+        if (isPart0Movie) {
+          if (!candidateAlbum) {
+            candidateAlbum = part0.replace(/\s+(?:telugu|hindi|tamil|malayalam|kannada)?\s*(?:movie|film|cinema)$/i, "").trim();
+          }
+        } else if (isLabelArtist) {
+          artist = part0;
+        }
+        candidateTitle = cleanPart(dashInFirst[1]);
+      } else {
+        candidateTitle = cleanPart(pipeParts[0]);
+        if (!candidateAlbum && pipeParts[1]) {
+          candidateAlbum = cleanPart(pipeParts[1]);
+        }
       }
     }
 
+    title = candidateTitle || cleanPart(pipeParts[0]);
+    if (candidateAlbum) album = candidateAlbum;
+
     if (isLabelArtist) {
-      const cand = pipeParts[pipeParts.length - 1];
-      if (cand && cand !== title && cand !== album) {
-        artist = cand;
-      } else if (pipeParts[2] && pipeParts[2] !== title && pipeParts[2] !== album) {
-        artist = pipeParts[2];
+      // Find artist among remaining parts
+      const remaining = pipeParts.filter((p) => p !== pipeParts[0] && (!album || !p.includes(album)) && cleanPart(p) !== title);
+      if (remaining.length > 0) {
+        const singerPart = remaining.find((p) => /\b(shreya|arijit|anirudh|thaman|sid sriram|spb|raja|radhan|sagar|chaitra)\b/i.test(p));
+        artist = singerPart || remaining[remaining.length - 1] || "";
+      } else {
+        artist = "";
       }
     }
   } else {
-    // Single or no pipe, check dash 'Artist - Title'
+    // Single or no pipe, check dash 'Artist - Title' or 'Movie - Title'
     const dashParts = cleaned.split(/\s+-\s+/);
     if (dashParts.length === 2 && dashParts[0] && dashParts[1]) {
-      artist = dashParts[0].trim();
-      title = dashParts[1].replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+      const part0 = dashParts[0].trim();
+      const part1 = cleanPart(dashParts[1]);
+      const isPart0Movie = /\b(movie|film|cinema)\b/i.test(part0) || /\((?:telugu|hindi|tamil|malayalam|kannada)\)/i.test(part0);
+      if (isPart0Movie) {
+        album = part0.replace(/\s+(?:telugu|hindi|tamil|malayalam|kannada)?\s*(?:movie|film|cinema)$/i, "").trim();
+        title = part1;
+      } else {
+        artist = part0;
+        title = part1;
+      }
     } else {
-      title = cleaned.replace(/\b(video\s*song|lyric(al)?\s*video|video|full\s*song|audio)\b/gi, "").trim();
+      title = cleanPart(cleaned);
     }
   }
 
@@ -272,7 +339,7 @@ export function cleanYouTubeTrackMetadata(
 
   return {
     title: title || rawTitle,
-    artist: artist || rawArtist,
+    artist: (isLabelArtist && (isChannelOrLabelName(artist) || LABEL_PATTERNS.some((p) => p.test(artist)))) ? "" : (artist || rawArtist),
     ...(album ? { album } : {}),
   };
 }
@@ -288,13 +355,16 @@ export function cleanYouTubeTrackMetadata(
  */
 export function cleanTrackDisplayMetadata<T extends TrackLike>(track: T): T {
   if (!track || !track.title) return track;
-  const { title, artist } = cleanYouTubeTrackMetadata(track.title, track.artist);
+  const { title, artist, album } = cleanYouTubeTrackMetadata(track.title, track.artist);
   const cleanTitle = cleanSongTitle(title) || title;
-  const movie = cleanMovieName((track as any).album, track.title);
+  const rawAlbum = album || (track as any).album;
+  const movie = cleanMovieName(rawAlbum, cleanTitle) || (album ? album : undefined);
+  const cleanArtist = isChannelOrLabelName(artist) ? "" : artist;
+  const finalArtist = cleanArtist || (track.artist && !isChannelOrLabelName(track.artist) ? track.artist : "");
   return {
     ...track,
     title: cleanTitle,
-    artist,
+    artist: finalArtist,
     ...(movie ? { album: movie } : {}),
   };
 }

@@ -124,6 +124,34 @@ describe("Podcast Subsystem", () => {
         thumbnail: "https://example.com/thumb.jpg",
       };
       expect(isPodcastTrack(musicTrack)).toBe(false);
+
+      // YouTube compilation tracks and record label uploads from user screenshot
+      expect(
+        isPodcastTrack({
+          id: "yt:purelove",
+          title: "Pure Love Vibes Telugu Songs",
+          artist: "Aditya Music PLAYBACK",
+          duration: "45:00",
+        }),
+      ).toBe(false);
+
+      expect(
+        isPodcastTrack({
+          id: "yt:romantic",
+          title: "Best Romantic Songs",
+          artist: "Grow Music",
+          duration: "30:00",
+        }),
+      ).toBe(false);
+
+      expect(
+        isPodcastTrack({
+          id: "yt:yaalalo",
+          title: "YAALALO YAALALO Full Video Song",
+          artist: "T-Series Telugu",
+          duration: "5:30",
+        }),
+      ).toBe(false);
     });
 
     it("exempts podcast episodes from 600-second music duration restriction", () => {
@@ -135,8 +163,9 @@ describe("Podcast Subsystem", () => {
         thumbnail: "https://example.com/thumb.jpg",
       };
 
-      // Music tracks >600s are forbidden by hasPlayableDuration
+      // Music tracks >600s are forbidden by hasPlayableDuration and are NOT podcasts
       expect(hasPlayableDuration(longMusicTrack)).toBe(false);
+      expect(isPodcastTrack(longMusicTrack)).toBe(false);
 
       const longPodcastEpisode: Track = {
         id: "podcast:ep:long1",

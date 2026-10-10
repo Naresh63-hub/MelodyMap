@@ -3,6 +3,8 @@
  * Shared across server and client to eliminate filter duplication.
  */
 
+import { isChannelOrLabelName } from "./track-metadata";
+
 export const NON_MUSIC_KEYWORDS = [
   "podcast",
   "podcasts",
@@ -214,7 +216,27 @@ export function isMusicTrack(
 }
 
 /**
+ * Common music song and jukebox indicators that disqualify a track from being a podcast.
+ */
+const MUSIC_DISQUALIFIERS = [
+  "song",
+  "songs",
+  "jukebox",
+  "audio song",
+  "video song",
+  "romantic songs",
+  "love vibes",
+  "hit songs",
+  "melody songs",
+  "all songs",
+  "music video",
+  "soundtrack",
+  "ost",
+];
+
+/**
  * Strict validator to guarantee a track is a genuine podcast episode.
+ * Explicitly rejects music tracks, music compilations, and record label channels.
  */
 export function isPodcastTrack(
   track: { id?: string | undefined; source?: string | undefined; title?: string | undefined; artist?: string | undefined; duration?: string | number | undefined } | null | undefined,
@@ -225,16 +247,15 @@ export function isPodcastTrack(
   const title = track.title.toLowerCase();
   const artist = (track.artist || "").toLowerCase();
 
+  // Reject junk media tags
   if (JUNK_MEDIA_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
 
-  const secs = parseDurationSeconds(track.duration);
-  const hasPodcastSignal = PODCAST_POSITIVE_KEYWORDS.some(
-    (kw) => title.includes(kw) || artist.includes(kw),
-  );
+  // Music record labels / channels are NEVER podcasts
+  if (isChannelOrLabelName(track.artist)) return false;
 
-  if (hasPodcastSignal) return true;
-  // If no explicit keyword, must be long-form audio (>= 5 mins) and NOT a standard music song
-  if (secs >= 300 && !isMusicTrack(track)) return true;
+  // Music song / jukebox terms are NEVER podcasts
+  if (MUSIC_DISQUALIFIERS.some((kw) => title.includes(kw))) return false;
 
-  return false;
+  // Must have an explicit podcast positive signal
+  return PODCAST_POSITIVE_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw));
 }

@@ -112,4 +112,70 @@ describe("cleanYouTubeTrackMetadata", () => {
     expect(res.title).toBe("Ordinary Song Name");
     expect(res.artist).toBe("Artist Name");
   });
+
+  it("cleans noisy YouTube titles and strips record labels from user history tracks", () => {
+    // 1. Tum Hi Ho
+    const tumHiHo = cleanYouTubeTrackMetadata(
+      "Aashiqui 2: Tum Hi Ho 8K Full Song | Aditya Roy Kapur | Shraddha Kapoor",
+      "T-Series",
+    );
+    expect(tumHiHo.title).toBe("Tum Hi Ho");
+    expect(tumHiHo.album).toBe("Aashiqui 2");
+    expect(tumHiHo.artist).not.toContain("T-Series");
+
+    // 2. Mandaara
+    const mandaara = cleanYouTubeTrackMetadata(
+      "Mandaara Video Song | Bhaagamathie | Anushka | Shreya Ghoshal | SS Thaman | G. Ashok",
+      "Saregama Telugu",
+    );
+    expect(mandaara.title).toBe("Mandaara");
+    expect(mandaara.album).toBe("Bhaagamathie");
+    expect(mandaara.artist).toBe("Shreya Ghoshal");
+
+    // 3. Nuvvena (Anand)
+    const nuvvena = cleanYouTubeTrackMetadata(
+      "Anand Telugu Movie || Nuvvena Full Song With Lyrics || Raja, Kamalinee Mukherjee",
+      "Aditya Music",
+    );
+    expect(nuvvena.title).toBe("Nuvvena");
+    expect(nuvvena.album).toBe("Anand");
+    expect(nuvvena.artist).not.toContain("Aditya Music");
+
+    // 4. Ye Kannulu Choodani
+    const yeKannulu = cleanYouTubeTrackMetadata(
+      "Ye Kannulu Choodani With Telugu Lyrics | Ardhashathabdam Songs | Karthik Rathnam | Sagar, Chaitra",
+      "Maa Paata Mee Nota",
+    );
+    expect(yeKannulu.title).toBe("Ye Kannulu Choodani");
+    expect(yeKannulu.album).toBe("Ardhashathabdam");
+    expect(yeKannulu.artist).toBe("Sagar, Chaitra");
+
+    // 5. Vachhe Vachhe (Anand)
+    const vachheVachhe = cleanYouTubeTrackMetadata(
+      "Vachhe Vachhe Full Song || Anand Movie || Raja, Kamalini Mukherjee",
+      "Aditya Music",
+    );
+    expect(vachheVachhe.title).toBe("Vachhe Vachhe");
+    expect(vachheVachhe.album).toBe("Anand");
+    expect(vachheVachhe.artist).not.toContain("Aditya Music");
+
+    // 6. Manasilaayo (Vettaiyan)
+    const manasilaayo = cleanYouTubeTrackMetadata(
+      "Vettaiyan - Manasilaayo Lyric | Rajinikanth | T.J. Gnanavel | Anirudh Ravichander | Manju Warrier",
+      "Sony Music South",
+    );
+    expect(manasilaayo.title).toBe("Manasilaayo");
+    expect(manasilaayo.album).toBe("Vettaiyan");
+    expect(manasilaayo.artist).toBe("Anirudh Ravichander");
+
+    // 7. Inthalo Ennenni Vinthalo (Karthikeya)
+    const inthalo = cleanYouTubeTrackMetadata(
+      "Inthalo Ennenni Vinthalo Video Song | Karthikeya Movie | Nikhil, Swathi",
+      "VolgaMusicBox",
+    );
+    expect(inthalo.title).toBe("Inthalo Ennenni Vinthalo");
+    expect(inthalo.album).toBe("Karthikeya");
+    expect(inthalo.artist).not.toContain("Volga");
+  });
 });
+

@@ -2575,8 +2575,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   // --- Track list for each tab ---
   const listForTab: Record<string, Track[]> = useMemo(
     () => ({
-      likes,
-      history: filteredHistory,
+      likes: likes.map(cleanTrackDisplayMetadata),
+      history: filteredHistory.map(cleanTrackDisplayMetadata),
       search: results,
       foryou: recs,
     }),

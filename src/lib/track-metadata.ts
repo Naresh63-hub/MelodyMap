@@ -93,6 +93,9 @@ const CHANNEL_OR_LABEL_PATTERNS: RegExp[] = [
   /\bspeed records\b/i,
   /\beros\b/i,
   /\bzeemusic\b/i,
+  /\bvolga\b/i,
+  /\bmusic\s*box\b/i,
+  /\bpaata\b/i,
 ];
 
 /**
@@ -287,7 +290,10 @@ export function isChannelOrLabelName(name: string | undefined | null): boolean {
 
 /** Internal single-name check (kept separate so lists can be evaluated as a whole). */
 function CHANNEL_OR_LABEL_NAME_MATCH(part: string): boolean {
-  return /^[^a-z0-9]*$/i.test(part) === false && CHANNEL_OR_LABEL_PATTERNS.some((re) => re.test(part));
+  if (/^[^a-z0-9]*$/i.test(part)) return false;
+  if (CHANNEL_OR_LABEL_PATTERNS.some((re) => re.test(part))) return true;
+  const splitCamel = part.replace(/([a-z])([A-Z])/g, "$1 $2");
+  return CHANNEL_OR_LABEL_PATTERNS.some((re) => re.test(splitCamel));
 }
 
 /**
