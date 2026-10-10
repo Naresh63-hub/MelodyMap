@@ -76,7 +76,7 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
   // JioSaavn titles arrive as `Song (From "Movie") (Telugu)` and the album field
   // mirrors that whole string, so both are normalised here: the card gets a clean
   // song name, and `album` becomes the movie name a listener recognises.
-  const rawTitle = cleanHtmlEntities(raw.title);
+  const rawTitle = cleanHtmlEntities(raw.title || raw.song);
   const title = cleanSongTitle(rawTitle) || rawTitle;
   const rawAlbum = cleanHtmlEntities(raw.more_info?.album || raw.album);
   const movie = cleanMovieName(rawAlbum, rawTitle);
@@ -86,9 +86,13 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
   const artist =
     artists.length > 0 ? artists.join(", ") : cleanHtmlEntities(raw.subtitle || raw.more_info?.music || "Unknown Artist");
 
-  const durationSeconds = Number(raw.more_info?.duration) || 0;
+  // Strict check on raw title, cleaned title, and album before processing
+  if (!isOriginalSong({ title: rawTitle, artist, album: rawAlbum })) return null;
+  if (!isOriginalSong({ title, artist, album: movie || rawAlbum })) return null;
+
+  const durationSeconds = Number(raw.more_info?.duration || raw.duration) || 0;
   const artwork = upgradeArtwork(raw.image);
-  const encryptedUrl = raw.more_info?.encrypted_media_url;
+  const encryptedUrl = raw.more_info?.encrypted_media_url || raw.encrypted_media_url;
   const streamUrl = decryptSaavnMediaUrl(encryptedUrl, "standard");
 
   return {
@@ -308,4 +312,254 @@ export async function resolveSaavnByMeta(
   }
 
   return null;
+}
+
+// In-memory cache for launch data (10-minute TTL)
+let launchDataCache: {
+  key: string;
+  timestamp: number;
+  data: any;
+} | null = null;
+
+export async function fetchSaavnLaunchData(languages: string[] = []): Promise<any> {
+  const normLangs = languages.map((l) => l.toLowerCase().trim()).filter(Boolean);
+  const key = normLangs.sort().join(",") || "all";
+  const now = Date.now();
+
+  if (launchDataCache && launchDataCache.key === key && now - launchDataCache.timestamp < 10 * 60 * 1000) {
+    return launchDataCache.data;
+  }
+
+  const langParam = normLangs.join(",") || "telugu,hindi,tamil,english,punjabi";
+  const url = `https://www.jiosaavn.com/api.php?__call=webapi.getLaunchData&api_version=4&_format=json&_marker=0&ctx=web6dot0&languages=${encodeURIComponent(langParam)}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        Accept: "application/json",
+        cookie: `L=${encodeURIComponent(langParam)}`,
+      },
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    launchDataCache = { key, timestamp: now, data };
+    return data;
+  } catch (err) {
+    console.warn("[Saavn] Failed to fetch launch data:", err);
+    return null;
+  }
+}
+
+/**
+ * Fetches official New Releases directly from JioSaavn's launch feed.
+ * Guaranteed 100% pure original tracks with direct CDN audio.
+ */
+export async function getSaavnNewReleases(
+  languages: string[] = [],
+  limit = 24,
+): Promise<UnifiedTrack[]> {
+  const data = await fetchSaavnLaunchData(languages);
+  if (!data || !Array.isArray(data.new_albums)) {
+    const fallbackLang = languages[0] || "Telugu";
+    return searchSaavn(`${fallbackLang} latest new hit songs ${new Date().getFullYear()}`, { limit });
+  }
+
+  const tracks: UnifiedTrack[] = [];
+  const seen = new Set<string>();
+
+  for (const item of data.new_albums) {
+    if (tracks.length >= limit) break;
+    if (item.more_info?.encrypted_media_url) {
+      const unified = mapSaavnSongToUnified(item);
+      if (unified && unified.playbackSource && isOriginalSong(unified)) {
+        if (!seen.has(unified.id)) {
+          seen.add(unified.id);
+          tracks.push(unified);
+        }
+      }
+    }
+  }
+
+  // If fewer than limit, supplement with targeted language query on JioSaavn
+  if (tracks.length < limit && languages.length > 0) {
+    const supp = await searchSaavn(`${languages[0]} latest songs ${new Date().getFullYear()}`, {
+      limit: limit - tracks.length + 5,
+    });
+    for (const t of supp) {
+      if (tracks.length >= limit) break;
+      if (!seen.has(t.id) && isOriginalSong(t)) {
+        seen.add(t.id);
+        tracks.push(t);
+      }
+    }
+  }
+
+  return tracks.slice(0, limit);
+}
+
+/**
+ * Fetches official Trending Songs / Top 50 Charts directly from JioSaavn.
+ * Guaranteed 100% pure original hit tracks with direct CDN audio.
+ */
+export async function getSaavnTrendingSongs(
+  languages: string[] = [],
+  limit = 25,
+): Promise<UnifiedTrack[]> {
+  const data = await fetchSaavnLaunchData(languages);
+  const charts: any[] = Array.isArray(data?.charts) ? data.charts : [];
+  const normLangs = languages.map((l) => l.toLowerCase());
+
+  let targetChart: any = null;
+  if (normLangs.length > 0) {
+    targetChart = charts.find((c) => {
+      const title = String(c.title || "").toLowerCase();
+      return normLangs.some((lang) => title.includes(lang)) && (title.includes("top 50") || title.includes("superhits"));
+    });
+    if (!targetChart) {
+      targetChart = charts.find((c) => {
+        const title = String(c.title || "").toLowerCase();
+        return normLangs.some((lang) => title.includes(lang));
+      });
+    }
+  }
+  if (!targetChart) {
+    targetChart = charts.find((c) => String(c.title || "").includes("India Superhits Top 50")) || charts[0];
+  }
+
+  if (targetChart && targetChart.id) {
+    try {
+      const playlistUrl = `https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid=${encodeURIComponent(targetChart.id)}&_format=json&_marker=0&api_version=4&ctx=web6dot0`;
+      const res = await fetch(playlistUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(9000),
+      });
+      if (res.ok) {
+        const playlistData = await res.json();
+        const songs: any[] = Array.isArray(playlistData?.list) ? playlistData.list : [];
+        const tracks: UnifiedTrack[] = [];
+        const seen = new Set<string>();
+
+        for (const s of songs) {
+          if (tracks.length >= limit) break;
+          const unified = mapSaavnSongToUnified(s);
+          if (unified && unified.playbackSource && isOriginalSong(unified)) {
+            if (!seen.has(unified.id)) {
+              seen.add(unified.id);
+              tracks.push(unified);
+            }
+          }
+        }
+        if (tracks.length > 0) return tracks.slice(0, limit);
+      }
+    } catch (err) {
+      console.warn("[Saavn] Failed to fetch chart playlist:", err);
+    }
+  }
+
+  const qLang = languages[0] || "Telugu";
+  return searchSaavn(`${qLang} top trending hit songs`, { limit });
+}
+
+/**
+ * Fetches official Old Songs / Retro Classics directly from JioSaavn.
+ * Guaranteed 100% pure original golden classics with direct CDN audio.
+ */
+export async function getSaavnOldSongs(
+  languages: string[] = [],
+  limit = 25,
+): Promise<UnifiedTrack[]> {
+  const data = await fetchSaavnLaunchData(languages);
+  const charts: any[] = Array.isArray(data?.charts) ? data.charts : [];
+  const normLangs = languages.map((l) => l.toLowerCase());
+
+  let retroChart: any = null;
+  if (normLangs.length > 0) {
+    retroChart = charts.find((c) => {
+      const title = String(c.title || "").toLowerCase();
+      const hasLang = normLangs.some((lang) => title.includes(lang));
+      const isRetro = title.includes("1990") || title.includes("1980") || title.includes("1970") || title.includes("2000");
+      return hasLang && isRetro;
+    });
+  }
+  if (!retroChart) {
+    retroChart = charts.find((c) => {
+      const title = String(c.title || "").toLowerCase();
+      return title.includes("1990") || title.includes("1980") || title.includes("1970");
+    });
+  }
+
+  if (retroChart && retroChart.id) {
+    try {
+      const playlistUrl = `https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid=${encodeURIComponent(retroChart.id)}&_format=json&_marker=0&api_version=4&ctx=web6dot0`;
+      const res = await fetch(playlistUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(9000),
+      });
+      if (res.ok) {
+        const playlistData = await res.json();
+        const songs: any[] = Array.isArray(playlistData?.list) ? playlistData.list : [];
+        const tracks: UnifiedTrack[] = [];
+        const seen = new Set<string>();
+
+        for (const s of songs) {
+          if (tracks.length >= limit) break;
+          const unified = mapSaavnSongToUnified(s);
+          if (unified && unified.playbackSource && isOriginalSong(unified)) {
+            if (!seen.has(unified.id)) {
+              seen.add(unified.id);
+              tracks.push(unified);
+            }
+          }
+        }
+        if (tracks.length >= 10) return tracks.slice(0, limit);
+      }
+    } catch (err) {
+      console.warn("[Saavn] Failed to fetch retro playlist:", err);
+    }
+  }
+
+  const userLangs = languages.length > 0 ? languages : ["Telugu", "Hindi"];
+  const queries: string[] = [];
+  for (const lang of userLangs) {
+    const l = lang.toLowerCase();
+    if (l === "telugu") {
+      queries.push("Telugu golden evergreen melodies SPB Chitra", "Telugu 90s all time classic hit songs");
+    } else if (l === "hindi") {
+      queries.push("Kishore Kumar Lata Mangeshkar evergreen hits", "Bollywood 90s golden era evergreen classics");
+    } else if (l === "tamil") {
+      queries.push("Ilaiyaraaja SPB classic hits Tamil", "Tamil 80s 90s golden melodies");
+    } else if (l === "punjabi") {
+      queries.push("Gurdas Maan evergreen Punjabi classics");
+    } else {
+      queries.push(`${lang} 80s 90s classic evergreen hits`);
+    }
+  }
+
+  const tracks: UnifiedTrack[] = [];
+  const seen = new Set<string>();
+
+  for (const q of queries) {
+    if (tracks.length >= limit) break;
+    const batch = await searchSaavn(q, { limit: 12 });
+    for (const t of batch) {
+      if (tracks.length >= limit) break;
+      if (!seen.has(t.id) && isOriginalSong(t)) {
+        seen.add(t.id);
+        tracks.push(t);
+      }
+    }
+  }
+
+  return tracks.slice(0, limit);
 }

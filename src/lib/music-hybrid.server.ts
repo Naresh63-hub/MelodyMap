@@ -32,31 +32,34 @@ export async function searchHybrid(
   offset?: number,
   page?: number,
 ): Promise<HybridSearchResult> {
-  // JioSaavn First Strategy:
-  // Query JioSaavn for clean metadata (song title, real artist/composer, movie/album)
-  // and direct crystal-clear 160kbps/320kbps streams.
+  const cleanQ = query.trim();
+  if (!cleanQ) return { tracks: [] };
+
+  // JioSaavn Pure Original Music Strategy:
   try {
     const { searchSaavn } = await import("./providers/saavn");
-    const saavnRes = await searchSaavn(query, { limit });
-    const originalTracks = saavnRes.filter(isOriginalSong);
+    let saavnRes = await searchSaavn(cleanQ, { limit });
+    let originalTracks = saavnRes.filter(isOriginalSong);
     if (originalTracks.length > 0) {
       return { tracks: originalTracks as HybridTrack[] };
     }
-  } catch (err) {
-    console.warn("[MelodyMap] Saavn primary search notice:", err);
-  }
 
-  // Multi-Provider Fallback:
-  // Query Audius, Jamendo, Deezer, and Internet Archive concurrently.
-  try {
-    const { searchMultiProvider } = await import("./providers/multi-search");
-    const multiRes = await searchMultiProvider(query, { limit });
-    const originalFallback = multiRes.tracks.filter(isOriginalSong);
-    if (originalFallback.length > 0) {
-      return { tracks: originalFallback as HybridTrack[] };
+    // Smart query simplification retry: e.g. "Song (From Movie)" -> "Song Movie"
+    const simplified = cleanQ
+      .replace(/[([][^()\[\]]*[)\]]/g, " ")
+      .replace(/["']/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (simplified && simplified.toLowerCase() !== cleanQ.toLowerCase()) {
+      saavnRes = await searchSaavn(simplified, { limit });
+      originalTracks = saavnRes.filter(isOriginalSong);
+      if (originalTracks.length > 0) {
+        return { tracks: originalTracks as HybridTrack[] };
+      }
     }
   } catch (err) {
-    console.warn("[MelodyMap] Multi-provider fallback search notice:", err);
+    console.warn("[MelodyMap] Saavn primary search notice:", err);
   }
 
   return { tracks: [] };

@@ -1,41 +1,60 @@
-import { Music2 } from "lucide-react";
+import { Music2, Sparkles, Users } from "lucide-react";
+import { useMemo } from "react";
 import { MediaCard } from "./MediaCard";
+import { ArtistCard } from "./ArtistCard";
 import { CardGrid } from "@/components/common/CardGrid";
 import type { Track } from "@/lib/library";
 import { trackSubtitle } from "@/lib/track-metadata";
+import { getTopArtistsForLanguages, type JioSaavnArtist } from "@/lib/artists-data";
 
 type Props = {
-  recentlyPlayed?: Track[] | undefined;
-  trending: Track[];
-  oldSongs?: Track[] | undefined;
-  newReleases: Track[];
+  dailyMix?: Track[] | undefined;
   recommended: Track[];
+  userLanguages?: string[] | undefined;
   onPlayTrack: (track: Track, index: number) => void;
   onToggleLike: (track: Track) => void;
+  onOpenOptions?: ((track: Track) => void) | undefined;
+  onArtistClick?: ((artist: JioSaavnArtist) => void) | undefined;
   likedIds: Set<string>;
   currentId?: string | null;
   isPlaying: boolean;
   /** Show skeleton placeholders while data loads. */
   loading?: boolean;
+
+  // Preserved for backwards compatibility
+  recentlyPlayed?: Track[] | undefined;
+  trending?: Track[] | undefined;
+  oldSongs?: Track[] | undefined;
+  newReleases?: Track[] | undefined;
 };
 
+/**
+ * Official JioSaavn Home Sections:
+ * 1. Daily Mix
+ * 2. Top Artists (circular avatars)
+ * 3. Made For You
+ */
 export function HomeSections({
-  recentlyPlayed = [],
-  trending,
-  oldSongs,
-  newReleases,
+  dailyMix,
   recommended,
+  userLanguages = [],
   onPlayTrack,
   onToggleLike,
+  onOpenOptions,
+  onArtistClick,
   likedIds,
   currentId,
   isPlaying,
   loading = false,
 }: Props) {
+  const topArtists = useMemo(() => {
+    return getTopArtistsForLanguages(userLanguages);
+  }, [userLanguages]);
+
   /** Skeleton placeholder card with neutral shimmer. */
   const SkeletonCard = () => (
     <div className="space-y-2">
-      <div className="aspect-square w-full rounded-lg bg-card border border-hair animate-pulse" />
+      <div className="aspect-square w-full rounded-xl bg-card border border-hair animate-pulse" />
       <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
       <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
     </div>
@@ -60,34 +79,33 @@ export function HomeSections({
     );
   }
 
-  const hasAnyContent =
-    trending.length > 0 ||
-    (oldSongs && oldSongs.length > 0) ||
-    newReleases.length > 0 ||
-    recommended.length > 0;
+  const hasAnyContent = (dailyMix && dailyMix.length > 0) || recommended.length > 0;
 
   const Section = ({
     title,
+    subtitle,
     tracks,
-    showMore = true,
+    icon: Icon,
   }: {
     title: string;
+    subtitle?: string;
     tracks: Track[];
-    showMore?: boolean;
+    icon?: typeof Sparkles | typeof Music2;
   }) => {
     if (tracks.length === 0) return null;
 
     return (
       <section className="mb-8 animate-page-in">
         <div className="mb-3.5 flex items-center justify-between px-1">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
-          {showMore && (
-            <button className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-              See all
-            </button>
+          <div className="flex items-center gap-2">
+            {Icon && <Icon className="h-4 w-4 text-primary" />}
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
+          </div>
+          {subtitle && (
+            <span className="text-xs text-muted-foreground">{subtitle}</span>
           )}
         </div>
-        <CardGrid 
+        <CardGrid
           items={tracks.slice(0, 12)}
           renderCard={(track, index) => (
             <MediaCard
@@ -100,6 +118,7 @@ export function HomeSections({
               liked={likedIds.has(track.id)}
               onPlay={() => onPlayTrack(track, index)}
               onToggleLike={() => onToggleLike(track)}
+              onMore={onOpenOptions ? () => onOpenOptions(track) : undefined}
               size="md"
             />
           )}
@@ -120,34 +139,50 @@ export function HomeSections({
           </p>
         </div>
       )}
-      
-      {trending.length > 0 && (
+
+      {/* 1. Daily Mix */}
+      {dailyMix && dailyMix.length > 0 && (
         <Section
-          title="Trending Now"
-          tracks={trending}
+          title="Daily Mix"
+          subtitle="Updated today"
+          icon={Sparkles}
+          tracks={dailyMix}
         />
       )}
 
-      {oldSongs && oldSongs.length > 0 && (
-        <Section
-          title="Old Classics"
-          tracks={oldSongs}
-        />
+      {/* 2. Top Artists (Circular Avatars) */}
+      {onArtistClick && topArtists.length > 0 && (
+        <section className="mb-8 animate-page-in">
+          <div className="mb-3.5 flex items-center justify-between px-1">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">Top Artists</h2>
+            </div>
+            <span className="text-xs text-muted-foreground">Popular right now</span>
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x snap-mandatory">
+            {topArtists.map((artist) => (
+              <ArtistCard
+                key={artist.id}
+                artist={artist}
+                onClick={onArtistClick}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
-      {newReleases.length > 0 && (
-        <Section
-          title="New Releases"
-          tracks={newReleases}
-        />
-      )}
-
+      {/* 3. Made For You */}
       {recommended.length > 0 && (
         <Section
           title="Made For You"
+          subtitle="Personalized for your taste"
+          icon={Music2}
           tracks={recommended}
         />
       )}
     </div>
   );
 }
+
+export default HomeSections;

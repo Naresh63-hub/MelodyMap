@@ -42,8 +42,6 @@ export function useAudioPlayer(options: {
   onSponsorBlockSkipped?: (category: string) => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const prebufferAudioRef = useRef<HTMLAudioElement | null>(null);
-  const prebufferedTrackIdRef = useRef<string | null>(null);
   const sponsorSegmentsRef = useRef<SponsorBlockSegment[]>([]);
   const qualityFallbackStepRef = useRef<number>(0); // 0 = original, 1 = standard, 2 = saver
 
@@ -86,59 +84,59 @@ export function useAudioPlayer(options: {
       .catch(() => {/* probe failed; no indicator shown */});
   }, []);
 
-  // Initialize and attach core audio + prebuffer to DOM.
-  // Must run in an effect, not during render: creating/appending DOM nodes is a
-  // side effect and violates render purity (breaks under StrictMode re-renders
-  // and can double-append during hydration).
+  // Initialize and attach core audio element as strict singleton in DOM
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    if (!audioRef.current) {
-      let el = document.getElementById("melodymap-core-audio") as HTMLAudioElement | null;
-      if (!el) {
-        el = document.createElement("audio");
-        el.id = "melodymap-core-audio";
-        el.setAttribute("playsinline", "true");
-        el.setAttribute("webkit-playsinline", "true");
-        el.setAttribute("x-webkit-airplay", "allow");
-        el.crossOrigin = "anonymous";
-        el.preload = "auto";
-        el.volume = 1;
-        el.muted = false;
-        el.style.position = "fixed";
-        el.style.bottom = "0";
-        el.style.left = "0";
-        el.style.width = "0";
-        el.style.height = "0";
-        el.style.opacity = "0";
-        el.style.pointerEvents = "none";
-        try {
-          document.body.appendChild(el);
-        } catch {}
-      } else {
-        el.crossOrigin = "anonymous";
-        el.muted = false;
-      }
-      audioRef.current = el;
+    // Purge any rogue prebuffer or duplicate audio elements
+    const pEl = document.getElementById("melodymap-prebuffer-audio");
+    if (pEl) {
+      try {
+        (pEl as HTMLAudioElement).pause();
+        pEl.removeAttribute("src");
+        (pEl as HTMLAudioElement).load();
+        pEl.remove();
+      } catch {}
     }
 
-    if (!prebufferAudioRef.current) {
-      let pEl = document.getElementById("melodymap-prebuffer-audio") as HTMLAudioElement | null;
-      if (!pEl) {
-        pEl = document.createElement("audio");
-        pEl.id = "melodymap-prebuffer-audio";
-        pEl.crossOrigin = "anonymous";
-        pEl.preload = "auto";
-        pEl.muted = true;
-        pEl.volume = 0;
-        pEl.style.display = "none";
-        try {
-          document.body.appendChild(pEl);
-        } catch {}
-      }
-      prebufferAudioRef.current = pEl;
+    let el = document.getElementById("melodymap-core-audio") as HTMLAudioElement | null;
+    if (!el) {
+      el = document.createElement("audio");
+      el.id = "melodymap-core-audio";
+      el.setAttribute("playsinline", "true");
+      el.setAttribute("webkit-playsinline", "true");
+      el.setAttribute("x-webkit-airplay", "allow");
+      el.preload = "auto";
+      el.volume = 1;
+      el.muted = false;
+      el.style.position = "fixed";
+      el.style.bottom = "0";
+      el.style.left = "0";
+      el.style.width = "0";
+      el.style.height = "0";
+      el.style.opacity = "0";
+      el.style.pointerEvents = "none";
+      try {
+        document.body.appendChild(el);
+      } catch {}
+    } else {
+      el.muted = false;
     }
 
+    // Purge any stale/duplicate audio elements in the document
+    const allAudios = Array.from(document.querySelectorAll("audio"));
+    for (const a of allAudios) {
+      if (a !== el) {
+        try {
+          a.pause();
+          a.removeAttribute("src");
+          a.load();
+          a.remove();
+        } catch {}
+      }
+    }
+
+    audioRef.current = el;
   }, []);
 
   const endedRef = useRef(options.onEnded);
@@ -357,6 +355,21 @@ export function useAudioPlayer(options: {
       try {
         audio.pause();
       } catch {}
+
+      // Stop and remove any other audio elements in the DOM to prevent dual-playback
+      if (typeof document !== "undefined") {
+        const allAudios = Array.from(document.querySelectorAll("audio"));
+        for (const a of allAudios) {
+          if (a !== audio) {
+            try {
+              a.pause();
+              a.removeAttribute("src");
+              a.load();
+              a.remove();
+            } catch {}
+          }
+        }
+      }
 
       // For external direct audio (e.g. JioSaavn CDN, podcast MP3s), omit crossorigin
       // so the browser never blocks streaming due to CORS headers. The audio element
@@ -578,20 +591,6 @@ export function useAudioPlayer(options: {
       onTime();
     };
     const onPause = () => {
-      if (wantPlayRef.current && !isSeekingRef.current) {
-        // Paused unexpectedly (buffer underrun, transient network stall, or audio ducking).
-        // Maintain loading/buffering state and auto-resume once bytes are ready.
-        setIsLoading(true);
-        const el = audioRef.current;
-        if (el && el.paused && el.src && !el.src.startsWith("data:audio")) {
-          setTimeout(() => {
-            if (wantPlayRef.current && !isSeekingRef.current && el.paused) {
-              el.play().catch(() => {});
-            }
-          }, 300);
-        }
-        return;
-      }
       setIsPlaying(false);
       setIsLoading(false);
     };
@@ -616,21 +615,6 @@ export function useAudioPlayer(options: {
             onSponsorBlockSkippedRef.current?.(seg.category);
             break;
           }
-        }
-      }
-
-      // Gapless Pre-buffering: when current song has <= 25s left, pre-buffer upcoming track
-      // Disabled in Low Network Mode to minimize cellular data usage
-      if (!isLowNetworkModeEnabled() && dur > 0 && dur - cur <= 25 && prebufferAudioRef.current) {
-        const nextTrack = getNextTrackRef.current?.();
-        if (nextTrack && nextTrack.id && prebufferedTrackIdRef.current !== nextTrack.id) {
-          prebufferedTrackIdRef.current = nextTrack.id;
-          const nextUrl =
-            nextTrack.previewUrl && hasFullLengthDirectSource(nextTrack.id)
-              ? nextTrack.previewUrl
-              : streamUrl(nextTrack.id, equalizerSettingsRef.current.quality);
-          prebufferAudioRef.current.src = nextUrl;
-          prebufferAudioRef.current.load();
         }
       }
 
@@ -807,31 +791,15 @@ export function useAudioPlayer(options: {
   useEffect(() => {
     if (typeof document === "undefined") return;
     const onVisibilityChange = () => {
-      // Audio continues playing seamlessly in the background.
       if (!document.hidden && wantPlayRef.current) {
         if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
           audioCtxRef.current.resume().catch(() => {});
-        }
-        const audio = audioRef.current;
-        if (audio && audio.paused && audio.src && !audio.src.startsWith("data:audio")) {
-          audio.play().catch(() => {});
         }
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
-    // Background playback watchdog: auto-resume audio if paused while app is active
-    const watchdog = setInterval(() => {
-      if (wantPlayRef.current && !isSeekingRef.current) {
-        const audio = audioRef.current;
-        if (audio && audio.paused && audio.src && !audio.src.startsWith("data:audio")) {
-          audio.play().catch(() => {});
-        }
-      }
-    }, 1000);
-
     return () => {
-      clearInterval(watchdog);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);

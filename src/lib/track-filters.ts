@@ -150,10 +150,10 @@ export function parseDurationSeconds(dur: string | number | undefined | null): n
  * Uses word boundaries so legitimate titles like "Matrix", "Six", "Reminisce" are untouched.
  */
 export const NON_ORIGINAL_TRACK_REGEX =
-  /\b(remix|remixes|remixed|cover|covers|mix|mixes|mixed|mashup|mashups|instrumental|instrumentals|karaoke|acoustic|unplugged|tribute|recreation|lofi|lo-fi|lo fi|flip|bootleg|rework|reimagined|medley|slowed|reverb|bass boosted|sped up|speed up|club mix|dj mix|dance mix|chill mix|party mix|retro mix|extended mix|radio edit)\b/i;
+  /\b(remix|remixes|remixed|cover|covers|mix|mixes|mixed|mashup|mashups|instrumental|instrumentals|karaoke|acoustic|unplugged|tribute|recreation|recreated|lofi|lo-fi|lo fi|flip|bootleg|rework|reimagined|medley|slowed|reverb|bass boosted|sped up|speed up|club mix|dj mix|dance mix|chill mix|party mix|retro mix|extended mix|radio edit|female version|male version|sad version|duet version|reprise|jhankar|dholki|ringtone|dialogue promo|dialogue|trailer|teaser|bgm|theme music|8d audio|3d audio|trap mix|chipmunk|nightcore|ai version|ai cover|guitar cover|piano cover|flute cover|violin cover|drum cover|dance cover|fan made|fans made)\b/i;
 
 export const NON_ORIGINAL_ARTIST_REGEX =
-  /\b(cover|covers|instrumental|instrumentals|karaoke|tribute|lofi|lo-fi|slowed|reverb)\b/i;
+  /\b(cover|covers|instrumental|instrumentals|karaoke|tribute|lofi|lo-fi|slowed|reverb|orchestra|jhankar|dj\s|remix|acoustic)\b/i;
 
 /**
  * Strict validator to guarantee a track is an original song.
@@ -163,14 +163,17 @@ export function isOriginalSong(track: {
   title?: string | undefined;
   artist?: string | undefined;
   album?: string | undefined;
+  subtitle?: string | undefined;
 } | null | undefined): boolean {
   if (!track || !track.title) return false;
   const title = track.title;
   const artist = track.artist || "";
   const album = track.album || "";
+  const subtitle = track.subtitle || "";
 
   if (NON_ORIGINAL_TRACK_REGEX.test(title)) return false;
   if (album && NON_ORIGINAL_TRACK_REGEX.test(album)) return false;
+  if (subtitle && NON_ORIGINAL_TRACK_REGEX.test(subtitle)) return false;
   if (artist && (NON_ORIGINAL_TRACK_REGEX.test(artist) || NON_ORIGINAL_ARTIST_REGEX.test(artist))) return false;
 
   return true;

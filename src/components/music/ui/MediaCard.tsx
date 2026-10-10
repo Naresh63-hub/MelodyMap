@@ -6,17 +6,17 @@ import { triggerHaptic } from "@/lib/haptics";
 
 type Props = {
   title: string;
-  subtitle?: string;
-  image?: string;
-  playing?: boolean;
-  active?: boolean;
-  liked?: boolean;
-  onPlay?: () => void;
-  onToggleLike?: () => void;
-  onMore?: () => void;
-  size?: "sm" | "md" | "lg";
-  className?: string;
-  style?: React.CSSProperties;
+  subtitle?: string | undefined;
+  image?: string | undefined;
+  playing?: boolean | undefined;
+  active?: boolean | undefined;
+  liked?: boolean | undefined;
+  onPlay?: (() => void) | undefined;
+  onToggleLike?: (() => void) | undefined;
+  onMore?: (() => void) | undefined;
+  size?: ("sm" | "md" | "lg") | undefined;
+  className?: string | undefined;
+  style?: React.CSSProperties | undefined;
 };
 
 /**

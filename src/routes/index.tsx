@@ -22,6 +22,7 @@ import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchRe
 import { VoiceSearchButton } from "@/components/music/ui/VoiceSearchButton";
 import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
 import { saveRecentSearch } from "@/lib/search-history";
+import type { JioSaavnArtist } from "@/lib/artists-data";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -2864,10 +2865,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   {/* Home Sections — mobile horizontal scroll */}
                   <MobileHomeSections
                     dailyMix={quickFilters.length > 0 ? [] : dailyMixTracks}
-                    trending={[]}
-                    oldSongs={[]}
-                    newReleases={[]}
                     recommended={quickFilters.length > 0 ? quickFilteredFeed : recs}
+                    userLanguages={settings.languages}
+                    onArtistClick={(artist: JioSaavnArtist) => {
+                      setTab("search");
+                      setQuery(artist.name);
+                      setSearchFilter("all");
+                      saveRecentSearch(artist.name);
+                      void searchFor(artist.name, "songs", "all");
+                    }}
                     quickFilterIds={quickFilters}
                     onClearQuickFilters={handleClearQuickFilters}
                     onPlayTrack={(track, sectionTracks, i) => {

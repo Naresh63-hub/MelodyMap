@@ -40,6 +40,13 @@ describe("isOriginalSong", () => {
     expect(isOriginalSong({ title: "Tum Hi Ho (Karaoke Version)", artist: "Mithoon" })).toBe(false);
     expect(isOriginalSong({ title: "Song", artist: "Rishi Kumar Instrumentals" })).toBe(false);
   });
+
+  it("rejects version knockoffs, reprises, and dialogue promos", () => {
+    expect(isOriginalSong({ title: "Samajavaragamana (Female Version)", artist: "Sid Sriram" })).toBe(false);
+    expect(isOriginalSong({ title: "Deva Deva (Reprise)", artist: "Arijit Singh" })).toBe(false);
+    expect(isOriginalSong({ title: "Chitti (Dialogue Promo)", artist: "Radhan" })).toBe(false);
+    expect(isOriginalSong({ title: "Song (BGM)", artist: "Composer" })).toBe(false);
+  });
 });
 
 describe("isMusicTrack with isOriginalSong integration", () => {

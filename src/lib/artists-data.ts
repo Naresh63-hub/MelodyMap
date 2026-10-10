@@ -222,17 +222,22 @@ export function getTopArtistsForLanguages(userLanguages: string[] = []): JioSaav
   }
 
   const normalized = userLanguages.map((l) => l.toLowerCase());
-  const matching: JioSaavnArtist[] = [];
-  const others: JioSaavnArtist[] = [];
 
-  for (const artist of TOP_JIOSAAVN_ARTISTS) {
-    const hasLang = artist.languages.some((l) => normalized.includes(l.toLowerCase()));
-    if (hasLang) {
-      matching.push(artist);
-    } else {
-      others.push(artist);
+  // Score each artist:
+  // 2 points if their primary (first) language matches
+  // 1 point if any other language matches
+  // 0 points if non-matching
+  const scored = TOP_JIOSAAVN_ARTISTS.map((artist) => {
+    let score = 0;
+    const firstLang = artist.languages[0];
+    if (firstLang && normalized.includes(firstLang.toLowerCase())) {
+      score = 2;
+    } else if (artist.languages.some((l) => normalized.includes(l.toLowerCase()))) {
+      score = 1;
     }
-  }
+    return { artist, score };
+  });
 
-  return [...matching, ...others].slice(0, 16);
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((s) => s.artist).slice(0, 16);
 }

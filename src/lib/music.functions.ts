@@ -336,11 +336,13 @@ export async function runQueryBatch(
         if (saavnRes.length > 0) return saavnRes as Track[];
       } catch {}
 
-      try {
-        const { searchMultiProvider } = await import("./providers/multi-search");
-        const multi = await searchMultiProvider(q, { limit: perQueryLimit });
-        if (multi.tracks.length > 0) return multi.tracks as Track[];
-      } catch {}
+      if (!musicOnly) {
+        try {
+          const { searchMultiProvider } = await import("./providers/multi-search");
+          const multi = await searchMultiProvider(q, { limit: perQueryLimit });
+          if (multi.tracks.length > 0) return multi.tracks as Track[];
+        } catch {}
+      }
 
       return [];
     }),
@@ -492,8 +494,18 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const count = data.count ?? 20;
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
-    const bypassCache = !!data.refreshNonce;
 
+    try {
+      const { getSaavnTrendingSongs } = await import("./providers/saavn");
+      const saavnTrending = await getSaavnTrendingSongs(langs, count);
+      if (saavnTrending.length > 0) {
+        return { tracks: saavnTrending as Track[], error: null };
+      }
+    } catch (err) {
+      console.warn("[getRealTrendingTracks] Saavn trending feed notice:", err);
+    }
+
+    const bypassCache = !!data.refreshNonce;
     const queries: string[] = [];
 
     if (langs.length > 0) {
@@ -514,9 +526,7 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
         queries.push(`Top ${lang} Songs This Week`);
         queries.push(`Latest ${lang} Trending Songs`);
       }
-      // Note: Generic global queries are STRICTLY omitted so the trending section displays ONLY songs related to the user's selected languages.
     } else {
-      // Default fallback when user has not chosen languages yet
       const fallbackLangs = ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
       if (typeof data.clientHour === "number") {
         const { getTemporalContext } = await import("./context-engine");
@@ -540,8 +550,8 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
 
     const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache);
     const filteredTracks = langs.length > 0
-      ? tracks.filter((t) => isLanguageConsistent(t, langs))
-      : tracks;
+      ? tracks.filter((t) => isLanguageConsistent(t, langs) && isOriginalSong(t))
+      : tracks.filter(isOriginalSong);
     return { tracks: shuffleArray(filteredTracks).slice(0, count), error: null };
   });
 
@@ -561,8 +571,18 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const count = data.count ?? 20;
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
-    const bypassCache = !!data.refreshNonce;
 
+    try {
+      const { getSaavnOldSongs } = await import("./providers/saavn");
+      const saavnOld = await getSaavnOldSongs(langs, count);
+      if (saavnOld.length > 0) {
+        return { tracks: saavnOld as Track[], error: null };
+      }
+    } catch (err) {
+      console.warn("[getOldSongsTracks] Saavn old songs feed notice:", err);
+    }
+
+    const bypassCache = !!data.refreshNonce;
     const userLangs = langs.length > 0 ? langs : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
     const queries: string[] = [];
 
@@ -617,7 +637,7 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
     const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache);
     const filteredTracks = tracks.filter((t) => {
       const langOk = langs.length > 0 ? isLanguageConsistent(t, langs) : true;
-      return langOk && isOldEraTrack(t);
+      return langOk && isOldEraTrack(t) && isOriginalSong(t);
     });
     return { tracks: shuffleArray(filteredTracks).slice(0, count), error: null };
   });
@@ -1196,75 +1216,43 @@ const LANG_SEARCH: Record<string, string> = {
 export const newSongs = createServerFn({ method: "POST" })
   .validator((input: unknown) => NewSongsInput.parse(input))
   .handler(async ({ data }) => {
-    const { searchYouTube } = await import("./music.server");
     const count = data.count ?? 24;
     const year = new Date().getFullYear();
-    const artists = data.artists.map((a) => a.trim()).filter(Boolean).slice(0, 4);
-    const langs = data.languages
-      .map((l) => LANG_SEARCH[l.trim()])
-      .filter((t): t is string => Boolean(t))
-      .slice(0, 3);
-    const hasLang = langs.length > 0;
+    const langs = data.languages.map((l) => l.trim()).filter(Boolean);
+
+    try {
+      const { getSaavnNewReleases } = await import("./providers/saavn");
+      const releases = await getSaavnNewReleases(langs, count);
+      if (releases.length > 0) {
+        return { tracks: releases as Track[], error: null };
+      }
+    } catch (err) {
+      console.warn("[newSongs] Saavn new releases feed notice:", err);
+    }
 
     const out: Track[] = [];
     const seen = new Set<string>();
 
-    /** Runs a set of queries (one per language when set) and merges results. */
-    const add = async (
-      queries: string[],
-      quota: number,
-      upload?: "today" | "week",
-    ) => {
-      if (out.length >= count || quota <= 0) return;
-      const per = Math.max(1, Math.ceil(quota / queries.length));
-      for (const query of queries) {
-        if (out.length >= count) return;
-        let tracks: Track[] = [];
-        try {
-          const { searchSaavn } = await import("./providers/saavn");
-          const saavnHits = await searchSaavn(query, { limit: per + 6 });
-          if (saavnHits.length > 0) {
-            tracks = saavnHits as Track[];
-          } else {
-            const { searchYouTube } = await import("./music.server");
-            tracks = await searchYouTube(query, per + 6, true, upload);
+    try {
+      const { searchSaavn } = await import("./providers/saavn");
+      const queries = langs.length > 0
+        ? langs.map((l) => `${l} latest new hit songs ${year}`)
+        : [`latest hit songs ${year}`];
+
+      for (const q of queries) {
+        if (out.length >= count) break;
+        const hits = await searchSaavn(q, { limit: 12 });
+        for (const t of hits) {
+          if (out.length >= count) break;
+          if (!seen.has(t.id) && isOriginalSong(t) && !isOldEraTrack(t)) {
+            seen.add(t.id);
+            out.push(t as Track);
           }
-        } catch {
-          continue;
-        }
-        for (const t of tracks) {
-          if (out.length >= count) return;
-          if (seen.has(t.id)) continue;
-          seen.add(t.id);
-          out.push(t);
         }
       }
-    };
+    } catch {}
 
-    const weekQueries = hasLang
-      ? langs.map((l) => `new ${l} songs`)
-      : ["new songs"];
-    const yearQueries = hasLang
-      ? langs.map((l) => `latest ${l} songs ${year}`)
-      : [`latest songs ${year}`];
-    const trendQueries = hasLang
-      ? langs.map((l) => `trending ${l} songs`)
-      : ["trending songs this week"];
-
-    // Fresh uploads from this week, then this year's latest, then their artists.
-    await add(weekQueries, Math.floor(count * 0.35), "week");
-    await add(yearQueries, Math.floor(count * 0.3));
-    for (const artist of artists) {
-      await add([`${artist} new song ${year}`], Math.ceil(count / 6));
-    }
-    // Top up with what people are listening to right now.
-    await add(trendQueries, count);
-    // Strict policy: exclusively genuinely fresh (drop any verified classic/retro
-    // leak) and consistent with the listener's selected languages.
-    const fresh = out.filter(
-      (t) => !isOldEraTrack(t) && (data.languages.length === 0 || isLanguageConsistent(t, data.languages)),
-    );
-    return { tracks: fresh.slice(0, count), error: null };
+    return { tracks: out.slice(0, count), error: null };
   });
 
 
