@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
-import { trackSubtitle } from "@/lib/track-metadata";
+import { trackSubtitle, getTrackDisplayDuration } from "@/lib/track-metadata";
 
 type Props = {
   trending: Track[];
@@ -229,21 +229,19 @@ function VerticalSongList({
               </p>
             </button>
 
-            {/* Song duration time */}
-            {track.duration && (
-              <span className="shrink-0 text-xs sm:text-sm tabular-nums text-muted-foreground font-medium px-1">
-                {track.duration}
+            {/* Song duration time & like button matching reference image */}
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium">
+                {getTrackDisplayDuration(track)}
               </span>
-            )}
-
-            {/* Heart-shaped like toggle button */}
-            {onToggleLike && (
-              <HeartLikeButton
-                liked={liked}
-                onToggle={() => onToggleLike(track)}
-                size="md"
-              />
-            )}
+              {onToggleLike && (
+                <HeartLikeButton
+                  liked={liked}
+                  onToggle={() => onToggleLike(track)}
+                  size="md"
+                />
+              )}
+            </div>
 
             {/* 3-dots Menu Button */}
             {onOpenOptions && (

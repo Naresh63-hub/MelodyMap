@@ -13,6 +13,7 @@ import {
   Pause,
   Play,
   Search,
+  Settings,
   SkipForward,
   Sparkles,
   Sun,
@@ -69,18 +70,19 @@ type Props = {
   onToggleCollapse: () => void;
   onNavigate: (tab: NavTab) => void;
   isSynced: boolean;
-  userName?: string;
-  userInitial?: string;
-  userAvatar?: string | null;
+  userName?: string | undefined;
+  userInitial?: string | undefined;
+  userAvatar?: string | null | undefined;
   // Mini-player props
-  currentTitle?: string | null;
-  currentArtist?: string | null;
-  currentThumbnail?: string | null;
+  currentTitle?: string | null | undefined;
+  currentArtist?: string | null | undefined;
+  currentThumbnail?: string | null | undefined;
   isPlaying?: boolean;
   onPlayPause?: () => void;
   onNext?: () => void;
   onSignIn?: () => void;
   onSignOut?: () => Promise<void> | void;
+  onOpenSettings?: () => void;
 };
 
 export function Sidebar({
@@ -100,6 +102,7 @@ export function Sidebar({
   onNext,
   onSignIn,
   onSignOut,
+  onOpenSettings,
 }: Props) {
   const { mode, setMode } = useTheme();
 
@@ -309,21 +312,35 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Footer controls: theme switch + collapse toggle */}
+        {/* Footer controls: theme switch + settings + collapse toggle */}
         <div className={cn("flex items-center", collapsed ? "flex-col gap-2 justify-center" : "justify-between")}>
-          <button
-            type="button"
-            onClick={() => setMode(mode === "light" ? "dark" : "light")}
-            aria-label={mode === "light" ? "Switch to Rose Ember dark mode" : "Switch to light mode"}
-            title={mode === "light" ? "Theme: Light (click for Rose Ember)" : "Theme: Rose Ember (click for light)"}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-all duration-200 hover:bg-chip hover:text-foreground button-press focus-ring-neon"
-          >
-            {mode === "light" ? (
-              <Sun className="h-4 w-4 text-amber-400" />
-            ) : (
-              <Moon className="h-4 w-4 text-primary" />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setMode(mode === "light" ? "dark" : "light")}
+              aria-label={mode === "light" ? "Switch to Rose Ember dark mode" : "Switch to light mode"}
+              title={mode === "light" ? "Theme: Light (click for Rose Ember)" : "Theme: Rose Ember (click for light)"}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-all duration-200 hover:bg-chip hover:text-foreground button-press focus-ring-neon"
+            >
+              {mode === "light" ? (
+                <Sun className="h-4 w-4 text-amber-400" />
+              ) : (
+                <Moon className="h-4 w-4 text-primary" />
+              )}
+            </button>
+
+            {onOpenSettings && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                aria-label="Open settings"
+                title="Settings"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-all duration-200 hover:bg-chip hover:text-foreground button-press focus-ring-neon"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
             )}
-          </button>
+          </div>
 
           {!collapsed && (
             <p className="px-1 text-[10px] text-foreground/20 font-medium">

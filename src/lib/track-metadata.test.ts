@@ -7,6 +7,7 @@ import {
   isChannelOrLabelName,
   stripLanguageAndNoiseTags,
   trackSubtitle,
+  getTrackDisplayDuration,
 } from "./track-metadata";
 
 /**
@@ -133,3 +134,33 @@ describe("stripLanguageAndNoiseTags", () => {
     expect(stripLanguageAndNoiseTags("Song (Deluxe Edition)")).toBe("Song");
   });
 });
+
+describe("getTrackDisplayDuration", () => {
+  it("preserves already formatted strings like 4:57 and 3:51", () => {
+    expect(getTrackDisplayDuration({ duration: "4:57" })).toBe("4:57");
+    expect(getTrackDisplayDuration({ duration: "3:57" })).toBe("3:57");
+    expect(getTrackDisplayDuration({ duration: "3:51" })).toBe("3:51");
+    expect(getTrackDisplayDuration({ duration: "04:57" })).toBe("4:57");
+  });
+
+  it("formats numeric seconds into m:ss", () => {
+    expect(getTrackDisplayDuration({ duration: 297 })).toBe("4:57");
+    expect(getTrackDisplayDuration({ duration: 237 })).toBe("3:57");
+    expect(getTrackDisplayDuration({ duration: 231 })).toBe("3:51");
+  });
+
+  it("formats string seconds into m:ss", () => {
+    expect(getTrackDisplayDuration({ duration: "297" })).toBe("4:57");
+  });
+
+  it("reads durationSeconds when duration is undefined", () => {
+    expect(getTrackDisplayDuration({ durationSeconds: 297 })).toBe("4:57");
+  });
+
+  it("safely falls back to standard music duration when missing", () => {
+    expect(getTrackDisplayDuration(null)).toBe("3:30");
+    expect(getTrackDisplayDuration({})).toBe("3:30");
+    expect(getTrackDisplayDuration({ duration: "" })).toBe("3:30");
+  });
+});
+

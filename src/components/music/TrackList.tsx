@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
-import { cleanSongTitle, trackSubtitle, isChannelOrLabelName } from "@/lib/track-metadata";
+import { cleanSongTitle, trackSubtitle, isChannelOrLabelName, getTrackDisplayDuration } from "@/lib/track-metadata";
 
 type Props = {
   tracks: Track[];
@@ -157,24 +157,24 @@ export function TrackList({
               );
             })()}
 
-              {track.duration && (
-                <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium px-1 shrink-0">
-                  {track.duration}
+              {/* Song duration time & like button matching reference image */}
+              <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium">
+                  {getTrackDisplayDuration(track)}
                 </span>
-              )}
-
-              <HeartLikeButton
-                liked={liked}
-                onToggle={() => onToggleLike(track)}
-                size="md"
-              />
+                <HeartLikeButton
+                  liked={liked}
+                  onToggle={() => onToggleLike(track)}
+                  size="md"
+                />
+              </div>
 
               {onToggleDislike && (
                 <button
                   type="button"
                   onClick={() => onToggleDislike(track)}
                   aria-label="Not for me"
-                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-red-400 active:scale-95"
+                  className="hidden sm:inline-flex rounded-full p-2 text-foreground/40 transition-colors hover:text-red-400 active:scale-95"
                 >
                   <ThumbsDown
                     className={cn(

@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { Track, Playlist } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
+import { getTrackDisplayDuration } from "@/lib/track-metadata";
 
 type LibrarySection = "liked" | "history" | "playlists" | "downloads" | null;
 
@@ -160,6 +161,10 @@ export function MobileLibrary({
                       {track.artist}
                     </p>
                   </button>
+
+                  <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium shrink-0 px-1">
+                    {getTrackDisplayDuration(track)}
+                  </span>
 
                   {onOpenOptions && (
                     <button

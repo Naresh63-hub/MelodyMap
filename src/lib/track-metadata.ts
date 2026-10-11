@@ -312,3 +312,65 @@ export function trackSubtitle(track: {
   if (artist && !isChannelOrLabelName(artist)) return stripDanglingClosers(artist);
   return "";
 }
+
+/**
+ * Normalises and formats track duration to "m:ss" format (e.g. "4:57", "3:57", "3:51").
+ * Reliably handles pre-formatted strings, numeric strings, raw seconds numbers, and durationSeconds.
+ */
+export function getTrackDisplayDuration(track?: {
+  duration?: string | number | null | undefined;
+  durationSeconds?: number | null | undefined;
+} | null | undefined): string {
+  if (!track) return "3:30";
+  const raw = track.duration;
+
+  // 1. If it's already a formatted string with colons like "4:57" or "04:57"
+  if (typeof raw === "string" && raw.includes(":")) {
+    const parts = raw.trim().split(":");
+    if (parts.length === 2) {
+      const min = parseInt(parts[0] || "0", 10);
+      const sec = parseInt(parts[1] || "0", 10);
+      if (!Number.isNaN(min) && !Number.isNaN(sec)) {
+        return `${min}:${sec.toString().padStart(2, "0")}`;
+      }
+    } else if (parts.length === 3) {
+      const hr = parseInt(parts[0] || "0", 10);
+      const min = parseInt(parts[1] || "0", 10);
+      const sec = parseInt(parts[2] || "0", 10);
+      if (!Number.isNaN(hr) && !Number.isNaN(min) && !Number.isNaN(sec)) {
+        return hr > 0
+          ? `${hr}:${min.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`
+          : `${min}:${sec.toString().padStart(2, "0")}`;
+      }
+    }
+    return raw.trim();
+  }
+
+  // 2. If it's a numeric string like "297"
+  if (typeof raw === "string" && raw.trim()) {
+    const parsed = Number(raw.trim());
+    if (Number.isFinite(parsed) && parsed > 0) {
+      const min = Math.floor(parsed / 60);
+      const sec = Math.floor(parsed % 60);
+      return `${min}:${sec.toString().padStart(2, "0")}`;
+    }
+  }
+
+  // 3. If raw duration is a number (e.g. 297 seconds)
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) {
+    const min = Math.floor(raw / 60);
+    const sec = Math.floor(raw % 60);
+    return `${min}:${sec.toString().padStart(2, "0")}`;
+  }
+
+  // 4. If durationSeconds is available
+  if (typeof track.durationSeconds === "number" && Number.isFinite(track.durationSeconds) && track.durationSeconds > 0) {
+    const min = Math.floor(track.durationSeconds / 60);
+    const sec = Math.floor(track.durationSeconds % 60);
+    return `${min}:${sec.toString().padStart(2, "0")}`;
+  }
+
+  // 5. Default fallback duration for music tracks
+  return "3:30";
+}
+

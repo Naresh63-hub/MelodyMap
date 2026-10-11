@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Playlist, Track } from "@/lib/library";
 import { cn } from "@/lib/utils";
+import { getTrackDisplayDuration } from "@/lib/track-metadata";
 
 type Props = {
   playlists: Playlist[];
@@ -298,6 +299,9 @@ export function PlaylistsPanel({
                           </p>
                           <p className="truncate text-xs text-muted-foreground">{track.artist}</p>
                         </button>
+                        <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium px-1 shrink-0">
+                          {getTrackDisplayDuration(track)}
+                        </span>
                         <button
                           type="button"
                           onClick={() => onRemoveTrack(open.id, track.id)}

@@ -2678,8 +2678,50 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     else if (section === "playlists") setTab("playlists");
   }, []);
 
+  const userNameDisplay =
+    auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+      ? auth.profile.display_name
+      : auth.email && auth.email !== "listener@google.com"
+        ? auth.email.split("@")[0]
+        : "My Account";
+
+  const userInitialDisplay = (
+    auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+      ? auth.profile.display_name[0]
+      : auth.email && auth.email !== "listener@google.com"
+        ? auth.email[0]
+        : "M"
+  )?.toUpperCase() ?? "M";
+
   return (
-    <div className="flex flex-col h-dvh bg-background text-foreground selection:bg-primary/20 overflow-hidden w-full max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl relative border-x border-hair">
+    <div className="flex h-dvh bg-background text-foreground selection:bg-primary/20 overflow-hidden w-full relative">
+      {/* Desktop Persistent Left Sidebar */}
+      <div className="hidden lg:flex shrink-0 h-full z-30">
+        <Sidebar
+          activeTab={tab}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+          onNavigate={setTab}
+          isSynced={!!auth.userId}
+          userName={userNameDisplay}
+          userInitial={userInitialDisplay}
+          userAvatar={auth.profile?.avatar_url ?? null}
+          currentTitle={current?.title ?? null}
+          currentArtist={current?.artist ?? null}
+          currentThumbnail={current?.thumbnail ?? null}
+          isPlaying={player.isPlaying}
+          onPlayPause={togglePlay}
+          onNext={goNext}
+          onSignIn={() => setShowAuthModal(true)}
+          onSignOut={async () => {
+            await auth.signOut();
+            setMessage("Signed out successfully");
+            setTimeout(() => setMessage(null), 3000);
+          }}
+          onOpenSettings={() => setShowSettings(true)}
+        />
+      </div>
+
       {/* Slide-out Mobile Sidebar Drawer */}
       <MobileDrawer
         open={drawerOpen}
@@ -2692,21 +2734,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }}
         isSynced={!!auth.userId}
         isPlaying={player.isPlaying}
-        userName={
-          auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
-            ? auth.profile.display_name
-            : auth.email && auth.email !== "listener@google.com"
-              ? auth.email.split("@")[0]
-              : "My Account"
-        }
-        userInitial={
-          (auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
-            ? auth.profile.display_name[0]
-            : auth.email && auth.email !== "listener@google.com"
-              ? auth.email[0]
-              : "M"
-          )?.toUpperCase() ?? "M"
-        }
+        userName={userNameDisplay}
+        userInitial={userInitialDisplay}
         userAvatar={auth.profile?.avatar_url ?? null}
         onSignIn={() => {
           setDrawerOpen(false);
@@ -2748,7 +2777,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 type="button"
                 onClick={() => setDrawerOpen(true)}
                 aria-label="Open menu"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip-subtle border border-hair text-secondary-foreground active:scale-95 transition-all"
+                className="flex lg:hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip-subtle border border-hair text-secondary-foreground active:scale-95 transition-all"
               >
                 <Menu className="h-4 w-4" />
               </button>
@@ -3357,6 +3386,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
           onSeek={(s) => player.seek(s)}
+          sidebarCollapsed={sidebarCollapsed}
         />
       )}
 
