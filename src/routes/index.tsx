@@ -9,7 +9,7 @@ import {
   X,
   RefreshCw,
 } from "lucide-react";
-import { type NavTab, NAV_ITEMS } from "@/components/music/layout/Sidebar";
+import { Sidebar, type NavTab, NAV_ITEMS } from "@/components/music/layout/Sidebar";
 import { MobileNav } from "@/components/music/layout/MobileNav";
 import { MobileDrawer } from "@/components/music/layout/MobileDrawer";
 import { MiniPlayer } from "@/components/music/layout/MiniPlayer";
@@ -255,6 +255,7 @@ function MusicApp() {
 
   // Initial feed & settings states — always empty/default on SSR to prevent hydration mismatches
   const [tab, setTab] = useState<NavTab>("foryou");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const prevTabRef = useRef<NavTab>("foryou");
   const [tabDirection, setTabDirection] = useState<'left' | 'right'>('right');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -868,6 +869,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         player.pause();
         setMessage("Playback stopped — several tracks failed to load");
         setTimeout(() => setMessage(null), 5000);
+        return;
+      }
+
+      // If the message asks the user to retry or tap play, do NOT force-skip:
+      // pause and let the user decide when to tap play.
+      if (
+        msg &&
+        (msg.toLowerCase().includes("retry") ||
+          msg.toLowerCase().includes("tap play") ||
+          msg.toLowerCase().includes("interrupted"))
+      ) {
+        player.pause();
+        setMessage(msg);
+        setTimeout(() => setMessage(null), 4000);
         return;
       }
 

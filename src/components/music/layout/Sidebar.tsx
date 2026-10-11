@@ -79,6 +79,8 @@ type Props = {
   isPlaying?: boolean;
   onPlayPause?: () => void;
   onNext?: () => void;
+  onSignIn?: () => void;
+  onSignOut?: () => Promise<void> | void;
 };
 
 export function Sidebar({
@@ -96,6 +98,8 @@ export function Sidebar({
   isPlaying = false,
   onPlayPause,
   onNext,
+  onSignIn,
+  onSignOut,
 }: Props) {
   const { mode, setMode } = useTheme();
 
@@ -260,7 +264,28 @@ export function Sidebar({
       <div className="border-t border-hair p-3">
         {/* User card (expanded only) */}
         {!collapsed && (
-          <div className="mb-3 flex items-center gap-3 rounded-lg border border-hair bg-chip-subtle px-3.5 py-2.5 hover:bg-chip transition-colors cursor-default group/user">
+          <div
+            onClick={() => {
+              if (isSynced) {
+                if (onSignOut) void onSignOut();
+              } else {
+                if (onSignIn) onSignIn();
+              }
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                if (isSynced) {
+                  if (onSignOut) void onSignOut();
+                } else {
+                  if (onSignIn) onSignIn();
+                }
+              }
+            }}
+            title={isSynced ? "Click to sign out" : "Click to sign in"}
+            className="mb-3 flex items-center gap-3 rounded-lg border border-hair bg-chip-subtle px-3.5 py-2.5 hover:bg-chip transition-colors cursor-pointer group/user active:scale-[0.98]"
+          >
             <div className="relative shrink-0">
               <div
                 className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-popover text-xs font-semibold text-foreground border border-hair-strong"
@@ -271,14 +296,14 @@ export function Sidebar({
                   <User className="h-4 w-4 text-foreground/70" />
                 )}
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" />
+              <div className={cn("absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background", isSynced ? "bg-primary" : "bg-muted-foreground")} />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-foreground/90">
                 {userName ?? "Listener"}
               </p>
               <p className="truncate text-[10px] text-foreground/40">
-                {isSynced ? "Synced to cloud" : "Local mode"}
+                {isSynced ? "Synced (Click to sign out)" : "Sign in / Sync account"}
               </p>
             </div>
           </div>

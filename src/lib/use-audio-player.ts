@@ -371,19 +371,9 @@ export function useAudioPlayer(options: {
         }
       }
 
-      // For external direct audio (e.g. JioSaavn CDN, podcast MP3s), omit crossorigin
-      // so the browser never blocks streaming due to CORS headers. The audio element
-      // plays directly to hardware speakers with full volume.
-      const isExternalDirect =
-        typeof window !== "undefined" &&
-        url.startsWith("http") &&
-        !url.includes(window.location.host) &&
-        !url.includes("/api/stream/");
-      if (isExternalDirect) {
-        audio.removeAttribute("crossorigin");
-      } else {
-        audio.crossOrigin = "anonymous";
-      }
+      // Direct HTML5 <audio> plays natively to OS audio subsystem with full volume
+      // and zero CORS restrictions. Omit crossorigin so streams never fail CORS.
+      audio.removeAttribute("crossorigin");
 
       audio.loop = false;
       audio.muted = false;
@@ -518,12 +508,11 @@ export function useAudioPlayer(options: {
           return;
         }
         const resumePos = lastValidPositionRef.current || 0;
-        pendingSeekRef.current = resumePos;
+        pendingSeekRef.current = resumePos > 0 ? resumePos : null;
 
         const freshUrl = `${streamUrl(tid)}&_reconnect=${Date.now()}`;
         a.src = freshUrl;
         a.load();
-        a.currentTime = resumePos;
         const playPromise = a.play();
         if (playPromise !== undefined) {
           playPromise
@@ -678,6 +667,15 @@ export function useAudioPlayer(options: {
     // When song ends with screen locked, synchronously switch .src & call .play()
     // inside the same event loop frame so mobile OS grants immediate autoplay permission!
     const onEnded = () => {
+      // Guard against spurious ended events:
+      // A song cannot legitimately finish if duration is unknown/0 or currentTime is near 0.
+      const dur = audio.duration;
+      const cur = audio.currentTime;
+      if (!Number.isFinite(dur) || dur <= 0 || cur < 3) {
+        console.warn("[MelodyMap] Spurious onEnded ignored (cur:", cur, "dur:", dur, ")");
+        return;
+      }
+
       setIsPlaying(false);
       setIsLoading(false);
 
