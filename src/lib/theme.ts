@@ -4,7 +4,7 @@ const THEME_KEY = 'melodymap-theme';
 
 const THEME_COLORS = {
   dark: '#1b1217',
-  light: '#f2f5fa',
+  light: '#faf6f4',
 } as const;
 
 function isTheme(value: string | null): value is Theme {

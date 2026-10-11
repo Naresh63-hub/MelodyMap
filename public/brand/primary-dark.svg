@@ -1,42 +1,81 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 320" fill="none">
   <defs>
-    <radialGradient id="disc-base" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#2a1723"/>
-      <stop offset="85%" stop-color="#1e1119"/>
-      <stop offset="100%" stop-color="#160c12"/>
-    </radialGradient>
-    <linearGradient id="grad-rose" x1="0%" y1="0%" x2="100%" y2="100%">
+    <!-- Main M Note Gradient: Coral-Rose to Neon Magenta/Plum -->
+    <linearGradient id="grad-main" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#ff7597"/>
-      <stop offset="100%" stop-color="#f43f5e"/>
+      <stop offset="35%" stop-color="#f43f5e"/>
+      <stop offset="70%" stop-color="#d926aa"/>
+      <stop offset="100%" stop-color="#a21caf"/>
+    </linearGradient>
+
+    <!-- Wordmark gradient -->
+    <linearGradient id="grad-word" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#f43f5e"/>
+      <stop offset="100%" stop-color="#ff7597"/>
+    </linearGradient>
+
+    <!-- Map Pin Gradient: Rose to Fuchsia -->
+    <linearGradient id="grad-pin" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#ff7597"/>
+      <stop offset="100%" stop-color="#d926aa"/>
+    </linearGradient>
+
+    <!-- Sound Wave Bars Left -->
+    <linearGradient id="grad-wave-l" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#ff7597" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <!-- Sound Wave Bars Right -->
+    <linearGradient id="grad-wave-r" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#d926aa" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#ff7597" stop-opacity="0.6"/>
     </linearGradient>
   </defs>
 
-  <!-- VINYL RECORD ICON -->
-  <g transform="translate(60, 40)">
-    <!-- Base Disc -->
-    <circle cx="120" cy="120" r="110" fill="url(#disc-base)" stroke="#f7809c" stroke-width="5" stroke-opacity="0.85"/>
-    <circle cx="120" cy="120" r="98" fill="none" stroke="#f7809c" stroke-width="1.5" stroke-opacity="0.2"/>
+  <!-- ICON (left side, scaled down to fit with wordmark) -->
+  <g transform="translate(30, 20) scale(0.55)">
+    <!-- Sound wave bars left -->
+    <rect x="62" y="195" width="7" height="50" rx="3.5" fill="url(#grad-wave-l)"/>
+    <rect x="78" y="170" width="7" height="100" rx="3.5" fill="url(#grad-wave-l)"/>
+    <rect x="94" y="155" width="7" height="130" rx="3.5" fill="url(#grad-wave-l)"/>
+    <rect x="110" y="165" width="7" height="110" rx="3.5" fill="url(#grad-wave-l)"/>
 
-    <!-- Outer Grooves -->
-    <path d="M 58 74 A 77 77 0 0 0 58 166" stroke="#f7809c" stroke-width="6" stroke-linecap="round"/>
-    <path d="M 182 74 A 77 77 0 0 1 182 166" stroke="#f7809c" stroke-width="6" stroke-linecap="round"/>
+    <!-- Sound wave bars right -->
+    <rect x="395" y="165" width="7" height="110" rx="3.5" fill="url(#grad-wave-r)"/>
+    <rect x="411" y="155" width="7" height="130" rx="3.5" fill="url(#grad-wave-r)"/>
+    <rect x="427" y="170" width="7" height="100" rx="3.5" fill="url(#grad-wave-r)"/>
+    <rect x="443" y="195" width="7" height="50" rx="3.5" fill="url(#grad-wave-r)"/>
 
-    <!-- Mid Grooves -->
-    <path d="M 73 87 A 57 57 0 0 0 73 153" stroke="#f7809c" stroke-width="5" stroke-linecap="round"/>
-    <path d="M 167 87 A 57 57 0 0 1 167 153" stroke="#f7809c" stroke-width="5" stroke-linecap="round"/>
+    <!-- M music note left stem -->
+    <path d="M 140 120 L 140 340 C 140 365 155 385 180 390 C 200 394 215 380 215 360 C 215 345 205 335 190 335 L 175 335 L 175 155 L 250 155 L 250 120 Z" fill="url(#grad-main)"/>
 
-    <!-- Center Spindle Disc -->
-    <circle cx="120" cy="120" r="24" fill="#f7809c"/>
-    <circle cx="120" cy="120" r="10" fill="#1e1119" stroke="#f7809c" stroke-width="1.5"/>
+    <!-- M music note right stem -->
+    <path d="M 332 120 L 332 340 C 332 365 347 385 372 390 C 392 394 407 380 407 360 C 407 345 397 335 382 335 L 367 335 L 367 155 L 290 155 L 290 120 Z" fill="url(#grad-main)"/>
+
+    <!-- Center V -->
+    <path d="M 250 120 L 210 230 L 250 280 L 290 230 L 250 120 Z" fill="url(#grad-main)" opacity="0.88"/>
+
+    <!-- Play triangle -->
+    <path d="M 235 200 L 268 225 L 235 250 Z" fill="#ffffff" opacity="0.95"/>
+
+    <!-- Map pin -->
+    <g transform="translate(370, 80) scale(0.55)">
+      <path d="M 24 0 C 10.7 0 0 10.7 0 24 C 0 42 24 64 24 64 C 24 64 48 42 48 24 C 48 10.7 37.3 0 24 0 Z" fill="url(#grad-pin)"/>
+      <circle cx="24" cy="22" r="8" fill="#140a10" opacity="0.65"/>
+    </g>
+
+    <!-- Dashed trail -->
+    <path d="M 388 118 C 380 135 370 145 355 150" stroke="#ff7597" stroke-width="2.5" stroke-dasharray="6 4" fill="none" opacity="0.6"/>
   </g>
 
   <!-- WORDMARK (Preserved exact text) -->
-  <text x="320" y="150" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="88" font-weight="800" letter-spacing="-2">
-    <tspan fill="#ffffff">Melody</tspan><tspan fill="url(#grad-rose)">Map</tspan>
+  <text x="340" y="195" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="96" font-weight="800" letter-spacing="-2">
+    <tspan fill="#ffffff">Melody</tspan><tspan fill="url(#grad-word)">Map</tspan>
   </text>
 
   <!-- TAGLINE (Preserved exact text) -->
-  <text x="322" y="195" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" font-weight="500" letter-spacing="3" fill="#a58c97">
+  <text x="342" y="240" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="22" font-weight="500" letter-spacing="4" fill="#a58c97">
     YOUR MUSIC. YOUR MOOD. YOUR MAP.
   </text>
 </svg>

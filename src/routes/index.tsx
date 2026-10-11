@@ -2740,7 +2740,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               <img
                 src="/brand/app-icon.png"
                 alt="MelodyMap"
-                className="h-8 w-8 rounded-full object-cover ring-1 ring-primary/40 shrink-0 hidden xs:block"
+                className="h-8 w-8 rounded-xl object-cover ring-1 ring-primary/30 shrink-0 hidden xs:block shadow-sm"
               />
               <form onSubmit={onSearch} className="relative flex-1 flex items-center gap-2">
                 <div className="relative flex-1">

@@ -9,14 +9,17 @@ import {
   Layers,
   ListMusic,
   Mic,
+  Moon,
   Pause,
   Play,
   Search,
   SkipForward,
   Sparkles,
+  Sun,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
 
 export type NavTab =
   | "foryou"
@@ -94,6 +97,8 @@ export function Sidebar({
   onPlayPause,
   onNext,
 }: Props) {
+  const { mode, setMode } = useTheme();
+
   return (
     <aside
       className={cn(
@@ -113,7 +118,7 @@ export function Sidebar({
           <img
             src="/brand/app-icon.png"
             alt="MelodyMap"
-            className="h-8 w-8 rounded-full object-cover shadow-sm ring-1 ring-primary/40"
+            className="h-8 w-8 rounded-xl object-cover shadow-sm ring-1 ring-primary/30"
           />
         </div>
         {!collapsed && (
@@ -285,13 +290,28 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Collapse toggle */}
-        <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
+        {/* Footer controls: theme switch + collapse toggle */}
+        <div className={cn("flex items-center", collapsed ? "flex-col gap-2 justify-center" : "justify-between")}>
+          <button
+            type="button"
+            onClick={() => setMode(mode === "light" ? "dark" : "light")}
+            aria-label={mode === "light" ? "Switch to Rose Ember dark mode" : "Switch to light mode"}
+            title={mode === "light" ? "Theme: Light (click for Rose Ember)" : "Theme: Rose Ember (click for light)"}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-all duration-200 hover:bg-chip hover:text-foreground button-press focus-ring-neon"
+          >
+            {mode === "light" ? (
+              <Sun className="h-4 w-4 text-amber-400" />
+            ) : (
+              <Moon className="h-4 w-4 text-primary" />
+            )}
+          </button>
+
           {!collapsed && (
             <p className="px-1 text-[10px] text-foreground/20 font-medium">
-              MelodyMap v1.0
+              MelodyMap
             </p>
           )}
+
           <button
             type="button"
             onClick={onToggleCollapse}

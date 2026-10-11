@@ -1,5 +1,5 @@
 import { Clock, Disc3, Flame, MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, TrendingUp, Users } from "lucide-react";
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
@@ -10,6 +10,40 @@ import { filterTracksByQuickFilters } from "@/lib/mood-genre-filters";
 import { trackSubtitle } from "@/lib/track-metadata";
 import { ArtistCard } from "./ArtistCard";
 import { getTopArtistsForLanguages, type JioSaavnArtist } from "@/lib/artists-data";
+
+/** Resilient track image with automatic fallback to prevent broken img icons */
+function TrackThumbnail({
+  src,
+  alt = "",
+  className,
+  fallbackClassName,
+}: {
+  src?: string | null | undefined;
+  alt?: string;
+  className?: string;
+  fallbackClassName?: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+  const optimized = src ? getOptimizedThumbnailUrl(src) : null;
+
+  if (!optimized || hasError) {
+    return (
+      <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-br from-[#362230] to-card text-primary/70", fallbackClassName)}>
+        <Music2 className="h-7 w-7 opacity-50" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={optimized}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setHasError(true)}
+    />
+  );
+}
 
 type Props = {
   dailyMix?: Track[] | undefined;
@@ -73,24 +107,22 @@ function HorizontalScrollRow({
             className="group/card relative w-[138px] sm:w-[156px] shrink-0 snap-start text-left p-1.5 rounded-xl transition-all hover:bg-chip/50"
           >
             {/* JioSaavn Square Artwork Container */}
-            <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-card border border-hair">
+            <div
+              className={cn(
+                "relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-card border border-hair transition-all duration-300",
+                active && "ring-2 ring-primary/80 shadow-[0_0_20px_rgba(247,128,156,0.35)]",
+                "group-hover/card:border-primary/40 group-hover/card:shadow-[0_8px_24px_-6px_rgba(247,128,156,0.25)]",
+              )}
+            >
               <button
                 type="button"
                 onClick={() => onPlayTrack(track, tracks, i)}
                 className="h-full w-full block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
-                {track.thumbnail ? (
-                  <img
-                    src={getOptimizedThumbnailUrl(track.thumbnail)}
-                    alt=""
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center text-muted-foreground">
-                    <Music2 className="h-7 w-7 opacity-40" />
-                  </div>
-                )}
+                <TrackThumbnail
+                  src={track.thumbnail}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105"
+                />
 
                 {/* JioSaavn Dark Gradient Hover/Playing Overlay */}
                 <div
@@ -109,7 +141,7 @@ function HorizontalScrollRow({
                       : "opacity-0 scale-90 group-hover/card:opacity-100 group-hover/card:scale-100",
                   )}
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-xl transition-transform hover:scale-110 active:scale-95">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 ring-2 ring-white/20 transition-transform hover:scale-110 active:scale-95">
                     {playing ? (
                       <Pause className="h-5 w-5 fill-current" />
                     ) : (
@@ -214,19 +246,16 @@ function VerticalSongList({
             <button
               type="button"
               onClick={() => onPlayTrack(track, tracks, i)}
-              className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-card border border-hair"
-            >
-              {track.thumbnail ? (
-                <img
-                  src={getOptimizedThumbnailUrl(track.thumbnail)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                  <Music2 className="h-5 w-5 opacity-40" />
-                </div>
+              className={cn(
+                "relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-card border border-hair transition-all",
+                active && "ring-1.5 ring-primary/80 shadow-[0_0_12px_rgba(247,128,156,0.3)]",
               )}
+            >
+              <TrackThumbnail
+                src={track.thumbnail}
+                className="h-full w-full object-cover"
+                fallbackClassName="text-primary/70"
+              />
               {active && isPlaying && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <Equalizer active className="h-4 w-4 text-primary" />

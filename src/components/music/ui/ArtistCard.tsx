@@ -30,7 +30,7 @@ export const ArtistCard = memo(function ArtistCard({ artist, onClick, className 
       )}
     >
       {/* Circular Avatar Container */}
-      <div className="relative mb-2 aspect-square w-24 sm:w-28 overflow-hidden rounded-full border-2 border-hair/60 bg-card shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-primary/80 group-hover:shadow-md group-hover:shadow-primary/20">
+      <div className="relative mb-2 aspect-square w-24 sm:w-28 overflow-hidden rounded-full border-2 border-hair/60 bg-gradient-to-br from-[#362230] to-card shadow-sm transition-all duration-300 group-hover:scale-105 group-hover:border-primary/80 group-hover:shadow-[0_0_20px_rgba(247,128,156,0.3)]">
         {!error ? (
           <img
             src={artist.image}
@@ -44,9 +44,14 @@ export const ArtistCard = memo(function ArtistCard({ artist, onClick, className 
               loaded && "opacity-100",
             )}
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-card text-muted-foreground">
-            <User className="h-8 w-8 opacity-40" />
+        ) : null}
+
+        {/* Fallback avatar if image failed or loading */}
+        {(error || !loaded) && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#362230] via-card to-[#231720] text-primary">
+            <span className="font-display text-xl font-bold tracking-tight text-primary/90">
+              {artist.name.charAt(0).toUpperCase()}
+            </span>
           </div>
         )}
 

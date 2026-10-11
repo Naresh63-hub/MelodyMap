@@ -8,12 +8,15 @@ import {
   LogIn,
   LogOut,
   Mic,
+  Moon,
   Search,
   Settings2,
   Sparkles,
+  Sun,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
 import type { NavTab } from "./Sidebar";
 
 type Props = {
@@ -45,6 +48,8 @@ export function MobileDrawer({
   onSignIn,
   onSignOut,
 }: Props) {
+  const { mode, setMode } = useTheme();
+
   if (!open) return null;
 
   const handleNav = (tab: NavTab) => {
@@ -90,7 +95,7 @@ export function MobileDrawer({
             <img
               src="/brand/app-icon.png"
               alt="MelodyMap"
-              className="h-8 w-8 rounded-full object-cover ring-1 ring-primary/40"
+              className="h-8 w-8 rounded-xl object-cover shadow-sm ring-1 ring-primary/30"
             />
             <span className="font-display text-base font-semibold">
               <span className="text-foreground">Melody</span>
@@ -210,6 +215,27 @@ export function MobileDrawer({
 
         {/* Bottom Actions */}
         <div className="p-3 border-t border-hair-strong space-y-1">
+          {/* Quick Theme Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === "light" ? "dark" : "light");
+            }}
+            className="flex w-full items-center justify-between rounded-lg px-3.5 py-2 text-xs font-medium text-foreground/80 hover:bg-chip hover:text-foreground text-left transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {mode === "light" ? (
+                <Sun className="h-4 w-4 text-amber-400" />
+              ) : (
+                <Moon className="h-4 w-4 text-primary" />
+              )}
+              <span>{mode === "light" ? "Light Mode" : "Rose Ember (Dark)"}</span>
+            </div>
+            <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground px-1.5 py-0.5 rounded bg-chip border border-hair">
+              {mode === "light" ? "Sun" : "Moon"}
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
