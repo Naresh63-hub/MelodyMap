@@ -1277,6 +1277,22 @@ export const newSongs = createServerFn({ method: "POST" })
       }
     } catch {}
 
+    if (out.length < 8) {
+      try {
+        const queryPool = langs.length > 0
+          ? langs.map((l) => `${l} latest songs ${year} official audio`)
+          : [`latest hit songs ${year} official audio`];
+        const ytTracks = await runQueryBatch(queryPool, 10, true, false);
+        for (const t of ytTracks) {
+          if (out.length >= count) break;
+          if (!seen.has(t.id) && isOriginalSong(t) && !isOldEraTrack(t)) {
+            seen.add(t.id);
+            out.push(t as Track);
+          }
+        }
+      } catch {}
+    }
+
     return { tracks: out.slice(0, count), error: null };
   });
 

@@ -272,15 +272,18 @@ function MusicApp() {
   const [oldSongsList, setOldSongsList] = useState<Track[]>([]);
   const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
+  const [exploreLoading, setExploreLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const { pullToRefreshProps, isPulling } = usePullToRefresh({
     onRefresh: async () => {
       setRefreshing(true);
-      // Reload the full discovery feed (recs, trending, new releases, old songs,
-      // daily mix) through the canonical, language-strict loaders.
       try {
-        await loadRecommendations();
+        if (tab === "explore") {
+          await loadExploreFeeds(Date.now());
+        } else {
+          await loadHomeFeeds(undefined, Date.now());
+        }
       } catch (e) {
         console.error('Error refreshing:', e);
       } finally {
@@ -537,6 +540,35 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       return filtered;
     },
     [likedIds, likes, history, settings.languages],
+  );
+
+  const applyExploreFilters = useCallback(
+    (pool: Track[]) => {
+      const sanitizedPool = pool.map((t) => (t ? cleanTrackDisplayMetadata(t) : t));
+      const recentIds = new Set<string>();
+      for (const h of history) {
+        if (h?.id) recentIds.add(h.id);
+      }
+      // For Explore catalog sections (Trending, New Releases, Old Songs):
+      // NEVER filter out tracks because they were displayed in previous sessions or cached!
+      // NEVER filter out tracks because the user liked them!
+      // ONLY filter out disliked tracks and junk media.
+      const filtered = filterFeedCandidates(sanitizedPool, {
+        previouslyDisplayedIds: new Set<string>(),
+        likedIds: new Set<string>(),
+        recentlyPlayedIds: recentIds,
+        currentTrackId: currentRef.current?.id ?? null,
+        previouslyDisplayed: [],
+        liked: [],
+        recentlyPlayed: [],
+        current: currentRef.current ?? null,
+      });
+      if (settings.languages && settings.languages.length > 0) {
+        return filtered.filter((t) => isLanguageConsistent(t, settings.languages));
+      }
+      return filtered;
+    },
+    [history, settings.languages],
   );
 
   // Record initially visible tracks into session displayed-tracks tracking on mount
@@ -1037,36 +1069,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       try {
         const artistList = topArtists(stats, likes);
         const res = await runNewSongs({
-          data: { artists: artistList, languages: settings.languages, count: 20 },
+          data: { artists: artistList, languages: settings.languages, count: 24 },
         });
-        if (res.tracks) {
-          const pool = res.tracks as Track[];
-          // Strict freshness + language consistency (belt-and-suspenders on top of the server filter).
-          let fresh = applyFeedFilters(pool.filter((t) => !isOldEraTrack(t)));
-          if (fresh.length < 8) {
-            const res2 = await runNewSongs({
-              data: { artists: artistList, languages: settings.languages, count: 20 },
-            });
-            if (res2.tracks) {
-              for (const t of res2.tracks as Track[]) {
-                if (!pool.some((existing) => sameSong(existing, t))) pool.push(t);
-              }
-              fresh = applyFeedFilters(pool.filter((t) => !isOldEraTrack(t)));
-            }
-          }
+        if (res.tracks && res.tracks.length > 0) {
+          const pool = (res.tracks as Track[]).filter((t) => !isOldEraTrack(t));
+          let fresh = applyExploreFilters(pool);
+          if (fresh.length === 0) fresh = pool;
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           setMixTracks((prev) => {
             const next = { ...prev, newrelease: ranked };
             writeHomeCache({ mixTracks: next });
             return next;
           });
-          markFeedDisplayed(ranked);
         }
       } finally {
         setMixLoading(false);
       }
     },
-    [runNewSongs, stats, likes, settings.languages, getSessionContext, applyFeedFilters, markFeedDisplayed],
+    [runNewSongs, stats, likes, settings.languages, getSessionContext, applyExploreFilters],
   );
 
   const loadMix = useCallback(
@@ -1176,10 +1196,80 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     [runDailyMix, settings.languages, stats, likes, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
-  const loadRecommendations = useCallback(
-    async (mood?: string) => {
+  const loadExploreFeeds = useCallback(
+    async (refreshNonce?: number | string) => {
+      setExploreLoading(true);
+      const nonce = refreshNonce ?? `${Date.now()}-${safeUUID()}`;
+      const clientHour = new Date().getHours();
+
+      try {
+        await Promise.allSettled([
+          (async () => {
+            const res = await runTrending({
+              data: {
+                languages: settings.languages,
+                count: 24,
+                refreshNonce: nonce,
+                clientHour,
+              },
+            });
+            if (res.tracks && res.tracks.length > 0) {
+              const fresh = applyExploreFilters(res.tracks as Track[]);
+              const finalTracks = fresh.length > 0 ? fresh : (res.tracks as Track[]);
+              const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
+              setTrendingList(ranked);
+              writeHomeCache({ trendingList: ranked });
+            }
+          })(),
+          (async () => {
+            const artistList = topArtists(stats, likes);
+            const res = await runNewSongs({
+              data: { artists: artistList, languages: settings.languages, count: 24 },
+            });
+            if (res.tracks && res.tracks.length > 0) {
+              const pool = (res.tracks as Track[]).filter((t) => !isOldEraTrack(t));
+              const fresh = applyExploreFilters(pool);
+              const finalTracks = fresh.length > 0 ? fresh : pool;
+              const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
+              setMixTracks((prev) => {
+                const next = { ...prev, newrelease: ranked };
+                writeHomeCache({ mixTracks: next });
+                return next;
+              });
+            }
+          })(),
+          (async () => {
+            const res = await runOldSongs({
+              data: {
+                languages: settings.languages,
+                count: 24,
+                refreshNonce: nonce,
+                artists: topArtists(stats, likes),
+              },
+            });
+            if (res.tracks && res.tracks.length > 0) {
+              const pool = (res.tracks as Track[]).filter(isOldEraTrack);
+              const fresh = applyExploreFilters(pool.length > 0 ? pool : (res.tracks as Track[]));
+              const finalTracks = fresh.length > 0 ? fresh : (res.tracks as Track[]);
+              const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
+              setOldSongsList(ranked);
+              writeHomeCache({ oldSongsList: ranked });
+            }
+          })(),
+        ]);
+      } catch (e) {
+        console.error("[loadExploreFeeds] Error:", e);
+      } finally {
+        setExploreLoading(false);
+      }
+    },
+    [runTrending, runNewSongs, runOldSongs, settings.languages, stats, likes, applyExploreFilters, getSessionContext],
+  );
+
+  const loadHomeFeeds = useCallback(
+    async (mood?: string, refreshNonce?: number | string) => {
       setRecLoading(true);
-      const nonce = `${Date.now()}-${safeUUID()}`;
+      const nonce = refreshNonce ?? `${Date.now()}-${safeUUID()}`;
       const clientHour = new Date().getHours();
       const affinity = contextEngine.getAffinityWeights(stats);
 
@@ -1188,7 +1278,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           (async () => {
             const pureMusic: Track[] = [];
             let fresh: Track[] = [];
-            const maxDepth = 4;
+            // Fast 2-depth query instead of slow 4 sequential loops
+            const maxDepth = 2;
             for (let depth = 1; depth <= maxDepth; depth++) {
               const res = await runRecommend({
                 data: {
@@ -1216,12 +1307,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   }
                 }
                 fresh = applyFeedFilters(pureMusic);
-                if (fresh.length >= 12) break;
+                if (fresh.length >= 10) break;
               }
             }
 
             // Fallback to trending catalog if deep search is still sparse
-            if (fresh.length < 8) {
+            if (fresh.length < 6) {
               const fallbackRes = await runTrending({
                 data: {
                   languages: settings.languages,
@@ -1240,50 +1331,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               }
             }
 
-            const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+            const ranked = thompsonSamplingPolicy.rankCandidates(
+              fresh.length > 0 ? fresh : pureMusic,
+              getSessionContext(),
+            );
             const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
             setRecs(distributed);
             markFeedDisplayed(distributed);
             writeHomeCache({ recs: distributed });
-          })(),
-          (async () => {
-            const res = await runTrending({
-              data: {
-                languages: settings.languages,
-                count: 24,
-                refreshNonce: nonce,
-                clientHour,
-              },
-            });
-            if (res.tracks) {
-              const pureMusic = res.tracks as Track[];
-              const fresh = applyFeedFilters(pureMusic);
-              const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-              setTrendingList(ranked);
-              markFeedDisplayed(ranked);
-              writeHomeCache({ trendingList: ranked });
-            }
-          })(),
-          (async () => {
-            await loadNewReleases(nonce);
-          })(),
-          (async () => {
-            const res = await runOldSongs({
-              data: {
-                languages: settings.languages,
-                count: 24,
-                refreshNonce: nonce,
-                artists: topArtists(stats, likes),
-              },
-            });
-            if (res.tracks) {
-              const pureMusic = (res.tracks as Track[]).filter(isOldEraTrack);
-              const fresh = applyFeedFilters(pureMusic);
-              const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-              setOldSongsList(ranked);
-              markFeedDisplayed(ranked);
-              writeHomeCache({ oldSongsList: ranked });
-            }
           })(),
           (async () => {
             await loadDailyMix(nonce);
@@ -1293,7 +1348,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setRecLoading(false);
       }
     },
-    [runRecommend, runTrending, runOldSongs, loadNewReleases, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
+    [runRecommend, runTrending, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
+  );
+
+  const loadRecommendations = useCallback(
+    async (mood?: string) => {
+      await loadHomeFeeds(mood);
+    },
+    [loadHomeFeeds],
   );
 
   /**
@@ -2476,20 +2538,29 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (cleanDailyMix.length) setDailyMixTracks(cleanDailyMix);
 
     // Auto-refresh recommendations on startup if cached feed is empty or lacks clean tracks matching user languages
-    const hasCachedFeed = cleanRecs.length >= 6 && cleanTrending.length >= 6;
+    const hasCachedHome = cleanRecs.length >= 6;
     markFeedDisplayed([
       ...cleanRecs,
-      ...cleanTrending,
-      ...cleanOldSongs,
       ...cleanDailyMix,
-      ...Object.values(cleanMixTracks || {}).flat(),
     ]);
-    if (!hasCachedFeed) {
-      void loadRecommendations();
+    if (!hasCachedHome) {
+      void loadHomeFeeds();
     }
-  }, [hydrated, loadRecommendations, markFeedDisplayed, settings.languages]);
 
-  // Reload recommendations ONLY when language preferences actually change in settings
+    // Prefetch explore feeds in the background after initial paint if not already cached
+    const hasCachedExplore = cleanTrending.length >= 6 && cleanOldSongs.length >= 4;
+    let timer: any = null;
+    if (!hasCachedExplore) {
+      timer = setTimeout(() => {
+        void loadExploreFeeds();
+      }, 2500);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [hydrated, loadHomeFeeds, loadExploreFeeds, markFeedDisplayed, settings.languages]);
+
+  // Reload feeds ONLY when language preferences actually change in settings
   const prevLanguagesRef = useRef<string | null>(null);
   useEffect(() => {
     if (!hydrated) return;
@@ -2524,9 +2595,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         });
       }
 
-      void loadRecommendations();
+      void loadHomeFeeds();
+      void loadExploreFeeds();
     }
-  }, [hydrated, settings.languages, loadRecommendations]);
+  }, [hydrated, settings.languages, loadHomeFeeds, loadExploreFeeds]);
 
   // Auto-populate explore feeds (new releases, old songs, trending) when switching to Explore tab if empty
   useEffect(() => {
@@ -2536,10 +2608,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       trendingList.length === 0 ||
       !mixTracks.newrelease ||
       mixTracks.newrelease.length === 0;
-    if (hasEmptyExploreFeeds && !recLoading) {
-      void loadRecommendations();
+    if (hasEmptyExploreFeeds && !exploreLoading) {
+      void loadExploreFeeds();
     }
-  }, [hydrated, tab, oldSongsList.length, trendingList.length, mixTracks.newrelease, recLoading, loadRecommendations]);
+  }, [hydrated, tab, oldSongsList.length, trendingList.length, mixTracks.newrelease, exploreLoading, loadExploreFeeds]);
 
   useMediaSession(current, player.isPlaying, player.position, player.duration, {
     onPlay: () => {
@@ -2832,7 +2904,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         variant="secondary"
                         size="sm"
                         className="rounded-full bg-chip-subtle text-secondary-foreground hover:bg-chip-strong hover:text-foreground border-hair text-xs font-normal button-modern-hover"
-                        onClick={() => void loadRecommendations()}
+                        onClick={() => void loadHomeFeeds(undefined, Date.now())}
                         disabled={recLoading}
                       >
                         {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
@@ -2935,10 +3007,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       variant="secondary"
                       size="sm"
                       className="rounded-full bg-chip-subtle text-secondary-foreground hover:bg-chip-strong hover:text-foreground border-hair text-xs font-normal"
-                      onClick={() => void loadRecommendations()}
-                      disabled={recLoading}
+                      onClick={() => void loadExploreFeeds(Date.now())}
+                      disabled={exploreLoading}
                     >
-                      {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
+                      {exploreLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
                       Refresh
                     </Button>
                   </div>
@@ -2946,8 +3018,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
                 <ExploreSections
                   trending={trendingList}
-                  oldSongs={oldSongsList.filter(isOldEraTrack)}
-                  newReleases={mixTracks.newrelease.slice(0, 12)}
+                  oldSongs={oldSongsList.length > 0 ? (oldSongsList.some(isOldEraTrack) ? oldSongsList.filter(isOldEraTrack) : oldSongsList) : []}
+                  newReleases={mixTracks.newrelease.slice(0, 16)}
                   onPlayTrack={(track, sectionTracks, i) => {
                     if (current?.id === track.id) {
                       if (player.isPlaying) {
@@ -2964,7 +3036,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   likedIds={likedIds}
                   currentId={current?.id ?? null}
                   isPlaying={player.isPlaying}
-                  loading={!hydrated || (recLoading && trendingList.length === 0 && oldSongsList.length === 0)}
+                  loading={!hydrated || (exploreLoading && trendingList.length === 0 && oldSongsList.length === 0 && (!mixTracks.newrelease || mixTracks.newrelease.length === 0))}
                 />
               </div>
             )}

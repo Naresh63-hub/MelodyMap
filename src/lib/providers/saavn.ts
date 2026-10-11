@@ -106,6 +106,7 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
     thumbnail: artwork,
     artwork,
     languageCode: raw.language ? String(raw.language).toLowerCase() : undefined,
+    year: raw.year || raw.more_info?.year ? String(raw.year || raw.more_info?.year) : undefined,
     provider: "saavn",
     source: "saavn",
     providerTrackId: songId,
@@ -361,38 +362,76 @@ export async function getSaavnNewReleases(
   languages: string[] = [],
   limit = 24,
 ): Promise<UnifiedTrack[]> {
-  const data = await fetchSaavnLaunchData(languages);
-  if (!data || !Array.isArray(data.new_albums)) {
-    const fallbackLang = languages[0] || "Telugu";
-    return searchSaavn(`${fallbackLang} latest new hit songs ${new Date().getFullYear()}`, { limit });
-  }
-
+  const normLangs = languages.map((l) => l.toLowerCase().trim()).filter(Boolean);
+  const userLangs = normLangs.length > 0 ? normLangs : ["telugu", "hindi", "tamil"];
+  const year = new Date().getFullYear();
   const tracks: UnifiedTrack[] = [];
   const seen = new Set<string>();
 
-  for (const item of data.new_albums) {
-    if (tracks.length >= limit) break;
-    if (item.more_info?.encrypted_media_url) {
-      const unified = mapSaavnSongToUnified(item);
-      if (unified && unified.playbackSource && isOriginalSong(unified)) {
-        if (!seen.has(unified.id)) {
-          seen.add(unified.id);
-          tracks.push(unified);
+  // 1. Fetch launch data for new_albums
+  try {
+    const data = await fetchSaavnLaunchData(languages);
+    const newAlbums: any[] = Array.isArray(data?.new_albums) ? data.new_albums : [];
+
+    // Fetch songs from top new albums in parallel with timeout
+    const albumTasks = newAlbums.slice(0, 3).map(async (alb) => {
+      if (!alb?.id) return [];
+      try {
+        const albumUrl = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&albumid=${encodeURIComponent(alb.id)}&_format=json&_marker=0&api_version=4&ctx=web6dot0`;
+        const res = await fetch(albumUrl, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0",
+            Accept: "application/json",
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!res.ok) return [];
+        const albumData = await res.json();
+        const songs: any[] = Array.isArray(albumData?.list) ? albumData.list : [];
+        const resTracks: UnifiedTrack[] = [];
+        for (const s of songs) {
+          const unified = mapSaavnSongToUnified(s);
+          if (unified && unified.playbackSource && isOriginalSong(unified)) {
+            resTracks.push(unified);
+          }
+        }
+        return resTracks;
+      } catch {
+        return [];
+      }
+    });
+
+    const albumResults = await Promise.allSettled(albumTasks);
+    for (const r of albumResults) {
+      if (r.status === "fulfilled") {
+        for (const t of r.value) {
+          if (tracks.length >= limit) break;
+          if (!seen.has(t.id)) {
+            seen.add(t.id);
+            tracks.push(t);
+          }
         }
       }
     }
-  }
+  } catch {}
 
-  // If fewer than limit, supplement with targeted language query on JioSaavn
-  if (tracks.length < limit && languages.length > 0) {
-    const supp = await searchSaavn(`${languages[0]} latest songs ${new Date().getFullYear()}`, {
-      limit: limit - tracks.length + 5,
-    });
-    for (const t of supp) {
-      if (tracks.length >= limit) break;
-      if (!seen.has(t.id) && isOriginalSong(t)) {
-        seen.add(t.id);
-        tracks.push(t);
+  // 2. Supplement with targeted search queries in parallel
+  if (tracks.length < limit) {
+    const searchQueries: string[] = [];
+    for (const l of userLangs.slice(0, 3)) {
+      searchQueries.push(`${l} latest new hit songs ${year}`, `${l} new release songs`);
+    }
+    const searchTasks = searchQueries.map((q) => searchSaavn(q, { limit: 12 }));
+    const searchResults = await Promise.allSettled(searchTasks);
+    for (const r of searchResults) {
+      if (r.status === "fulfilled") {
+        for (const t of r.value) {
+          if (tracks.length >= limit) break;
+          if (!seen.has(t.id) && isOriginalSong(t)) {
+            seen.add(t.id);
+            tracks.push(t);
+          }
+        }
       }
     }
   }
@@ -475,88 +514,71 @@ export async function getSaavnOldSongs(
   languages: string[] = [],
   limit = 25,
 ): Promise<UnifiedTrack[]> {
-  const data = await fetchSaavnLaunchData(languages);
-  const charts: any[] = Array.isArray(data?.charts) ? data.charts : [];
-  const normLangs = languages.map((l) => l.toLowerCase());
+  const normLangs = languages.map((l) => l.toLowerCase().trim()).filter(Boolean);
+  const userLangs = normLangs.length > 0 ? normLangs : ["telugu", "hindi"];
 
-  let retroChart: any = null;
-  if (normLangs.length > 0) {
-    retroChart = charts.find((c) => {
-      const title = String(c.title || "").toLowerCase();
-      const hasLang = normLangs.some((lang) => title.includes(lang));
-      const isRetro = title.includes("1990") || title.includes("1980") || title.includes("1970") || title.includes("2000");
-      return hasLang && isRetro;
-    });
-  }
-  if (!retroChart) {
-    retroChart = charts.find((c) => {
-      const title = String(c.title || "").toLowerCase();
-      return title.includes("1990") || title.includes("1980") || title.includes("1970");
-    });
-  }
+  const RETRO_ARTISTS_BY_LANG: Record<string, string[]> = {
+    telugu: [
+      "S. P. Balasubrahmanyam hits",
+      "Ghantasala Telugu hits",
+      "K. S. Chithra Telugu hits",
+      "Ilaiyaraaja Telugu hits",
+      "P. Susheela Telugu hits",
+    ],
+    hindi: [
+      "Kishore Kumar hits",
+      "Lata Mangeshkar hits",
+      "Mohammed Rafi hits",
+      "R. D. Burman hits",
+      "Asha Bhosle hits",
+    ],
+    tamil: [
+      "Ilaiyaraaja Tamil hits",
+      "S. P. Balasubrahmanyam Tamil hits",
+      "TMS MSV old Tamil classic hits",
+      "S Janaki Tamil hits",
+    ],
+    malayalam: [
+      "K. J. Yesudas Malayalam hits",
+      "Johnson Master Malayalam hits",
+    ],
+    kannada: [
+      "Dr Rajkumar Kannada hits",
+      "S. P. Balasubrahmanyam Kannada hits",
+    ],
+    punjabi: [
+      "Kuldeep Manak hits",
+      "Gurdas Maan hits",
+    ],
+    english: [
+      "The Beatles hits",
+      "Queen classic rock hits",
+      "ABBA hits",
+      "70s 80s classic rock hits",
+    ],
+  };
 
-  if (retroChart && retroChart.id) {
-    try {
-      const playlistUrl = `https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid=${encodeURIComponent(retroChart.id)}&_format=json&_marker=0&api_version=4&ctx=web6dot0`;
-      const res = await fetch(playlistUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(9000),
-      });
-      if (res.ok) {
-        const playlistData = await res.json();
-        const songs: any[] = Array.isArray(playlistData?.list) ? playlistData.list : [];
-        const tracks: UnifiedTrack[] = [];
-        const seen = new Set<string>();
-
-        for (const s of songs) {
-          if (tracks.length >= limit) break;
-          const unified = mapSaavnSongToUnified(s);
-          if (unified && unified.playbackSource && isOriginalSong(unified)) {
-            if (!seen.has(unified.id)) {
-              seen.add(unified.id);
-              tracks.push(unified);
-            }
-          }
-        }
-        if (tracks.length >= 10) return tracks.slice(0, limit);
-      }
-    } catch (err) {
-      console.warn("[Saavn] Failed to fetch retro playlist:", err);
-    }
-  }
-
-  const userLangs = languages.length > 0 ? languages : ["Telugu", "Hindi"];
   const queries: string[] = [];
   for (const lang of userLangs) {
-    const l = lang.toLowerCase();
-    if (l === "telugu") {
-      queries.push("S. P. Balasubrahmanyam hits", "K. S. Chithra Telugu hits", "Ilaiyaraaja Telugu hits");
-    } else if (l === "hindi") {
-      queries.push("Kishore Kumar hits", "Lata Mangeshkar hits", "R. D. Burman hits");
-    } else if (l === "tamil") {
-      queries.push("Ilaiyaraaja Tamil hits", "S. P. Balasubrahmanyam Tamil hits");
-    } else if (l === "punjabi") {
-      queries.push("Gurdas Maan hits");
-    } else {
-      queries.push(`${lang} top hits`);
-    }
+    const pool = RETRO_ARTISTS_BY_LANG[lang] || [`${lang} classic old hit songs`];
+    queries.push(...pool.slice(0, 3));
   }
 
   const tracks: UnifiedTrack[] = [];
   const seen = new Set<string>();
 
-  for (const q of queries) {
-    if (tracks.length >= limit) break;
-    const batch = await searchSaavn(q, { limit: 12 });
-    for (const t of batch) {
-      if (tracks.length >= limit) break;
-      if (!seen.has(t.id) && isOriginalSong(t)) {
-        seen.add(t.id);
-        tracks.push(t);
+  // Fetch retro queries concurrently in parallel with timeout
+  const searchTasks = queries.map((q) => searchSaavn(q, { limit: 12 }));
+  const searchResults = await Promise.allSettled(searchTasks);
+
+  for (const r of searchResults) {
+    if (r.status === "fulfilled") {
+      for (const t of r.value) {
+        if (tracks.length >= limit) break;
+        if (!seen.has(t.id) && isOriginalSong(t)) {
+          seen.add(t.id);
+          tracks.push(t);
+        }
       }
     }
   }
