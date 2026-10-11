@@ -182,7 +182,7 @@ export function FloatingMiniPlayer({
           className="h-1 rounded-full transition-all"
           style={{
             width: `${progressPct}%`,
-            background: "linear-gradient(90deg, #38bdf8 0%, #e94560 100%)",
+            background: "linear-gradient(90deg, #f7809c 0%, #fb7185 100%)",
           }}
         />
         <span
@@ -224,21 +224,19 @@ export function FloatingMiniPlayer({
 
         {/* Track Thumbnail & Info */}
         <div className="flex items-center gap-3">
-          <div className="relative h-12 w-12 shrink-0 rounded-lg overflow-hidden border border-hair bg-card">
-            <img src={track.thumbnail} alt={track.title} className="h-full w-full object-cover" />
-            {isPlaying && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                <div className="flex items-end gap-0.5 h-3.5">
-                  {[0, 1, 2].map((i) => (
-                    <div
-                      key={i}
-                      className="w-0.5 bg-primary rounded-full animate-bar"
-                      style={{ animationDelay: `${i * 0.15}s`, height: "100%" }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="relative h-12 w-12 shrink-0 rounded-full p-[2px] bg-gradient-to-tr from-neutral-900 via-neutral-800 to-black shadow-md border border-white/10 ring-1 ring-black/50 overflow-hidden flex items-center justify-center">
+            <div
+              className="h-full w-full rounded-full overflow-hidden relative flex items-center justify-center animate-vinyl-spin select-none"
+              style={{
+                animationPlayState: isPlaying ? "running" : "paused",
+              }}
+            >
+              <img src={track.thumbnail} alt={track.title} className="h-full w-full object-cover rounded-full pointer-events-none select-none" />
+              {/* Vinyl center spindle hole */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#121214] border border-white/30 shadow-inner z-10 pointer-events-none" />
+              {/* Subtle vinyl groove ring border */}
+              <div className="absolute inset-0 rounded-full border border-black/40 pointer-events-none z-10" />
+            </div>
           </div>
 
           <div className="min-w-0 flex-1">

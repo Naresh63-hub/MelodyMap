@@ -162,7 +162,7 @@ export function ScrubBar({ position, duration, thumbnail, onSeek, className }: P
             className="absolute inset-y-0 left-0 rounded-full"
             style={{ 
               width: `${pct}%`,
-              background: "linear-gradient(90deg, #38bdf8 0%, #e94560 100%)",
+              background: "linear-gradient(90deg, #f7809c 0%, #fb7185 100%)",
             }}
           />
           {/* Thumb handle */}

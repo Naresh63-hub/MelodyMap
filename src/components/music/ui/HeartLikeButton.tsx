@@ -64,7 +64,7 @@ export function HeartLikeButton({
         "relative flex items-center justify-center rounded-full transition-all focus:outline-none active:scale-90",
         buttonSizes[size],
         liked
-          ? "text-primary hover:text-[#7dd3fc]"
+          ? "text-primary hover:text-primary/80"
           : "text-foreground/40 hover:text-foreground/80 hover:bg-chip",
         className,
       )}

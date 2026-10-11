@@ -3,7 +3,7 @@ export type Theme = 'dark' | 'light' | 'auto';
 const THEME_KEY = 'melodymap-theme';
 
 const THEME_COLORS = {
-  dark: '#050b12',
+  dark: '#1b1217',
   light: '#f2f5fa',
 } as const;
 

@@ -87,7 +87,7 @@ export function MiniPlayer({
           className="h-full transition-all duration-150 ease-linear rounded-r-full"
           style={{
             width: `${progressPct}%`,
-            background: "linear-gradient(90deg, #38bdf8 0%, #e94560 100%)",
+            background: "linear-gradient(90deg, #f7809c 0%, #fb7185 100%)",
           }}
         />
       </div>
@@ -101,19 +101,31 @@ export function MiniPlayer({
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
           aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
-          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 overflow-hidden rounded-md bg-card border border-border">
-            {track?.thumbnail && !thumbError ? (
-              <img
-                src={track.thumbnail}
-                alt=""
-                onError={() => setThumbError(true)}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-card text-muted-foreground">
-                <Music2 className="h-4 w-4" />
-              </div>
-            )}
+          {/* Circular rotating vinyl disc artwork */}
+          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 rounded-full p-[2px] bg-gradient-to-tr from-neutral-900 via-neutral-800 to-black shadow-md border border-white/10 ring-1 ring-black/50 overflow-hidden flex items-center justify-center">
+            <div
+              className="h-full w-full rounded-full overflow-hidden relative flex items-center justify-center animate-vinyl-spin select-none"
+              style={{
+                animationPlayState: isPlaying ? "running" : "paused",
+              }}
+            >
+              {track?.thumbnail && !thumbError ? (
+                <img
+                  src={track.thumbnail}
+                  alt=""
+                  onError={() => setThumbError(true)}
+                  className="h-full w-full object-cover rounded-full pointer-events-none select-none"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-card text-muted-foreground rounded-full">
+                  <Music2 className="h-4 w-4" />
+                </div>
+              )}
+              {/* Vinyl center spindle hole */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-[#121214] border border-white/30 shadow-inner z-10 pointer-events-none" />
+              {/* Subtle vinyl groove ring border */}
+              <div className="absolute inset-0 rounded-full border border-black/40 pointer-events-none z-10" />
+            </div>
           </div>
 
           <div className="min-w-0 flex-1">

@@ -113,7 +113,7 @@ export function Sidebar({
           <img
             src="/brand/app-icon.png"
             alt="MelodyMap"
-            className="h-8 w-8 rounded-lg object-cover shadow-sm"
+            className="h-8 w-8 rounded-full object-cover shadow-sm ring-1 ring-primary/40"
           />
         </div>
         {!collapsed && (

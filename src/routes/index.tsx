@@ -2737,6 +2737,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               >
                 <Menu className="h-4 w-4" />
               </button>
+              <img
+                src="/brand/app-icon.png"
+                alt="MelodyMap"
+                className="h-8 w-8 rounded-full object-cover ring-1 ring-primary/40 shrink-0 hidden xs:block"
+              />
               <form onSubmit={onSearch} className="relative flex-1 flex items-center gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -2789,14 +2794,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   type="submit"
                   aria-label="Search"
                   title="Search"
-                  className="flex h-10 px-3.5 shrink-0 items-center justify-center gap-1.5 rounded-full bg-chip hover:bg-chip-strong border border-hair text-xs font-medium text-secondary-foreground active:scale-95 transition-all"
+                  className="flex h-10 px-4 shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold active:scale-95 transition-all shadow-sm"
                 >
                   {searching ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary-foreground" />
                   ) : (
-                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Search className="h-3.5 w-3.5 text-primary-foreground" />
                   )}
-                  <span className="hidden sm:inline">Search</span>
+                  <span>Search</span>
                 </button>
               </form>
               <button

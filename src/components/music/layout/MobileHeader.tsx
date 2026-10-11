@@ -58,6 +58,12 @@ export function MobileHeader({
           </button>
         )}
 
+        <img
+          src="/brand/app-icon.png"
+          alt="MelodyMap"
+          className="h-7 w-7 rounded-full object-cover ring-1 ring-primary/40 shrink-0"
+        />
+
         <div className="min-w-0">
           <h1
             suppressHydrationWarning
@@ -66,7 +72,7 @@ export function MobileHeader({
             {getTitle()}
           </h1>
           {getSubtitle() && (
-            <p className="text-[11px] text-neutral-400 font-normal truncate leading-tight mt-0.5">
+            <p className="text-[11px] text-muted-foreground font-normal truncate leading-tight mt-0.5">
               {getSubtitle()}
             </p>
           )}

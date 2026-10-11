@@ -6,9 +6,9 @@
 
 /*
  * MelodyMap Design System
- * Clean, human-designed editorial dark streaming aesthetic.
- * Content-first: midnight-sky base (#050B12), blue-tinted surfaces (#08111C, #0C1826, #102032),
- * and a luminous sky-blue accent (#38BDF8). Album artwork provides visual color.
+ * Midnight Plum & Neon Rose streaming aesthetic.
+ * Deep black-cherry velvet base (#1B1217), smoked plum surfaces (#231720, #2B1D26, #362230),
+ * and a luminous coral-rose accent (#F7809C).
  */
 
 @theme inline {
@@ -67,76 +67,76 @@
   --mm-inset-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
   --mm-inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
 
-  /* Palette: refined midnight-sky theme */
-  --bg-main: #050b12;
-  --bg-secondary: #08111c;
-  --bg-card: #0c1826;
-  --bg-elevated: #102032;
+  /* Palette: Midnight Plum & Neon Rose theme */
+  --bg-main: #1b1217;
+  --bg-secondary: #231720;
+  --bg-card: #2b1d26;
+  --bg-elevated: #362230;
 
-  --text-primary: #f5f5f5;
-  --text-secondary: #a1a1a1;
-  --text-muted: #737373;
+  --text-primary: #ffffff;
+  --text-secondary: #d4b8c6;
+  --text-muted: #a58c97;
 
-  --background: #050b12;
-  --foreground: #f5f5f5;
+  --background: #1b1217;
+  --foreground: #ffffff;
 
-  /* Surfaces: midnight-blue tinted darks */
-  --card: #0c1826;
-  --card-foreground: #f5f5f5;
-  --surface: #08111c;
-  --surface-foreground: #f5f5f5;
-  --surface-elevated: #102032;
-  --popover: #102032;
-  --popover-foreground: #f5f5f5;
+  /* Surfaces: smoked-plum tinted darks */
+  --card: #2b1d26;
+  --card-foreground: #ffffff;
+  --surface: #231720;
+  --surface-foreground: #ffffff;
+  --surface-elevated: #362230;
+  --popover: #362230;
+  --popover-foreground: #ffffff;
 
-  /* Primary & Accent: luminous sky blue */
-  --primary: #38bdf8;
-  --primary-foreground: #052034;
-  --accent: #38bdf8;
-  --accent-foreground: #052034;
+  /* Primary & Accent: luminous coral-rose */
+  --primary: #f7809c;
+  --primary-foreground: #22121b;
+  --accent: #f7809c;
+  --accent-foreground: #22121b;
 
-  /* Secondary: dark water surface for chips, hover, controls */
-  --secondary: #0c1826;
-  --secondary-foreground: #a1a1a1;
+  /* Secondary: smoked plum for chips, hover, controls */
+  --secondary: #2b1d26;
+  --secondary-foreground: #d4b8c6;
 
   /* Muted: secondary and tertiary gray text */
-  --muted: #08111c;
-  --muted-foreground: #737373;
+  --muted: #231720;
+  --muted-foreground: #a58c97;
 
   /* Destructive: soft restrained red */
-  --destructive: #e05252;
+  --destructive: #f43f5e;
   --destructive-foreground: #ffffff;
 
-  /* Borders: subtle white transparency */
-  --border: rgba(255, 255, 255, 0.06);
-  --input: rgba(255, 255, 255, 0.08);
-  --ring: #7dd3fc;
-  --ring-soft: rgba(125, 211, 252, 0.25);
+  /* Borders: subtle rose-white transparency */
+  --border: rgba(247, 128, 156, 0.1);
+  --input: rgba(247, 128, 156, 0.14);
+  --ring: #f7809c;
+  --ring-soft: rgba(247, 128, 156, 0.3);
 
   /* Interactive surface steps: single restrained hover elevation */
-  --surface-hover: rgba(255, 255, 255, 0.04);
-  --surface-hover-strong: rgba(255, 255, 255, 0.07);
+  --surface-hover: rgba(247, 128, 156, 0.05);
+  --surface-hover-strong: rgba(247, 128, 156, 0.09);
 
   /* Chip / hairline scales (theme-flippable) */
-  --chip-subtle: rgba(255, 255, 255, 0.03);
-  --chip: rgba(255, 255, 255, 0.05);
-  --chip-strong: rgba(255, 255, 255, 0.09);
-  --hair: rgba(255, 255, 255, 0.06);
-  --hair-strong: rgba(255, 255, 255, 0.12);
+  --chip-subtle: rgba(247, 128, 156, 0.04);
+  --chip: rgba(247, 128, 156, 0.07);
+  --chip-strong: rgba(247, 128, 156, 0.12);
+  --hair: rgba(247, 128, 156, 0.09);
+  --hair-strong: rgba(247, 128, 156, 0.18);
 
   /* Glass system surfaces */
-  --glass-panel-bg: rgba(8, 17, 28, 0.94);
-  --glass-bg: rgba(20, 20, 20, 0.7);
-  --glass-bg-md: rgba(25, 25, 25, 0.65);
-  --glass-bg-soft: rgba(30, 30, 30, 0.65);
-  --glass-bg-heavy: rgba(15, 15, 15, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-strong: rgba(255, 255, 255, 0.13);
-  --glass-hi: rgba(255, 255, 255, 0.1);
+  --glass-panel-bg: rgba(35, 23, 32, 0.94);
+  --glass-bg: rgba(30, 18, 26, 0.75);
+  --glass-bg-md: rgba(35, 21, 30, 0.7);
+  --glass-bg-soft: rgba(40, 24, 34, 0.65);
+  --glass-bg-heavy: rgba(25, 15, 22, 0.82);
+  --glass-border: rgba(247, 128, 156, 0.12);
+  --glass-border-strong: rgba(247, 128, 156, 0.2);
+  --glass-hi: rgba(255, 255, 255, 0.12);
 
-  --selection-bg: rgba(56, 189, 248, 0.35);
-  --scrollbar-thumb: rgba(255, 255, 255, 0.12);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.25);
+  --selection-bg: rgba(247, 128, 156, 0.35);
+  --scrollbar-thumb: rgba(247, 128, 156, 0.2);
+  --scrollbar-thumb-hover: rgba(247, 128, 156, 0.35);
 }
 
 /*
@@ -630,6 +630,20 @@ html.light {
 
 @utility animate-avatar-glow {
   animation: avatar-glow 2s ease-in-out infinite;
+}
+
+/* Vinyl record continuous spin */
+@keyframes vinyl-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility animate-vinyl-spin {
+  animation: vinyl-spin 9s linear infinite;
 }
 
 /* Modern button hover with glow */

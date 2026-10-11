@@ -41,8 +41,8 @@ export default function AudioVisualizer({ getAnalyser, active, barCount = 28, cl
 
     let running = true;
     let frame = 0;
-    let primary = "#38bdf8";
-    let ring = "#7dd3fc";
+    let primary = "#f7809c";
+    let ring = "#f7809c";
 
     const readTheme = () => {
       const style = getComputedStyle(document.documentElement);

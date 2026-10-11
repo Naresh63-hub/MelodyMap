@@ -90,7 +90,7 @@ export function MobileDrawer({
             <img
               src="/brand/app-icon.png"
               alt="MelodyMap"
-              className="h-8 w-8 rounded-lg object-cover"
+              className="h-8 w-8 rounded-full object-cover ring-1 ring-primary/40"
             />
             <span className="font-display text-base font-semibold">
               <span className="text-foreground">Melody</span>
