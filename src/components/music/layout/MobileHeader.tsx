@@ -98,9 +98,9 @@ export function MobileHeader({
           <button
             type="button"
             onClick={onOpenAuth}
-            aria-label="Account profile"
-            title="Account profile"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5 hover:from-primary/30 hover:to-primary/10 border border-primary/30 text-white overflow-hidden active:scale-95 transition-all ml-0.5 ring-2 ring-primary/20 animate-avatar-glow animate-avatar-gentle"
+            aria-label="User account info"
+            title="User account info"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ml-0.5 ring-1 ring-primary/30"
           >
             {userAvatar ? (
               <img src={userAvatar} alt="Profile" className="h-full w-full object-cover" />

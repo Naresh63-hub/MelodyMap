@@ -2815,18 +2815,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
               {/* Circle user mark on only top of app (Search view) */}
               <div className="relative shrink-0">
-                {player.isPlaying && (
-                  <div className="playing-ring-conic animate-avatar-ring absolute -inset-[2.5px] rounded-full opacity-90" />
-                )}
                 <button
                   type="button"
                   onClick={() => setShowAuthModal(true)}
                   aria-label="Account profile"
                   title="Account profile"
-                  className={cn(
-                    "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ring-1 ring-hair",
-                    player.isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
-                  )}
+                  className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ring-1 ring-hair"
                 >
                   {auth.profile?.avatar_url ? (
                     <img src={auth.profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />

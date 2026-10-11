@@ -262,14 +262,8 @@ export function Sidebar({
         {!collapsed && (
           <div className="mb-3 flex items-center gap-3 rounded-lg border border-hair bg-chip-subtle px-3.5 py-2.5 hover:bg-chip transition-colors cursor-default group/user">
             <div className="relative shrink-0">
-              {isPlaying && (
-                <div className="playing-ring-conic animate-avatar-ring absolute -inset-[2.5px] rounded-full opacity-90" />
-              )}
               <div
-                className={cn(
-                  "relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-popover text-xs font-semibold text-foreground border border-hair-strong",
-                  isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
-                )}
+                className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-popover text-xs font-semibold text-foreground border border-hair-strong"
               >
                 {userAvatar ? (
                   <img src={userAvatar} alt="" className="h-full w-full object-cover" />
@@ -280,7 +274,7 @@ export function Sidebar({
               <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className={cn("truncate text-xs font-semibold text-foreground/90", isPlaying && "animate-name-glow")}>
+              <p className="truncate text-xs font-semibold text-foreground/90">
                 {userName ?? "Listener"}
               </p>
               <p className="truncate text-[10px] text-foreground/40">

@@ -127,31 +127,20 @@ export function MobileDrawer({
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div className="relative shrink-0">
-                  {isPlaying && (
-                    <div className="playing-ring-conic animate-avatar-ring absolute -inset-[2.5px] rounded-full opacity-90" />
-                  )}
                   {userAvatar ? (
                     <img
                       src={userAvatar}
                       alt=""
-                      className={cn(
-                        "relative h-9 w-9 rounded-full object-cover border border-primary/40",
-                        isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
-                      )}
+                      className="h-9 w-9 rounded-full object-cover border border-primary/40"
                     />
                   ) : (
-                    <div
-                      className={cn(
-                        "relative flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary font-semibold text-xs border border-primary/25",
-                        isPlaying && "shadow-[0_0_14px_rgba(56,189,248,0.4)]",
-                      )}
-                    >
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/15 text-primary font-semibold text-xs border border-primary/25">
                       {displayInitial}
                     </div>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={cn("truncate text-sm font-semibold text-foreground", isPlaying && "animate-name-glow")}>
+                  <p className="truncate text-sm font-semibold text-foreground">
                     {displayUserName}
                   </p>
                   <p className="text-[11px] text-foreground/50">

@@ -157,33 +157,10 @@ export function TrackList({
               );
             })()}
 
-            <span className="hidden text-xs tabular-nums text-muted-foreground group-hover:text-secondary-foreground transition-colors sm:block">
-              {track.duration}
-            </span>
-
-            <div className="flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-              {onDownload && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (downloadedIds?.has(track.id)) onRemoveDownload?.(track);
-                    else onDownload(track);
-                  }}
-                  aria-label={
-                    downloadedIds?.has(track.id)
-                      ? "Remove offline copy"
-                      : "Download for offline"
-                  }
-                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-foreground active:scale-95"
-                >
-                  {downloadingIds?.has(track.id) ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-foreground/60" />
-                  ) : downloadedIds?.has(track.id) ? (
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                </button>
+              {track.duration && (
+                <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium px-1 shrink-0">
+                  {track.duration}
+                </span>
               )}
 
               <HeartLikeButton
@@ -242,7 +219,6 @@ export function TrackList({
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-            </div>
           </li>
         );
       })}

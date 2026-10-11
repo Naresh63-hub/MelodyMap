@@ -144,16 +144,15 @@ export type UpstreamAudioResult =
     }
   | { ok: false; status: number; message: string };
 
-export const DEFAULT_PROXY_CHUNK_SIZE = 512 * 1024; // 512 KB per chunk (~32s of audio, ~2-3s download)
+export const DEFAULT_PROXY_CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB per chunk (~2.5 minutes of 160kbps audio, downloads in <1s)
 
 /**
  * Normalizes client Range headers into serverless-safe chunk requests.
  *
  * Full-file or open-ended requests (like bytes=0-) streamed through a serverless
- * proxy exceed Vercel's execution timeout (10-15s), causing mid-stream drops.
- * Clamping open-ended and oversized ranges to 512 KB ensures each partial response
- * finishes in 2-3s and allows standard HTML5 <audio> players to stream smoothly
- * chunk by chunk without interruption.
+ * proxy exceed Vercel's execution timeout (10-15s) if unconstrained.
+ * Sizing chunks to 2 MB ensures fast downloads (<1s) while pre-buffering over 2 minutes
+ * of audio so standard HTML5 <audio> players never stall or stutter mid-song.
  */
 export function normalizeUpstreamRange(
   rangeHeader: string | null | undefined,

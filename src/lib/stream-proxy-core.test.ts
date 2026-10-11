@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   VIDEO_ID_REGEX,
   checkStreamRateLimit,
+  DEFAULT_PROXY_CHUNK_SIZE,
   extractClientIp,
   isAllowedOrigin,
   isAllowedUpstreamUrl,
@@ -120,15 +121,15 @@ describe("resolveAudioMimeType", () => {
 
 describe("normalizeUpstreamRange", () => {
   it("defaults open-ended requests to chunk-size bounds", () => {
-    expect(normalizeUpstreamRange("bytes=0-")).toBe(`bytes=0-${512 * 1024 - 1}`);
-    expect(normalizeUpstreamRange(null)).toBe(`bytes=0-${512 * 1024 - 1}`);
-    expect(normalizeUpstreamRange(undefined)).toBe(`bytes=0-${512 * 1024 - 1}`);
-    expect(normalizeUpstreamRange("invalid")).toBe(`bytes=0-${512 * 1024 - 1}`);
+    expect(normalizeUpstreamRange("bytes=0-")).toBe(`bytes=0-${DEFAULT_PROXY_CHUNK_SIZE - 1}`);
+    expect(normalizeUpstreamRange(null)).toBe(`bytes=0-${DEFAULT_PROXY_CHUNK_SIZE - 1}`);
+    expect(normalizeUpstreamRange(undefined)).toBe(`bytes=0-${DEFAULT_PROXY_CHUNK_SIZE - 1}`);
+    expect(normalizeUpstreamRange("invalid")).toBe(`bytes=0-${DEFAULT_PROXY_CHUNK_SIZE - 1}`);
   });
 
   it("chunks mid-stream open-ended ranges", () => {
     const start = 524288;
-    expect(normalizeUpstreamRange(`bytes=${start}-`)).toBe(`bytes=${start}-${start + 512 * 1024 - 1}`);
+    expect(normalizeUpstreamRange(`bytes=${start}-`)).toBe(`bytes=${start}-${start + DEFAULT_PROXY_CHUNK_SIZE - 1}`);
   });
 
   it("preserves small probe range requests", () => {
@@ -137,6 +138,6 @@ describe("normalizeUpstreamRange", () => {
   });
 
   it("clamps oversized client ranges to the chunk size", () => {
-    expect(normalizeUpstreamRange("bytes=0-50000000")).toBe(`bytes=0-${512 * 1024 - 1}`);
+    expect(normalizeUpstreamRange("bytes=0-50000000")).toBe(`bytes=0-${DEFAULT_PROXY_CHUNK_SIZE - 1}`);
   });
 });

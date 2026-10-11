@@ -646,6 +646,10 @@ html.light {
   animation: vinyl-spin 9s linear infinite;
 }
 
+.animate-vinyl-spin {
+  animation: vinyl-spin 9s linear infinite;
+}
+
 /* Modern button hover with glow */
 @utility button-modern-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

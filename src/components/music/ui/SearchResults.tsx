@@ -272,6 +272,13 @@ export function SearchResults(props: Props) {
                 </p>
               </button>
 
+              {/* Song duration time */}
+              {track.duration && (
+                <span className="shrink-0 text-xs sm:text-sm tabular-nums text-muted-foreground font-medium px-1">
+                  {track.duration}
+                </span>
+              )}
+
               {/* Heart-shaped like toggle button */}
               <HeartLikeButton
                 liked={likedIds.has(track.id)}

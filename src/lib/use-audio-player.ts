@@ -463,7 +463,7 @@ export function useAudioPlayer(options: {
     if (!trackId || !wantPlayRef.current) return;
 
     const attempts = reconnectAttemptsRef.current;
-    if (attempts >= 3) {
+    if (attempts >= 5) {
       setIsReconnecting(false);
       onErrorRef.current?.("Audio connection interrupted. Tap play to retry.");
       return;
@@ -473,9 +473,9 @@ export function useAudioPlayer(options: {
     setIsReconnecting(true);
     setIsLoading(true);
 
-    // Exponential backoff with random jitter: ~500ms, ~1200ms, ~2500ms...
-    const baseDelay = Math.min(500 * Math.pow(1.8, attempts), 5000);
-    const jitter = Math.random() * 350;
+    // Exponential backoff with random jitter: ~600ms, ~1400ms, ~2500ms...
+    const baseDelay = Math.min(600 * Math.pow(1.6, attempts), 5000);
+    const jitter = Math.random() * 250;
     const delay = Math.round(baseDelay + jitter);
 
     reconnectTimerRef.current = setTimeout(() => {
@@ -491,26 +491,58 @@ export function useAudioPlayer(options: {
         return;
       }
 
-      const resumePos = lastValidPositionRef.current || 0;
-      pendingSeekRef.current = resumePos;
-
-      const freshUrl = `${streamUrl(trackId)}&_reconnect=${Date.now()}`;
-      audio.src = freshUrl;
-      audio.load();
-      audio.currentTime = resumePos;
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
+      // If the audio element has not errored and already has buffered media,
+      // attempt resuming playback directly without tearing down the buffered data
+      if (!audio.error && audio.readyState >= 2 && audio.src) {
+        const p = audio.play();
+        if (p !== undefined) {
+          p.then(() => {
             reconnectAttemptsRef.current = 0;
             setIsReconnecting(false);
             setIsPlaying(true);
             setIsLoading(false);
-          })
-          .catch((err) => {
-            console.warn("[MelodyMap] Mid-song reconnection attempt failed:", err);
-            triggerReconnect();
+          }).catch(() => {
+            reloadAndResume();
           });
+          return;
+        }
+      }
+
+      reloadAndResume();
+
+      function reloadAndResume() {
+        const a = audioRef.current;
+        const tid = currentTrackIdRef.current;
+        if (!a || !tid) {
+          setIsReconnecting(false);
+          return;
+        }
+        const resumePos = lastValidPositionRef.current || 0;
+        pendingSeekRef.current = resumePos;
+
+        const freshUrl = `${streamUrl(tid)}&_reconnect=${Date.now()}`;
+        a.src = freshUrl;
+        a.load();
+        a.currentTime = resumePos;
+        const playPromise = a.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              reconnectAttemptsRef.current = 0;
+              setIsReconnecting(false);
+              setIsPlaying(true);
+              setIsLoading(false);
+            })
+            .catch((err) => {
+              console.warn("[MelodyMap] Mid-song reconnection attempt failed:", err);
+              if (err?.name === "NotAllowedError") {
+                setIsReconnecting(false);
+                setIsLoading(false);
+                return;
+              }
+              triggerReconnect();
+            });
+        }
       }
     }, delay);
   }, [streamUrl]);
