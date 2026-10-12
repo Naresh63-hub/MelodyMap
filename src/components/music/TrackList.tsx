@@ -1,7 +1,5 @@
 import {
-  CheckCircle2,
   Download,
-  Loader2,
   Play,
   Plus,
   ThumbsDown,

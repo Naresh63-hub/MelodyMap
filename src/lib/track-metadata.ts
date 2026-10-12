@@ -117,15 +117,28 @@ const TRAILING_RELEASE_SUFFIX_RE = /\s*[-–—_]\s*(single|ep|deluxe(\s+edition
 export function decodeEntities(text: string | undefined | null): string {
   if (!text) return "";
   return text
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&lsquo;|&rsquo;/g, "'")
-    .replace(/&ldquo;|&rdquo;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ")
+    .replace(/&(quot|apos|lt|gt|nbsp|#0?39|[lg]squo|[lr]dquo);/g, (_, entity: string) => {
+      if (entity.startsWith("#")) return "'"; // `#39` / `#039` — numeric apostrophe
+      switch (entity) {
+        case "quot":
+        case "ldquo":
+        case "rdquo":
+          return '"';
+        case "apos":
+        case "lsquo":
+        case "rsquo":
+          return "'";
+        case "lt":
+          return "<";
+        case "gt":
+          return ">";
+        case "nbsp":
+          return " ";
+        default:
+          return _;
+      }
+    })
+    .replace(/&amp;/g, "&") // decoded last so `&amp;quot;` cannot double-decode
     .replace(/\s+/g, " ")
     .trim();
 }

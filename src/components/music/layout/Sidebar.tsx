@@ -4,6 +4,7 @@ import {
   Clock,
   Compass,
   Disc3,
+  Download,
   Globe2,
   Heart,
   Layers,
@@ -32,6 +33,7 @@ export type NavTab =
   | "likes"
   | "playlists"
   | "history"
+  | "downloads"
   | "library";
 
 type NavSection = {
@@ -57,6 +59,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { id: "likes", label: "Favourites", icon: Heart, shortcut: "6" },
       { id: "playlists", label: "Playlists", icon: ListMusic, shortcut: "7" },
       { id: "history", label: "Recent", icon: Clock, shortcut: "8" },
+      { id: "downloads", label: "Downloads", icon: Download, shortcut: "9" },
     ],
   },
 ];

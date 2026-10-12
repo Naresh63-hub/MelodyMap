@@ -1,6 +1,7 @@
 import {
   Clock,
   Compass,
+  Download,
   Globe2,
   Heart,
   Layers,
@@ -75,6 +76,7 @@ export function MobileDrawer({
         { id: "likes" as NavTab, label: "Liked Songs", icon: Heart },
         { id: "playlists" as NavTab, label: "Playlists", icon: ListMusic },
         { id: "history" as NavTab, label: "Listening History", icon: Clock },
+        { id: "downloads" as NavTab, label: "Downloads", icon: Download },
       ],
     },
   ];

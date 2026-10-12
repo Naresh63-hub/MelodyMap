@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Capacitor } from "@capacitor/core";
 import {
-  EQUALIZER_FREQUENCIES,
   EQUALIZER_PRESETS,
   loadEqualizerSettings,
   saveEqualizerSettings,
@@ -14,8 +12,8 @@ import {
   type SponsorBlockSegment,
 } from "@/lib/sponsorblock";
 import { isLowNetworkModeEnabled } from "@/lib/network-mode";
-import { isNativePlaybackEnv, resolvePlaybackEngine } from "@/lib/native-playback";
 import { hasFullLengthDirectSource } from "@/lib/track-stream-policy";
+import { getBlob } from "@/lib/offline";
 
 export type NextTrackInfo = {
   id: string;
@@ -46,7 +44,6 @@ export function useAudioPlayer(options: {
   const qualityFallbackStepRef = useRef<number>(0); // 0 = original, 1 = standard, 2 = saver
 
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
   const filterNodesRef = useRef<BiquadFilterNode[]>([]);
 
   const isSeekingRef = useRef<boolean>(false);
@@ -161,7 +158,9 @@ export function useAudioPlayer(options: {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [streamSource, setStreamSource] = useState<"saavn" | "audius" | "jamendo" | null>(null);
+  const [streamSource, setStreamSource] = useState<
+    "saavn" | "audius" | "jamendo" | "offline" | null
+  >(null);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
     try {
@@ -184,7 +183,6 @@ export function useAudioPlayer(options: {
 
   const currentTrackIdRef = useRef<string | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);
-  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const isFadingOutRef = useRef<boolean>(false);
 
@@ -667,11 +665,12 @@ export function useAudioPlayer(options: {
     // When song ends with screen locked, synchronously switch .src & call .play()
     // inside the same event loop frame so mobile OS grants immediate autoplay permission!
     const onEnded = () => {
-      // Guard against spurious ended events:
-      // A song cannot legitimately finish if duration is unknown/0 or currentTime is near 0.
+      // Guard against spurious ended events from browser audio bugs during buffering:
+      // In real playback with media loaded, an audio track cannot legitimately finish
+      // at currentTime === 0 if duration is known and > 3 seconds.
       const dur = audio.duration;
       const cur = audio.currentTime;
-      if (!Number.isFinite(dur) || dur <= 0 || cur < 3) {
+      if (Number.isFinite(dur) && dur > 10 && cur > 0 && cur < 2) {
         console.warn("[MelodyMap] Spurious onEnded ignored (cur:", cur, "dur:", dur, ")");
         return;
       }
@@ -854,13 +853,29 @@ export function useAudioPlayer(options: {
     };
   }, []);
 
-  /** Use downloaded blob when available - DISABLED to ensure only original songs play */
+  /** Use downloaded blob when available in IndexedDB offline storage */
   const playOffline = useCallback(
-    async (_id: string, _startAt = 0): Promise<boolean> => {
-      // Disabled - always return false to force streaming from Saavn
+    async (id: string, startAt = 0): Promise<boolean> => {
+      try {
+        const blob = await getBlob(id);
+        if (blob && blob.size > 10000) {
+          if (objectUrlRef.current) {
+            try {
+              URL.revokeObjectURL(objectUrlRef.current);
+            } catch {}
+          }
+          const blobUrl = URL.createObjectURL(blob);
+          objectUrlRef.current = blobUrl;
+          setStream(blobUrl, startAt);
+          setStreamSource("offline");
+          return true;
+        }
+      } catch (err) {
+        console.warn("[MelodyMap] playOffline failed for", id, err);
+      }
       return false;
     },
-    [],
+    [setStream],
   );
 
   /**

@@ -5,11 +5,10 @@ import {
   Loader2,
   Menu,
   Search,
-  Settings2,
   X,
   RefreshCw,
 } from "lucide-react";
-import { Sidebar, type NavTab, NAV_ITEMS } from "@/components/music/layout/Sidebar";
+import { Sidebar, type NavTab } from "@/components/music/layout/Sidebar";
 import { MobileNav } from "@/components/music/layout/MobileNav";
 import { MobileDrawer } from "@/components/music/layout/MobileDrawer";
 import { MiniPlayer } from "@/components/music/layout/MiniPlayer";
@@ -82,13 +81,11 @@ import {
   topArtists,
   skippedLabels,
   sequenceBrief,
-  isMusicTrack,
   isPodcastTrack,
   isOriginalSong,
   isOldEraTrack,
   isLanguageConsistent,
   parseDurationSeconds,
-  MOODS,
   LANGUAGES,
   type Track,
 } from "@/lib/library";
@@ -115,7 +112,7 @@ import {
 import { GenreMoodFilterBar } from "@/components/music/ui/GenreMoodFilterBar";
 import { useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
-import { listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
+import { clearDownloads, listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 import { trackExistsIn, dedupeTracks, cleanTrackDisplayMetadata, type TrackLike } from "@/lib/track-dedup";
 import { resolveRestorablePlayback, resolveRestoreStartSeconds } from "@/lib/playback-restore";
@@ -274,11 +271,8 @@ function MusicApp() {
   const [historyQuery, setHistoryQuery] = useState("");
   const [recLoading, setRecLoading] = useState(false);
   const [exploreLoading, setExploreLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
   const { pullToRefreshProps, isPulling } = usePullToRefresh({
     onRefresh: async () => {
-      setRefreshing(true);
       try {
         if (tab === "explore") {
           await loadExploreFeeds(Date.now());
@@ -287,8 +281,6 @@ function MusicApp() {
         }
       } catch (e) {
         console.error('Error refreshing:', e);
-      } finally {
-        setRefreshing(false);
       }
     },
   });
@@ -323,6 +315,7 @@ function MusicApp() {
   const [showSleepTimer, setShowSleepTimer] = useState(false);
   const [shareTrack, setShareTrack] = useState<Track | null>(null);
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
+  const [downloadedTracks, setDownloadedTracks] = useState<Track[]>([]);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(80);
@@ -338,6 +331,7 @@ function MusicApp() {
     contextEngine.loadFromStorage();
     void listDownloads().then((items: DownloadInfo[]) => {
       setDownloadedIds(new Set(items.map((t: DownloadInfo) => t.track.id)));
+      setDownloadedTracks(items.map((t: DownloadInfo) => t.track));
     });
   }, []);
 
@@ -428,7 +422,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
     }
 
-    // Standard download (< 20 min) -> saved to IndexedDB
+    // Standard download -> saved to IndexedDB for in-app offline play AND triggered to save to phone/disk
     setDownloadingIds((prev) => new Set([...prev, track.id]));
     try {
       const res = await fetch(`/api/stream/${encodeURIComponent(track.id)}`);
@@ -443,9 +437,30 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         } catch {}
       }
 
+      // 1. Save to in-app offline storage (IndexedDB)
       await saveDownload(track, blob, imgBlob);
       setDownloadedIds((prev) => new Set([...prev, track.id]));
-      setMessage(`Downloaded "${track.title}" for offline listening`);
+      setDownloadedTracks((prev) => {
+        if (prev.some((t) => t.id === track.id)) return prev;
+        return [track, ...prev];
+      });
+
+      // 2. Trigger direct file download to device storage (.m4a/.mp3)
+      try {
+        const safeFileName = `${(track.title || "Song").replace(/[/\\?%*:|"<>]/g, "_")} - ${(track.artist || "MelodyMap").replace(/[/\\?%*:|"<>]/g, "_")}.m4a`;
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = safeFileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      } catch (saveErr) {
+        console.warn("[MelodyMap] Disk save failed, in-app offline saved successfully", saveErr);
+      }
+
+      setMessage(`Downloaded "${track.title}" to storage & offline library`);
     } catch {
       setMessage("Failed to download song");
     } finally {
@@ -465,6 +480,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       next.delete(track.id);
       return next;
     });
+    setDownloadedTracks((prev) => prev.filter((t) => t.id !== track.id));
     setMessage(`Removed offline copy of "${track.title}"`);
     setTimeout(() => setMessage(null), 3000);
   };
@@ -2664,10 +2680,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     () => ({
       likes: likes.map(cleanTrackDisplayMetadata),
       history: filteredHistory.map(cleanTrackDisplayMetadata),
+      downloads: downloadedTracks.map(cleanTrackDisplayMetadata),
       search: results,
       foryou: recs,
     }),
-    [likes, filteredHistory, results, recs],
+    [likes, filteredHistory, downloadedTracks, results, recs],
   );
   const visible = listForTab[tab] ?? [];
 
@@ -2676,6 +2693,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (section === "liked") setTab("likes");
     else if (section === "history") setTab("history");
     else if (section === "playlists") setTab("playlists");
+    else if (section === "downloads") setTab("downloads");
   }, []);
 
   const userNameDisplay =
@@ -3179,7 +3197,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 likes={likes}
                 history={history}
                 playlists={playlists}
-                downloads={[]}
+                downloads={downloadedTracks.map((t) => ({ track: t, size: 0, savedAt: Date.now() }))}
                 currentId={current?.id ?? null}
                 isPlaying={player.isPlaying}
                 onNavigateSection={handleMobileLibraryNav}
@@ -3199,17 +3217,26 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               </div>
             )}
 
-            {/* FAVOURITES / HISTORY TABS (TrackList) */}
-            {(tab === "likes" || tab === "history") && (
+            {/* FAVOURITES / HISTORY / DOWNLOADS TABS (TrackList) */}
+            {(tab === "likes" || tab === "history" || tab === "downloads") && (
               <div className={cn("space-y-4", tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-foreground">
-                      {tab === "likes" ? "Your Favourites" : "Recently Played"}
+                      {tab === "likes"
+                        ? "Your Favourites"
+                        : tab === "downloads"
+                          ? "Downloaded Songs"
+                          : "Recently Played"}
                     </h2>
                     {tab === "history" && history.length > 0 && (
                       <span className="text-xs text-muted-foreground font-medium">
                         ({historyQuery ? `${filteredHistory.length} of ${history.length}` : `${history.length}`})
+                      </span>
+                    )}
+                    {tab === "downloads" && downloadedTracks.length > 0 && (
+                      <span className="text-xs text-muted-foreground font-medium">
+                        ({downloadedTracks.length})
                       </span>
                     )}
                   </div>
@@ -3225,6 +3252,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       className="text-xs text-muted-foreground hover:text-foreground"
                     >
                       Clear history
+                    </Button>
+                  )}
+                  {tab === "downloads" && downloadedTracks.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        if (typeof window !== "undefined" && window.confirm("Clear all offline downloads?")) {
+                          await clearDownloads();
+                          setDownloadedIds(new Set());
+                          setDownloadedTracks([]);
+                          setMessage("Cleared all offline downloads");
+                          setTimeout(() => setMessage(null), 3000);
+                        }
+                      }}
+                      className="text-xs text-muted-foreground hover:text-red-400"
+                    >
+                      Clear all
                     </Button>
                   )}
                 </div>
@@ -3287,9 +3332,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   emptyMessage={
                     tab === "likes"
                       ? "Tap the heart on any song to save your favourites."
-                      : historyQuery
-                        ? `No songs found matching "${historyQuery}" in your history.`
-                        : "Songs you listen to will appear here."
+                      : tab === "downloads"
+                        ? "No downloaded songs yet. Tap the 3 dots on any song and choose 'Download' to listen offline and save to your phone."
+                        : historyQuery
+                          ? `No songs found matching "${historyQuery}" in your history.`
+                          : "Songs you listen to will appear here."
                   }
                 />
               </div>

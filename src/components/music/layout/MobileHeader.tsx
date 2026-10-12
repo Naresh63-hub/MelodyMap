@@ -33,6 +33,7 @@ export function MobileHeader({
     if (tab === "library") return "Your Library";
     if (tab === "likes") return "Favourites";
     if (tab === "history") return "Recently Played";
+    if (tab === "downloads") return "Downloaded Songs";
     if (tab === "mixes") return "Mixes";
     return "MelodyMap";
   };
@@ -41,6 +42,7 @@ export function MobileHeader({
     if (tab === "foryou") return "Music picked for you";
     if (tab === "podcasts") return "Shows and episodes";
     if (tab === "languages") return "Explore music across languages";
+    if (tab === "downloads") return "Available offline";
     return "";
   };
 
