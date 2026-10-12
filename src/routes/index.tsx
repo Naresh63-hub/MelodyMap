@@ -19,7 +19,6 @@ import { MobileQueue } from "@/components/music/ui/MobileQueue";
 import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
 import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchResults";
 import { VoiceSearchButton } from "@/components/music/ui/VoiceSearchButton";
-import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
 import { saveRecentSearch } from "@/lib/search-history";
 import type { JioSaavnArtist } from "@/lib/artists-data";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";

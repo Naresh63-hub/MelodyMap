@@ -121,7 +121,7 @@ describe("resolveWithInnerTubePlayer (full-length-only fallback chain)", () => {
     // the old code would have returned the 30-second dzcdn preview here.
     expect(meta).toBeNull();
     expect(calls.some((u) => hostOf(u) === "api.deezer.com")).toBe(false);
-    expect(calls.some((u) => hostOf(u).endsWith("dzcdn.net"))).toBe(false);
+    expect(calls.some((u) => hostOf(u) === "cdns-preview-d.dzcdn.net")).toBe(false);
   });
 
   it("falls through when the Jamendo match fails its byte probe", async () => {

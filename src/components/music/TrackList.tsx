@@ -1,5 +1,4 @@
 import {
-  Download,
   Play,
   Plus,
   ThumbsDown,
