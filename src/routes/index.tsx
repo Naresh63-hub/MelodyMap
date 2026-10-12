@@ -1657,7 +1657,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setSearching(true);
       setSearchContinuation(undefined);
       searchPageRef.current = 1;
-      setQuery(term);
+      setQuery((prev) => (prev.trim() === term.trim() ? prev : term));
       setMessage(null);
 
       const requestId = ++activeSearchIdRef.current;
@@ -2810,6 +2810,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     value={query}
                     onChange={(e) => {
                       setQuery(e.target.value);
+                    }}
+                    onKeyDown={(e) => {
+                      // Ensure spacebar and cursor navigation are never intercepted by global shortcut listeners
+                      e.stopPropagation();
                     }}
                     placeholder="Search songs, artists, podcasts..."
                     className="h-10 w-full rounded-xl border border-hair bg-chip-subtle pl-10 pr-16 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-primary/20 focus:outline-none"

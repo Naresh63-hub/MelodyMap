@@ -29,17 +29,27 @@ export function useKeyboardShortcuts(
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing inside input, textarea, contenteditable, or select
-      const activeEl = document.activeElement;
+      const activeEl = document.activeElement as HTMLElement | null;
+      const targetEl = e.target as HTMLElement | null;
       const isInput =
-        activeEl &&
-        (activeEl.tagName === "INPUT" ||
-          activeEl.tagName === "TEXTAREA" ||
-          activeEl.tagName === "SELECT" ||
-          activeEl.getAttribute("contenteditable") === "true");
+        (activeEl &&
+          (activeEl.tagName === "INPUT" ||
+            activeEl.tagName === "TEXTAREA" ||
+            activeEl.tagName === "SELECT" ||
+            activeEl.getAttribute("contenteditable") === "true" ||
+            Boolean(activeEl.isContentEditable))) ||
+        (targetEl &&
+          (targetEl.tagName === "INPUT" ||
+            targetEl.tagName === "TEXTAREA" ||
+            targetEl.tagName === "SELECT" ||
+            targetEl.getAttribute("contenteditable") === "true" ||
+            Boolean(targetEl.isContentEditable)));
 
       // Exception: Escape key can blur active input
       if (e.key === "Escape" && isInput) {
-        (activeEl as HTMLElement).blur();
+        if (activeEl && typeof activeEl.blur === "function") {
+          activeEl.blur();
+        }
         return;
       }
 
