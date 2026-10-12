@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { Play, User } from "lucide-react";
+import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JioSaavnArtist } from "@/lib/artists-data";
 

@@ -19,6 +19,15 @@ const DEEZER_PREVIEW = "https://cdns-preview-d.dzcdn.net/stream/30s.mp3";
 
 const calls: string[] = [];
 
+/** Host of a recorded fetch URL, or "" when it cannot be parsed. */
+function hostOf(raw: string): string {
+  try {
+    return new URL(raw).host;
+  } catch {
+    return "";
+  }
+}
+
 function jsonRes(body: unknown, status = 200) {
   return {
     ok: status >= 200 && status < 300,
@@ -49,14 +58,15 @@ function installFetchMock(opts: {
     if (url.includes("youtube.com/oembed")) {
       return jsonRes({ title: OE_TITLE, author_name: OE_AUTHOR });
     }
-    if (url.includes("audius.co")) return jsonRes({ data: [] });
-    if (url.includes("api.jamendo.com")) {
+    const host = hostOf(url);
+    if (host.endsWith(".audius.co") || host === "audius.co") return jsonRes({ data: [] });
+    if (host === "api.jamendo.com") {
       return jsonRes({
         headers: { status: "success", code: 0, results_count: opts.jamendoResults?.length ?? 0 },
         results: opts.jamendoResults ?? [],
       });
     }
-    if (url.includes("api.deezer.com")) return jsonRes({ data: opts.deezerResults ?? [] });
+    if (host === "api.deezer.com") return jsonRes({ data: opts.deezerResults ?? [] });
 
     // Media byte-range probes (Jamendo MP3s, etc.)
     const status = opts.probeStatus ?? 206;
@@ -110,8 +120,8 @@ describe("resolveWithInnerTubePlayer (full-length-only fallback chain)", () => {
     // No full-length source → nothing is served (per-track backoff → skip);
     // the old code would have returned the 30-second dzcdn preview here.
     expect(meta).toBeNull();
-    expect(calls.some((u) => u.includes("api.deezer.com"))).toBe(false);
-    expect(calls.some((u) => u.includes("dzcdn.net"))).toBe(false);
+    expect(calls.some((u) => hostOf(u) === "api.deezer.com")).toBe(false);
+    expect(calls.some((u) => hostOf(u).endsWith("dzcdn.net"))).toBe(false);
   });
 
   it("falls through when the Jamendo match fails its byte probe", async () => {

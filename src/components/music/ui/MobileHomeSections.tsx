@@ -1,4 +1,4 @@
-import { Clock, Disc3, Flame, MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, TrendingUp, Users } from "lucide-react";
+import { MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, Users } from "lucide-react";
 import { useRef, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";

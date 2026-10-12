@@ -205,8 +205,8 @@ export function extractFromClause(text: string): string | undefined {
   // "the movie Vikram" as the movie name.
   const patterns = [
     /[([{]\s*from\s+the\s+(?:movie|film|series|album)\s+["'“‘]?([^"'“”’)\]}]+)["'“”’]?\s*[)\]}]\s*$/i,
-    /[([{]\s*from\s*[:\-]?\s*["'“‘]?([^"'“”’)\]}]+)["'“”’]?\s*[)\]}]\s*$/i,
-    /[([{]\s*from\s*[:\-]?\s*["'“‘]?([^"'“”’)\]}]+)["'“”’]?\s*[)\]}]\s*/i,
+    /[([{]\s*from\s*[:-]?\s*["'“‘]?([^"'“”’)\]}]+)["'“”’]?\s*[)\]}]\s*$/i,
+    /[([{]\s*from\s*[:-]?\s*["'“‘]?([^"'“”’)\]}]+)["'“”’]?\s*[)\]}]\s*/i,
   ];
   for (const re of patterns) {
     const m = decoded.match(re);
@@ -231,7 +231,7 @@ export function cleanSongTitle(rawTitle: string | undefined | null): string {
 
   // Drop the "(From "Movie")" / "[From the movie X]" clause wherever it sits.
   title = title
-    .replace(/[([{]\s*from\s*[:\-]?\s*["'“‘]?[^"'“”’)\]}]+["'“”’]?\s*[)\]}]\s*/gi, " ")
+    .replace(/[([{]\s*from\s*[:-]?\s*["'“‘]?[^"'“”’)\]}]+["'“”’]?\s*[)\]}]\s*/gi, " ")
     .replace(/[([{]\s*from\s+the\s+(?:movie|film|series|album)\s+["'“‘]?[^"'“”’)\]}]+["'“”’]?\s*[)\]}]\s*/gi, " ");
 
   // Drop "| Official Video" style tails before the generic junk pass.

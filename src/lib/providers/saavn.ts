@@ -7,6 +7,7 @@
 import CryptoJS from "crypto-js";
 import type { UnifiedTrack, ProviderSearchOptions } from "./types";
 import { isOriginalSong } from "../track-filters";
+import { decodeEntities } from "../track-metadata";
 import { cleanAlbumName, cleanMovieName, cleanSongTitle } from "../track-metadata";
 
 const DES_KEY = "38346591";
@@ -45,13 +46,7 @@ export function decryptSaavnMediaUrl(
 
 function cleanHtmlEntities(text?: string): string {
   if (!text) return "";
-  return text
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .trim();
+  return decodeEntities(text);
 }
 
 function formatDuration(seconds: number): string {

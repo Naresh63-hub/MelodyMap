@@ -2,9 +2,6 @@ import { Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Track } from '@/lib/library';
 
-const RELEASE_RADAR_KEY = 'melodymap-release-radar';
-const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
-
 type Props = {
   allTracks: Track[];
   followedArtists: string[];

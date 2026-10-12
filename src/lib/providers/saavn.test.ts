@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decryptSaavnMediaUrl, searchSaavn, resolveSaavnByMeta } from "./saavn";
+import { decryptSaavnMediaUrl } from "./saavn";
 
 describe("JioSaavn Provider", () => {
   it("decrypts encrypted media URL to direct 320kbps CDN URL", () => {

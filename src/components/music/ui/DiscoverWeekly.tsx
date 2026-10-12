@@ -2,9 +2,6 @@ import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Track } from '@/lib/library';
 
-const DISCOVER_WEEKLY_KEY = 'melodymap-discover-weekly';
-const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
-
 type Props = {
   allTracks: Track[];
   likedTracks: Track[];

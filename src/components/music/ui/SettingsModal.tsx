@@ -22,8 +22,6 @@ import {
   Activity,
   Disc,
   Sun,
-  Moon,
-  Monitor,
 } from "lucide-react";
 import { loadEqualizerSettings, saveEqualizerSettings } from "@/lib/equalizer";
 import { useNavigate } from "@tanstack/react-router";

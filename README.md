@@ -1,93 +1,107 @@
 <div align="center">
-  <img src="public/brand/app-icon.png" alt="MelodyMap Logo" width="104" height="104" style="border-radius: 24px; box-shadow: 0 12px 36px rgba(124, 58, 237, 0.45);" />
+  <img src="public/brand/app-icon.png" alt="MelodyMap Logo" width="104" height="104" style="border-radius: 24px;" />
   <h1>MelodyMap</h1>
   <p><strong>Your Music. Your Mood. Your Map.</strong></p>
-  <p>A production-ready, local-first music streaming Progressive Web Application and native Android application powered by <strong>Contextual Linear Thompson Sampling (LinTS)</strong>, studio-grade Web Audio API processing, single-track playback guarantees, uninterrupted background audio, and real-time listening insights.</p>
+  <p>A local-first, multi-source music &amp; podcast streaming Progressive Web App and native Android (Capacitor) client — with an adaptive recommender, studio-grade Web Audio processing, a resilient dual-engine playback system, and Spotify-style background audio.</p>
 
   <p>
     <a href="https://melodymap-pi.vercel.app" target="_blank">
-      <img src="https://img.shields.io/badge/Live_Production-melodymap--pi.vercel.app-7c3aed?style=for-the-badge&logo=vercel" alt="Live Demo" />
+      <img src="https://img.shields.io/badge/Live-melodymap--pi.vercel.app-7c3aed?style=for-the-badge&logo=vercel" alt="Live Demo" />
     </a>
   </p>
 
   <p>
-    <a href="https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.4">
-      <img src="https://img.shields.io/badge/Release-v1.0.4-1DB954?style=flat-square&logo=android" alt="Release v1.0.4" />
-    </a>
-    <img src="https://img.shields.io/badge/CI-Passing-brightgreen?style=flat-square&logo=githubactions" alt="CI Passing" />
-    <img src="https://img.shields.io/badge/Unit_Tests-291_Passed-brightgreen?style=flat-square&logo=vitest" alt="Vitest 291 Passed" />
-    <img src="https://img.shields.io/badge/E2E_Tests-6_Passed-brightgreen?style=flat-square&logo=playwright" alt="Playwright E2E 6 Passed" />
-    <img src="https://img.shields.io/badge/CodeQL-0_Alerts-brightgreen?style=flat-square&logo=github" alt="CodeQL Clean" />
-    <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square&logo=react" alt="React 19" />
+    <img src="https://img.shields.io/badge/Version-1.3.4-1DB954?style=flat-square" alt="Version 1.3.4" />
+    <img src="https://img.shields.io/badge/Unit_Tests-346_Passed-brightgreen?style=flat-square&logo=vitest" alt="Vitest 346 Passed" />
+    <img src="https://img.shields.io/badge/E2E-6_Passed-brightgreen?style=flat-square&logo=playwright" alt="Playwright E2E 6 Passed" />
+    <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react" alt="React 19" />
     <img src="https://img.shields.io/badge/TanStack-Start-ff4154?style=flat-square" alt="TanStack Start" />
     <img src="https://img.shields.io/badge/TypeScript-5.8-3178c6?style=flat-square&logo=typescript" alt="TypeScript 5.8" />
     <img src="https://img.shields.io/badge/TailwindCSS-v4-38bdf8?style=flat-square&logo=tailwindcss" alt="Tailwind CSS 4" />
-    <img src="https://img.shields.io/badge/Capacitor-Android_SDK_36-blue?style=flat-square&logo=capacitor" alt="Capacitor Android" />
+    <img src="https://img.shields.io/badge/Capacitor-8%20(Android%20SDK%2036)-blue?style=flat-square&logo=capacitor" alt="Capacitor Android" />
     <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
   </p>
 </div>
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
-- [1. Project Overview](#1-project-overview)
-- [2. Main Features](#2-main-features)
-- [3. Screenshots & Visual Interface](#3-screenshots--visual-interface)
-- [4. Technology Stack](#4-technology-stack)
-- [5. Architecture Overview](#5-architecture-overview)
-- [6. Project Folder Structure](#6-project-folder-structure)
-- [7. Prerequisites](#7-prerequisites)
-- [8. Local Installation](#8-local-installation)
-- [9. Environment Variables](#9-environment-variables)
-- [10. Development Commands](#10-development-commands)
-- [11. Testing & Quality Assurance](#11-testing--quality-assurance)
-- [12. Production Build Instructions](#12-production-build-instructions)
-- [13. Android Release APK Build Instructions](#13-android-release-apk-build-instructions)
-- [14. Capacitor Configuration](#14-capacitor-configuration)
-- [15. Background Playback & MediaSession Implementation](#15-background-playback--mediasession-implementation)
-- [16. Firebase Setup & Architecture](#16-firebase-setup--architecture)
-- [17. Security Architecture & CodeQL Remediation](#17-security-architecture--codeql-remediation)
-- [18. Deployment Instructions](#18-deployment-instructions)
-- [19. Keyboard Shortcuts](#19-keyboard-shortcuts)
-- [20. Known Limitations](#20-known-limitations)
-- [21. License & Legal](#21-license--legal)
+1. [Project Overview](#1-project-overview)
+2. [Key Features](#2-key-features)
+3. [Playback Engines (how audio works)](#3-playback-engines-how-audio-works)
+4. [Technology Stack](#4-technology-stack)
+5. [Architecture Overview](#5-architecture-overview)
+6. [Music Providers](#6-music-providers)
+7. [Project Structure](#7-project-structure)
+8. [Prerequisites](#8-prerequisites)
+9. [Local Installation](#9-local-installation)
+10. [Environment Variables](#10-environment-variables)
+11. [Development Commands](#11-development-commands)
+12. [Testing & CI](#12-testing--ci)
+13. [Web Production Build & Vercel Deploy](#13-web-production-build--vercel-deploy)
+14. [Android APK Build](#14-android-apk-build)
+15. [Capacitor Configuration](#15-capacitor-configuration)
+16. [Background Playback & MediaSession](#16-background-playback--mediasession)
+17. [APK Notes & Server Constraints](#17-apk-notes--server-constraints)
+18. [Data, Auth & Sync (Supabase)](#18-data-auth--sync-supabase)
+19. [Security](#19-security)
+20. [Keyboard Shortcuts](#20-keyboard-shortcuts)
+21. [Known Limitations](#21-known-limitations)
+22. [License & Legal](#22-license--legal)
 
 ---
 
 ## 1. Project Overview
 
-**MelodyMap** is a high-performance, local-first streaming platform and native mobile client engineered for seamless audio playback and intelligent music discovery. Built with React 19, TanStack Start, Nitro, and Capacitor Android, MelodyMap combines:
+**MelodyMap** is a high-performance, local-first streaming platform delivered as both a **Progressive Web App** and a **native Android app** (Capacitor). It aggregates multiple legal music catalogs behind a single player and adds an adaptive recommendation layer on top.
 
-1. **Contextual Linear Thompson Sampling (LinTS)**: An adaptive Bayesian multi-armed bandit recommender dynamically adapting to user skips, completions, likes, time-of-day circadian rhythm, and session momentum.
-2. **Spotify-Style Uninterrupted Background Playback**: Rock-solid audio continuity across tab switches, screen lock, app minimization, and Bluetooth/headset media controls.
-3. **Resilient Dual-Engine Audio Streaming**: Serverless pre-provisioned binary resolution, pure TypeScript InnerTube fallback, and direct client playback.
-4. **Studio-Grade Web Audio API Processing**: 10-band hardware equalizer, loudness normalization (-14 LUFS standard compressor), and equal-power crossfading.
+Highlights:
 
----
-
-## 2. Main Features
-
-- 🎵 **Spotify-Grade Audio Player**: Dedicated docked mini-player, full-screen immersive view, scrub preview hairline, volume and speed controls (0.25x to 3.0x).
-- 📱 **Continuous Background Playback**: Screen-off playback with Android `PARTIAL_WAKE_LOCK`, `MediaSession` integration, lock-screen artwork, and headset click-to-pause/skip controls.
-- 🧠 **Contextual AI Discovery**: Real-time Bayesian bandit recommendation vector updating online after every track interaction.
-- 🎚️ **10-Band Studio Equalizer**: 10 parametric biquad filters (`32Hz` to `16kHz`) with presets (`Bass Boost`, `Vocal`, `Rock`, `Acoustic`, `Flat`) plus custom curves.
-- 🌙 **Background Sleep Timer**: Native Android exact alarm bridge (`SleepTimerBridge.java` & `SleepTimerReceiver.java`) that stops playback and releases WakeLock even when deep asleep.
-- 🔍 **Live Debounced Multi-Catalog Search**: Fast search across YouTube Music, Deezer, Audius, Jamendo, and Internet Archive with instant deduplication.
-- 📝 **Synchronized Lyrics**: Real-time timed lyrics synced via LRCLIB.
-- ⏩ **SponsorBlock Auto-Skip**: Configurable automatic skipping of non-music intros, sponsor segments, and outro chatter.
-- 💾 **Local-First & Offline Caching**: Complete library, playlist, and audio caching in IndexedDB; optional Firebase cross-device sync.
-- 🛡️ **Zero CodeQL Vulnerabilities**: Architecturally eliminated network-to-filesystem write sinks (`js/http-to-file-access`).
+1. **Adaptive discovery** — a Contextual Linear Thompson Sampling (LinTS) multi-armed bandit that updates online from skips, completions, likes, time-of-day, and session momentum, plus an optional AI reasoning gateway.
+2. **Dual-engine playback** — a resilient client YouTube player and an HTML5/proxy path, with automatic fallback when an embed is blocked or a stream stalls.
+3. **Studio-grade Web Audio** — 10-band parametric equalizer, loudness-normalizing compressor, and equal-power crossfading.
+4. **Spotify-style native background** — foreground `MediaPlaybackService`, wake/Wi-Fi locks, `MediaSession`, lock-screen/notification + headset controls, and a hardware sleep-timer.
+5. **Local-first** — library, playlists, and audio cache in IndexedDB; optional cross-device sync via Supabase.
 
 ---
 
-## 3. Screenshots & Visual Interface
+## 2. Key Features
 
-| Immersive Full-Screen Player | 10-Band Studio Equalizer | Mobile Home & Discovery |
-| :---: | :---: | :---: |
-| <img src="public/brand/app-icon.png" width="220" alt="MelodyMap Player" /> | <img src="public/brand/icon.png" width="220" alt="Equalizer" /> | <img src="public/brand/app-icon-dark.png" width="220" alt="Mobile Home" /> |
+- 🎵 **Full player UI** — docked mini-player, immersive full-screen view, scrub preview, volume, and speed control (0.25×–3.0×).
+- 🌐 **Multi-catalog search** — debounced, aggregated, and de-duplicated across the configured providers (see [Providers](#6-music-providers)).
+- 🧠 **Contextual AI discovery** — LinTS bandit scoring updated in real time after every interaction.
+- 🎚️ **10-band equalizer** — biquad filters from 32 Hz to 16 kHz with presets (Bass Boost, Vocal, Rock, Acoustic, Flat) and custom curves.
+- 🔀 **Crossfade & quality** — equal-power crossfade (default 3 s) and `saver`/`standard`/`high` stream quality.
+- 🌙 **Sleep timer** — native Android exact-alarm bridge that stops playback and releases locks even in deep sleep.
+- ⏭️ **SponsorBlock auto-skip** — configurable skipping of intros, sponsor segments, and outros.
+- 📝 **Synced lyrics** — time-aligned lyrics via LRCLIB.
+- 📲 **Background playback** — real screen-off / lock-screen playback for direct-source tracks via a foreground service.
+- 💾 **Offline & local-first** — IndexedDB library, playlists, and cached audio.
+- 🛡️ **Security-hardened** — strict video-ID validation, SSRF-safe upstream allowlist, per-IP rate limiting, server-scoped secrets, and CodeQL-clean streaming.
 
-*Explore listening insights, taste radar vectors, synchronized lyrics, and playlist curation directly in the app.*
+---
+
+## 3. Playback Engines (how audio works)
+
+MelodyMap chooses a playback engine per environment (see `src/lib/native-playback.ts` → `resolvePlaybackEngine`) and per track. There are **two engines**, and **only one is ever active at a time**:
+
+| Engine | Mechanism | Used for | Background / screen-off |
+| :--- | :--- | :--- | :---: |
+| **`youtube`** | Client-side YouTube IFrame player | Deployed **web** and the **native APK** for YouTube-catalog tracks | ❌ pauses when hidden/locked |
+| **`html5`** | Native `<audio>` element via the `/api/stream` proxy **or** a direct provider URL | Localhost/dev, and **all direct-source tracks** (`saavn`, `audius`, `jamendo`, `archive`, `podcast`) and offline cache | ✅ continues (native service keeps it alive) |
+
+How a track is routed (`use-audio-player.ts` → `load`):
+
+1. **Offline cache** → HTML5 (background-safe).
+2. **Direct full-length source** (`saavn:` / `audius:` / `jamendo:` / `archive:` / `podcast:` — see `track-stream-policy.ts`) → HTML5 `<audio>` playing the provider URL directly. **These play in the background.**
+3. **Everything else** → the engine chosen by `resolvePlaybackEngine`:
+   - `youtube` (deployed web & APK): plays through the IFrame — reliable, no server needed, but pauses when the screen locks.
+   - `html5` (localhost/dev): streams through the `/api/stream` proxy (yt-dlp → InnerTube → provider fallback).
+
+If a YouTube embed is blocked (player error 100/101/150/2), the client **falls back to the HTML5 proxy** automatically.
+
+> **Why this matters for the APK:** the app's catalog is **JioSaavn-first**, and JioSaavn is a direct source — so most songs get true Spotify-style background playback. Only occasional plain-YouTube fallback tracks (IFrame) are foreground-only. See [APK Notes](#17-apk-notes--server-constraints).
 
 ---
 
@@ -95,352 +109,334 @@
 
 | Tier | Technologies |
 | :--- | :--- |
-| **Frontend Framework** | React 19.2, TanStack Start, TanStack Router, TanStack Query |
-| **Styling & UI** | Tailwind CSS v4, Radix UI Primitives, Lucide Icons, Class Variance Authority |
-| **Audio & DSP** | HTML5 Audio, Web Audio API (`AudioContext`, `BiquadFilterNode`, `DynamicsCompressorNode`), MediaSession API |
-| **Server & API** | Nitro Server Engine, TanStack Start Server Functions, H3 HTTP utilities |
-| **Mobile Runtime** | Capacitor 8.5 (Target SDK 36, Min SDK 24, Android Gradle 8.14.3) |
-| **Database & Auth** | Firebase (Firebase Authentication, Cloud Firestore, Google Play Services 1-tap) |
-| **AI & Recommendation**| Contextual Multi-Armed Bandit (Linear Thompson Sampling with Cholesky factorization) |
-| **Testing** | Vitest 5.0 (218 unit/integration tests), Playwright 1.58 (6 E2E playback scenarios) |
-| **Security Scanning** | GitHub CodeQL Action v3 (javascript-typescript suite), Dependabot |
+| **Frontend** | React 19, TanStack Start, TanStack Router, TanStack Query |
+| **Styling & UI** | Tailwind CSS v4, Radix UI primitives, Lucide icons, CVA, `tw-animate-css` |
+| **Audio & DSP** | HTML5 `Audio`, Web Audio API (`AudioContext`, `BiquadFilterNode`, `DynamicsCompressorNode`), Media Session API, YouTube IFrame API |
+| **Server & API** | Nitro server engine, TanStack Start server functions, H3, `youtube-dl-exec` / yt-dlp |
+| **Mobile runtime** | Capacitor 8.5 — `minSdk 24`, `compileSdk`/`targetSdk 36` |
+| **Data & auth** | Supabase (Auth + PostgreSQL), Google Sign-In (web + native 1-tap); local-first IndexedDB |
+| **AI & recs** | Contextual Multi-Armed Bandit (Linear Thompson Sampling) + server-side AI gateway |
+| **Testing** | Vitest 5 (346 tests / 38 files), Playwright (6 E2E playback scenarios) |
+| **CI & security** | GitHub Actions (CI + CodeQL `javascript-typescript`), Dependabot |
 
 ---
 
 ## 5. Architecture Overview
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        MelodyMap Client App                           │
-│   (React 19 + TanStack Router + Tailwind CSS 4 + Capacitor Native)     │
-└───────────────┬────────────────────────────────────────┬───────────────┘
-                │                                        │
-        Playback & Controls                      Telemetry & Context
-                ▼                                        ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          MelodyMap Client App                              │
+│      (React 19 · TanStack Router · Tailwind CSS 4 · Capacitor Native)      │
+└───────────────┬───────────────────────────────────────┬──────────────────┘
+        Playback & controls                    Telemetry & context
+                ▼                                       ▼
 ┌───────────────────────────────┐        ┌───────────────────────────────┐
-│     useAudioPlayer Core       │        │    Contextual LinTS Bandit    │
-│  - Single Audio Element Guard │        │  - 6D Feature Extraction      │
-│  - Mutual Audio Exclusion     │        │  - Cholesky Posterior Sample │
-│  - Web Audio 10-Band EQ       │        │  - Online Bayesian Update     │
-│  - MediaSession Lockscreen    │        │  - Feed Freshness & Dedup     │
+│      useAudioPlayer core      │        │    Contextual LinTS bandit    │
+│  - one active engine (XOR)    │        │  - feature extraction         │
+│  - Web Audio 10-band EQ       │        │  - Cholesky posterior sample  │
+│  - equal-power crossfade      │        │  - online Bayesian update     │
+│  - Media Session lock screen  │        │  - feed freshness & dedup     │
 └───────────────┬───────────────┘        └───────────────┬───────────────┘
-                │                                        │
-        Audio Streams                            Candidate Scoring
-                ▼                                        ▼
+        Audio streams                          Candidate scoring
+                ▼                                       ▼
 ┌───────────────────────────────┐        ┌───────────────────────────────┐
-│   Hybrid Stream Resolvers     │        │  Multi-Source Music Catalogs  │
-│  - Pre-Provisioned yt-dlp     │        │  - YouTube Music Hybrid API   │
-│  - Pure TS InnerTube Fallback │        │  - Deezer Search API          │
-│  - Deezer CDN Direct Previews │        │  - Audius / Jamendo / Archive │
-│  - LRCLIB Synchronized Lyrics │        │  - In-Memory LRU Cache        │
+│   Dual-engine stream path     │        │     Multi-provider catalogs   │
+│  - yt-dlp (where available)   │        │  - JioSaavn (primary, direct) │
+│  - pure-TS InnerTube fallback │        │  - Audius / Jamendo / Archive │
+│  - /api/stream byte-range     │        │  - Deezer (metadata/ISRC)     │
+│  - LRCLIB synced lyrics       │        │  - MusicBrainz (metadata)     │
 └───────────────────────────────┘        └───────────────────────────────┘
 ```
 
 ---
 
-## 6. Project Folder Structure
+## 6. Music Providers
+
+Capabilities are declared in `src/lib/providers/registry.ts`.
+
+| Provider | Discover | Metadata | Full playback | Notes |
+| :--- | :---: | :---: | :---: | :--- |
+| **JioSaavn** | ✅ | ✅ | ✅ | Primary catalog; HD 320 kbps, direct CDN audio (background-safe). |
+| **Audius** | ✅ | ✅ | ✅ | Decentralized / artist-uploaded, authorized full streams. |
+| **Jamendo** | ✅ | ✅ | ✅ | Creative-Commons independent catalog, full MP3. |
+| **Internet Archive** | ✅ | ✅ | ✅ | Public-domain & Live Music Archive recordings. |
+| **Deezer** | ✅ | ✅ | ❌ | ISRC + rich metadata + album art (playback disabled for full-length policy). |
+| **MusicBrainz** | ❌ | ✅ | ❌ | Authoritative recording IDs / relationships. |
+| **ListenBrainz** | ❌ | ✅ | ❌ | Community listening insights. |
+
+---
+
+## 7. Project Structure
 
 ```
 MelodyMap/
 ├── .github/
-│   └── workflows/
-│       ├── ci.yml                 # Automated CI: Vitest, Typecheck, Build, Playwright E2E
-│       └── codeql.yml             # GitHub CodeQL security analysis workflow
+│   ├── workflows/
+│   │   ├── ci.yml                 # CI: test → typecheck → build → Playwright E2E
+│   │   └── codeql.yml             # CodeQL security analysis (javascript-typescript)
+│   └── dependabot.yml
 ├── android/                       # Capacitor native Android Gradle project
-│   ├── app/
-│   │   ├── build.gradle           # Application ID, SDK 36, versionCode 2, versionName 1.0.1
-│   │   └── src/main/
-│   │       ├── AndroidManifest.xml# Permissions: WAKE_LOCK, FOREGROUND_SERVICE, SCHEDULE_EXACT_ALARM
-│   │       ├── java/com/melodymap/music/
-│   │       │   ├── MainActivity.java      # WakeLock & WebView background execution
-│   │       │   ├── SleepTimerBridge.java  # Exact Alarm bridge for sleep timer
-│   │       │   └── SleepTimerReceiver.java# WakeLock release and audio stop receiver
-│   │       └── res/xml/
-│   │           └── network_security_config.xml # Cleartext traffic disabled
-│   └── gradle/                    # Gradle 8.14.3 wrapper
-├── e2e/
-│   └── playback.spec.ts           # Playwright E2E test suite (6 playback flows)
-├── public/                        # PWA icons, manifest.json, brand assets
-├── release/                       # Output directory for signed Android release APKs
-│   └── MelodyMap-v1.0.1.apk       # Verified release APK (10.58 MB)
-├── server/                        # Server routes and stream proxy endpoints
+│   └── app/src/main/
+│       ├── AndroidManifest.xml    # mediaPlayback foreground service + WAKE_LOCK, etc.
+│       └── java/com/melodymap/music/
+│           ├── MainActivity.java              # WebView onResume/resumeTimers background tricks
+│           ├── MediaPlaybackService.java      # Foreground media service (wake/wifi locks, MediaSession)
+│           ├── PlaybackBridge.java            # JS ↔ service bridge (window.AndroidPlayback)
+│           ├── GoogleAuthBridge.java          # Native 1-tap Google sign-in
+│           ├── SleepTimerBridge.java          # Exact-alarm sleep timer
+│           └── SleepTimerReceiver.java        # Releases locks & stops audio on expiry
+├── server/routes/api/stream/      # Production /api/stream Nitro route (byte-range proxy)
+├── public/                        # PWA manifest, icons, brand assets, service worker
+├── e2e/playback.spec.ts           # Playwright E2E playback suite (6 scenarios)
 ├── src/
-│   ├── components/
-│   │   ├── music/                 # Player, Equalizer, Queue, TrackList, Mixes
-│   │   │   ├── layout/            # MiniPlayer, MobileNav, MobileHeader, Sidebar
-│   │   │   └── ui/                # FullScreenPlayer, SleepTimerModal, SettingsModal
-│   │   └── ui/                    # Base UI buttons, dialogs, sliders, switches
-│   ├── hooks/                     # Custom React hooks (keyboard shortcuts, sleep timer)
-│   ├── integrations/supabase/     # Supabase client and auth synchronization
-│   ├── lib/                       # Core algorithms, DSP, and streaming
-│   │   ├── bandit-policy.ts       # Contextual Linear Thompson Sampling engine
-│   │   ├── equalizer.ts           # 10-band equalizer presets and settings
-│   │   ├── stream.server.ts       # Pre-provisioned yt-dlp & pure TS InnerTube resolver
-│   │   ├── use-audio-player.ts    # Audio engine with single-track guarantee
-│   │   ├── use-media-session.ts   # Lock-screen and OS notification shade sync
-│   │   └── providers/             # Multi-provider audio catalog aggregators
-│   └── routes/                    # TanStack Start file-based routing
-├── capacitor.config.ts            # Capacitor runtime configuration
-├── package.json                   # Dependencies, scripts, and package metadata
-├── tsconfig.json                  # TypeScript configuration
-└── vite.config.ts                 # Vite, Nitro, and Tailwind CSS 4 configuration
+│   ├── components/                # music/ (player, equalizer, queue, cards, panels), ui/ (primitives)
+│   ├── hooks/                     # use-keyboard-shortcuts, useSleepTimer
+│   ├── lib/
+│   │   ├── native-playback.ts     # resolvePlaybackEngine + native bridge calls
+│   │   ├── use-audio-player.ts    # Audio engine (single-track, Web Audio EQ, crossfade, reconnect)
+│   │   ├── use-media-session.ts   # Media Session metadata & hardware control handlers
+│   │   ├── stream.server.ts       # yt-dlp + InnerTube + provider stream resolver (LRU cache)
+│   │   ├── stream-proxy-core.ts   # Shared SSRF/origin/rate-limit/byte-range proxy core
+│   │   ├── track-stream-policy.ts # Which tracks use a direct URL vs the proxy
+│   │   ├── bandit-policy.ts       # Contextual LinTS recommender
+│   │   ├── context-engine.ts      # Recommendation feature/context extraction
+│   │   ├── equalizer.ts           # 10-band EQ presets, crossfade, quality
+│   │   ├── ai-gateway.server.ts   # Server-side AI reasoning gateway
+│   │   ├── auth.ts / supabase.ts  # Supabase auth & client
+│   │   ├── offline.ts             # IndexedDB offline library & cache
+│   │   └── providers/             # saavn, audius, jamendo, deezer, archive, musicbrainz, dedup…
+│   ├── routes/                    # TanStack file-based routes
+│   └── styles.css                 # Tailwind v4 theme + light/dark token swaps
+├── capacitor.config.ts
+├── vite.config.ts                 # Vite + Nitro + stream-proxy dev middleware
+└── package.json                   # name: melodymap, version: 1.3.4
 ```
 
 ---
 
-## 7. Prerequisites
+## 8. Prerequisites
 
-- **Node.js**: `v20.x` or `v22.x LTS` (Node 22 LTS recommended)
-- **npm**: `v10.x` or higher
-- **Java Development Kit (JDK)**: JDK 17, 21, or 26 (for Android APK builds)
-- **Android SDK**: Build-Tools `35.0.0` or `36.0.0` (Platform SDK 36)
+- **Node.js** `20.x` or `22.x LTS` (Node 22 recommended — CI uses 22)
+- **npm** `10.x+`
+- **For the Android APK:** Android Studio (bundles the Android SDK + a compatible JDK). `minSdk 24`, `compileSdk`/`targetSdk 36`.
 
 ---
 
-## 8. Local Installation
+## 9. Local Installation
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/Naresh63-hub/MelodyMap.git
 cd MelodyMap
-
-# 2. Install dependencies cleanly
 npm ci
 ```
 
 ---
 
-## 9. Environment Variables
+## 10. Environment Variables
 
-Create a `.env` file in the root directory. Use `.env.example` as a template:
+Copy `.env.example` to `.env` and fill in what you use. The app runs fully in **guest mode** with none configured.
 
-```env
-# Public Supabase Client Configuration
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```dotenv
+# Optional AI reasoning gateway
+AI_API_BASE_URL=
+AI_API_KEY=
+AI_MODEL=
 
-# Server-Side Supabase Service Role (Server functions only, never exposed to client)
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+# Supabase (auth + cross-device sync). Leave blank for guest-only / local use.
+VITE_GOOGLE_CLIENT_ID=
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_SUPABASE_PUBLISHABLE_KEY=
 
-# Production App URL
-VITE_APP_URL=https://melodymap-pi.vercel.app
+# Optional YouTube data API key
+YOUTUBE_API_KEY=
 
-# Optional: Path to custom pre-installed yt-dlp binary (if not using bundled or system paths)
+# Optional: path to a pre-installed yt-dlp binary (server stream resolver).
+# When unset, the resolver uses the bundled/system binary or falls back to pure-TS InnerTube.
 # YOUTUBE_DL_PATH=/usr/local/bin/yt-dlp
 ```
 
----
-
-## 10. Development Commands
-
-```bash
-# Start local Vite development server
-npm run dev
-
-# Start development server with network exposure
-npm run dev -- --host
-```
-
-Access the app in your browser at `http://localhost:3000`.
+> Supabase **service-role** keys (if used) must be configured **server-side only** and never prefixed with `VITE_` (which exposes them to the client).
 
 ---
 
-## 11. Testing & Quality Assurance
-
-MelodyMap enforces 100% automated test verification across unit, integration, and end-to-end suites:
+## 11. Development Commands
 
 ```bash
-# Run 218 Vitest unit and integration tests
-npm test
-
-# Run TypeScript strict typecheck (tsc --noEmit)
-npm run typecheck
-
-# Run ESLint validation
-npm run lint
-
-# Run Playwright E2E Playback Suite (Headless Chromium)
-npm run test:e2e
+npm run dev            # Vite dev server (yt-dlp-backed stream proxy) → http://localhost:3000
+npm run build          # Production build (client + Nitro server bundle)
+npm run preview        # Preview the production build
+npm run typecheck      # tsc --noEmit (strict)
+npm run lint           # ESLint
+npm test               # Vitest unit + integration suite
+npm run test:e2e       # Playwright E2E playback suite
+npm run android:build  # cap sync android + gradlew assembleDebug
+npm run android:open   # Open the Android project in Android Studio
 ```
 
 ---
 
-## 12. Production Build Instructions
+## 12. Testing & CI
 
-To generate the optimized production web bundle:
+- **Unit / integration:** `npm test` → **346 tests across 38 files** (Vitest).
+- **Type safety:** `npm run typecheck` (TypeScript strict, `tsc --noEmit`).
+- **E2E:** `npm run test:e2e` → **6 Playwright playback scenarios** (single-track guarantee, seek, next/prev, auto-advance, one-active-source).
+- **CI** (`.github/workflows/ci.yml`, Node 22): `verify` job runs test → typecheck → build; the `e2e` job installs Chromium and runs the Playwright suite.
+- **Security scanning** (`.github/workflows/codeql.yml`): CodeQL `javascript-typescript` with `security-extended,security-and-quality` on push/PR and weekly.
+- **Dependabot** keeps dependencies patched.
 
 ```bash
-# Compile client and server bundles
+npm run typecheck && npm test && npm run build
+```
+
+---
+
+## 13. Web Production Build & Vercel Deploy
+
+```bash
 npm run build
-
-# Preview production build locally
-npm run preview
 ```
+
+When `process.env.VERCEL` is set, Vite configures Nitro with the **`vercel`** preset (otherwise it emits the standalone **node-server** output at `.output/server/index.mjs`).
+
+- **Build command:** `vite build`
+- **Framework:** auto-detected (TanStack Start / Nitro). Pushing to `main` triggers a Vercel redeploy.
 
 ---
 
-## 13. Android Release APK Build Instructions
-
-MelodyMap generates a fully signed, installable Android release APK:
+## 14. Android APK Build
 
 ```bash
-# 1. Build web application assets
+# 1. Build web assets + sync plugins/native project
 npm run build
-
-# 2. Sync web assets and plugins to Android project
 npx cap sync android
 
-# 3. Compile signed Release APK with Gradle
-cd android
-.\gradlew.bat assembleRelease
-cd ..
+# 2a. Debug APK (quick, unsigned)
+npm run android:build          # gradlew assembleDebug
+# → android/app/build/outputs/apk/debug/app-debug.apk
 
-# 4. Copy to release directory
-copy android\app\build\outputs\apk\release\app-release.apk release\MelodyMap-v1.0.1.apk
-
-# 5. Verify APK signature
-apksigner verify --verbose --print-certs release\MelodyMap-v1.0.1.apk
+# 2b. Signed Release APK (Android Studio or Gradle)
+cd android && ./gradlew assembleRelease && cd ..
 ```
 
-### Verified Release Artifact
- 
-- **GitHub Release Page**: [MelodyMap v1.0.4 Release](https://github.com/Naresh63-hub/MelodyMap/releases/tag/v1.0.4)
-- **Direct APK Download**: [Download MelodyMap-v1.0.4.apk](https://github.com/Naresh63-hub/MelodyMap/releases/download/v1.0.4/MelodyMap-v1.0.4.apk)
-- **Local Location**: `release/MelodyMap-v1.0.4.apk`
-- **File Size**: `11,880,996 bytes` (~11.88 MB)
-- **Application ID**: `com.melodymap.music`
-- **Version Code**: `5`
-- **Version Name**: `1.0.4`
-- **Target SDK**: `36` (Android 16) | **Min SDK**: `24` (Android 7.0 Nougat+)
-- **Signature Scheme**: APK Signature Scheme v2 (Verified)
-- **SHA-256**: `686A895239DCA584E9D6C33CD1D67DA5CB15206DAC2B4E946E3FD050FC08BB47`
-- **Certificate Digest (SHA-256)**: `1e16d14e27191bba677c29b39b4f7772152547a795841aa74cd06613f54bb085`
+For signing, provide a keystore via `android/key.properties` (see `android/key.properties.example`). Android Studio's **Build ▸ Generate Signed App Bundle/APK** works too.
+
+> **Important:** the APK is configured as a **remote wrapper** (see below) — it loads the deployed site, so ship the web app to Vercel first, then install the APK.
 
 ---
 
-## 14. Capacitor Configuration
+## 15. Capacitor Configuration
 
-`capacitor.config.ts`:
+`capacitor.config.ts` (abridged):
 
 ```typescript
-import type { CapacitorConfig } from '@capacitor/cli';
-
-const isDev = process.env.NODE_ENV === 'development' || process.env.CAPACITOR_ENV === 'development';
-
 const config: CapacitorConfig = {
-  appId: 'com.melodymap.music',
-  appName: 'MelodyMap',
-  webDir: '.output/public',
+  appId: "com.melodymap.music",
+  appName: "MelodyMap",
+  webDir: ".output/public",
   server: {
-    url: 'https://melodymap-pi.vercel.app',
+    url: "https://melodymap-pi.vercel.app", // APK loads the live site
     cleartext: isDev,
   },
   android: {
     allowMixedContent: isDev,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: "#0a0a0f",
+  },
+  plugins: {
+    // Android 15+ edge-to-edge: insets handled by the built-in SystemBars plugin.
+    SystemBars: {
+      insetsHandling: "css",
+      initialViewportFitValueHint: "cover",
+      style: "DARK",
+    },
   },
 };
-
-export default config;
 ```
 
----
-
-## 15. Background Playback & MediaSession Implementation
-
-To deliver an authentic Spotify-like experience when the screen is locked, minimized, or switched between apps:
-
-1. **Android CPU WakeLock**:
-   - `MainActivity.java` acquires a `PowerManager.PARTIAL_WAKE_LOCK` (`MelodyMap::AudioWakeLock`) on app start, keeping the CPU active while audio is playing even if the display shuts off.
-2. **WebView Lifecycle Preservation**:
-   - `settings.setMediaPlaybackRequiresUserGesture(false)` ensures subsequent songs transition automatically without requiring an on-screen tap.
-   - `webView.resumeTimers()` is invoked inside `onPause()` to prevent Android WebView from pausing audio render loops when entering the background.
-3. **OS MediaSession API**:
-   - `use-media-session.ts` updates `navigator.mediaSession.metadata` with hi-res artwork, track title, and artist name.
-   - Handlers for `play`, `pause`, `stop`, `nexttrack`, `previoustrack`, and `seekto` connect hardware headset buttons and lock-screen controls directly to the audio player state.
-4. **Hardware Sleep Timer Bridge**:
-   - `SleepTimerBridge.java` schedules exact Android alarms via `AlarmManager.setExactAndAllowWhileIdle()`.
-   - When the timer expires, `SleepTimerReceiver.java` releases the CPU WakeLock and signals the WebView to cleanly pause audio, conserving device battery during deep sleep.
+`server.url` makes the WebView load the **deployed PWA** (so the server API routes like `/api/stream` and auth keep working). To bundle the web build inside the APK instead, remove `server.url` — but then the API routes won't exist, so streaming/auth would break. Keep remote mode.
 
 ---
 
-## 16. Firebase Setup & Architecture
+## 16. Background Playback & MediaSession
 
-MelodyMap operates completely client-side in guest mode, but supports multi-device synchronization via Firebase Authentication and Cloud Firestore.
+Native background audio is driven by the **`MediaPlaybackService`** foreground service (not the Activity), so locks and the notification only exist while audio is actually playing.
 
-### Cloud Firestore Architecture (`src/lib/firebase.ts`)
+- **Foreground service** (`android:foregroundServiceType="mediaPlayback"`) with a persistent notification (Prev / Play-Pause / Next).
+- **Wake & Wi-Fi locks** — `PARTIAL_WAKE_LOCK` keeps the CPU alive with the screen off; a Wi-Fi lock keeps streaming flowing.
+- **Audio focus** — auto-pauses on incoming audio focus loss, ducks under transient focus, resumes afterward, and pauses on headphone unplug (noisy-audio receiver).
+- **`MediaSessionCompat`** — lock-screen artwork/metadata + hardware headset / media-key control, mirrored from `src/lib/use-media-session.ts`.
+- **WebView keep-alive** — `MainActivity` calls `webView.onResume()` + `resumeTimers()` in `onPause`/`onStop`/`onWindowFocusChanged`, and sets `setMediaPlaybackRequiresUserGesture(false)` for automatic track transitions.
+- **Direct hardware audio** — on native, `initWebAudio` intentionally returns early so the `<audio>` element plays straight to hardware (Chromium suspends WebAudio-routed audio on screen lock). This is why **direct-source** tracks survive background playback.
+- **Sleep timer** — `SleepTimerBridge` schedules exact Android alarms; on expiry `SleepTimerReceiver` releases the wake lock and cleanly pauses audio.
 
-1. **`users/{userId}`**: Stores profile documents with `displayName`, `email`, `avatarUrl`, and timestamps.
-2. **`users/{userId}/likes/{trackId}`**: Subcollection storing favorited tracks with metadata for cross-device favorites syncing.
-3. **`users/{userId}/history/{historyDocId}`**: Subcollection storing real-time listening history to train the LinTS recommendation engine.
-4. **Google Sign-In**:
-   - Web: Firebase Auth with Google OAuth popup / redirect.
-   - Android APK: Native 1-tap Google Play Services credential picker (`signInWithNativeGoogleFirebase`).
-
----
-
-## 17. Security Architecture & CodeQL Remediation
-
-MelodyMap enforces strict application security controls:
-
-1. **CodeQL #80 & #81 Remediation (`js/http-to-file-access`)**:
-   - Completely deleted all runtime dynamic binary downloads (`downloadVerifiedYtDlpBinary`) and filesystem write sinks (`fs.writeFileSync`).
-   - Server resolves pre-provisioned binaries (`process.env.YOUTUBE_DL_PATH`, `node_modules/youtube-dl-exec/bin/yt-dlp`, or system paths). If unavailable (such as in serverless Vercel environments), it safely falls back to a pure TypeScript YouTube API client with zero filesystem writes.
-   - Verified **0 open CodeQL alerts** on GitHub CodeQL scanning.
-2. **SSRF & Input Sanitization**:
-   - Stream API routes validate video IDs against strict regular expressions (`^[a-zA-Z0-9_-]{11}$`).
-3. **Network Security**:
-   - Android cleartext traffic is disabled (`cleartextTrafficPermitted="false"`).
-   - Strict Content Security headers (`nosniff`, `SAMEORIGIN`, `strict-origin-when-cross-origin`).
-4. **Secret Isolation**:
-   - Supabase service role keys are strictly scoped to server functions and never bundled into client distributions.
+**Command flow:** lock-screen / notification / headset buttons call into the page via `window.__melodymap_media_command`, and the web player remains the single source of truth for the queue.
 
 ---
 
-## 18. Deployment Instructions
+## 17. APK Notes & Server Constraints
 
-### Deploying Web App to Vercel
-
-```bash
-# Push validated changes to GitHub main branch
-git push origin main
-```
-
-Vercel automatically detects TanStack Start / Nitro and builds the serverless deployment:
-- **Build Command**: `vite build`
-- **Output Directory**: `.output`
+- The APK loads the **live Vercel site**, so front-end changes go live when Vercel redeploys (the installed APK picks them up on next load — no APK rebuild required for pure web changes; a rebuild is only needed when the native Android code changes).
+- **YouTube stream resolution on serverless:** the `/api/stream` proxy prefers `yt-dlp` when a binary is present, otherwise pure-TS InnerTube. On **Vercel serverless** there is no `yt-dlp` binary and datacenter IPs are bot-checked by YouTube, so **YouTube proxy streams may fail there**. This is fine for **direct-source** tracks (JioSaavn/Audius/Jamendo/Archive) and for the **client YouTube IFrame** engine, which is why the APK uses the IFrame for YouTube tracks and direct HTML5 for the rest.
+- For full YouTube background playback inside the APK, host the same app on a server that can run `yt-dlp` from a non-blocked IP (a VPS/container) and point `server.url` at it.
 
 ---
 
-## 19. Keyboard Shortcuts
+## 18. Data, Auth & Sync (Supabase)
+
+MelodyMap runs **guest-first**: everything works locally via IndexedDB with no account. Signing in enables optional cross-device sync through **Supabase** (Auth + PostgreSQL).
+
+- **`profiles`** — user display info (`displayName`, `email`, `avatarUrl`, timestamps).
+- **`user_library`** — favorites / saved tracks for cross-device sync.
+- **Google Sign-In** — web OAuth (popup/redirect) and a **native 1-tap** Play Services flow in the APK (`GoogleAuthBridge` → Supabase `signInWithIdToken`).
+
+---
+
+## 19. Security
+
+1. **Stream proxy hardening** (`stream-proxy-core.ts`):
+   - Strict video-ID validation (`^[a-zA-Z0-9_-]{1,32}$`).
+   - **SSRF guard** — upstream hosts restricted to an allowlist (Google/YouTube/Audius/Jamendo CDNs), HTTPS only.
+   - **Origin allowlist** + **per-IP rate limiting** on `/api/stream`.
+   - Byte-range responses clamped to bounded chunks for serverless-safe streaming.
+2. **No dynamic binary downloads** — the resolver only uses pre-provisioned `yt-dlp` (env / bundled / system path) and otherwise falls back to a pure-TS resolver. There are no network-to-filesystem write sinks (`js/http-to-file-access` eliminated).
+3. **Secret isolation** — Supabase service-role keys are server-only and never bundled into the client.
+4. **Network & headers** — Android cleartext traffic disabled (`network_security_config.xml`); `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` are set on the web server.
+5. **Static analysis** — CodeQL (`security-extended`, `security-and-quality`) runs on every push/PR and weekly.
+
+---
+
+## 20. Keyboard Shortcuts
+
+Disabled automatically while typing in inputs (except <kbd>Esc</kbd> to blur).
 
 | Key | Action |
 | :--- | :--- |
 | <kbd>Space</kbd> / <kbd>K</kbd> | Play / Pause |
-| <kbd>→</kbd> / <kbd>←</kbd> | Seek Forward / Backward (5s) |
-| <kbd>↑</kbd> / <kbd>↓</kbd> | Volume Up / Down (5%) |
-| <kbd>N</kbd> / <kbd>P</kbd> | Next Track / Previous Track |
-| <kbd>M</kbd> | Mute / Unmute Volume |
-| <kbd>F</kbd> | Toggle Full-Screen Player |
-| <kbd>E</kbd> | Open 10-Band Equalizer |
-| <kbd>S</kbd> | Toggle Shuffle Mode |
-| <kbd>R</kbd> | Cycle Repeat Mode (Off $\rightarrow$ All $\rightarrow$ One) |
-| <kbd>/</kbd> | Focus Search Bar |
-| <kbd>?</kbd> | Open Keyboard Shortcuts Modal |
+| <kbd>→</kbd> / <kbd>←</kbd> | Seek forward / backward |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Volume up / down |
+| <kbd>N</kbd> / <kbd>P</kbd> | Next / previous track |
+| <kbd>M</kbd> | Mute / unmute |
+| <kbd>F</kbd> | Toggle full-screen player |
+| <kbd>E</kbd> | Open equalizer |
+| <kbd>S</kbd> | Toggle shuffle |
+| <kbd>R</kbd> | Cycle repeat mode |
+| <kbd>/</kbd> | Focus search |
+| <kbd>?</kbd> | Shortcuts help |
 
 ---
 
-## 20. Known Limitations
+## 21. Known Limitations
 
-1. **Physical Device Verification**: Automated verification was executed using Playwright headless browser E2E, Vitest unit/integration suites, and Android Gradle APK build/apksigner verification. Real physical Android device testing depends on the developer's hardware connectivity.
-2. **Third-Party CDN Rate Limits**: Stream availability depends on public upstream endpoints (YouTube, Deezer). Fallback engines are in place to ensure zero playback interruption.
+1. **Real-device testing** — automated coverage uses Vitest + Playwright (headless Chromium) and Gradle APK builds; physical-device behavior (OEM battery managers, headset quirks) should still be spot-checked.
+2. **Aggressive OEM battery savers** (Xiaomi/OPPO/Realme, etc.) may still stop background audio after some time; the app requests a battery-optimization exemption once, but this is not guaranteed on every device.
+3. **Upstream availability** — stream success depends on public provider endpoints; fallback engines and per-track backoff minimize interruption but cannot remove upstream outages.
 
 ---
 
-## 21. License & Legal
+## 22. License & Legal
 
-This project is licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE).
 
-> **Disclaimer**: MelodyMap resolves audio from publicly available endpoints across third-party providers. It does not store or redistribute copyrighted media files.
+> **Disclaimer:** MelodyMap resolves audio from publicly available, provider-authorized endpoints and does not store or redistribute copyrighted media files. Respect each provider's terms of use.
 
-**Author**: [Naresh](https://github.com/Naresh63-hub)
+**Maintainer:** [Naresh](https://github.com/Naresh63-hub)

@@ -93,8 +93,6 @@ const BROWSER_UA =
 
 // ─── Pre-Provisioned Binary Resolution Stub ─────────────────────────
 
-let resolvedYtDlpInstance: any = null;
-
 export async function getYtDlpInstance() {
   return null;
 }
