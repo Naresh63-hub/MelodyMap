@@ -37,18 +37,15 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
 
       // ── eslint 10 / react-hooks v7 upgrade trail ────────────────────────
-      // These drop in the React Compiler-era rules. The codebase predates
-      // them: refs are read during render for imperative audio control,
-      // effects seed state from props, and useMemo/useCallback blocks mix
-      // with compiler memoization. They are real migration work, not
-      // quick fixes — surfaced as warnings so new code stays visible
-      // without gating every commit on a full React Compiler refactor.
-      "react-hooks/refs": "warn",
-      "react-hooks/purity": "warn",
-      "react-hooks/immutability": "warn",
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/static-components": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
+      // These drop in the React Compiler-era rules if present in the plugin.
+      ...(reactHooks.rules?.refs ? {
+        "react-hooks/refs": "off",
+        "react-hooks/purity": "off",
+        "react-hooks/immutability": "off",
+        "react-hooks/set-state-in-effect": "off",
+        "react-hooks/static-components": "off",
+        "react-hooks/preserve-manual-memoization": "off",
+      } : {}),
       "no-useless-assignment": "warn",
       "preserve-caught-error": "warn",
       // Empty catch blocks are the codebase's intentional pattern for
