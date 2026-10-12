@@ -96,6 +96,8 @@ capacitor-cordova-android-plugins
 app/src/main/assets/public
 
 # Generated Config files
-app/src/main/assets/capacitor.config.json
+# capacitor.config.json is tracked: src/lib/native-safe-area-insets.test.ts asserts the
+# shipped assets copy matches capacitor.config.ts, so it must exist in CI checkouts.
+!app/src/main/assets/capacitor.config.json
 app/src/main/assets/capacitor.plugins.json
 app/src/main/res/xml/config.xml

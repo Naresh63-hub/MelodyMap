@@ -1,0 +1,20 @@
+{
+	"appId": "com.melodymap.music",
+	"appName": "MelodyMap",
+	"webDir": ".output/public",
+	"server": {
+		"url": "https://melodymap-pi.vercel.app",
+		"cleartext": false
+	},
+	"android": {
+		"allowMixedContent": false,
+		"backgroundColor": "#0a0a0f"
+	},
+	"plugins": {
+		"SystemBars": {
+			"insetsHandling": "css",
+			"initialViewportFitValueHint": "cover",
+			"style": "DARK"
+		}
+	}
+}
