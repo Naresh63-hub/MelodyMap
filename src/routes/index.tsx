@@ -2906,19 +2906,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     counts={quickFilterCounts}
                   />
 
-                  {/* Recent Searches section in the main view (stores last 5 searched artist or song terms locally) */}
-                  <RecentSearchesSection
-                    onSelectQuery={(q) => {
-                      setTab("search");
-                      setQuery(q);
-                      setSearchFilter("all");
-                      saveRecentSearch(q);
-                      void searchFor(q, "songs", "all");
-                    }}
-                    maxItems={5}
-                    className="pt-1"
-                  />
-
                   {/* Home Sections — mobile horizontal scroll */}
                   <MobileHomeSections
                     dailyMix={quickFilters.length > 0 ? [] : dailyMixTracks}
