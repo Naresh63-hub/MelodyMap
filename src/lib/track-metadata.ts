@@ -181,7 +181,7 @@ export function stripLanguageAndNoiseTags(text: string): string {
   let changed = true;
   while (changed) {
     changed = false;
-    const tagRe = /[([{]\s*([^()\[\]{}]*?)\s*[)\]}]\s*$/;
+    const tagRe = /[([{]\s*((?:(?![()\]{}]).)*?)\s*[)\]}]\s*$/;
     const m = out.match(tagRe);
     if (!m || !m[1]) continue;
     const inner = m[1].trim().toLowerCase().replace(/[\s-]+/g, " ");
@@ -264,7 +264,7 @@ export function cleanMovieName(
   const fromClause = extractFromClause(decoded);
   if (fromClause) return fromClause;
 
-  let candidate = stripDanglingClosers(stripLanguageAndNoiseTags(decoded));
+  const candidate = stripDanglingClosers(stripLanguageAndNoiseTags(decoded));
   if (!candidate) return undefined;
   // A bare language tag is not a movie.
   if (LANGUAGE_TAGS.some((l) => candidate.toLowerCase() === l)) return undefined;

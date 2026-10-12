@@ -23,8 +23,8 @@ export async function getRadioTracks(
 ): Promise<{ tracks: Track[]; continuation?: string }> {
   try {
     let title = options?.title?.trim() || "";
-    let artist = options?.artist?.trim() || "";
-    let album = options?.album?.trim() || "";
+    const artist = options?.artist?.trim() || "";
+    const album = options?.album?.trim() || "";
 
     if (!title && videoId) {
       const clean = videoId.replace(/^saavn:/, "").replace(/[-_]/g, " ").trim();

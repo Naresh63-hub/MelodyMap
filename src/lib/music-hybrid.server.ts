@@ -46,7 +46,7 @@ export async function searchHybrid(
 
     // Smart query simplification retry: e.g. "Song (From Movie)" -> "Song Movie"
     const simplified = cleanQ
-      .replace(/[([][^()\[\]]*[)\]]/g, " ")
+      .replace(/[([]((?:(?![()\]]).)*)[)\]]/g, " ")
       .replace(/["']/g, " ")
       .replace(/\s+/g, " ")
       .trim();
