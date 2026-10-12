@@ -2771,38 +2771,39 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
         {/* Mobile search bar — on search tab */}
         {tab === "search" && (
-          <div className="sticky top-0 z-20 bg-surface/90 backdrop-blur-xl border-b border-hair header-safe-top">
-            <div className="flex items-center gap-2 px-4 py-3">
+          <div className="sticky top-0 z-20 bg-surface/95 backdrop-blur-xl border-b border-hair header-safe-top">
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
                 aria-label="Open menu"
-                className="flex lg:hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip-subtle border border-hair text-secondary-foreground active:scale-95 transition-all"
+                className="flex lg:hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-chip-subtle border border-hair text-secondary-foreground active:scale-95 transition-all"
               >
-                <Menu className="h-4 w-4" />
+                <Menu className="h-5 w-5" />
               </button>
-              <img
-                src="/brand/app-icon.png"
-                alt="MelodyMap"
-                className="h-8 w-8 rounded-xl object-cover ring-1 ring-primary/30 shrink-0 hidden xs:block shadow-sm"
-              />
-              <form onSubmit={onSearch} className="relative flex-1 flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+              <form onSubmit={onSearch} className="relative flex-1 min-w-0">
+                <div className="relative w-full flex items-center">
+                  <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                   <input
                     id="main-search-input"
-                    type="search"
+                    type="text"
+                    inputMode="search"
+                    dir="ltr"
                     value={query}
                     onChange={(e) => {
                       setQuery(e.target.value);
                     }}
                     placeholder="Search songs, artists, podcasts..."
-                    className="h-10 w-full rounded-full border border-hair bg-chip-subtle pl-10 pr-16 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-primary/20 focus:outline-none"
+                    className="h-10 w-full rounded-xl border border-hair bg-chip-subtle pl-10 pr-16 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-primary/20 focus:outline-none"
                     autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                   />
-                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                     {searching ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                      <Loader2 className="h-4 w-4 animate-spin text-primary mr-1" />
                     ) : query ? (
                       <button
                         type="button"
@@ -2816,10 +2817,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                           setResults([]);
                           setSearching(false);
                         }}
-                        className="text-muted-foreground hover:text-foreground active:text-foreground p-1"
+                        className="text-muted-foreground hover:text-foreground active:text-foreground p-1.5 rounded-full hover:bg-chip"
                         aria-label="Clear search"
                       >
-                        <X className="h-3.5 w-3.5" />
+                        <X className="h-4 w-4" />
                       </button>
                     ) : null}
                     {/* Hands-free Voice Search Button */}
@@ -2833,66 +2834,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     />
                   </div>
                 </div>
-                {/* Manual Search trigger button */}
-                <button
-                  type="submit"
-                  aria-label="Search"
-                  title="Search"
-                  className="flex h-10 px-4 shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold active:scale-95 transition-all shadow-sm"
-                >
-                  {searching ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary-foreground" />
-                  ) : (
-                    <Search className="h-3.5 w-3.5 text-primary-foreground" />
-                  )}
-                  <span>Search</span>
-                </button>
               </form>
-              <button
-                type="button"
-                onClick={() => setShowSettings(true)}
-                aria-label="Settings"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-chip-subtle border border-hair text-muted-foreground active:scale-95 transition-all hover:text-foreground"
-              >
-                <Settings2 className="h-4 w-4" />
-              </button>
-
-              {/* Circle user mark on only top of app (Search view) */}
-              <div className="relative shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowAuthModal(true)}
-                  aria-label="Account profile"
-                  title="Account profile"
-                  className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ring-1 ring-hair"
-                >
-                  {auth.profile?.avatar_url ? (
-                    <img src={auth.profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-medium text-foreground">
-                      {(auth.profile?.display_name?.[0] || auth.email?.[0] || "U").toUpperCase()}
-                    </span>
-                  )}
-                </button>
-              </div>
-            </div>
-            {/* Quick filter chips */}
-            <div className="flex gap-1.5 overflow-x-auto px-4 pb-2.5 scrollbar-hide">
-              {["foryou", "explore", "mixes", "podcasts", "languages", "likes", "history"].map((id) => (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setTab(id as NavTab)}
-                  className={cn(
-                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition-all",
-                    tab === id
-                      ? "bg-foreground text-background font-medium border-transparent shadow-sm"
-                      : "border-hair bg-transparent text-secondary-foreground hover:text-foreground hover:bg-chip-subtle",
-                  )}
-                >
-                  {NAV_ITEMS.find((n) => n.id === id)?.label ?? id}
-                </button>
-              ))}
             </div>
           </div>
         )}
