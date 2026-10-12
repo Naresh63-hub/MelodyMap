@@ -21,7 +21,7 @@ dist-ssr
 .wrangler/
 .dev.vars
 
-# Environment variables — never commit secrets
+# Environment variables & service configs — never commit secrets
 .env
 .env.*
 .env.local
@@ -29,6 +29,9 @@ dist-ssr
 .env.test.local
 .env.production.local
 !.env.example
+firebase-applet-config*.json
+firebase-blueprint*.json
+google-services*.json
 .qoder/
 .freebuff/
 
