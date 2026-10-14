@@ -148,7 +148,7 @@ export function LanguagesPanel({
           </Button>
           <Button
             size="sm"
-            className="rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 text-white shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 button-press"
+            className="rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary-hover active:bg-primary-pressed button-press"
             disabled={tracks.length === 0}
             onClick={() => onPlay(tracks, 0)}
           >

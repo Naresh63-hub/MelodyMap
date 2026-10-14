@@ -91,7 +91,7 @@ export function MiniPlayer({
           className="h-full transition-all duration-150 ease-linear rounded-r-full"
           style={{
             width: `${progressPct}%`,
-            background: "linear-gradient(90deg, #f7809c 0%, #fb7185 100%)",
+            background: "linear-gradient(90deg, #8B5CF6 0%, #A78BFA 100%)",
           }}
         />
       </div>
@@ -106,7 +106,7 @@ export function MiniPlayer({
           aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
           {/* Circular rotating vinyl disc artwork */}
-          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 rounded-full p-[2px] bg-gradient-to-tr from-neutral-900 via-neutral-800 to-black shadow-md border border-white/10 ring-1 ring-black/50 overflow-hidden flex items-center justify-center">
+          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 rounded-full p-[2px] bg-gradient-to-tr from-neutral-900 via-neutral-800 to-black shadow-md border border-hair-strong ring-1 ring-black/50 overflow-hidden flex items-center justify-center">
             <div
               className="h-full w-full rounded-full overflow-hidden relative flex items-center justify-center animate-vinyl-spin select-none"
               style={{
@@ -133,7 +133,7 @@ export function MiniPlayer({
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs sm:text-[13px] font-medium text-foreground/95 leading-tight">
+            <p className="truncate text-xs sm:text-[13px] font-semibold text-foreground leading-tight">
               {track?.title ?? "No track"}
             </p>
             <p className="truncate text-[11px] text-muted-foreground font-normal leading-tight mt-0.5">
@@ -166,7 +166,7 @@ export function MiniPlayer({
             </button>
           )}
 
-          {/* Primary Play/Pause Button */}
+          {/* Primary Play/Pause Button - Deep Violet Accent */}
           <button
             type="button"
             onClick={() => {
@@ -174,7 +174,7 @@ export function MiniPlayer({
               onTogglePlay();
             }}
             disabled={isLoading}
-            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-foreground text-background hover:scale-105 active:scale-95 transition-transform disabled:opacity-75"
+            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary-hover active:bg-primary-pressed hover:scale-105 active:scale-95 transition-all disabled:opacity-75"
             aria-label={isLoading ? "Loading" : isPlaying ? "Pause" : "Play"}
           >
             {isLoading ? (

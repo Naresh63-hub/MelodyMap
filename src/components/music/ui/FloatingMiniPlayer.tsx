@@ -182,7 +182,7 @@ export function FloatingMiniPlayer({
           className="h-1 rounded-full transition-all"
           style={{
             width: `${progressPct}%`,
-            background: "linear-gradient(90deg, #f7809c 0%, #fb7185 100%)",
+            background: "linear-gradient(90deg, #8B5CF6 0%, #A78BFA 100%)",
           }}
         />
         <span
@@ -284,7 +284,7 @@ export function FloatingMiniPlayer({
               type="button"
               onClick={onTogglePlay}
               disabled={isLoading}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-background shadow-md hover:scale-105 active:scale-95 transition-transform"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary-hover active:bg-primary-pressed hover:scale-105 active:scale-95 transition-all"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? (

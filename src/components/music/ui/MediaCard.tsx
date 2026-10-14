@@ -130,7 +130,7 @@ export function MediaCard({
                 : "opacity-0 scale-90 group-hover/card:opacity-100 group-hover/card:scale-100",
             )}
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 backdrop-blur-md border border-white/20 text-white shadow-xl transition-transform hover:scale-110 active:scale-95">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 ring-2 ring-white/20 transition-transform hover:scale-110 active:scale-95">
               {playing ? (
                 <Pause className="h-5 w-5 fill-current" />
               ) : (
