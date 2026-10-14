@@ -290,7 +290,7 @@ export function SearchResults(props: Props) {
                   type="button"
                   onClick={() => onOpenOptions(track)}
                   aria-label="Options"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:text-foreground hover:bg-chip active:scale-90 transition-all"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/40 hover:text-foreground hover:bg-chip active:scale-90 transition-all"
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>

@@ -26,11 +26,11 @@ export function RecentSearchesSection({
     <section className={cn("space-y-2.5 animate-fade-in", className)}>
       <div className="flex items-center justify-between px-0.5">
         <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-neutral-400" />
+          <Clock className="h-4 w-4 text-foreground/50" />
           <h2 className="text-sm font-semibold tracking-normal text-foreground/90">
             Recent Searches
           </h2>
-          <span className="text-[10px] font-normal text-neutral-400 px-1.5 py-0.5 rounded-full bg-chip border border-hair">
+          <span className="text-[10px] font-normal text-foreground/50 px-1.5 py-0.5 rounded-full bg-chip border border-hair">
             Last {last5.length}
           </span>
         </div>
@@ -38,7 +38,7 @@ export function RecentSearchesSection({
         <button
           type="button"
           onClick={clearHistory}
-          className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-red-400 transition-colors py-1 px-1.5 rounded active:scale-95"
+          className="flex items-center gap-1 text-[11px] text-foreground/50 hover:text-red-400 transition-colors py-1 px-1.5 rounded active:scale-95"
           title="Clear recent searches"
         >
           <Trash2 className="h-3 w-3" />

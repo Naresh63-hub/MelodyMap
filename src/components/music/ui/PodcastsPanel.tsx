@@ -261,7 +261,7 @@ export function PodcastsPanel({
               )}
             </div>
 
-            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white tracking-tight leading-tight">
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground tracking-tight leading-tight">
               {selectedShow.title}
             </h1>
             <p className="text-sm text-foreground/60 mt-1 font-medium">{selectedShow.publisher}</p>

@@ -134,7 +134,7 @@ export function HomeSections({
         <div className="flex flex-col items-center justify-center py-20 text-center animate-page-in">
           <Music2 className="h-10 w-10 text-neutral-600 mb-3" />
           <h3 className="text-base font-semibold text-foreground/80 mb-1">Nothing here yet</h3>
-          <p className="text-xs text-neutral-400 max-w-xs">
+          <p className="text-xs text-foreground/50 max-w-xs">
             Search for a song, pick a genre, or tune your feed to get personalized picks.
           </p>
         </div>

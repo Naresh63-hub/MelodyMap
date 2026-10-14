@@ -284,7 +284,7 @@ export function ListeningInsightsPanel() {
         </div>
 
         {simulationReport && (
-          <div className="rounded-lg border border-border bg-black/30 p-4 space-y-3">
+          <div className="rounded-lg border border-border bg-chip-subtle p-4 space-y-3">
             <div className="grid grid-cols-3 gap-2 text-center border-b border-border pb-3">
               <div>
                 <p className="text-lg font-semibold text-primary tabular-nums">

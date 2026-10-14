@@ -54,12 +54,20 @@ function installFetchMock(opts: {
       typeof input === "string" ? input : String((input as { url?: string })?.url ?? input);
     calls.push(url);
 
+    try {
+      const parsed = new URL(url);
+      const host = parsed.host.toLowerCase();
+      if (host === "www.youtube.com" || host === "youtube.com" || parsed.pathname.includes("/youtubei/v1/player") || url.includes("youtubei/v1/player")) {
+        // handle as before
+      }
+    } catch {}
     if (url.includes("youtubei/v1/player")) return jsonRes({}, 404);
     if (url.includes("youtube.com/oembed")) {
       return jsonRes({ title: OE_TITLE, author_name: OE_AUTHOR });
     }
     const host = hostOf(url);
-    if (host.endsWith(".audius.co") || host === "audius.co") return jsonRes({ data: [] });
+    const hostLower = host.toLowerCase();
+    if (hostLower === "audius.co" || hostLower.endsWith(".audius.co")) return jsonRes({ data: [] });
     if (host === "api.jamendo.com") {
       return jsonRes({
         headers: { status: "success", code: 0, results_count: opts.jamendoResults?.length ?? 0 },

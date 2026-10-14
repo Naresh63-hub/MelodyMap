@@ -117,8 +117,16 @@ const TRAILING_RELEASE_SUFFIX_RE = /\s*[-–—_]\s*(single|ep|deluxe(\s+edition
 export function decodeEntities(text: string | undefined | null): string {
   if (!text) return "";
   return text
-    .replace(/&(quot|apos|lt|gt|nbsp|#0?39|[lg]squo|[lr]dquo);/g, (_, entity: string) => {
-      if (entity.startsWith("#")) return "'"; // `#39` / `#039` — numeric apostrophe
+    .replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (_, entity: string) => {
+      if (entity.startsWith("#")) {
+        const code = entity.startsWith("#x") || entity.startsWith("#X")
+          ? parseInt(entity.slice(2), 16)
+          : parseInt(entity.slice(1), 10);
+        if (!Number.isNaN(code)) {
+          return String.fromCharCode(code);
+        }
+        return "'";
+      }
       switch (entity) {
         case "quot":
         case "ldquo":
@@ -134,11 +142,12 @@ export function decodeEntities(text: string | undefined | null): string {
           return ">";
         case "nbsp":
           return " ";
+        case "amp":
+          return "&";
         default:
           return _;
       }
     })
-    .replace(/&amp;/g, "&") // decoded last so `&amp;quot;` cannot double-decode
     .replace(/\s+/g, " ")
     .trim();
 }
