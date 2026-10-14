@@ -269,12 +269,12 @@ function AuthPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-background px-4 py-8 sm:px-6 lg:px-8 text-white">
+    <div className="flex min-h-screen flex-col justify-center bg-background px-4 py-8 sm:px-6 lg:px-8 text-foreground">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center mb-2">
           <Link
             to="/"
-            className="flex items-center gap-2 text-xs text-white/50 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-xs text-foreground/60 hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back to music</span>
@@ -282,16 +282,16 @@ function AuthPage() {
         </div>
 
         <div className="flex flex-col items-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 shadow-lg mb-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 shadow-lg mb-3">
             <Sparkles className="h-6 w-6 text-primary" />
           </div>
-          <h2 className="text-center text-2xl font-semibold tracking-tight text-white">
+          <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground font-display">
             {mode === "signin" && "Sign in to MelodyMap"}
             {mode === "signup" && "Create an account"}
             {mode === "forgot" && "Reset your password"}
             {mode === "reset_password" && "Set new password"}
           </h2>
-          <p className="mt-1.5 text-center text-xs text-white/50">
+          <p className="mt-1.5 text-center text-xs text-foreground/60">
             {mode === "signin" && "Sign in with Google or email to sync across all your devices"}
             {mode === "signup" && "Create an account to keep your listening history and favourites safe"}
             {mode === "forgot" && "Enter your email to receive password reset instructions"}
@@ -301,16 +301,16 @@ function AuthPage() {
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="rounded-2xl bg-background border border-white/10 p-6 sm:p-8 shadow-2xl space-y-4">
+        <div className="rounded-2xl bg-card border border-hair-strong p-6 sm:p-8 shadow-2xl space-y-4">
           {/* Notification alerts */}
           {errorNote && (
-            <div className="flex items-center gap-2.5 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-400">
+            <div className="flex items-center gap-2.5 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
               <AlertCircle className="h-4 w-4 shrink-0" />
               <p className="flex-1">{errorNote}</p>
             </div>
           )}
           {successNote && (
-            <div className="flex items-center gap-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-400">
+            <div className="flex items-center gap-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-600 dark:text-emerald-400">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <p className="flex-1">{successNote}</p>
             </div>
@@ -318,7 +318,7 @@ function AuthPage() {
 
           {/* Mode Switcher */}
           {mode !== "reset_password" && mode !== "forgot" && (
-            <div className="flex rounded-xl bg-white/[0.04] p-1 border border-white/5">
+            <div className="flex rounded-xl bg-chip-subtle p-1 border border-hair">
               <button
                 type="button"
                 onClick={() => {
@@ -329,7 +329,7 @@ function AuthPage() {
                 className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                   mode === "signin"
                     ? "bg-primary text-primary-foreground shadow-md"
-                    : "text-white/60 hover:text-white"
+                    : "text-foreground/60 hover:text-foreground"
                 }`}
               >
                 Sign In
@@ -344,7 +344,7 @@ function AuthPage() {
                 className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                   mode === "signup"
                     ? "bg-primary text-primary-foreground shadow-md"
-                    : "text-white/60 hover:text-white"
+                    : "text-foreground/60 hover:text-foreground"
                 }`}
               >
                 Create Account
@@ -388,8 +388,8 @@ function AuthPage() {
               </Button>
 
               <div className="relative flex items-center justify-center">
-                <div className="border-t border-white/10 w-full" />
-                <span className="bg-background px-2 text-[10px] text-white/40 uppercase tracking-widest font-mono">
+                <div className="border-t border-hair w-full" />
+                <span className="bg-card px-2 text-[10px] text-foreground/50 uppercase tracking-widest font-mono">
                   or with email
                 </span>
               </div>
@@ -399,16 +399,16 @@ function AuthPage() {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {mode === "signup" && (
               <div className="space-y-1.5">
-                <Label className="text-xs text-white/70 font-medium">Full Name</Label>
+                <Label className="text-xs text-foreground/80 font-medium">Full Name</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                   <Input
                     type="text"
                     placeholder="Your Name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary"
+                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -417,16 +417,16 @@ function AuthPage() {
 
             {mode !== "reset_password" && (
               <div className="space-y-1.5">
-                <Label className="text-xs text-white/70 font-medium">Email Address</Label>
+                <Label className="text-xs text-foreground/80 font-medium">Email Address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                   <Input
                     type="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary"
+                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -436,7 +436,7 @@ function AuthPage() {
             {mode !== "forgot" && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs text-white/70 font-medium">
+                  <Label className="text-xs text-foreground/80 font-medium">
                     {mode === "reset_password" ? "New Password" : "Password"}
                   </Label>
                   {mode === "signin" && (
@@ -447,27 +447,27 @@ function AuthPage() {
                         setErrorNote(null);
                         setSuccessNote(null);
                       }}
-                      className="text-[11px] text-primary hover:underline"
+                      className="text-[11px] text-primary hover:underline font-medium"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="At least 6 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 pr-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary"
+                    className="pl-9 pr-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -477,16 +477,16 @@ function AuthPage() {
 
             {(mode === "signup" || mode === "reset_password") && (
               <div className="space-y-1.5">
-                <Label className="text-xs text-white/70 font-medium">Confirm Password</Label>
+                <Label className="text-xs text-foreground/80 font-medium">Confirm Password</Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
                   <Input
                     type="password"
                     placeholder="Re-enter password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-white/[0.05] border-white/10 text-white placeholder:text-white/30 h-10 rounded-xl focus:border-primary"
+                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -516,17 +516,17 @@ function AuthPage() {
             <button
               type="button"
               onClick={() => setMode("signin")}
-              className="w-full py-2 text-xs text-white/60 hover:text-white transition-colors text-center"
+              className="w-full py-2 text-xs text-foreground/60 hover:text-foreground transition-colors text-center"
             >
               Back to Sign In
             </button>
           )}
 
-          <div className="pt-2 border-t border-white/[0.06] text-center">
+          <div className="pt-2 border-t border-hair text-center">
             <button
               type="button"
               onClick={continueAsGuest}
-              className="text-xs text-white/40 hover:text-white transition-colors"
+              className="text-xs text-foreground/50 hover:text-foreground transition-colors"
             >
               Skip for now · Continue as Guest
             </button>
