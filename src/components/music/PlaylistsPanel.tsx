@@ -325,7 +325,7 @@ export function PlaylistsPanel({
 
       {/* Delete confirmation dialog */}
       <Dialog open={!!deleteConfirmId} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
-        <DialogContent className="sm:max-w-md bg-[#12121e] border-hair-strong text-foreground">
+        <DialogContent className="sm:max-w-md bg-card border-hair-strong text-foreground">
           <DialogHeader>
             <DialogTitle className="text-foreground">Delete playlist?</DialogTitle>
             <DialogDescription className="text-foreground/50">

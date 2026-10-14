@@ -140,7 +140,7 @@ export function LyricsPanel({
   );
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#0a0a18]/95 backdrop-blur-xl border-l border-hair shadow-2xl animate-slide-up sm:max-w-sm md:max-w-md" role="dialog" aria-label="Lyrics panel">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-surface/95 backdrop-blur-xl border-l border-hair shadow-2xl animate-slide-up sm:max-w-sm md:max-w-md" role="dialog" aria-label="Lyrics panel">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-hair p-4">
         <div className="flex items-center gap-3">

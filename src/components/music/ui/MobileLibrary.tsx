@@ -78,7 +78,7 @@ export function MobileLibrary({
               key={section.id}
               type="button"
               onClick={() => onNavigateSection(section.id)}
-              className="flex w-full items-center gap-3.5 rounded-lg bg-[#141414] border border-hair p-3 text-left transition-colors hover:bg-chip active:scale-[0.99]"
+              className="flex w-full items-center gap-3.5 rounded-2xl bg-card border border-hair p-3 text-left transition-all hover:bg-chip hover:border-hair-strong active:scale-[0.99] shadow-xs"
             >
               <div
                 className={cn(
