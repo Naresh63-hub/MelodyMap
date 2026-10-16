@@ -224,10 +224,10 @@ export function diversifyTrackList<T extends TrackLike>(
 ): T[] {
   if (!tracks || tracks.length <= 1) return tracks ?? [];
 
-  const maxPerArtist = options?.maxPerArtist ?? 2;
-  const maxPerAlbum = options?.maxPerAlbum ?? 1;
-  const minArtistSpacing = options?.minArtistSpacing ?? 2;
-  const minAlbumSpacing = options?.minAlbumSpacing ?? 3;
+  const maxPerArtist = Math.max(1, options?.maxPerArtist ?? 2);
+  const maxPerAlbum = Math.max(1, options?.maxPerAlbum ?? 1);
+  const minArtistSpacing = Math.max(1, options?.minArtistSpacing ?? 2);
+  const minAlbumSpacing = Math.max(1, options?.minAlbumSpacing ?? 3);
 
   // Deduplicate before diversifying
   const deduped = dedupeTracks(tracks);
@@ -246,17 +246,23 @@ export function diversifyTrackList<T extends TrackLike>(
   const recentAlbums: string[] = [];
 
   while (candidates.length > 0) {
+    // Purge any candidates whose artist or album cap has already been reached
+    for (let cIdx = candidates.length - 1; cIdx >= 0; cIdx--) {
+      const c = candidates[cIdx]!;
+      const aCount = c.artist ? (artistCounts.get(c.artist) || 0) : 0;
+      const albCount = c.album ? (albumCounts.get(c.album) || 0) : 0;
+      if ((c.artist && aCount >= maxPerArtist) || (c.album && albCount >= maxPerAlbum)) {
+        candidates.splice(cIdx, 1);
+      }
+    }
+
+    if (candidates.length === 0) break;
+
     let bestIndex = -1;
     let bestPenalty = Infinity;
 
     for (let i = 0; i < candidates.length; i++) {
       const { artist, album } = candidates[i]!;
-      const aCount = artist ? (artistCounts.get(artist) || 0) : 0;
-      const albCount = album ? (albumCounts.get(album) || 0) : 0;
-
-      // Heavy penalty if exceeding max count caps
-      const artistCapExceeded = artist && aCount >= maxPerArtist;
-      const albumCapExceeded = album && albCount >= maxPerAlbum;
 
       // Spacing penalties: how recently was this artist/album used?
       let spacingPenalty = 0;
@@ -281,9 +287,7 @@ export function diversifyTrackList<T extends TrackLike>(
 
       // Base index penalty to preserve original ranking order when diverse
       const rankPenalty = i;
-      const capPenalty = (artistCapExceeded ? 50000 : 0) + (albumCapExceeded ? 60000 : 0);
-
-      const totalPenalty = capPenalty + spacingPenalty + rankPenalty;
+      const totalPenalty = spacingPenalty + rankPenalty;
 
       if (totalPenalty < bestPenalty) {
         bestPenalty = totalPenalty;
