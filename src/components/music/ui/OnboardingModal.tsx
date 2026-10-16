@@ -90,18 +90,18 @@ export function OnboardingModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto border-hair-strong bg-[#170D35]/95 p-0 text-foreground backdrop-blur-2xl shadow-2xl rounded-3xl scrollbar-hide">
+      <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto border-hair-strong bg-surface p-0 text-foreground shadow-2xl rounded-3xl scrollbar-hide">
         {/* Header with gradient banner */}
         <div className="relative overflow-hidden border-b border-hair-strong bg-gradient-to-b from-primary/20 via-primary/5 to-transparent p-6 sm:p-7 text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary via-accent to-primary p-0.5 shadow-lg shadow-primary/25">
-            <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-[#21133F]">
+            <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-card">
               <Sparkles className="h-6 w-6 text-primary animate-pulse" />
             </div>
           </div>
-          <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display">
+          <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight text-foreground font-display">
             Personalize Your Music
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm text-[#D4CBEA] mt-1 max-w-md mx-auto">
+          <DialogDescription className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-md mx-auto">
             Choose your song languages and favorite artists so MelodyMap can stream the music you love.
           </DialogDescription>
 
@@ -245,7 +245,7 @@ export function OnboardingModal({
                     {selectedArtists.map((artist) => (
                       <span
                         key={artist}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/20 px-3 py-1 text-xs text-[#D4CBEA] shadow-sm"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/20 px-3 py-1 text-xs text-foreground shadow-sm"
                       >
                         {artist}
                         <button
@@ -271,7 +271,7 @@ export function OnboardingModal({
                       key={artist}
                       type="button"
                       onClick={() => addArtist(artist)}
-                      className="inline-flex items-center gap-1 rounded-full border border-hair-strong bg-chip-subtle px-2.5 py-1 text-xs text-foreground/70 hover:border-primary/40 hover:bg-primary/10 hover:text-[#D4CBEA] transition-colors"
+                      className="inline-flex items-center gap-1 rounded-full border border-hair-strong bg-chip-subtle px-2.5 py-1 text-xs text-secondary-foreground hover:border-primary/40 hover:bg-primary/10 hover:text-foreground transition-colors"
                     >
                       <Plus className="h-3 w-3 text-foreground/40" />
                       {artist}

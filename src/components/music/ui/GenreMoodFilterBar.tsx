@@ -35,10 +35,10 @@ function FilterChip({
       disabled={disabled}
       onClick={() => onToggle(filter.id)}
       className={cn(
-        "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
+        "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 button-press whitespace-nowrap",
         active
-          ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/30"
-          : "border border-hair bg-chip/60 font-medium text-secondary-foreground hover:bg-chip hover:text-foreground",
+          ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/25"
+          : "border border-hair bg-card font-medium text-secondary-foreground hover:bg-chip-strong hover:text-foreground hover:border-hair-strong",
         isEmpty && "opacity-45",
         disabled && "opacity-50",
       )}
@@ -81,7 +81,10 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
       role="group"
       aria-label="Genre and mood quick filters"
       data-testid="genre-mood-filter-bar"
-      className={cn("flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory", className)}
+      className={cn(
+        "flex max-w-full items-center gap-2 overflow-x-auto py-1.5 scrollbar-hide snap-x snap-mandatory scroll-px-4",
+        className
+      )}
     >
       <button
         type="button"
@@ -89,17 +92,17 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
         disabled={disabled}
         onClick={handleClear}
         className={cn(
-          "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
+          "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 button-press whitespace-nowrap",
           !hasActive
-            ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/30"
-            : "border border-hair bg-chip/60 font-medium text-secondary-foreground hover:bg-chip hover:text-foreground",
+            ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/25"
+            : "border border-hair bg-card font-medium text-secondary-foreground hover:bg-chip-strong hover:text-foreground hover:border-hair-strong",
           disabled && "opacity-50",
         )}
       >
         All
       </button>
 
-      <span aria-hidden="true" className="shrink-0 pl-1 pr-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span aria-hidden="true" className="shrink-0 pl-1.5 pr-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Genre
       </span>
       {genres.map((filter) => (
@@ -113,7 +116,7 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
         />
       ))}
 
-      <span aria-hidden="true" className="shrink-0 pl-2 pr-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <span aria-hidden="true" className="shrink-0 pl-2.5 pr-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         Mood
       </span>
       {moods.map((filter) => (

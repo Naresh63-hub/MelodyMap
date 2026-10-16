@@ -2793,7 +2793,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   )?.toUpperCase() ?? "M";
 
   return (
-    <div className="flex h-dvh bg-background text-foreground selection:bg-primary/20 overflow-hidden w-full relative">
+    <div className="flex h-dvh bg-transparent text-foreground selection:bg-primary/20 overflow-hidden w-full relative">
       {/* Desktop Persistent Left Sidebar */}
       <div className="hidden lg:flex shrink-0 h-full z-30">
         <Sidebar
@@ -2848,7 +2848,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       />
 
       {/* Main column */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
         {/* Mobile header — on all non-search tabs */}
         {tab !== "search" && (
           <MobileHeader
@@ -2870,13 +2870,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
         {/* Mobile search bar — on search tab */}
         {tab === "search" && (
-          <div className="sticky top-0 z-20 bg-surface/95 backdrop-blur-xl border-b border-hair header-safe-top">
+          <div className="sticky top-0 z-20 bg-surface border-b border-hair-strong header-safe-top">
             <div className="flex items-center gap-2.5 px-3.5 py-2.5">
               <button
                 type="button"
                 onClick={() => setDrawerOpen(true)}
                 aria-label="Open menu"
-                className="flex lg:hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-chip-subtle border border-hair text-secondary-foreground active:scale-95 transition-all"
+                className="flex lg:hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card border border-hair text-secondary-foreground hover:text-foreground active:scale-95 transition-all"
               >
                 <Menu className="h-5 w-5" />
               </button>

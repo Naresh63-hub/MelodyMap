@@ -28,7 +28,7 @@ function TrackThumbnail({
 
   if (!optimized || hasError) {
     return (
-      <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-br from-[#2E1065] to-card text-primary/70", fallbackClassName)}>
+      <div className={cn("flex h-full w-full items-center justify-center bg-surface text-primary/70", fallbackClassName)}>
         <Music2 className="h-7 w-7 opacity-50" />
       </div>
     );
@@ -104,12 +104,12 @@ function HorizontalScrollRow({
         return (
           <div
             key={track.id}
-            className="group/card relative w-[138px] sm:w-[156px] shrink-0 snap-start text-left p-1.5 rounded-xl transition-all hover:bg-chip/50"
+            className="group/card relative w-[140px] sm:w-[158px] shrink-0 snap-start text-left p-2 rounded-2xl transition-all duration-200 bg-card hover:bg-card border border-hair hover:border-hair-strong hover:-translate-y-0.5 hover:shadow-md"
           >
             {/* JioSaavn Square Artwork Container */}
             <div
               className={cn(
-                "relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-card border border-hair transition-all duration-300",
+                "relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-surface border border-hair transition-all duration-300",
                 active && "ring-2 ring-primary shadow-sm",
                 "group-hover/card:border-hair-strong group-hover/card:shadow-sm",
               )}
@@ -141,7 +141,7 @@ function HorizontalScrollRow({
                       : "opacity-0 scale-90 group-hover/card:opacity-100 group-hover/card:scale-100",
                   )}
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 ring-2 ring-white/20 transition-transform hover:scale-110 active:scale-95">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-white shadow-xl shadow-primary/35 ring-2 ring-white/20 transition-transform hover:scale-110 active:scale-95">
                     {playing ? (
                       <Pause className="h-5 w-5 fill-current" />
                     ) : (
@@ -238,8 +238,10 @@ function VerticalSongList({
           <div
             key={track.id}
             className={cn(
-              "flex items-center gap-3 rounded-xl p-2 transition-colors",
-              active ? "bg-chip-strong" : "hover:bg-chip-subtle",
+              "flex items-center gap-3 rounded-xl p-2.5 transition-colors border active:scale-[0.99]",
+              active
+                ? "bg-primary/15 border-primary/30 shadow-xs"
+                : "bg-card border-hair hover:border-hair-strong hover:bg-chip",
             )}
           >
             {/* Thumbnail + Play Action */}
@@ -247,8 +249,8 @@ function VerticalSongList({
               type="button"
               onClick={() => onPlayTrack(track, tracks, i)}
               className={cn(
-                "relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-card border border-hair transition-all",
-                active && "ring-2 ring-primary shadow-[0_0_14px_rgba(139,92,246,0.4)]",
+                "relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface border border-hair transition-all",
+                active && "ring-2 ring-primary shadow-sm",
               )}
             >
               <TrackThumbnail

@@ -14,7 +14,7 @@ describe("radio.server getRadioTracks", () => {
   it("excludes devotional tracks, limits artist clustering, and includes co-artists", async () => {
     const mockSearch = vi.mocked(saavnProvider.searchSaavn);
 
-    mockSearch.mockImplementation(async (query: string) => {
+    mockSearch.mockImplementation(async (query: string): Promise<any> => {
       const q = query.toLowerCase();
       if (q.includes("mangli")) {
         return [

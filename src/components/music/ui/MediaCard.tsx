@@ -81,14 +81,14 @@ export function MediaCard({
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
       className={cn(
-        "group/card shrink-0 cursor-pointer p-2 sm:p-2.5 rounded-2xl transition-all bg-card hover:bg-card border border-hair hover:border-hair-strong shadow-xs hover:shadow-md card-modern-lift",
+        "group/card shrink-0 cursor-pointer p-2.5 sm:p-3 rounded-2xl transition-all duration-200 bg-card hover:bg-card border border-hair hover:border-hair-strong shadow-xs hover:shadow-md hover:-translate-y-0.5",
         isLongPressing && "scale-95 opacity-80",
         dims,
         className,
       )}
     >
       {/* Artwork Container */}
-      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg sm:rounded-xl bg-card border border-hair">
+      <div className="relative mb-2.5 aspect-square w-full overflow-hidden rounded-xl bg-surface border border-hair">
         <button
           type="button"
           onClick={onPlay}
@@ -108,7 +108,7 @@ export function MediaCard({
               )}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-card text-muted-foreground">
+            <div className="flex h-full w-full items-center justify-center bg-surface text-muted-foreground">
               <Music2 className="h-8 w-8 opacity-40" />
             </div>
           )}
@@ -130,7 +130,7 @@ export function MediaCard({
                 : "opacity-0 scale-90 group-hover/card:opacity-100 group-hover/card:scale-100",
             )}
           >
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xl shadow-primary/30 ring-2 ring-white/20 transition-transform hover:scale-110 active:scale-95">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25 ring-2 ring-white/20 transition-transform hover:scale-105 active:scale-95">
               {playing ? (
                 <Pause className="h-5 w-5 fill-current" />
               ) : (

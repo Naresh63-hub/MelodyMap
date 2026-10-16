@@ -72,7 +72,7 @@ export function MiniPlayer({
     <div
       {...swipeProps}
       className={cn(
-        "fixed z-40 border-t border-hair-strong bg-surface shadow-lift h-14 sm:h-16 flex flex-col justify-between safe-bottom bottom-[var(--mobile-nav-height,56px)] lg:bottom-0 left-0 right-0 transition-all duration-300",
+        "fixed z-40 border-t border-hair-strong bg-surface shadow-lg h-14 sm:h-16 flex flex-col justify-between safe-bottom bottom-[var(--mobile-nav-height,56px)] lg:bottom-0 left-0 right-0 transition-all duration-300",
         sidebarCollapsed ? "lg:left-[72px]" : "lg:left-[260px]"
       )}
     >
@@ -91,7 +91,7 @@ export function MiniPlayer({
           className="h-full transition-all duration-150 ease-linear rounded-r-full"
           style={{
             width: `${progressPct}%`,
-            background: "linear-gradient(90deg, #8B5CF6 0%, #A78BFA 100%)",
+            background: "linear-gradient(90deg, #8B5CF6 0%, #A855F7 100%)",
           }}
         />
       </div>
@@ -106,7 +106,7 @@ export function MiniPlayer({
           aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
           {/* Circular rotating vinyl disc artwork */}
-          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 rounded-full p-[2px] bg-gradient-to-tr from-neutral-900 via-neutral-800 to-black shadow-md border border-hair-strong ring-1 ring-black/50 overflow-hidden flex items-center justify-center">
+          <div className="relative h-10 w-10 sm:h-11 sm:w-11 shrink-0 rounded-full p-[2px] bg-gradient-to-tr from-neutral-900 via-neutral-800 to-black shadow-sm border border-hair ring-1 ring-black/30 overflow-hidden flex items-center justify-center">
             <div
               className="h-full w-full rounded-full overflow-hidden relative flex items-center justify-center animate-vinyl-spin select-none"
               style={{
@@ -174,7 +174,7 @@ export function MiniPlayer({
               onTogglePlay();
             }}
             disabled={isLoading}
-            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary-hover active:bg-primary-pressed hover:scale-105 active:scale-95 transition-all disabled:opacity-75"
+            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 active:bg-primary/80 hover:scale-105 active:scale-95 transition-all disabled:opacity-75"
             aria-label={isLoading ? "Loading" : isPlaying ? "Pause" : "Play"}
           >
             {isLoading ? (

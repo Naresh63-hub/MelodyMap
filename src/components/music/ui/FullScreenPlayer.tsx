@@ -240,23 +240,23 @@ export function FullScreenPlayer({
       <div className="absolute inset-0 bg-gradient-to-b from-background/70 via-background/90 to-background pointer-events-none" />
 
       {/* Main Container */}
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col justify-between px-6 py-6 pb-[calc(var(--mm-inset-bottom)+20px)] pt-[calc(var(--mm-inset-top)+16px)]">
+      <div className="relative z-10 flex h-full w-full max-w-md flex-col justify-between px-6 py-5 pb-[calc(var(--mm-inset-bottom)+18px)] pt-[calc(var(--mm-inset-top)+14px)]">
         {/* Top Header */}
         <div className="flex w-full items-center justify-between">
           <button
             type="button"
             onClick={onClose}
             aria-label="Collapse player"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-chip/80 border border-hair text-secondary-foreground hover:bg-chip-strong hover:text-white transition-all active:scale-95 shadow-sm"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-card border border-hair text-muted-foreground hover:bg-chip hover:text-foreground transition-all active:scale-95 shadow-xs"
           >
             <ChevronDown className="h-5 w-5" />
           </button>
 
           <div className="text-center px-4 min-w-0">
-            <p className="text-xs sm:text-sm font-semibold tracking-wide text-white">
+            <p className="text-xs sm:text-sm font-semibold tracking-wide text-foreground">
               Now Playing
             </p>
-            <p className="text-[11px] font-normal text-[#D4CBEA] truncate max-w-[200px] mt-0.5">
+            <p className="text-[11px] font-normal text-muted-foreground truncate max-w-[200px] mt-0.5">
               {playlistName}
             </p>
           </div>
@@ -265,7 +265,7 @@ export function FullScreenPlayer({
             type="button"
             onClick={() => onOpenOptions?.(track)}
             aria-label="Song options"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-chip/80 border border-hair text-secondary-foreground hover:bg-chip-strong hover:text-white transition-all active:scale-95 shadow-sm"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-card border border-hair text-muted-foreground hover:bg-chip hover:text-foreground transition-all active:scale-95 shadow-xs"
           >
             <MoreVertical className="h-4 w-4" />
           </button>
@@ -437,14 +437,14 @@ export function FullScreenPlayer({
                 liked={liked}
                 onToggle={onToggleLike}
                 size="lg"
-                className="bg-chip/80 border border-hair hover:bg-chip-strong"
+                className="bg-card border border-hair text-muted-foreground hover:bg-chip hover:text-foreground"
               />
               {onAddToPlaylist && (
                 <button
                   type="button"
                   onClick={() => onAddToPlaylist(track)}
                   aria-label="Add to playlist"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-chip/80 border border-hair text-secondary-foreground hover:text-white active:scale-90 transition-all"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-card border border-hair text-muted-foreground hover:text-foreground active:scale-90 transition-all"
                 >
                   <Plus className="h-5 w-5" />
                 </button>
@@ -466,7 +466,7 @@ export function FullScreenPlayer({
               onSeek={onSeek}
               className="w-full"
             />
-            <div className="flex justify-between text-[11px] font-medium tabular-nums text-[#D4CBEA]">
+            <div className="flex justify-between text-[11px] font-medium tabular-nums text-muted-foreground">
               <span>{formatTime(position)}</span>
               <span>{formatTime(duration)}</span>
             </div>
@@ -479,7 +479,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onToggleShuffle}
               className={cn(
-                "p-2 text-[#D4CBEA] hover:text-white transition-colors active:scale-95",
+                "p-2 text-muted-foreground hover:text-foreground transition-colors active:scale-95",
                 shuffle && "text-primary"
               )}
               aria-label={shuffle ? "Disable shuffle" : "Enable shuffle"}
@@ -493,7 +493,7 @@ export function FullScreenPlayer({
               <button
                 type="button"
                 onClick={() => onSkipBackward(10)}
-                className="relative flex items-center justify-center p-1.5 text-[#D4CBEA] hover:text-white active:scale-95 transition-all"
+                className="relative flex items-center justify-center p-1.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
                 title="Rewind 10 seconds"
               >
                 <RotateCcw className="h-5 w-5" />
@@ -506,7 +506,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onPrevious}
               disabled={!canPrevious}
-              className="p-2 text-white hover:text-white/80 disabled:opacity-30 active:scale-95 transition-all"
+              className="p-2 text-foreground hover:text-foreground/80 disabled:opacity-30 active:scale-95 transition-all"
               aria-label="Previous track"
             >
               <SkipBack className="h-6 w-6 fill-current" />
@@ -517,7 +517,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onTogglePlay}
               disabled={isLoading}
-              className="flex h-16 w-16 sm:h-18 sm:w-18 items-center justify-center rounded-full bg-gradient-to-tr from-[#8B5CF6] via-[#9333EA] to-[#A855F7] text-white shadow-[0_0_35px_rgba(139,92,246,0.5)] ring-4 ring-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-70"
+              className="flex h-16 w-16 sm:h-18 sm:w-18 items-center justify-center rounded-full bg-gradient-to-tr from-[#8B5CF6] via-[#9333EA] to-[#A855F7] text-white shadow-xl shadow-primary/35 ring-4 ring-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-70"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
               {isLoading ? (
@@ -534,7 +534,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onNext}
               disabled={!canNext}
-              className="p-2 text-white hover:text-white/80 disabled:opacity-30 active:scale-95 transition-all"
+              className="p-2 text-foreground hover:text-foreground/80 disabled:opacity-30 active:scale-95 transition-all"
               aria-label="Next track"
             >
               <SkipForward className="h-6 w-6 fill-current" />
@@ -545,7 +545,7 @@ export function FullScreenPlayer({
               <button
                 type="button"
                 onClick={() => onSkipForward(10)}
-                className="relative flex items-center justify-center p-1.5 text-[#D4CBEA] hover:text-white active:scale-95 transition-all"
+                className="relative flex items-center justify-center p-1.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
                 title="Forward 10 seconds"
               >
                 <RotateCw className="h-5 w-5" />
@@ -558,7 +558,7 @@ export function FullScreenPlayer({
               type="button"
               onClick={onToggleRepeat}
               className={cn(
-                "relative p-2 text-[#D4CBEA] hover:text-white transition-colors active:scale-95",
+                "relative p-2 text-muted-foreground hover:text-foreground transition-colors active:scale-95",
                 repeatMode !== "off" && "text-primary"
               )}
               aria-label={`Repeat mode: ${repeatMode}`}

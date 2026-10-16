@@ -54,7 +54,7 @@ export function MobileHeader({
             type="button"
             onClick={onOpenMenu}
             aria-label="Open navigation menu"
-            className="flex lg:hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-chip border border-hair-strong text-foreground/70 hover:text-foreground active:scale-95 transition-all"
+            className="flex lg:hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-card border border-hair text-secondary-foreground hover:text-foreground active:scale-95 transition-all"
           >
             <Menu className="h-4 w-4" />
           </button>
@@ -69,7 +69,7 @@ export function MobileHeader({
         <div className="min-w-0">
           <h1
             suppressHydrationWarning
-            className="text-base sm:text-lg font-semibold text-foreground/95 truncate leading-tight tracking-tight"
+            className="text-base sm:text-lg font-semibold text-foreground truncate leading-tight tracking-tight"
           >
             {getTitle()}
           </h1>
@@ -89,7 +89,7 @@ export function MobileHeader({
             type="button"
             onClick={onOpenSettings}
             aria-label="Settings"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/50 hover:text-foreground/90 hover:bg-chip active:scale-95 transition-all"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-card active:scale-95 transition-all"
           >
             <Settings2 className="h-4 w-4" />
           </button>
@@ -102,12 +102,12 @@ export function MobileHeader({
             onClick={onOpenAuth}
             aria-label="User account info"
             title="User account info"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ml-0.5 ring-1 ring-primary/30"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ml-0.5 ring-1 ring-primary/30"
           >
             {userAvatar ? (
               <img src={userAvatar} alt="Profile" className="h-full w-full object-cover" />
             ) : userInitial ? (
-              <span className="text-xs font-medium text-foreground/90 font-bold tracking-wide">{userInitial}</span>
+              <span className="text-xs font-semibold text-foreground tracking-wide">{userInitial}</span>
             ) : (
               <User className="h-3.5 w-3.5 text-foreground/70" />
             )}

@@ -173,7 +173,7 @@ export function SearchResults(props: Props) {
   return (
     <div className="space-y-4 animate-fade-in pt-1">
       {/* Category Pills Header */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex max-w-full gap-2 overflow-x-auto py-1.5 scrollbar-hide snap-x scroll-px-4">
         {filterOptions.map((opt) => {
           const active = filter === opt.value;
           return (
@@ -185,10 +185,10 @@ export function SearchResults(props: Props) {
                 onFilterChange?.(opt.value);
               }}
               className={cn(
-                "rounded-full px-3.5 py-1 text-xs transition-all",
+                "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 button-press whitespace-nowrap",
                 active
-                  ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/30"
-                  : "border border-hair bg-chip/60 font-medium text-secondary-foreground hover:bg-chip hover:text-foreground"
+                  ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/25"
+                  : "border border-hair bg-card font-medium text-secondary-foreground hover:bg-chip-strong hover:text-foreground hover:border-hair-strong"
               )}
             >
               {opt.label}
@@ -229,10 +229,10 @@ export function SearchResults(props: Props) {
             <div
               key={`${track.id}-${i}`}
               className={cn(
-                "group flex items-center gap-3 rounded-xl p-2 transition-colors",
+                "group flex items-center gap-3 rounded-xl p-2 transition-colors border",
                 active
-                  ? "bg-secondary text-primary shadow-xs"
-                  : "hover:bg-chip"
+                  ? "bg-primary/15 border-primary/30 text-primary shadow-xs"
+                  : "border-transparent hover:bg-chip"
               )}
             >
               {/* Thumbnail + Play */}

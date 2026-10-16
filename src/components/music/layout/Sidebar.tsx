@@ -133,11 +133,11 @@ export function Sidebar({
         </div>
         {!collapsed && (
           <div className="min-w-0 animate-fade-in-up">
-            <p className="truncate text-base font-semibold tracking-tight">
-              <span className="text-foreground">Melody</span>
+            <p className="truncate text-base font-semibold tracking-tight text-foreground">
+              <span>Melody</span>
               <span className="text-primary">Map</span>
             </p>
-            <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-normal">
+            <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-medium">
               Music player
             </p>
           </div>
@@ -145,15 +145,15 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-hide">
+      <nav className="flex-1 overflow-y-auto px-3.5 py-4 space-y-6 scrollbar-hide">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             {!collapsed && (
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#A69ABD]">
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 {section.label}
               </p>
             )}
-            <div className="space-y-0.5">
+            <div className="space-y-1">
               {section.items.map(({ id, label, icon: Icon, shortcut }) => {
                 const active = activeTab === id;
                 return (
@@ -163,16 +163,16 @@ export function Sidebar({
                     onClick={() => onNavigate(id)}
                     title={collapsed ? label : undefined}
                     className={cn(
-                      "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition-all",
-                      collapsed && "justify-center px-2",
+                      "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition-all duration-150",
+                      collapsed && "justify-center px-2 py-2.5",
                       active
-                        ? "bg-primary/20 border border-primary/30 text-white font-semibold shadow-xs"
-                        : "text-[#D4CBEA] font-medium hover:bg-chip hover:text-white",
+                        ? "bg-primary/15 border border-primary/30 text-primary dark:text-white font-medium"
+                        : "text-secondary-foreground font-medium hover:bg-chip hover:text-foreground",
                     )}
                   >
                     {/* Active indicator bar */}
                     {active && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2.5px] rounded-full bg-primary" />
+                      <div className="absolute left-1.5 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-primary" />
                     )}
 
                     <Icon
@@ -180,14 +180,14 @@ export function Sidebar({
                         "h-[18px] w-[18px] shrink-0 transition-colors",
                         active
                           ? "text-primary"
-                          : "text-[#A69ABD] group-hover:text-[#D4CBEA]",
+                          : "text-muted-foreground group-hover:text-secondary-foreground",
                       )}
                     />
                     {!collapsed && (
                       <>
                         <span className="flex-1 text-left truncate">{label}</span>
                         {shortcut && (
-                          <span className="hidden group-hover:inline text-[10px] tabular-nums text-[#A69ABD] font-mono">
+                          <span className="hidden group-hover:inline text-[10px] tabular-nums text-muted-foreground font-mono">
                             {shortcut}
                           </span>
                         )}
@@ -290,25 +290,25 @@ export function Sidebar({
               }
             }}
             title={isSynced ? "Click to sign out" : "Click to sign in"}
-            className="mb-3 flex items-center gap-3 rounded-lg border border-hair bg-chip-subtle px-3.5 py-2.5 hover:bg-chip transition-colors cursor-pointer group/user active:scale-[0.98]"
+            className="mb-3 flex items-center gap-3 rounded-xl border border-hair bg-card px-3.5 py-2.5 hover:bg-chip transition-colors cursor-pointer group/user active:scale-[0.98]"
           >
             <div className="relative shrink-0">
               <div
-                className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-popover text-xs font-semibold text-foreground border border-hair-strong"
+                className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-secondary text-xs font-semibold text-foreground border border-hair-strong"
               >
                 {userAvatar ? (
                   <img src={userAvatar} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <User className="h-4 w-4 text-foreground/70" />
+                  <User className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
               <div className={cn("absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background", isSynced ? "bg-primary" : "bg-muted-foreground")} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white">
+              <p className="truncate text-xs font-semibold text-foreground">
                 {userName ?? "Listener"}
               </p>
-              <p className="truncate text-[10px] text-[#D4CBEA]">
+              <p className="truncate text-[10px] text-muted-foreground">
                 {isSynced ? "Synced (Click to sign out)" : "Sign in / Sync account"}
               </p>
             </div>
