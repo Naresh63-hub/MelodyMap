@@ -8,6 +8,7 @@ import {
   Trash2,
   X,
   Moon,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
@@ -22,6 +23,7 @@ type Props = {
   onAddToPlaylist: (track: Track) => void;
   onDownload: (track: Track) => void;
   onAddToQueue: (track: Track) => void;
+  onOpenLyrics?: (track: Track) => void;
   onOpenSleepTimer?: () => void;
   onGoToArtist?: (artist: string) => void;
   onShare?: (track: Track) => void;
@@ -38,6 +40,7 @@ export function SongOptionsModal({
   onAddToPlaylist,
   onDownload,
   onAddToQueue,
+  onOpenLyrics,
   onOpenSleepTimer,
   onGoToArtist,
   onShare,
@@ -49,7 +52,7 @@ export function SongOptionsModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity animate-fade-in"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity animate-fade-in"
         onClick={onClose}
       />
 
@@ -63,7 +66,7 @@ export function SongOptionsModal({
           <img
             src={track.thumbnail}
             alt=""
-            className="h-14 w-14 rounded-xl object-cover shadow-lg shadow-black/60"
+            className="h-14 w-14 rounded-xl object-cover shadow-sm border border-hair"
           />
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-base font-semibold text-foreground">{track.title}</h3>
@@ -145,6 +148,21 @@ export function SongOptionsModal({
             <span className="font-medium">Add to Queue</span>
             <ListPlus className="h-5 w-5 text-foreground/40" />
           </button>
+
+          {/* View Lyrics */}
+          {onOpenLyrics && (
+            <button
+              type="button"
+              onClick={() => {
+                onOpenLyrics(track);
+                onClose();
+              }}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-foreground hover:bg-chip active:bg-chip-strong transition-colors"
+            >
+              <span className="font-medium">View Lyrics</span>
+              <MessageSquare className="h-5 w-5 text-foreground/40" />
+            </button>
+          )}
 
           {/* Sleep Timer */}
           {onOpenSleepTimer && (

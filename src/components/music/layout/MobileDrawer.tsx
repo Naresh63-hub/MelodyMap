@@ -183,10 +183,10 @@ export function MobileDrawer({
                       type="button"
                       onClick={() => handleNav(item.id)}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors text-left",
+                        "flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-medium transition-all text-left",
                         active
-                          ? "bg-chip-strong text-foreground font-semibold"
-                          : "text-foreground/60 hover:bg-chip hover:text-foreground"
+                          ? "bg-secondary text-primary font-semibold shadow-xs"
+                          : "text-foreground/70 hover:bg-chip hover:text-foreground"
                       )}
                     >
                       <Icon

@@ -37,8 +37,8 @@ function FilterChip({
       className={cn(
         "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
         active
-          ? "border border-primary/40 bg-chip-strong font-semibold text-primary shadow-md"
-          : "border border-hair bg-chip-subtle font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground",
+          ? "border border-hair-strong bg-secondary font-semibold text-primary shadow-xs"
+          : "border border-hair bg-white font-normal text-secondary-foreground hover:bg-chip hover:text-foreground",
         isEmpty && "opacity-45",
         disabled && "opacity-50",
       )}
@@ -91,8 +91,8 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
         className={cn(
           "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
           !hasActive
-            ? "border border-primary/40 bg-primary/15 font-semibold text-primary shadow-md"
-            : "border border-hair bg-chip-subtle font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground",
+            ? "border border-hair-strong bg-secondary font-semibold text-primary shadow-xs"
+            : "border border-hair bg-white font-normal text-secondary-foreground hover:bg-chip hover:text-foreground",
           disabled && "opacity-50",
         )}
       >

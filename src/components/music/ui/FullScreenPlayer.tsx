@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   ChevronDown,
   HelpCircle,
@@ -19,6 +20,12 @@ import {
   Gauge,
   Plus,
   Moon,
+  Sparkles,
+  Image as ImageIcon,
+  ExternalLink,
+  Music2,
+  Copy,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrubBar } from "@/components/music/ScrubBar";
@@ -28,6 +35,7 @@ import { useDragToDismiss, useDoubleTapSeek, useSwipeGestures } from "@/hooks/us
 import type { Track } from "@/lib/library";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import AudioVisualizer from "./AudioVisualizer";
+import { useTrackLyrics } from "@/lib/use-track-lyrics";
 
 type Props = {
   track: Track | null;
@@ -121,7 +129,82 @@ export function FullScreenPlayer({
     threshold: 80,
   });
 
-  if (!track) return null;
+  const [showLiveLyrics, setShowLiveLyrics] = useState(false);
+  const [copiedLyrics, setCopiedLyrics] = useState(false);
+  const lyricsContainerRef = useRef<HTMLDivElement>(null);
+  const lyricLineRefs = useRef<(HTMLElement | null)[]>([]);
+  const userScrollingLyricsRef = useRef(false);
+  const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const lyricsState = useTrackLyrics({
+    title: track?.title,
+    artist: track?.artist,
+    trackId: track?.id,
+    duration,
+  });
+
+  const [currentLyricIndex, setCurrentLyricIndex] = useState(0);
+
+  useEffect(() => {
+    if (!lyricsState.isSynced || lyricsState.syncedLyrics.length === 0) return;
+    let idx = -1;
+    for (let i = lyricsState.syncedLyrics.length - 1; i >= 0; i--) {
+      const line = lyricsState.syncedLyrics[i];
+      if (line && position >= line.time) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx !== -1 && idx !== currentLyricIndex) {
+      setCurrentLyricIndex(idx);
+    }
+  }, [position, lyricsState.syncedLyrics, currentLyricIndex, lyricsState.isSynced]);
+
+  const handleLyricsScroll = () => {
+    userScrollingLyricsRef.current = true;
+    if (userScrollTimeoutRef.current) clearTimeout(userScrollTimeoutRef.current);
+    userScrollTimeoutRef.current = setTimeout(() => {
+      userScrollingLyricsRef.current = false;
+    }, 3500);
+  };
+
+  useEffect(() => {
+    if (!showLiveLyrics || !lyricsState.isSynced || userScrollingLyricsRef.current) return;
+    const lineEl = lyricLineRefs.current[currentLyricIndex];
+    const container = lyricsContainerRef.current;
+    if (!lineEl || !container) return;
+
+    const containerH = container.clientHeight;
+    const lineTop = lineEl.offsetTop;
+    const lineH = lineEl.clientHeight;
+    container.scrollTo({
+      top: Math.max(0, lineTop - containerH / 2 + lineH / 2),
+      behavior: "smooth",
+    });
+  }, [currentLyricIndex, showLiveLyrics, lyricsState.isSynced]);
+
+  const handleCopyLyrics = async () => {
+    if (!track) return;
+    let text = "";
+    if (lyricsState.plainLyrics) {
+      text = lyricsState.plainLyrics;
+    } else if (lyricsState.syncedLyrics.length > 0) {
+      text = lyricsState.syncedLyrics.map((l) => l.text).join("\n");
+    }
+    if (!text) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(`"${track.title}" — ${track.artist}\n\n${text}`);
+        setCopiedLyrics(true);
+        setTimeout(() => setCopiedLyrics(false), 2000);
+      }
+    } catch {}
+  };
+
+  const plainParagraphs = useMemo(() => {
+    if (!lyricsState.plainLyrics) return [];
+    return lyricsState.plainLyrics.split(/\n\s*\n/).map((para) => para.split("\n"));
+  }, [lyricsState.plainLyrics]);
 
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
   const dismissProgress = Math.min(1, Math.abs(dragY) / (viewportH * 0.9));
@@ -132,6 +215,8 @@ export function FullScreenPlayer({
     const nextIndex = (currentIndex + 1) % SPEEDS.length;
     onSpeedChange(SPEEDS[nextIndex] ?? 1);
   };
+
+  if (!track) return null;
 
   return (
     <div
@@ -186,34 +271,145 @@ export function FullScreenPlayer({
           </button>
         </div>
 
-        {/* Center Artwork */}
+        {/* Center Area: Artwork OR Live Lyrics */}
         <div className="flex flex-col items-center justify-center my-auto w-full py-4">
-          <div
-            {...doubleTapProps}
-            onTouchStart={swipeStart}
-            onTouchEnd={swipeEnd}
-            className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border touch-manipulation select-none"
-          >
-            <img
-              src={track.thumbnail}
-              alt={track.title}
-              className="h-full w-full object-cover"
-            />
-            {/* Double-tap seek feedback halves */}
-            {flash && (
-              <div
-                className={cn(
-                  "pointer-events-none absolute inset-y-0 w-1/2 flex items-center justify-center bg-black/35 animate-fade-in",
-                  flash === "left" ? "left-0 rounded-l-xl" : "right-0 rounded-r-xl",
-                )}
-              >
-                <span className="flex flex-col items-center gap-1 text-white">
-                  {flash === "left" ? <RotateCcw className="h-6 w-6" /> : <RotateCw className="h-6 w-6" />}
-                  <span className="text-xs font-semibold tabular-nums">10s</span>
-                </span>
+          {!showLiveLyrics ? (
+            <div
+              {...doubleTapProps}
+              onTouchStart={swipeStart}
+              onTouchEnd={swipeEnd}
+              className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border touch-manipulation select-none"
+            >
+              <img
+                src={track.thumbnail}
+                alt={track.title}
+                className="h-full w-full object-cover"
+              />
+              {/* Double-tap seek feedback halves */}
+              {flash && (
+                <div
+                  className={cn(
+                    "pointer-events-none absolute inset-y-0 w-1/2 flex items-center justify-center bg-black/35 animate-fade-in",
+                    flash === "left" ? "left-0 rounded-l-xl" : "right-0 rounded-r-xl",
+                  )}
+                >
+                  <span className="flex flex-col items-center gap-1 text-white">
+                    {flash === "left" ? <RotateCcw className="h-6 w-6" /> : <RotateCw className="h-6 w-6" />}
+                    <span className="text-xs font-semibold tabular-nums">10s</span>
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Live Karaoke Lyrics View */
+            <div className="relative w-full max-w-sm h-64 sm:h-72 rounded-2xl bg-card/70 backdrop-blur-2xl border border-hair-strong shadow-2xl p-4 flex flex-col overflow-hidden animate-fade-in select-none">
+              {/* Header Bar */}
+              <div className="flex items-center justify-between pb-2 border-b border-hair shrink-0">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  <span>{lyricsState.isSynced ? "LIVE LYRICS" : "LYRICS"}</span>
+                  {lyricsState.source && (
+                    <span className="text-[10px] font-mono uppercase text-muted-foreground">
+                      · {lyricsState.source}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1">
+                  {!lyricsState.isInstrumental && (lyricsState.syncedLyrics.length > 0 || lyricsState.plainLyrics) && (
+                    <button
+                      type="button"
+                      onClick={handleCopyLyrics}
+                      title="Copy lyrics"
+                      className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-chip transition-colors"
+                    >
+                      {copiedLyrics ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  )}
+                  {onOpenLyrics && (
+                    <button
+                      type="button"
+                      onClick={onOpenLyrics}
+                      title="Open full lyrics panel"
+                      className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-chip transition-colors"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowLiveLyrics(false)}
+                    className="flex items-center gap-1 text-[11px] font-medium text-secondary-foreground hover:text-foreground bg-chip hover:bg-chip-strong border border-hair px-2 py-0.5 rounded-full transition-all"
+                  >
+                    <ImageIcon className="h-3 w-3" />
+                    <span>Artwork</span>
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Scrolling Lyrics List */}
+              <div
+                ref={lyricsContainerRef}
+                onScroll={handleLyricsScroll}
+                onTouchStart={handleLyricsScroll}
+                onWheel={handleLyricsScroll}
+                className="flex-1 overflow-y-auto py-3 px-2 scrollbar-none"
+              >
+                {lyricsState.loading ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center space-y-2 py-8">
+                    <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                    <p className="text-xs text-muted-foreground">Finding live lyrics...</p>
+                  </div>
+                ) : lyricsState.isInstrumental ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center space-y-2 py-8">
+                    <Music2 className="h-8 w-8 text-primary" />
+                    <p className="text-sm font-semibold text-foreground">Instrumental Song</p>
+                    <p className="text-xs text-muted-foreground">This track is recorded without vocals.</p>
+                  </div>
+                ) : lyricsState.syncedLyrics.length === 0 && !lyricsState.plainLyrics ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center space-y-2 py-8">
+                    <MessageSquare className="h-8 w-8 text-muted-foreground/30" />
+                    <p className="text-xs text-muted-foreground">Lyrics not available for this track.</p>
+                  </div>
+                ) : lyricsState.isSynced ? (
+                  <div className="space-y-3 py-6">
+                    {lyricsState.syncedLyrics.map((line, idx) => {
+                      const isActive = idx === currentLyricIndex;
+                      return (
+                        <button
+                          key={`${line.time}-${idx}`}
+                          type="button"
+                          ref={(el) => {
+                            lyricLineRefs.current[idx] = el;
+                          }}
+                          onClick={() => onSeek(line.time)}
+                          className={cn(
+                            "w-full text-center transition-all duration-300 py-1.5 px-3 rounded-lg cursor-pointer",
+                            isActive
+                              ? "text-foreground font-bold text-base sm:text-lg scale-105"
+                              : "text-muted-foreground/45 text-sm hover:text-foreground/80",
+                          )}
+                        >
+                          {line.text}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="space-y-4 py-3 text-center">
+                    {plainParagraphs.map((para, pIdx) => (
+                      <div key={pIdx} className="space-y-1">
+                        {para.map((line, lIdx) => (
+                          <p key={lIdx} className="text-xs sm:text-sm text-foreground/85 leading-relaxed">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Track Info Row */}
           <div className="flex items-center justify-between w-full mt-6 px-1">
@@ -445,17 +641,20 @@ export function FullScreenPlayer({
                 </button>
               )}
 
-              {onOpenLyrics && (
-                <button
-                  type="button"
-                  onClick={onOpenLyrics}
-                  aria-label="Lyrics"
-                  title="Lyrics"
-                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-chip rounded-full transition-colors"
-                >
-                  <MessageSquare className="h-5 w-5" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowLiveLyrics((prev) => !prev)}
+                aria-label={showLiveLyrics ? "Hide live lyrics" : "Show live lyrics"}
+                title={showLiveLyrics ? "Hide lyrics (Show Artwork)" : "Show live lyrics"}
+                className={cn(
+                  "p-2 rounded-full transition-all active:scale-95",
+                  showLiveLyrics
+                    ? "text-primary bg-primary/20 shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-chip",
+                )}
+              >
+                <MessageSquare className="h-5 w-5" />
+              </button>
 
               {onOpenQueue && (
                 <button

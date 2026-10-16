@@ -2816,7 +2816,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       e.stopPropagation();
                     }}
                     placeholder="Search songs, artists, podcasts..."
-                    className="h-10 w-full rounded-xl border border-hair bg-chip-subtle pl-10 pr-16 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-primary/20 focus:outline-none"
+                    className="h-10 w-full rounded-xl border border-hair bg-white pl-10 pr-16 text-sm text-foreground shadow-xs placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/10 focus:outline-none transition-all"
                     autoComplete="off"
                     autoCorrect="off"
                     autoCapitalize="off"
@@ -3286,7 +3286,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       value={historyQuery}
                       onChange={(e) => setHistoryQuery(e.target.value)}
                       placeholder="Search listening history..."
-                      className="w-full rounded-xl bg-chip border border-hair pl-10 pr-9 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-primary/20 focus:bg-chip-strong focus:outline-none transition-all"
+                      className="w-full rounded-xl bg-white border border-hair pl-10 pr-9 py-2 text-sm text-foreground shadow-xs placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/10 focus:outline-none transition-all"
                     />
                     {historyQuery && (
                       <button
@@ -3464,6 +3464,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             downloadedIds.has(t.id) ? void handleRemoveDownload(t) : void handleDownload(t)
           }
           onAddToQueue={(t) => enqueue([t])}
+          onOpenLyrics={(t) => {
+            if (!current || current.id !== t.id) {
+              playSong(t);
+            }
+            setShowLyrics(true);
+          }}
           onOpenSleepTimer={() => setShowSleepTimer(true)}
           onGoToArtist={(artist) => openArtist(artist)}
           onShare={(t) => setShareTrack(t)}

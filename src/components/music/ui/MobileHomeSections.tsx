@@ -110,8 +110,8 @@ function HorizontalScrollRow({
             <div
               className={cn(
                 "relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-card border border-hair transition-all duration-300",
-                active && "ring-2 ring-primary/80 shadow-[0_0_20px_rgba(247,128,156,0.35)]",
-                "group-hover/card:border-primary/40 group-hover/card:shadow-[0_8px_24px_-6px_rgba(247,128,156,0.25)]",
+                active && "ring-2 ring-primary shadow-sm",
+                "group-hover/card:border-hair-strong group-hover/card:shadow-sm",
               )}
             >
               <button

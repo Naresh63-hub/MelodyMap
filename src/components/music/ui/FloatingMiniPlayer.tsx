@@ -153,8 +153,8 @@ export function FloatingMiniPlayer({
           : undefined
       }
       className={cn(
-        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl glass-premium-apple text-foreground shadow-2xl shadow-black/80 overflow-hidden transition-shadow select-none",
-        isDragging && "cursor-grabbing ring-1 ring-white/30"
+        "fixed bottom-20 right-4 z-50 w-80 sm:w-88 rounded-2xl glass-premium-apple text-foreground shadow-xl shadow-black/10 border border-hair-strong overflow-hidden transition-shadow select-none",
+        isDragging && "cursor-grabbing ring-2 ring-primary/40"
       )}
     >
       {/* Background ambient glow */}

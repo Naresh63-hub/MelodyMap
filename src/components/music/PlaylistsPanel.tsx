@@ -110,8 +110,8 @@ export function PlaylistsPanel({
                 className={cn(
                   "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors",
                   p.id === openId
-                    ? "border-transparent bg-foreground text-background font-medium shadow-sm"
-                    : "border-hair bg-card text-secondary-foreground hover:text-foreground hover:bg-popover",
+                    ? "border-hair-strong bg-secondary text-primary font-semibold shadow-xs"
+                    : "border-hair bg-white text-secondary-foreground hover:text-foreground hover:bg-chip",
                 )}
               >
                 <ListMusic className="h-4 w-4" />
@@ -248,7 +248,7 @@ export function PlaylistsPanel({
                         }}
                         className={cn(
                           "group flex items-center gap-3 rounded-xl px-2 py-2 transition-colors",
-                          active ? "bg-surface shadow-lift" : "hover:bg-surface/60",
+                          active ? "bg-secondary text-primary shadow-xs" : "hover:bg-chip",
                           dragIndex === index && "opacity-50",
                           overIndex === index && dragIndex !== null && dragIndex !== index
                             ? "ring-1 ring-primary"

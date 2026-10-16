@@ -121,9 +121,9 @@ export function MobileLibrary({
                 <div
                   key={`${track.id}-${i}`}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg p-2 transition-colors",
+                    "flex items-center gap-3 rounded-xl p-2.5 transition-all",
                     active
-                      ? "bg-chip-strong"
+                      ? "bg-secondary text-primary shadow-xs"
                       : "hover:bg-chip"
                   )}
                 >

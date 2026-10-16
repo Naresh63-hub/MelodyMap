@@ -123,15 +123,16 @@ const LyricsInput = z.object({
   title: z.string().min(1),
   artist: z.string().min(1),
   duration: z.number().optional(),
+  trackId: z.string().optional(),
 });
 
-/** Fetches real-time synced and plain lyrics via LRCLIB */
+/** Fetches real-time synced and plain lyrics via LRCLIB with JioSaavn fallback */
 export const getTrackLyrics = createServerFn({ method: "POST" })
   .validator((input: unknown) => LyricsInput.parse(input))
   .handler(async ({ data }) => {
     const { fetchTrackLyrics } = await import("./lyrics.server");
     try {
-      const res = await fetchTrackLyrics(data.title, data.artist, data.duration);
+      const res = await fetchTrackLyrics(data.title, data.artist, data.duration, data.trackId);
       return { lyrics: res, error: null };
     } catch (err) {
       console.warn("[getTrackLyrics] Lyrics fetch error:", err);

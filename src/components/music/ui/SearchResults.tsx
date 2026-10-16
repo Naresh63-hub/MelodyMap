@@ -187,8 +187,8 @@ export function SearchResults(props: Props) {
               className={cn(
                 "rounded-full px-3.5 py-1 text-xs transition-all",
                 active
-                  ? "bg-foreground text-background font-semibold"
-                  : "bg-chip text-secondary-foreground hover:text-foreground hover:bg-chip-strong border border-hair font-medium"
+                  ? "border border-hair-strong bg-secondary font-semibold text-primary shadow-xs"
+                  : "border border-hair bg-white font-medium text-secondary-foreground hover:bg-chip hover:text-foreground"
               )}
             >
               {opt.label}
@@ -229,10 +229,10 @@ export function SearchResults(props: Props) {
             <div
               key={`${track.id}-${i}`}
               className={cn(
-                "group flex items-center gap-3 rounded-lg p-2 transition-colors",
+                "group flex items-center gap-3 rounded-xl p-2 transition-colors",
                 active
-                  ? "bg-popover"
-                  : "hover:bg-chip-subtle"
+                  ? "bg-secondary text-primary shadow-xs"
+                  : "hover:bg-chip"
               )}
             >
               {/* Thumbnail + Play */}

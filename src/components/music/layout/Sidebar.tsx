@@ -163,11 +163,11 @@ export function Sidebar({
                     onClick={() => onNavigate(id)}
                     title={collapsed ? label : undefined}
                     className={cn(
-                      "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-[13px] transition-colors",
+                      "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition-all",
                       collapsed && "justify-center px-2",
                       active
-                        ? "bg-chip text-foreground font-semibold"
-                        : "text-secondary-foreground font-medium hover:bg-chip-subtle hover:text-foreground",
+                        ? "bg-secondary text-primary font-semibold shadow-xs"
+                        : "text-secondary-foreground font-medium hover:bg-chip hover:text-foreground",
                     )}
                   >
                     {/* Active indicator bar */}

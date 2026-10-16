@@ -96,7 +96,7 @@ export function SleepTimerModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity animate-fade-in"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity animate-fade-in"
         onClick={onClose}
       />
 
@@ -197,8 +197,8 @@ export function SleepTimerModal({
                     className={cn(
                       "rounded-xl border py-2 px-1 text-xs font-semibold transition-all text-center",
                       isSelected
-                        ? "border-primary bg-primary/15 text-primary shadow-sm"
-                        : "border-border bg-surface-hover text-secondary-foreground hover:bg-surface-hover-strong hover:text-foreground"
+                        ? "border-hair-strong bg-secondary text-primary shadow-xs"
+                        : "border-hair bg-white text-secondary-foreground hover:bg-chip hover:text-foreground"
                     )}
                   >
                     {p.label}

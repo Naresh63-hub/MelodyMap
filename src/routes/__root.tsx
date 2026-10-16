@@ -80,13 +80,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#1b1217" },
+      { name: "theme-color", content: "#8b5cf6" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "MelodyMap" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "application-name", content: "MelodyMap" },
-      { name: "msapplication-TileColor", content: "#1b1217" },
+      { name: "msapplication-TileColor", content: "#8b5cf6" },
       { name: "msapplication-tap-highlight", content: "no" },
       { name: "format-detection", content: "telephone=no" },
       { title: "MelodyMap — Stream Music & Podcasts Free" },
@@ -117,7 +117,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "apple-touch-icon", sizes: "192x192", href: "/icons/icon-192.png" },
       { rel: "apple-touch-icon", sizes: "512x512", href: "/icons/icon-512.png" },
       { rel: "manifest", href: "/manifest.json" },
-      { rel: "mask-icon", href: "/icons/icon.svg", color: "#f7809c" },
+      { rel: "mask-icon", href: "/icons/icon.svg", color: "#8b5cf6" },
     ],
   }),
   shellComponent: RootShell,
@@ -128,17 +128,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="light">
       <head>
         <HeadContent />
-        {/* Apply persisted light/dark theme before first paint (avoids flash) */}
+        {/* Apply persisted light/dark theme before first paint (defaults to clean light theme) */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              '(function(){try{var m=localStorage.getItem("melodymap-theme")||"dark";' +
-              'var l=m==="light"||(m==="auto"&&window.matchMedia("(prefers-color-scheme: light)").matches);' +
+              '(function(){try{var m=localStorage.getItem("melodymap-theme")||"light";' +
+              'var l=m==="light"||(m==="auto"&&window.matchMedia("(prefers-color-scheme: light)").matches)||m!=="dark";' +
               'if(l){document.documentElement.classList.add("light");document.documentElement.style.colorScheme="light";' +
-              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#f2f5fa";}}catch(e){}})();',
+              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#8b5cf6";}}catch(e){}})();',
           }}
         />
       </head>

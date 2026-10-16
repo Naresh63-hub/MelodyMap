@@ -42,12 +42,12 @@ export function AddToPlaylistModal({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       {/* Sheet / Dialog */}
-      <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-surface border border-hair p-5 shadow-2xl shadow-black/80 z-10 animate-slide-up space-y-4">
+      <div className="relative w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-card border border-hair-strong p-5 shadow-xl z-10 animate-slide-up space-y-4">
         {/* Grab bar on mobile */}
         <div className="mx-auto h-1 w-12 rounded-full bg-chip-strong sm:hidden" />
 
@@ -68,7 +68,7 @@ export function AddToPlaylistModal({
         </div>
 
         {/* Track preview */}
-        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-card border border-hair">
+        <div className="flex items-center gap-3 p-2.5 rounded-xl bg-chip/60 border border-hair">
           <img
             src={track.thumbnail}
             alt=""
@@ -95,7 +95,7 @@ export function AddToPlaylistModal({
               value={newPlaylistName}
               onChange={(e) => setNewPlaylistName(e.target.value)}
               placeholder="Playlist name..."
-              className="flex-1 h-10 rounded-xl bg-chip border border-hair-strong px-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-hair-strong focus:ring-1 focus:ring-chip-strong focus:outline-none transition-all"
+              className="flex-1 h-10 rounded-xl bg-white border border-hair px-3.5 text-sm text-foreground shadow-xs placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/10 focus:outline-none transition-all"
               autoFocus
             />
             <button

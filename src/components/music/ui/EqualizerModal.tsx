@@ -90,13 +90,13 @@ export function EqualizerModal({
         </DialogHeader>
 
         {/* Tab switcher */}
-        <div className="flex gap-2 my-2 p-1 bg-surface-hover rounded-xl border border-border">
+        <div className="flex gap-2 my-2 p-1 bg-chip rounded-xl border border-hair">
           <button
             type="button"
             onClick={() => setTab("eq")}
             className={cn(
               "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
-              tab === "eq" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
+              tab === "eq" ? "bg-white text-primary font-semibold shadow-xs" : "text-secondary-foreground hover:text-foreground"
             )}
           >
             <Waves className="h-3.5 w-3.5" />
@@ -107,7 +107,7 @@ export function EqualizerModal({
             onClick={() => setTab("fx")}
             className={cn(
               "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
-              tab === "fx" ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
+              tab === "fx" ? "bg-white text-primary font-semibold shadow-xs" : "text-secondary-foreground hover:text-foreground"
             )}
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -122,7 +122,7 @@ export function EqualizerModal({
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-[0.06em]">Presets</span>
                 {settings.preset === "custom" && (
-                  <span className="text-[10px] text-primary font-medium uppercase bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                  <span className="text-[10px] text-primary font-medium uppercase bg-secondary px-2 py-0.5 rounded-md border border-primary/20">
                     Custom Tuning
                   </span>
                 )}
@@ -138,8 +138,8 @@ export function EqualizerModal({
                       className={cn(
                         "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border",
                         active
-                          ? "bg-primary/15 border-primary/40 text-primary"
-                          : "bg-surface-hover border-border text-muted-foreground hover:text-foreground hover:bg-surface-hover-strong"
+                          ? "border-hair-strong bg-secondary text-primary font-semibold shadow-xs"
+                          : "border-hair bg-white text-secondary-foreground hover:bg-chip hover:text-foreground"
                       )}
                     >
                       {EQUALIZER_PRESETS[p]?.name}

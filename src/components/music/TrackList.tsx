@@ -82,10 +82,10 @@ export function TrackList({
           <li
             key={track.id}
             className={cn(
-              "group flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors sm:px-3",
+              "group flex items-center gap-3 rounded-xl px-2.5 py-2 transition-all sm:px-3",
               active
-                ? "bg-popover"
-                : "hover:bg-chip-subtle",
+                ? "bg-secondary text-primary shadow-xs"
+                : "hover:bg-chip",
             )}
           >
             <button
