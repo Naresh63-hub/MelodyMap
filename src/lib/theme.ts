@@ -14,20 +14,23 @@ function isTheme(value: string | null): value is Theme {
 /** Resolve an abstract mode to the concrete palette in use right now. */
 export function resolveTheme(mode: Theme): 'dark' | 'light' {
   if (mode === 'auto') {
-    return 'dark';
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    return 'light';
   }
   return mode;
 }
 
 export function getStoredTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   try {
     const stored = localStorage.getItem(THEME_KEY);
     if (isTheme(stored)) return stored;
   } catch {
     /* private mode / unavailable storage */
   }
-  return 'dark';
+  return 'light';
 }
 
 /** Toggle the `html.light` or `html.dark` class + native chrome hints for a given mode. */
@@ -41,6 +44,16 @@ export function applyTheme(mode: Theme): void {
   root.style.colorScheme = isLight ? 'light' : 'dark';
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (meta) meta.content = isLight ? '#f8fafc' : '#0a0515';
+
+  // Synchronize native Android status bar icons (dark icons on light background, light icons on dark background)
+  if (typeof window !== 'undefined') {
+    const androidTheme = (window as unknown as { AndroidTheme?: { setStatusBarTheme?: (isLight: boolean) => void } }).AndroidTheme;
+    if (androidTheme?.setStatusBarTheme) {
+      try {
+        androidTheme.setStatusBarTheme(isLight);
+      } catch {}
+    }
+  }
 }
 
 const listeners = new Set<() => void>();

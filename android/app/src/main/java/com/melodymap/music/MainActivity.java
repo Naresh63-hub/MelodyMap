@@ -23,6 +23,7 @@ public class MainActivity extends BridgeActivity {
         // Ensure system status bar and navigation bars do not overlap web content
         try {
             androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+            setStatusBarStyle(true);
         } catch (Exception ignored) {}
 
         // Allow media autoplay without requiring immediate user gesture on each track transition
@@ -47,6 +48,9 @@ public class MainActivity extends BridgeActivity {
 
                 // Register Spotify-style background playback bridge
                 webView.addJavascriptInterface(new PlaybackBridge(this), "AndroidPlayback");
+
+                // Register Native Theme synchronization bridge
+                webView.addJavascriptInterface(new ThemeBridge(this), "AndroidTheme");
             }
         } catch (Exception ignored) {}
 
@@ -85,6 +89,27 @@ public class MainActivity extends BridgeActivity {
             serviceIntent.setAction(MediaPlaybackService.ACTION_STOP);
             startService(serviceIntent);
         } catch (Exception ignored) {}
+    }
+
+    /**
+     * Dynamically update system status bar and navigation bar icon contrast
+     * to prevent icons (clock, battery, WiFi) from being invisible against light surfaces.
+     */
+    public void setStatusBarStyle(boolean isLight) {
+        runOnUiThread(() -> {
+            try {
+                androidx.core.view.WindowInsetsControllerCompat controller =
+                    androidx.core.view.WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+                if (controller != null) {
+                    controller.setAppearanceLightStatusBars(isLight);
+                    controller.setAppearanceLightNavigationBars(isLight);
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    getWindow().setStatusBarColor(isLight ? 0xFFF8FAFC : 0xFF0A0515);
+                    getWindow().setNavigationBarColor(isLight ? 0xFFF8FAFC : 0xFF0A0515);
+                }
+            } catch (Exception ignored) {}
+        });
     }
 
     /**

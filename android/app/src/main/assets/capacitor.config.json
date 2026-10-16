@@ -8,13 +8,13 @@
 	},
 	"android": {
 		"allowMixedContent": false,
-		"backgroundColor": "#0a0515"
+		"backgroundColor": "#f8fafc"
 	},
 	"plugins": {
 		"SystemBars": {
 			"insetsHandling": "css",
 			"initialViewportFitValueHint": "cover",
-			"style": "DARK"
+			"style": "LIGHT"
 		}
 	}
 }
