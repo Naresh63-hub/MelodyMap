@@ -12,7 +12,7 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: isDev,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#0a0515',
     // NOTE: `android.adjustMarginsForEdgeToEdge` is not a Capacitor option —
     // it is absent from CapConfig.java and the CLI config type, so it was
     // silently ignored and never kept the WebView out of the system bars.
@@ -37,8 +37,8 @@ const config: CapacitorConfig = {
       // The document already declares `viewport-fit=cover`; declaring it here
       // too removes the startup layout jump while Capacitor detects the tag.
       initialViewportFitValueHint: 'cover',
-      // Light UI -> dark system-bar icons.
-      style: 'LIGHT',
+      // Deep Violet Dark UI -> light system-bar icons.
+      style: 'DARK',
     },
   },
 };

@@ -96,7 +96,7 @@ export function EqualizerModal({
             onClick={() => setTab("eq")}
             className={cn(
               "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
-              tab === "eq" ? "bg-white text-primary font-semibold shadow-xs" : "text-secondary-foreground hover:text-foreground"
+              tab === "eq" ? "bg-card text-primary font-semibold shadow-xs" : "text-secondary-foreground hover:text-foreground"
             )}
           >
             <Waves className="h-3.5 w-3.5" />
@@ -107,7 +107,7 @@ export function EqualizerModal({
             onClick={() => setTab("fx")}
             className={cn(
               "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
-              tab === "fx" ? "bg-white text-primary font-semibold shadow-xs" : "text-secondary-foreground hover:text-foreground"
+              tab === "fx" ? "bg-card text-primary font-semibold shadow-xs" : "text-secondary-foreground hover:text-foreground"
             )}
           >
             <Sparkles className="h-3.5 w-3.5" />
@@ -138,8 +138,8 @@ export function EqualizerModal({
                       className={cn(
                         "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border",
                         active
-                          ? "border-hair-strong bg-secondary text-primary font-semibold shadow-xs"
-                          : "border-hair bg-white text-secondary-foreground hover:bg-chip hover:text-foreground"
+                          ? "border-primary bg-primary text-primary-foreground font-semibold shadow-sm shadow-primary/25"
+                          : "border-hair bg-card text-secondary-foreground hover:bg-chip hover:text-foreground"
                       )}
                     >
                       {EQUALIZER_PRESETS[p]?.name}

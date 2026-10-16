@@ -272,13 +272,16 @@ export function FullScreenPlayer({
         </div>
 
         {/* Center Area: Artwork OR Live Lyrics */}
-        <div className="flex flex-col items-center justify-center my-auto w-full py-4">
+        <div className="flex flex-col items-center justify-center my-auto w-full py-4 relative">
+          {/* Reference Image Atmospheric Ambient Violet Aura */}
+          <div className="absolute w-72 sm:w-80 h-72 sm:h-80 rounded-full bg-primary/25 blur-3xl pointer-events-none -z-0 animate-pulse" />
+
           {!showLiveLyrics ? (
             <div
               {...doubleTapProps}
               onTouchStart={swipeStart}
               onTouchEnd={swipeEnd}
-              className="relative aspect-square w-64 sm:w-72 overflow-hidden rounded-xl shadow-lift border border-border touch-manipulation select-none"
+              className="relative z-10 aspect-square w-64 sm:w-72 overflow-hidden rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.3)] border-2 border-primary/30 ring-4 ring-primary/10 touch-manipulation select-none"
             >
               <img
                 src={track.thumbnail}

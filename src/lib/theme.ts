@@ -3,7 +3,7 @@ export type Theme = 'dark' | 'light' | 'auto';
 const THEME_KEY = 'melodymap-theme';
 
 const THEME_COLORS = {
-  dark: '#f8fafc',
+  dark: '#0a0515',
   light: '#f8fafc',
 } as const;
 
@@ -14,31 +14,33 @@ function isTheme(value: string | null): value is Theme {
 /** Resolve an abstract mode to the concrete palette in use right now. */
 export function resolveTheme(mode: Theme): 'dark' | 'light' {
   if (mode === 'auto') {
-    return 'light';
+    return 'dark';
   }
   return mode;
 }
 
 export function getStoredTheme(): Theme {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return 'dark';
   try {
     const stored = localStorage.getItem(THEME_KEY);
     if (isTheme(stored)) return stored;
   } catch {
     /* private mode / unavailable storage */
   }
-  return 'light';
+  return 'dark';
 }
 
-/** Toggle the `html.light` class + native chrome hints for a given mode. */
+/** Toggle the `html.light` or `html.dark` class + native chrome hints for a given mode. */
 export function applyTheme(mode: Theme): void {
   if (typeof document === 'undefined') return;
-  const light = resolveTheme(mode) === 'light';
+  const concrete = resolveTheme(mode);
+  const isLight = concrete === 'light';
   const root = document.documentElement;
-  root.classList.toggle('light', light);
-  root.style.colorScheme = 'light';
+  root.classList.toggle('light', isLight);
+  root.classList.toggle('dark', !isLight);
+  root.style.colorScheme = isLight ? 'light' : 'dark';
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  if (meta) meta.content = '#8b5cf6';
+  if (meta) meta.content = isLight ? '#f8fafc' : '#0a0515';
 }
 
 const listeners = new Set<() => void>();

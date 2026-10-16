@@ -248,7 +248,7 @@ function VerticalSongList({
               onClick={() => onPlayTrack(track, tracks, i)}
               className={cn(
                 "relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-card border border-hair transition-all",
-                active && "ring-1.5 ring-primary/80 shadow-[0_0_12px_rgba(247,128,156,0.3)]",
+                active && "ring-2 ring-primary shadow-[0_0_14px_rgba(139,92,246,0.4)]",
               )}
             >
               <TrackThumbnail
@@ -374,12 +374,12 @@ export function MobileHomeSections({
       <div className="space-y-6">
         {[1, 2].map((s) => (
           <div key={s} className="space-y-3">
-            <div className="h-4 w-28 rounded bg-[#1c1c1c] animate-pulse" />
+            <div className="h-4 w-28 rounded bg-chip animate-pulse" />
             <div className="flex gap-3 overflow-hidden">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="w-[138px] shrink-0 space-y-2">
                   <div className="aspect-square w-full rounded-xl bg-card border border-hair animate-pulse" />
-                  <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
+                  <div className="h-3 w-3/4 rounded bg-chip animate-pulse" />
                   <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
                 </div>
               ))}

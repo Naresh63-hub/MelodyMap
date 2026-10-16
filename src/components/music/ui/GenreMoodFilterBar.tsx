@@ -37,19 +37,19 @@ function FilterChip({
       className={cn(
         "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
         active
-          ? "border border-hair-strong bg-secondary font-semibold text-primary shadow-xs"
-          : "border border-hair bg-white font-normal text-secondary-foreground hover:bg-chip hover:text-foreground",
+          ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/30"
+          : "border border-hair bg-chip/60 font-medium text-secondary-foreground hover:bg-chip hover:text-foreground",
         isEmpty && "opacity-45",
         disabled && "opacity-50",
       )}
     >
       {filter.label}
       {typeof count === "number" && count > 0 ? (
-        <span className={cn("ml-1.5 text-[10px] tabular-nums", active ? "text-primary/80" : "text-muted-foreground")}>
+        <span className={cn("ml-1.5 text-[10px] tabular-nums", active ? "text-primary-foreground/90" : "text-muted-foreground")}>
           {count}
         </span>
       ) : null}
-      {active ? <X className="ml-1.5 inline-block h-3 w-3 opacity-70" aria-hidden="true" /> : null}
+      {active ? <X className="ml-1.5 inline-block h-3 w-3 opacity-90" aria-hidden="true" /> : null}
     </button>
   );
 }
@@ -91,8 +91,8 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
         className={cn(
           "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 chip-bounce button-press",
           !hasActive
-            ? "border border-hair-strong bg-secondary font-semibold text-primary shadow-xs"
-            : "border border-hair bg-white font-normal text-secondary-foreground hover:bg-chip hover:text-foreground",
+            ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/30"
+            : "border border-hair bg-chip/60 font-medium text-secondary-foreground hover:bg-chip hover:text-foreground",
           disabled && "opacity-50",
         )}
       >

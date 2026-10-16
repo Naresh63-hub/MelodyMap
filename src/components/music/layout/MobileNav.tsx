@@ -42,10 +42,13 @@ export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props)
             aria-label={label}
             aria-current={active ? "page" : undefined}
           >
+            {active && (
+              <div className="absolute inset-x-2 inset-y-1 rounded-xl bg-primary/20 -z-10 animate-fade-in" />
+            )}
             <Icon
               className={cn(
                 "h-5 w-5 transition-transform",
-                active ? "text-primary" : "text-muted-foreground"
+                active ? "text-primary scale-105" : "text-muted-foreground"
               )}
               strokeWidth={active ? 2.2 : 1.7}
             />

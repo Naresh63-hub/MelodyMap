@@ -110,8 +110,8 @@ export function PlaylistsPanel({
                 className={cn(
                   "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors",
                   p.id === openId
-                    ? "border-hair-strong bg-secondary text-primary font-semibold shadow-xs"
-                    : "border-hair bg-white text-secondary-foreground hover:text-foreground hover:bg-chip",
+                    ? "border-primary bg-primary text-primary-foreground font-semibold shadow-sm shadow-primary/25"
+                    : "border-hair bg-card text-secondary-foreground hover:text-foreground hover:bg-chip",
                 )}
               >
                 <ListMusic className="h-4 w-4" />

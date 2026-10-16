@@ -95,7 +95,7 @@ export function AddToPlaylistModal({
               value={newPlaylistName}
               onChange={(e) => setNewPlaylistName(e.target.value)}
               placeholder="Playlist name..."
-              className="flex-1 h-10 rounded-xl bg-white border border-hair px-3.5 text-sm text-foreground shadow-xs placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/10 focus:outline-none transition-all"
+              className="flex-1 h-10 rounded-xl bg-card border border-hair px-3.5 text-sm text-foreground shadow-xs placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/10 focus:outline-none transition-all"
               autoFocus
             />
             <button

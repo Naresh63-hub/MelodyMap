@@ -197,8 +197,8 @@ export function SleepTimerModal({
                     className={cn(
                       "rounded-xl border py-2 px-1 text-xs font-semibold transition-all text-center",
                       isSelected
-                        ? "border-hair-strong bg-secondary text-primary shadow-xs"
-                        : "border-hair bg-white text-secondary-foreground hover:bg-chip hover:text-foreground"
+                        ? "border-primary bg-primary text-primary-foreground font-semibold shadow-sm shadow-primary/25"
+                        : "border-hair bg-card text-secondary-foreground hover:bg-chip hover:text-foreground"
                     )}
                   >
                     {p.label}

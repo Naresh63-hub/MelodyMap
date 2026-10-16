@@ -187,8 +187,8 @@ export function SearchResults(props: Props) {
               className={cn(
                 "rounded-full px-3.5 py-1 text-xs transition-all",
                 active
-                  ? "border border-hair-strong bg-secondary font-semibold text-primary shadow-xs"
-                  : "border border-hair bg-white font-medium text-secondary-foreground hover:bg-chip hover:text-foreground"
+                  ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/30"
+                  : "border border-hair bg-chip/60 font-medium text-secondary-foreground hover:bg-chip hover:text-foreground"
               )}
             >
               {opt.label}
