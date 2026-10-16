@@ -68,47 +68,50 @@
   --mm-inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
 
   /*
-   * Palette: Deep Violet & Atmospheric Dark Theme (Reference Image)
-   * Main Background: #0A0515, Card: #18112C, Primary: #8B5CF6
+   * Official Violet Colour Palette (Reference Image Inspired)
+   * Primary Violet: #8B5CF6 | Bright Violet: #A855F7 | Electric Purple: #9333EA
+   * Deep Violet: #6D28D9 | Dark Purple: #2E1065 | Background Purple: #170D35
+   * Dark Surface: #21133F | Glass Surface: rgba(139, 92, 246, 0.12)
+   * Violet Border: rgba(167, 139, 250, 0.28) | Text: #FFFFFF, #D4CBEA, #A69ABD
    */
-  --bg-main: #0a0515;
-  --bg-sidebar: #0e071c;
-  --bg-secondary: #160d2b;
-  --bg-card: #18112c;
-  --bg-elevated: #1f1638;
-  --bg-elevated-2: #281c47;
+  --bg-main: #170d35;
+  --bg-sidebar: #170d35;
+  --bg-secondary: #21133f;
+  --bg-card: #21133f;
+  --bg-elevated: #2e1065;
+  --bg-elevated-2: #3b1780;
 
-  --text-primary: #fcfcfd;
-  --text-secondary: #a19bb5;
-  --text-muted: #736d86;
+  --text-primary: #ffffff;
+  --text-secondary: #d4cbea;
+  --text-muted: #a69abd;
 
-  --background: #0a0515;
-  --foreground: #fcfcfd;
+  --background: #170d35;
+  --foreground: #ffffff;
 
   /* Surfaces */
-  --card: #18112c;
-  --card-foreground: #fcfcfd;
-  --surface: #120a22;
-  --surface-foreground: #fcfcfd;
-  --surface-elevated: #1a1030;
-  --popover: #18112c;
-  --popover-foreground: #fcfcfd;
+  --card: #21133f;
+  --card-foreground: #ffffff;
+  --surface: #21133f;
+  --surface-foreground: #ffffff;
+  --surface-elevated: #2e1065;
+  --popover: #21133f;
+  --popover-foreground: #ffffff;
 
   /* Primary Accent: Deep Violet #8B5CF6 */
   --primary: #8b5cf6;
-  --primary-hover: #a78bfa;
-  --primary-pressed: #7c3aed;
+  --primary-hover: #a855f7;
+  --primary-pressed: #6d28d9;
   --primary-foreground: #ffffff;
-  --accent: #8b5cf6;
+  --accent: #9333ea;
   --accent-foreground: #ffffff;
 
   /* Secondary: Soft violet atmospheric surfaces */
-  --secondary: #261942;
-  --secondary-foreground: #c4b5fd;
+  --secondary: #2e1065;
+  --secondary-foreground: #d4cbea;
 
   /* Muted */
-  --muted: #1c1432;
-  --muted-foreground: #9ca3af;
+  --muted: #21133f;
+  --muted-foreground: #a69abd;
 
   /* Functional */
   --destructive: #ef4444;
@@ -116,104 +119,104 @@
   --success: #22c55e;
   --warning: #f59e0b;
 
-  /* Borders: Standard Border #2A1E48 and Subtle Violet #3B2A60 */
-  --border: #2a1e48;
-  --input: #2a1e48;
+  /* Borders: Violet Border rgba(167, 139, 250, 0.28) */
+  --border: rgba(167, 139, 250, 0.28);
+  --input: rgba(139, 92, 246, 0.15);
   --ring: #8b5cf6;
   --ring-soft: rgba(139, 92, 246, 0.35);
 
   /* Interactive surface steps */
-  --surface-hover: rgba(139, 92, 246, 0.1);
-  --surface-hover-strong: rgba(139, 92, 246, 0.18);
+  --surface-hover: rgba(139, 92, 246, 0.12);
+  --surface-hover-strong: rgba(139, 92, 246, 0.22);
 
   /* Chip / hairline scales */
-  --chip-subtle: #140d27;
-  --chip: #1c1335;
-  --chip-strong: #271a48;
-  --hair: #261b40;
-  --hair-strong: #3b2a60;
+  --chip-subtle: rgba(139, 92, 246, 0.08);
+  --chip: #21133f;
+  --chip-strong: #2e1065;
+  --hair: rgba(167, 139, 250, 0.18);
+  --hair-strong: rgba(167, 139, 250, 0.28);
 
   /* Glass system surfaces */
-  --glass-panel-bg: rgba(24, 17, 44, 0.92);
-  --glass-bg: rgba(18, 10, 34, 0.85);
-  --glass-bg-md: rgba(24, 17, 44, 0.82);
-  --glass-bg-soft: rgba(30, 20, 56, 0.7);
-  --glass-bg-heavy: rgba(14, 8, 26, 0.95);
-  --glass-border: #2a1e48;
-  --glass-border-strong: #3b2a60;
-  --glass-hi: rgba(255, 255, 255, 0.1);
+  --glass-panel-bg: rgba(33, 19, 63, 0.88);
+  --glass-bg: rgba(33, 19, 63, 0.82);
+  --glass-bg-md: rgba(33, 19, 63, 0.88);
+  --glass-bg-soft: rgba(139, 92, 246, 0.12);
+  --glass-bg-heavy: rgba(23, 13, 53, 0.95);
+  --glass-border: rgba(167, 139, 250, 0.28);
+  --glass-border-strong: rgba(167, 139, 250, 0.38);
+  --glass-hi: rgba(255, 255, 255, 0.12);
 
-  --selection-bg: #2e2045;
-  --scrollbar-thumb: rgba(139, 92, 246, 0.3);
-  --scrollbar-thumb-hover: rgba(139, 92, 246, 0.5);
+  --selection-bg: #2e1065;
+  --scrollbar-thumb: rgba(139, 92, 246, 0.35);
+  --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
 }
 
 html.dark {
-  --bg-main: #0a0515;
-  --bg-sidebar: #0e071c;
-  --bg-secondary: #160d2b;
-  --bg-card: #18112c;
-  --bg-elevated: #1f1638;
-  --bg-elevated-2: #281c47;
+  --bg-main: #170d35;
+  --bg-sidebar: #170d35;
+  --bg-secondary: #21133f;
+  --bg-card: #21133f;
+  --bg-elevated: #2e1065;
+  --bg-elevated-2: #3b1780;
 
-  --text-primary: #fcfcfd;
-  --text-secondary: #a19bb5;
-  --text-muted: #736d86;
+  --text-primary: #ffffff;
+  --text-secondary: #d4cbea;
+  --text-muted: #a69abd;
 
-  --background: #0a0515;
-  --foreground: #fcfcfd;
+  --background: #170d35;
+  --foreground: #ffffff;
 
-  --card: #18112c;
-  --card-foreground: #fcfcfd;
-  --surface: #120a22;
-  --surface-foreground: #fcfcfd;
-  --surface-elevated: #1a1030;
-  --popover: #18112c;
-  --popover-foreground: #fcfcfd;
+  --card: #21133f;
+  --card-foreground: #ffffff;
+  --surface: #21133f;
+  --surface-foreground: #ffffff;
+  --surface-elevated: #2e1065;
+  --popover: #21133f;
+  --popover-foreground: #ffffff;
 
   --primary: #8b5cf6;
-  --primary-hover: #a78bfa;
-  --primary-pressed: #7c3aed;
+  --primary-hover: #a855f7;
+  --primary-pressed: #6d28d9;
   --primary-foreground: #ffffff;
-  --accent: #8b5cf6;
+  --accent: #9333ea;
   --accent-foreground: #ffffff;
 
-  --secondary: #261942;
-  --secondary-foreground: #c4b5fd;
-  --muted: #1c1432;
-  --muted-foreground: #9ca3af;
+  --secondary: #2e1065;
+  --secondary-foreground: #d4cbea;
+  --muted: #21133f;
+  --muted-foreground: #a69abd;
 
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
   --success: #22c55e;
   --warning: #f59e0b;
 
-  --border: #2a1e48;
-  --input: #2a1e48;
+  --border: rgba(167, 139, 250, 0.28);
+  --input: rgba(139, 92, 246, 0.15);
   --ring: #8b5cf6;
   --ring-soft: rgba(139, 92, 246, 0.35);
 
-  --surface-hover: rgba(139, 92, 246, 0.1);
-  --surface-hover-strong: rgba(139, 92, 246, 0.18);
+  --surface-hover: rgba(139, 92, 246, 0.12);
+  --surface-hover-strong: rgba(139, 92, 246, 0.22);
 
-  --chip-subtle: #140d27;
-  --chip: #1c1335;
-  --chip-strong: #271a48;
-  --hair: #261b40;
-  --hair-strong: #3b2a60;
+  --chip-subtle: rgba(139, 92, 246, 0.08);
+  --chip: #21133f;
+  --chip-strong: #2e1065;
+  --hair: rgba(167, 139, 250, 0.18);
+  --hair-strong: rgba(167, 139, 250, 0.28);
 
-  --glass-panel-bg: rgba(24, 17, 44, 0.92);
-  --glass-bg: rgba(18, 10, 34, 0.85);
-  --glass-bg-md: rgba(24, 17, 44, 0.82);
-  --glass-bg-soft: rgba(30, 20, 56, 0.7);
-  --glass-bg-heavy: rgba(14, 8, 26, 0.95);
-  --glass-border: #2a1e48;
-  --glass-border-strong: #3b2a60;
-  --glass-hi: rgba(255, 255, 255, 0.1);
+  --glass-panel-bg: rgba(33, 19, 63, 0.88);
+  --glass-bg: rgba(33, 19, 63, 0.82);
+  --glass-bg-md: rgba(33, 19, 63, 0.88);
+  --glass-bg-soft: rgba(139, 92, 246, 0.12);
+  --glass-bg-heavy: rgba(23, 13, 53, 0.95);
+  --glass-border: rgba(167, 139, 250, 0.28);
+  --glass-border-strong: rgba(167, 139, 250, 0.38);
+  --glass-hi: rgba(255, 255, 255, 0.12);
 
-  --selection-bg: #2e2045;
-  --scrollbar-thumb: rgba(139, 92, 246, 0.3);
-  --scrollbar-thumb-hover: rgba(139, 92, 246, 0.5);
+  --selection-bg: #2e1065;
+  --scrollbar-thumb: rgba(139, 92, 246, 0.35);
+  --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
 }
 
 /*
@@ -294,11 +297,20 @@ html.light {
 
   body {
     background-color: var(--color-background);
+    background-image: 
+      radial-gradient(ellipse 70% 45% at 85% -5%, rgba(147, 51, 234, 0.22) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 10% 35%, rgba(109, 40, 217, 0.16) 0%, transparent 55%),
+      radial-gradient(ellipse 80% 50% at 50% 100%, rgba(46, 16, 101, 0.4) 0%, transparent 70%),
+      linear-gradient(135deg, #170d35 0%, #1e1140 48%, #25124d 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: cover;
     color: var(--color-foreground);
     font-family: var(--font-sans);
     font-weight: 400;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
   }
 
   h1 {

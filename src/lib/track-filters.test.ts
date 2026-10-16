@@ -65,6 +65,9 @@ describe("isOriginalSong", () => {
     expect(isOriginalSong({ title: "Shiva Stotram", album: "Lord Shiva Chants" })).toBe(false);
     expect(isOriginalSong({ title: "Ayyappa Swamy Bhajana", album: "Sabarimala Paatalu" })).toBe(false);
     expect(isOriginalSong({ title: "Hanuman Chalisa", artist: "Hariharan" })).toBe(false);
+    expect(isOriginalSong({ title: "Shivaratri Song 2019", artist: "Mangli" })).toBe(false);
+    expect(isOriginalSong({ title: "Mangli Renuka Yellamma", artist: "Mangli, Nakka Srikanth" })).toBe(false);
+    expect(isOriginalSong({ title: "Mangli Yellamma Bonalu", artist: "Mangli" })).toBe(false);
   });
 
   it("rejects speeches, web series, promos, and discourses", () => {

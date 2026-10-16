@@ -309,12 +309,12 @@ export function ExploreSections({
       <div className="space-y-6 pt-2">
         {[1, 2].map((s) => (
           <div key={s} className="space-y-3">
-            <div className="h-4 w-28 rounded bg-[#1c1c1c] animate-pulse" />
+            <div className="h-4 w-28 rounded bg-chip animate-pulse" />
             <div className="flex gap-3 overflow-hidden">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="w-[138px] shrink-0 space-y-2">
                   <div className="aspect-square w-full rounded-xl bg-card border border-hair animate-pulse" />
-                  <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
+                  <div className="h-3 w-3/4 rounded bg-chip animate-pulse" />
                   <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
                 </div>
               ))}

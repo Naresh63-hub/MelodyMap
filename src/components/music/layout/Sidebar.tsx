@@ -149,7 +149,7 @@ export function Sidebar({
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             {!collapsed && (
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#A69ABD]">
                 {section.label}
               </p>
             )}
@@ -166,8 +166,8 @@ export function Sidebar({
                       "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition-all",
                       collapsed && "justify-center px-2",
                       active
-                        ? "bg-secondary text-primary font-semibold shadow-xs"
-                        : "text-secondary-foreground font-medium hover:bg-chip hover:text-foreground",
+                        ? "bg-primary/20 border border-primary/30 text-white font-semibold shadow-xs"
+                        : "text-[#D4CBEA] font-medium hover:bg-chip hover:text-white",
                     )}
                   >
                     {/* Active indicator bar */}
@@ -180,14 +180,14 @@ export function Sidebar({
                         "h-[18px] w-[18px] shrink-0 transition-colors",
                         active
                           ? "text-primary"
-                          : "text-muted-foreground group-hover:text-secondary-foreground",
+                          : "text-[#A69ABD] group-hover:text-[#D4CBEA]",
                       )}
                     />
                     {!collapsed && (
                       <>
                         <span className="flex-1 text-left truncate">{label}</span>
                         {shortcut && (
-                          <span className="hidden group-hover:inline text-[10px] tabular-nums text-muted-foreground font-mono">
+                          <span className="hidden group-hover:inline text-[10px] tabular-nums text-[#A69ABD] font-mono">
                             {shortcut}
                           </span>
                         )}
@@ -305,10 +305,10 @@ export function Sidebar({
               <div className={cn("absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background", isSynced ? "bg-primary" : "bg-muted-foreground")} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-foreground/90">
+              <p className="truncate text-xs font-semibold text-white">
                 {userName ?? "Listener"}
               </p>
-              <p className="truncate text-[10px] text-foreground/40">
+              <p className="truncate text-[10px] text-[#D4CBEA]">
                 {isSynced ? "Synced (Click to sign out)" : "Sign in / Sync account"}
               </p>
             </div>
@@ -321,8 +321,8 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => setMode(mode === "light" ? "dark" : "light")}
-              aria-label={mode === "light" ? "Switch to Rose Ember dark mode" : "Switch to light mode"}
-              title={mode === "light" ? "Theme: Light (click for Rose Ember)" : "Theme: Rose Ember (click for light)"}
+              aria-label={mode === "light" ? "Switch to Deep Violet dark mode" : "Switch to light mode"}
+              title={mode === "light" ? "Theme: Light (click for Deep Violet)" : "Theme: Deep Violet (click for light)"}
               className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-all duration-200 hover:bg-chip hover:text-foreground button-press focus-ring-neon"
             >
               {mode === "light" ? (

@@ -6,7 +6,8 @@
 import type { Track } from "./music.server";
 import { searchSaavn } from "./providers/saavn";
 import { LANGUAGE_ARTISTS } from "./language-artists";
-import { norm } from "./track-dedup";
+import { norm, diversifyTrackList } from "./track-dedup";
+import { isOriginalSong } from "./track-filters";
 
 export interface RadioOptions {
   title?: string | undefined;
@@ -55,45 +56,48 @@ export async function getRadioTracks(
 
     const primaryLang = languages[0] || "";
 
-    // Build 2–3 high-value queries on JioSaavn for smart queue progression
-    const queries: string[] = [];
+    // Build balanced queries:
+    // 1 query for seed artist top hits (max 6 tracks)
+    // 1 query for seed album/soundtrack (if valid and distinct from track title)
+    // 2-3 queries for distinct co-artists in the same language or user languages
+    const queries: { query: string; limit: number }[] = [];
 
-    // 1. Same artist top hits
     if (artist) {
-      queries.push(`${artist} top hit songs`);
-      if (primaryLang) {
-        queries.push(`${artist} ${primaryLang} best songs`);
-      }
+      const artistQuery = primaryLang ? `${artist} ${primaryLang} top songs` : `${artist} top songs`;
+      queries.push({ query: artistQuery, limit: 6 });
     }
 
-    // 2. Same album/soundtrack hits (other songs from the same movie!)
     if (album && album.length > 2 && norm(album) !== normalizedSeedTitle) {
-      queries.push(`${album} songs`);
+      queries.push({ query: `${album} songs`, limit: 4 });
     }
 
-    // 3. Co-artists in the same language for natural musical progression
-    if (primaryLang && LANGUAGE_ARTISTS[primaryLang]) {
-      const coArtists = LANGUAGE_ARTISTS[primaryLang].filter(
-        (a) => a.toLowerCase() !== artist.toLowerCase(),
-      );
-      if (coArtists.length > 0) {
-        const randA = coArtists[Math.floor(Math.random() * coArtists.length)]!;
-        queries.push(`${randA} top songs`);
+    // Co-artists for musical variety in the listener's language(s)
+    const availableCoArtists = (primaryLang && LANGUAGE_ARTISTS[primaryLang]
+      ? LANGUAGE_ARTISTS[primaryLang]
+      : Object.values(LANGUAGE_ARTISTS).flat()
+    ).filter((a) => !artist || a.toLowerCase() !== artist.toLowerCase());
+
+    if (availableCoArtists.length > 0) {
+      // Pick up to 3 distinct random co-artists
+      const shuffled = [...availableCoArtists].sort(() => Math.random() - 0.5);
+      const pickedCoArtists = shuffled.slice(0, 3);
+      for (const ca of pickedCoArtists) {
+        queries.push({ query: `${ca} hit songs`, limit: 6 });
       }
     }
 
-    // Fallback query if no artist or album known
+    // Fallback if no queries were formed
     if (queries.length === 0) {
       if (cleanTitle) {
-        queries.push(`${cleanTitle} song`);
+        queries.push({ query: `${cleanTitle} song`, limit: 10 });
       } else {
-        queries.push(`${primaryLang || "top"} superhit songs`);
+        queries.push({ query: `${primaryLang || "top"} superhit songs`, limit: 12 });
       }
     }
 
     // Fetch queries concurrently on JioSaavn with timeout protection
-    const searchPromises = queries.slice(0, 3).map((q) =>
-      searchSaavn(q, { limit: Math.min(limit, 12) }).catch(() => []),
+    const searchPromises = queries.map(({ query, limit: qLimit }) =>
+      searchSaavn(query, { limit: qLimit }).catch(() => [] as Track[]),
     );
     const searchResults = await Promise.all(searchPromises);
 
@@ -103,14 +107,18 @@ export async function getRadioTracks(
       seenTitles.add(normalizedSeedTitle);
     }
 
-    const tracks: Track[] = [];
+    // Interleave query results round-robin to ensure diversity across queries,
+    // rather than letting the seed artist query fill the entire initial quota!
+    const interleavedCandidates: Track[] = [];
+    const maxBatchLen = Math.max(...searchResults.map((b) => b.length), 0);
 
-    for (const batch of searchResults) {
-      for (const t of batch) {
-        if (!t.id || seenIds.has(t.id)) continue;
+    for (let i = 0; i < maxBatchLen; i++) {
+      for (const batch of searchResults) {
+        const t = batch[i];
+        if (!t || !t.id || seenIds.has(t.id)) continue;
 
         const tTitleNorm = norm(t.title);
-        // Exclude the current song or any version/remix/cover of it
+        // Exclude the seed song itself or duplicate titles
         if (
           normalizedSeedTitle &&
           (tTitleNorm === normalizedSeedTitle ||
@@ -120,13 +128,15 @@ export async function getRadioTracks(
           continue;
         }
 
-        // Deduplicate across batch
         if (seenTitles.has(tTitleNorm)) continue;
+
+        // Non-film devotional/festival folk song filter
+        if (!isOriginalSong(t)) continue;
 
         seenIds.add(t.id);
         seenTitles.add(tTitleNorm);
 
-        tracks.push({
+        interleavedCandidates.push({
           id: t.id,
           title: t.title,
           artist: t.artist,
@@ -135,13 +145,19 @@ export async function getRadioTracks(
           album: t.album,
           previewUrl: t.previewUrl,
         });
-
-        if (tracks.length >= limit) break;
       }
-      if (tracks.length >= limit) break;
     }
 
-    return { tracks };
+    // Apply strict anti-clustering diversification:
+    // max 2 tracks per artist, max 1 track per movie, minimum artist spacing of 2
+    const diversified = diversifyTrackList(interleavedCandidates, {
+      maxPerArtist: 2,
+      maxPerAlbum: 1,
+      minArtistSpacing: 2,
+      minAlbumSpacing: 3,
+    });
+
+    return { tracks: diversified.slice(0, limit) };
   } catch (err) {
     console.warn("[getRadioTracks] Radio resolution notice:", err);
     return { tracks: [] };

@@ -113,7 +113,15 @@ import { useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
 import { clearDownloads, listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
 import { cn } from "@/lib/utils";
-import { trackExistsIn, dedupeTracks, cleanTrackDisplayMetadata, type TrackLike } from "@/lib/track-dedup";
+import {
+  trackExistsIn,
+  dedupeTracks,
+  cleanTrackDisplayMetadata,
+  extractPrimaryArtist,
+  extractTrackMovieOrAlbum,
+  diversifyTrackList,
+  type TrackLike,
+} from "@/lib/track-dedup";
 import { resolveRestorablePlayback, resolveRestoreStartSeconds } from "@/lib/playback-restore";
 import {
   installMediaCommandHandler,
@@ -1217,9 +1225,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           }
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-          setDailyMixTracks(ranked);
-          markFeedDisplayed(ranked);
-          writeHomeCache({ dailyMixTracks: ranked });
+          const diversified = diversifyTrackList(ranked, {
+            maxPerArtist: 2,
+            maxPerAlbum: 1,
+            minArtistSpacing: 2,
+            minAlbumSpacing: 3,
+          });
+          setDailyMixTracks(diversified);
+          markFeedDisplayed(diversified);
+          writeHomeCache({ dailyMixTracks: diversified });
         }
       } catch {}
     },
@@ -1247,8 +1261,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               const fresh = applyExploreFilters(res.tracks as Track[]);
               const finalTracks = fresh.length > 0 ? fresh : (res.tracks as Track[]);
               const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
-              setTrendingList(ranked);
-              writeHomeCache({ trendingList: ranked });
+              const diversified = diversifyTrackList(ranked, {
+                maxPerArtist: 2,
+                maxPerAlbum: 1,
+                minArtistSpacing: 2,
+                minAlbumSpacing: 3,
+              });
+              setTrendingList(diversified);
+              writeHomeCache({ trendingList: diversified });
             }
           })(),
           (async () => {
@@ -1261,8 +1281,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               const fresh = applyExploreFilters(pool);
               const finalTracks = fresh.length > 0 ? fresh : pool;
               const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
+              const diversified = diversifyTrackList(ranked, {
+                maxPerArtist: 2,
+                maxPerAlbum: 1,
+                minArtistSpacing: 2,
+                minAlbumSpacing: 3,
+              });
               setMixTracks((prev) => {
-                const next = { ...prev, newrelease: ranked };
+                const next = { ...prev, newrelease: diversified };
                 writeHomeCache({ mixTracks: next });
                 return next;
               });
@@ -1282,8 +1308,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               const fresh = applyExploreFilters(pool.length > 0 ? pool : (res.tracks as Track[]));
               const finalTracks = fresh.length > 0 ? fresh : (res.tracks as Track[]);
               const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
-              setOldSongsList(ranked);
-              writeHomeCache({ oldSongsList: ranked });
+              const diversified = diversifyTrackList(ranked, {
+                maxPerArtist: 2,
+                maxPerAlbum: 1,
+                minArtistSpacing: 2,
+                minAlbumSpacing: 3,
+              });
+              setOldSongsList(diversified);
+              writeHomeCache({ oldSongsList: diversified });
             }
           })(),
         ]);
@@ -1366,9 +1398,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               getSessionContext(),
             );
             const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
-            setRecs(distributed);
-            markFeedDisplayed(distributed);
-            writeHomeCache({ recs: distributed });
+            const diversified = diversifyTrackList(distributed, {
+              maxPerArtist: 2,
+              maxPerAlbum: 1,
+              minArtistSpacing: 2,
+              minAlbumSpacing: 3,
+            });
+            setRecs(diversified);
+            markFeedDisplayed(diversified);
+            writeHomeCache({ recs: diversified });
           })(),
           (async () => {
             await loadDailyMix(nonce);
@@ -1516,7 +1554,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
         if (fresh.length > 0) {
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-          setRecs((prev) => dedupeTracks([...prev, ...ranked]));
+          setRecs((prev) =>
+            diversifyTrackList(dedupeTracks([...prev, ...ranked]), {
+              maxPerArtist: 2,
+              maxPerAlbum: 1,
+              minArtistSpacing: 2,
+              minAlbumSpacing: 3,
+            }),
+          );
           markFeedDisplayed(ranked);
         }
       } finally {
@@ -1623,9 +1668,46 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
 
       if (candidateTracks.length > 0) {
-        const deduplicatedBatch = dedupeTracks(candidateTracks).slice(0, 15);
-        setQueue((prev) => [...prev, ...deduplicatedBatch]);
-        return deduplicatedBatch;
+        const deduped = dedupeTracks(candidateTracks);
+        // Diversify to guarantee no more than 2 tracks per artist, 1 per movie, and spaced out
+        const diversifiedBatch = diversifyTrackList(deduped, {
+          maxPerArtist: 2,
+          maxPerAlbum: 1,
+          minArtistSpacing: 2,
+          minAlbumSpacing: 3,
+        });
+
+        // Ensure the immediate next song transitions away from currentTrack's primary artist and movie
+        if (currentTrack && diversifiedBatch.length > 1) {
+          const currArtist = extractPrimaryArtist(currentTrack.artist);
+          const currMovie = extractTrackMovieOrAlbum(currentTrack);
+          const firstNext = diversifiedBatch[0];
+          const firstArtist = firstNext ? extractPrimaryArtist(firstNext.artist) : "";
+          const firstMovie = firstNext ? extractTrackMovieOrAlbum(firstNext) : "";
+
+          // If the very first track in the new batch repeats the current song's artist or movie,
+          // find the first candidate that is different and swap it to position 0
+          if (
+            (currArtist && firstArtist === currArtist) ||
+            (currMovie && firstMovie === currMovie)
+          ) {
+            const alternateIndex = diversifiedBatch.findIndex((t) => {
+              const a = extractPrimaryArtist(t.artist);
+              const m = extractTrackMovieOrAlbum(t);
+              return (!currArtist || a !== currArtist) && (!currMovie || m !== currMovie);
+            });
+            if (alternateIndex > 0) {
+              const [alt] = diversifiedBatch.splice(alternateIndex, 1);
+              if (alt) {
+                diversifiedBatch.unshift(alt);
+              }
+            }
+          }
+        }
+
+        const finalBatch = diversifiedBatch.slice(0, 15);
+        setQueue((prev) => [...prev, ...finalBatch]);
+        return finalBatch;
       }
       return [];
     } finally {

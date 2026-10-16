@@ -90,18 +90,18 @@ export function OnboardingModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto border-hair-strong bg-[#0d0d17]/95 p-0 text-foreground backdrop-blur-2xl shadow-2xl rounded-3xl scrollbar-hide">
+      <DialogContent className="max-h-[90vh] w-full max-w-xl overflow-y-auto border-hair-strong bg-[#170D35]/95 p-0 text-foreground backdrop-blur-2xl shadow-2xl rounded-3xl scrollbar-hide">
         {/* Header with gradient banner */}
-        <div className="relative overflow-hidden border-b border-hair-strong bg-gradient-to-b from-purple-900/30 via-purple-900/10 to-transparent p-6 sm:p-7 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-pink-500 via-purple-600 to-cyan-400 p-0.5 shadow-lg shadow-purple-500/25">
-            <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-[#0d0a1a]">
-              <Sparkles className="h-6 w-6 text-pink-400 animate-pulse" />
+        <div className="relative overflow-hidden border-b border-hair-strong bg-gradient-to-b from-primary/20 via-primary/5 to-transparent p-6 sm:p-7 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary via-accent to-primary p-0.5 shadow-lg shadow-primary/25">
+            <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-[#21133F]">
+              <Sparkles className="h-6 w-6 text-primary animate-pulse" />
             </div>
           </div>
           <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display">
             Personalize Your Music
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm text-purple-200/70 mt-1 max-w-md mx-auto">
+          <DialogDescription className="text-xs sm:text-sm text-[#D4CBEA] mt-1 max-w-md mx-auto">
             Choose your song languages and favorite artists so MelodyMap can stream the music you love.
           </DialogDescription>
 
@@ -113,7 +113,7 @@ export function OnboardingModal({
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all",
                 step === 1
-                  ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
                   : "bg-chip text-foreground/50 hover:bg-chip-strong",
               )}
             >
@@ -131,7 +131,7 @@ export function OnboardingModal({
               className={cn(
                 "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all",
                 step === 2
-                  ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/30"
                   : "bg-chip text-foreground/50 hover:bg-chip-strong",
               )}
             >
@@ -196,7 +196,7 @@ export function OnboardingModal({
                 <Button
                   type="button"
                   onClick={() => setStep(2)}
-                  className="rounded-xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-xs font-semibold text-white shadow-md hover:brightness-110"
+                  className="rounded-xl bg-gradient-to-r from-[#8B5CF6] via-[#9333EA] to-[#6D28D9] text-xs font-semibold text-white shadow-md shadow-primary/25 hover:brightness-110 active:scale-[0.98] transition-all"
                 >
                   Next: Pick Favorite Artists
                   <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -224,13 +224,13 @@ export function OnboardingModal({
                     }
                   }}
                   placeholder="Type an artist or singer name..."
-                  className="h-10 rounded-xl border-hair-strong bg-chip text-xs text-foreground placeholder:text-foreground/30 focus:border-purple-500/50"
+                  className="h-10 rounded-xl border-hair-strong bg-chip text-xs text-foreground placeholder:text-foreground/30 focus:border-primary"
                 />
                 <Button
                   type="button"
                   onClick={() => addArtist(artistInput)}
                   disabled={!artistInput.trim()}
-                  className="h-10 rounded-xl bg-purple-600 px-4 text-xs font-semibold text-white hover:bg-purple-500 shrink-0"
+                  className="h-10 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-hover shrink-0 shadow-sm"
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" />
                   Add
@@ -245,13 +245,13 @@ export function OnboardingModal({
                     {selectedArtists.map((artist) => (
                       <span
                         key={artist}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-purple-500/40 bg-purple-500/20 px-3 py-1 text-xs text-purple-100 shadow-sm"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/20 px-3 py-1 text-xs text-[#D4CBEA] shadow-sm"
                       >
                         {artist}
                         <button
                           type="button"
                           onClick={() => removeArtist(artist)}
-                          className="text-foreground/40 hover:text-pink-400 transition-colors"
+                          className="text-foreground/40 hover:text-primary transition-colors"
                           aria-label={`Remove ${artist}`}
                         >
                           <X className="h-3 w-3" />
@@ -271,7 +271,7 @@ export function OnboardingModal({
                       key={artist}
                       type="button"
                       onClick={() => addArtist(artist)}
-                      className="inline-flex items-center gap-1 rounded-full border border-hair-strong bg-chip-subtle px-2.5 py-1 text-xs text-foreground/70 hover:border-purple-500/40 hover:bg-purple-500/10 hover:text-purple-200 transition-colors"
+                      className="inline-flex items-center gap-1 rounded-full border border-hair-strong bg-chip-subtle px-2.5 py-1 text-xs text-foreground/70 hover:border-primary/40 hover:bg-primary/10 hover:text-[#D4CBEA] transition-colors"
                     >
                       <Plus className="h-3 w-3 text-foreground/40" />
                       {artist}
@@ -286,7 +286,7 @@ export function OnboardingModal({
           <div className="border-t border-hair-strong pt-4 space-y-3">
             <div className="flex items-center justify-between text-xs text-foreground/40">
               <span className="inline-flex items-center gap-1.5 text-[11px]">
-                <Sliders className="h-3.5 w-3.5 text-purple-400" />
+                <Sliders className="h-3.5 w-3.5 text-primary" />
                 You can edit these anytime in <strong className="text-foreground/70">Settings</strong>
               </span>
               <button
@@ -301,7 +301,7 @@ export function OnboardingModal({
             <Button
               type="button"
               onClick={handleFinish}
-              className="w-full h-11 rounded-xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 font-semibold text-white shadow-lg shadow-purple-500/25 hover:brightness-110 active:scale-[0.99] transition-all text-xs sm:text-sm"
+              className="w-full h-11 rounded-xl bg-gradient-to-r from-[#8B5CF6] via-[#9333EA] to-[#6D28D9] font-semibold text-white shadow-lg shadow-primary/25 hover:brightness-110 active:scale-[0.99] transition-all text-xs sm:text-sm"
             >
               <CheckCircle2 className="mr-2 h-4 w-4" />
               Save Preferences &amp; Start Listening

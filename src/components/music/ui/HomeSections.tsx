@@ -55,7 +55,7 @@ export function HomeSections({
   const SkeletonCard = () => (
     <div className="space-y-2">
       <div className="aspect-square w-full rounded-xl bg-card border border-hair animate-pulse" />
-      <div className="h-3 w-3/4 rounded bg-[#1c1c1c] animate-pulse" />
+      <div className="h-3 w-3/4 rounded bg-chip animate-pulse" />
       <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
     </div>
   );
@@ -66,7 +66,7 @@ export function HomeSections({
         {[1, 2].map((section) => (
           <section key={section} className="mb-8">
             <div className="mb-4 flex items-center gap-2">
-              <div className="h-4 w-32 rounded bg-[#1c1c1c] animate-pulse" />
+              <div className="h-4 w-32 rounded bg-chip animate-pulse" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3">
               {Array.from({ length: 6 }).map((_, i) => (

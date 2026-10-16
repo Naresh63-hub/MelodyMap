@@ -17,6 +17,7 @@ export interface TrackLike {
   id: string;
   title: string;
   artist: string;
+  album?: string | undefined;
   duration?: string | number | undefined;
   thumbnail?: string | undefined;
   reason?: string | undefined;
@@ -184,6 +185,136 @@ export function trackExistsIn<T extends TrackLike>(collection: T[], track: T): b
 export function appendIfNew<T extends TrackLike>(collection: T[], track: T): T[] {
   if (trackExistsIn(collection, track)) return collection;
   return [...collection, track];
+}
+
+/** Extracts the main leading artist from complex multi-artist strings */
+export function extractPrimaryArtist(rawArtist?: string | null | undefined): string {
+  if (!rawArtist) return "";
+  const firstPart = rawArtist.split(/[,&/|]|\b(?:feat|ft|featuring|with|and)\b/i)[0] || "";
+  return norm(firstPart);
+}
+
+/** Extracts the clean movie or album name for a track to group soundtrack songs */
+export function extractTrackMovieOrAlbum(track?: { album?: string | undefined; title?: string | undefined } | null | undefined): string {
+  if (!track) return "";
+  const movie = cleanMovieName(track.album, track.title);
+  if (movie) return norm(movie);
+  if (track.album) return norm(track.album);
+  return "";
+}
+
+export interface DiversifyOptions {
+  /** Maximum number of tracks allowed from the same primary artist. Defaults to 2. */
+  maxPerArtist?: number | undefined;
+  /** Maximum number of tracks allowed from the same movie/soundtrack album. Defaults to 1. */
+  maxPerAlbum?: number | undefined;
+  /** Minimum number of intervening tracks required between songs by the same artist. Defaults to 2. */
+  minArtistSpacing?: number | undefined;
+  /** Minimum number of intervening tracks required between songs from the same movie/album. Defaults to 3. */
+  minAlbumSpacing?: number | undefined;
+}
+
+/**
+ * Enforces per-artist and per-movie diversity and interleaving across recommendations and queues.
+ * Prevents continuous clusters of the same singer or same movie soundtrack.
+ */
+export function diversifyTrackList<T extends TrackLike>(
+  tracks: T[],
+  options?: DiversifyOptions,
+): T[] {
+  if (!tracks || tracks.length <= 1) return tracks ?? [];
+
+  const maxPerArtist = options?.maxPerArtist ?? 2;
+  const maxPerAlbum = options?.maxPerAlbum ?? 1;
+  const minArtistSpacing = options?.minArtistSpacing ?? 2;
+  const minAlbumSpacing = options?.minAlbumSpacing ?? 3;
+
+  // Deduplicate before diversifying
+  const deduped = dedupeTracks(tracks);
+
+  // Pool candidates
+  const candidates: Array<{ track: T; artist: string; album: string }> = deduped.map((t) => ({
+    track: t,
+    artist: extractPrimaryArtist(t.artist),
+    album: extractTrackMovieOrAlbum(t),
+  }));
+
+  const artistCounts = new Map<string, number>();
+  const albumCounts = new Map<string, number>();
+  const result: T[] = [];
+  const recentArtists: string[] = [];
+  const recentAlbums: string[] = [];
+
+  while (candidates.length > 0) {
+    let bestIndex = -1;
+    let bestPenalty = Infinity;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const { artist, album } = candidates[i]!;
+      const aCount = artist ? (artistCounts.get(artist) || 0) : 0;
+      const albCount = album ? (albumCounts.get(album) || 0) : 0;
+
+      // Heavy penalty if exceeding max count caps
+      const artistCapExceeded = artist && aCount >= maxPerArtist;
+      const albumCapExceeded = album && albCount >= maxPerAlbum;
+
+      // Spacing penalties: how recently was this artist/album used?
+      let spacingPenalty = 0;
+      if (artist) {
+        const lastIdx = recentArtists.lastIndexOf(artist);
+        if (lastIdx !== -1) {
+          const dist = recentArtists.length - lastIdx; // 1 means immediate previous track
+          if (dist <= minArtistSpacing) {
+            spacingPenalty += (minArtistSpacing - dist + 1) * 1000;
+          }
+        }
+      }
+      if (album) {
+        const lastIdx = recentAlbums.lastIndexOf(album);
+        if (lastIdx !== -1) {
+          const dist = recentAlbums.length - lastIdx;
+          if (dist <= minAlbumSpacing) {
+            spacingPenalty += (minAlbumSpacing - dist + 1) * 2000;
+          }
+        }
+      }
+
+      // Base index penalty to preserve original ranking order when diverse
+      const rankPenalty = i;
+      const capPenalty = (artistCapExceeded ? 50000 : 0) + (albumCapExceeded ? 60000 : 0);
+
+      const totalPenalty = capPenalty + spacingPenalty + rankPenalty;
+
+      if (totalPenalty < bestPenalty) {
+        bestPenalty = totalPenalty;
+        bestIndex = i;
+        if (totalPenalty === rankPenalty) {
+          break; // Ideal candidate with zero collisions
+        }
+      }
+    }
+
+    if (bestIndex === -1) break;
+
+    const chosen = candidates.splice(bestIndex, 1)[0]!;
+    result.push(chosen.track);
+
+    if (chosen.artist) {
+      artistCounts.set(chosen.artist, (artistCounts.get(chosen.artist) || 0) + 1);
+      recentArtists.push(chosen.artist);
+    } else {
+      recentArtists.push("");
+    }
+
+    if (chosen.album) {
+      albumCounts.set(chosen.album, (albumCounts.get(chosen.album) || 0) + 1);
+      recentAlbums.push(chosen.album);
+    } else {
+      recentAlbums.push("");
+    }
+  }
+
+  return result;
 }
 
 /**

@@ -155,7 +155,7 @@ export function VoiceSearchButton({
 
       {/* Floating feedback badge while listening or on result */}
       {feedback && (
-        <div className="absolute -bottom-8 right-0 z-30 whitespace-nowrap rounded-md bg-[#1a1a1a] px-2.5 py-1 text-[11px] font-medium text-foreground/90 shadow-lg border border-hair-strong backdrop-blur-md animate-in fade-in zoom-in-95 pointer-events-none">
+        <div className="absolute -bottom-8 right-0 z-30 whitespace-nowrap rounded-md bg-popover px-2.5 py-1 text-[11px] font-medium text-foreground/90 shadow-lg border border-hair-strong backdrop-blur-md animate-in fade-in zoom-in-95 pointer-events-none">
           <div className="flex items-center gap-1.5">
             {isListening && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
             <span>{feedback}</span>

@@ -162,13 +162,13 @@ export const NON_ORIGINAL_ARTIST_REGEX =
  * Enforces pure Spotify-quality catalog integrity (original soundtracks & official singles only).
  */
 export const LOCAL_COMPILATION_REGEX =
-  /\b(classics\s+of|classic\s+telugu|classic\s+hindi|classic\s+tamil|ultimate\s+blockbuster|ultimate\s+hits|blockbuster\s+hits|blockbuster\s+tollywood|tollywood\s+ugadi|holi\s+special|bhaje\s+bhaje|rose\s+day|valentine\s+hits|valentines?\s+day|kuchi\s+kuchi|top\s+90s|top\s+80s|top\s+70s|best\s+of\s+tollywood|best\s+of\s+bollywood|all\s+time\s+hits|evergreen\s+hits|non\s*stop\s*hits|jani\s+master|hits\s+collection|songs\s+jukebox|audio\s+playlist|full\s+album\s+jukebox)\b/i;
+  /\b(classics\s+of|classic\s+telugu|classic\s+hindi|classic\s+tamil|ultimate\s+blockbuster|ultimate\s+hits|blockbuster\s+hits|blockbuster\s+tollywood|tollywood\s+ugadi|holi\s+special|bhaje\s+bhaje|rose\s+day|valentine\s+hits|valentines?\s+day|kuchi\s+kuchi|top\s+90s|top\s+80s|top\s+70s|best\s+of\s+tollywood|best\s+of\s+bollywood|all\s+time\s+hits|evergreen\s+hits|non\s*stop\s*hits|jani\s+master|hits\s+collection|songs\s+jukebox|audio\s+playlist|full\s+album\s+jukebox|festival\s*special|diwali\s*special|dasara\s*special|sankranti\s*special|ugadi\s*special|bonalu\s*songs|bathukamma\s*songs|jathara\s*songs)\b/i;
 
 /**
  * Rejects devotional, temple, religious chants, hymns, pooja, bhajans, keerthanas, and village paatalu.
  */
 export const DEVOTIONAL_REGEX =
-  /\b(devotional|bhajan|bhajans|keerthana|keerthanas|keerthanalu|stotram|stotrams|sloka|slokas|chalisa|aarti|pooja|puja|mantra|mantras|paatalu|suprabhatam|devatha|swamy|ayyappa|shiva|govinda|venkateswara|hanuman|ganesh|sai\s*baba|krishna|rama|namam|satsang|bhakthi|bhakti|annamayya|akkadevathala|keerthanam|dhyanam|harikatha)\b/i;
+  /\b(devotional|bhajan|bhajans|keerthana|keerthanas|keerthanalu|stotram|stotrams|sloka|slokas|chalisa|aarti|pooja|puja|mantra|mantras|paatalu|suprabhatam|devatha|swamy|ayyappa|shiva|shivaratri|shivarathri|shivuni|shivaiah|shambho|mahadev|rudra|govinda|venkateswara|venkataramana|srinivasa|balaji|tirumala|tirupati|hanuman|ganesh|ganapathi|ganesha|vinayaka|sai\s*baba|shiridi|krishna|rama|namam|satsang|bhakthi|bhakti|annamayya|akkadevathala|keerthanam|dhyanam|harikatha|yellamma|renuka|bonalu|bathukamma|sammakka|saralamma|peddamma|maisamma|poleramma|gangamma|ankalamma|jathara|kanaka\s*durga|durga\s*devi)\b/i;
 
 /**
  * Rejects speeches, discourses, web series, dialogues, scenes, and promos.

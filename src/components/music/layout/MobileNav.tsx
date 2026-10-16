@@ -21,7 +21,7 @@ type Props = {
 export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props) {
   return (
     <nav
-      className="fixed z-40 flex lg:hidden items-stretch justify-around border-t border-hair-strong bg-surface safe-bottom w-full left-0 right-0 bottom-0"
+      className="fixed z-40 flex lg:hidden items-stretch justify-around border-t border-hair-strong bg-surface/95 backdrop-blur-xl safe-bottom w-full left-0 right-0 bottom-0 shadow-lg shadow-black/20"
       style={{ height: "var(--mobile-nav-height, 56px)" }}
       aria-label="Mobile navigation"
     >
@@ -37,25 +37,25 @@ export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props)
             }}
             className={cn(
               "relative flex flex-1 flex-col items-center justify-center gap-1 py-1 text-[10px] font-medium transition-colors active:scale-95",
-              active ? "text-foreground font-semibold" : "text-muted-foreground hover:text-secondary-foreground"
+              active ? "text-white font-semibold" : "text-[#A69ABD] hover:text-[#D4CBEA]"
             )}
             aria-label={label}
             aria-current={active ? "page" : undefined}
           >
             {active && (
-              <div className="absolute inset-x-2 inset-y-1 rounded-xl bg-primary/20 -z-10 animate-fade-in" />
+              <div className="absolute inset-x-2.5 inset-y-1 rounded-xl bg-primary/25 border border-primary/30 -z-10 animate-fade-in shadow-sm shadow-primary/20" />
             )}
             <Icon
               className={cn(
                 "h-5 w-5 transition-transform",
-                active ? "text-primary scale-105" : "text-muted-foreground"
+                active ? "text-primary scale-105" : "text-[#A69ABD]"
               )}
               strokeWidth={active ? 2.2 : 1.7}
             />
             <span
               className={cn(
                 "truncate max-w-[64px]",
-                active ? "font-semibold text-foreground" : ""
+                active ? "font-semibold text-white" : "text-[#A69ABD]"
               )}
             >
               {label}

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { areSameTrack, dedupeTracks, norm, stringSimilarity, cleanYouTubeTrackMetadata } from "./track-dedup";
+import {
+  areSameTrack,
+  dedupeTracks,
+  norm,
+  stringSimilarity,
+  cleanYouTubeTrackMetadata,
+  extractPrimaryArtist,
+  extractTrackMovieOrAlbum,
+  diversifyTrackList,
+} from "./track-dedup";
 
 describe("norm", () => {
   it("lowercases and strips noise words and punctuation", () => {
@@ -178,4 +187,58 @@ describe("cleanYouTubeTrackMetadata", () => {
     expect(inthalo.artist).not.toContain("Volga");
   });
 });
+
+describe("extractPrimaryArtist", () => {
+  it("extracts the leading artist from joint credits", () => {
+    expect(extractPrimaryArtist("Mangli, Nakka Srikanth")).toBe("mangli");
+    expect(extractPrimaryArtist("Anirudh Ravichander, Shilpa Rao")).toBe("anirudh ravichander");
+    expect(extractPrimaryArtist("Ram Miriyala & Bheems Ceciroleo")).toBe("ram miriyala");
+    expect(extractPrimaryArtist("Sid Sriram feat. Sunitha")).toBe("sid sriram");
+    expect(extractPrimaryArtist("Kishore Kumar / Lata Mangeshkar")).toBe("kishore kumar");
+  });
+});
+
+describe("extractTrackMovieOrAlbum", () => {
+  it("extracts clean movie/album name", () => {
+    expect(extractTrackMovieOrAlbum({ title: "Bindaas", album: "Jailer 2" })).toBe("jailer 2");
+    expect(extractTrackMovieOrAlbum({ title: "Song (From \"Devara\")", album: "Devara" })).toBe("devara");
+  });
+});
+
+describe("diversifyTrackList", () => {
+  it("prevents consecutive songs from the same movie soundtrack (e.g. Jailer 2)", () => {
+    const raw = [
+      { id: "1", title: "Bindaas", artist: "Anirudh", album: "Jailer 2" },
+      { id: "2", title: "Dhadha Giri", artist: "Anirudh", album: "Jailer 2" },
+      { id: "3", title: "Tillu Anna DJ Pedithe", artist: "Ram Miriyala", album: "DJ Tillu" },
+      { id: "4", title: "Samajavaragamana", artist: "Sid Sriram", album: "Ala Vaikunthapurramuloo" },
+    ];
+    const diversified = diversifyTrackList(raw, { maxPerArtist: 2, maxPerAlbum: 1, minAlbumSpacing: 2 });
+    // First two songs should NOT both be from Jailer 2
+    expect(diversified[0]?.album).toBe("Jailer 2");
+    expect(diversified[1]?.album).not.toBe("Jailer 2");
+  });
+
+  it("limits repetitive artist clustering (e.g. 5 Mangli songs in a feed)", () => {
+    const raw = [
+      { id: "1", title: "Mangli Song 1", artist: "Mangli", album: "Album 1" },
+      { id: "2", title: "Mangli Song 2", artist: "Mangli, Singer B", album: "Album 2" },
+      { id: "3", title: "Other Song A", artist: "Sid Sriram", album: "Movie A" },
+      { id: "4", title: "Other Song B", artist: "Anirudh", album: "Movie B" },
+      { id: "5", title: "Mangli Song 3", artist: "Mangli", album: "Album 3" },
+      { id: "6", title: "Mangli Song 4", artist: "Mangli", album: "Album 4" },
+      { id: "7", title: "Other Song C", artist: "Thaman S", album: "Movie C" },
+      { id: "8", title: "Mangli Song 5", artist: "Mangli", album: "Album 5" },
+    ];
+    const diversified = diversifyTrackList(raw, { maxPerArtist: 2, maxPerAlbum: 1, minArtistSpacing: 3 });
+    // Songs 1 and 2 should NOT both be Mangli
+    expect(extractPrimaryArtist(diversified[0]?.artist)).toBe("mangli");
+    expect(extractPrimaryArtist(diversified[1]?.artist)).not.toBe("mangli");
+
+    // Across the first 4 items, Mangli should have at most 1 song
+    const top4Mangli = diversified.slice(0, 4).filter((t) => extractPrimaryArtist(t.artist) === "mangli");
+    expect(top4Mangli.length).toBeLessThanOrEqual(1);
+  });
+});
+
 

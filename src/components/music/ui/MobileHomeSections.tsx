@@ -28,7 +28,7 @@ function TrackThumbnail({
 
   if (!optimized || hasError) {
     return (
-      <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-br from-[#362230] to-card text-primary/70", fallbackClassName)}>
+      <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-br from-[#2E1065] to-card text-primary/70", fallbackClassName)}>
         <Music2 className="h-7 w-7 opacity-50" />
       </div>
     );

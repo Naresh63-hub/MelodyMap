@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Track } from "./types";
-import { norm, areSameTrack } from "./track-dedup";
+import { norm, areSameTrack, diversifyTrackList } from "./track-dedup";
 import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext } from "./context-engine";
 import { isLanguageConsistent, isOldEraTrack } from "./library";
@@ -453,7 +453,14 @@ async function getLocalPicks(data: {
     if (o) interleaved.push(o);
   }
 
-  return interleaved.slice(0, count);
+  const diversified = diversifyTrackList(interleaved, {
+    maxPerArtist: 2,
+    maxPerAlbum: 1,
+    minArtistSpacing: 2,
+    minAlbumSpacing: 3,
+  });
+
+  return diversified.slice(0, count);
 }
 
 
@@ -1202,10 +1209,16 @@ export const getDailyMix = createServerFn({ method: "POST" })
     const consistent = languages.length > 0
       ? deduplicatedCandidates.filter((t) => isLanguageConsistent(t, languages) && isOriginalSong(t))
       : deduplicatedCandidates.filter(isOriginalSong);
-    const dailyTracks = data.refreshNonce
-      ? shuffleArray(consistent).slice(0, count)
-      : seededShuffleArray(consistent, `${dateSeed}-final`).slice(0, count);
-    return { tracks: dailyTracks, dateSeed, error: null };
+    const shuffled = data.refreshNonce
+      ? shuffleArray(consistent)
+      : seededShuffleArray(consistent, `${dateSeed}-final`);
+    const diversified = diversifyTrackList(shuffled, {
+      maxPerArtist: 2,
+      maxPerAlbum: 1,
+      minArtistSpacing: 2,
+      minAlbumSpacing: 3,
+    });
+    return { tracks: diversified.slice(0, count), dateSeed, error: null };
   });
 
 
