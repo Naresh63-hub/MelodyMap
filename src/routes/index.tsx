@@ -2943,7 +2943,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         )}
 
         <main 
-          className="relative flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-36"
+          className="relative flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-[calc(136px+var(--mm-inset-bottom,0px))] lg:pb-24"
           {...pullToRefreshProps}
         >
           <ErrorBoundary>
@@ -2955,7 +2955,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               </div>
             )}
             
-            <div className="relative w-full px-4 py-5 sm:px-6 pb-32">
+            <div className="relative w-full px-4 py-5 sm:px-6 pb-2">
               {message && (
                 <div className="pointer-events-auto fixed bottom-36 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <div className="flex items-center gap-3 rounded-full border border-hair-strong bg-card/95 px-5 py-2.5 shadow-2xl backdrop-blur-md">

@@ -82,7 +82,7 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
       aria-label="Genre and mood quick filters"
       data-testid="genre-mood-filter-bar"
       className={cn(
-        "flex max-w-full items-center gap-2 overflow-x-auto py-1.5 scrollbar-hide snap-x snap-mandatory scroll-px-4",
+        "flex max-w-full items-center gap-2 overflow-x-auto py-2.5 px-1 scrollbar-hide snap-x snap-mandatory scroll-px-4",
         className
       )}
     >
@@ -129,6 +129,7 @@ export function GenreMoodFilterBar({ activeIds, onToggle, onClear, counts, disab
           onToggle={handleToggle}
         />
       ))}
+      <div className="w-3 shrink-0" aria-hidden="true" />
     </div>
   );
 }

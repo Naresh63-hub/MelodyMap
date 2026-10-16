@@ -88,7 +88,7 @@ export function MediaCard({
       )}
     >
       {/* Artwork Container */}
-      <div className="relative mb-2.5 aspect-square w-full overflow-hidden rounded-xl bg-surface border border-hair">
+      <div className="relative mb-2.5 aspect-square w-full overflow-hidden rounded-xl bg-surface shadow-xs">
         <button
           type="button"
           onClick={onPlay}

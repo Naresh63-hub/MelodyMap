@@ -21,12 +21,10 @@ import {
   HardDrive,
   Activity,
   Disc,
-  Sun,
 } from "lucide-react";
 import { loadEqualizerSettings, saveEqualizerSettings } from "@/lib/equalizer";
 import { useNavigate } from "@tanstack/react-router";
 import { isLowNetworkModeEnabled, setLowNetworkMode } from "@/lib/network-mode";
-import { useTheme } from "@/hooks/use-theme";
 import { ListeningInsightsPanel } from "./ListeningInsightsPanel";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -35,7 +33,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RecSettingsPanel } from "@/components/music/RecSettingsPanel";
 import { LanguageArtistPicker } from "@/components/music/ui/LanguageArtistPicker";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
   exportLibraryData,
   importLibraryData,
@@ -108,8 +105,7 @@ export function SettingsModal({
   onLibraryRestored,
 }: Props) {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "appearance" | "insights">("account");
-  const { mode: theme, setMode: setTheme } = useTheme();
+  const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "insights">("account");
   const [sponsorBlockOn, setSponsorBlockOn] = useState<boolean>(getSponsorBlockEnabled);
   const [lowNetworkOn, setLowNetworkOn] = useState<boolean>(isLowNetworkModeEnabled);
   const [internalCrossfade, setInternalCrossfade] = useState<number>(() => {
@@ -361,19 +357,6 @@ export function SettingsModal({
           >
             <Activity className="h-3.5 w-3.5 text-primary" />
             Listening Insights
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection("appearance")}
-            className={cn(
-              "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
-              activeSection === "appearance"
-              ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
-            )}
-          >
-            <Sun className="h-3.5 w-3.5 text-primary" />
-            Appearance
           </button>
         </div>
 
@@ -969,23 +952,7 @@ export function SettingsModal({
             </div>
           )}
 
-          {/* 5. APPEARANCE SECTION */}
-          {activeSection === "appearance" && (
-            <div className="rounded-3xl border border-hair-strong bg-chip-subtle p-5 sm:p-6 space-y-5 shadow-lg backdrop-blur-md">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground">Appearance</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Pick a look for MelodyMap. “System” follows your device’s light/dark setting automatically.
-                </p>
-              </div>
-
-              <div className="flex items-center justify-center">
-                <ThemeToggle theme={theme} onChange={setTheme} />
-              </div>
-            </div>
-          )}
-
-          {/* 6. LISTENING INSIGHTS & AI RADAR SECTION */}
+          {/* 5. LISTENING INSIGHTS & AI RADAR SECTION */}
           {activeSection === "insights" && (
             <ListeningInsightsPanel />
           )}

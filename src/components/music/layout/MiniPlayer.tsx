@@ -72,7 +72,7 @@ export function MiniPlayer({
     <div
       {...swipeProps}
       className={cn(
-        "fixed z-40 border-t border-hair-strong bg-surface shadow-lg h-14 sm:h-16 flex flex-col justify-between safe-bottom bottom-[var(--mobile-nav-height,56px)] lg:bottom-0 left-0 right-0 transition-all duration-300",
+        "fixed z-40 border-t border-hair-strong bg-surface shadow-lg h-14 sm:h-16 flex flex-col justify-between bottom-[calc(var(--mobile-nav-height,56px)+var(--mm-inset-bottom,0px))] lg:bottom-0 left-0 right-0 transition-all duration-300",
         sidebarCollapsed ? "lg:left-[72px]" : "lg:left-[260px]"
       )}
     >

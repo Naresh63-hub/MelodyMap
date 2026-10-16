@@ -109,9 +109,9 @@ function HorizontalScrollRow({
             {/* JioSaavn Square Artwork Container */}
             <div
               className={cn(
-                "relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-surface border border-hair transition-all duration-300",
+                "relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-surface shadow-xs transition-all duration-300",
                 active && "ring-2 ring-primary shadow-sm",
-                "group-hover/card:border-hair-strong group-hover/card:shadow-sm",
+                "group-hover/card:shadow-sm",
               )}
             >
               <button
@@ -207,6 +207,7 @@ function HorizontalScrollRow({
           </div>
         );
       })}
+      <div className="w-2 shrink-0" aria-hidden="true" />
     </div>
   );
 }
@@ -469,6 +470,7 @@ export function MobileHomeSections({
                 onClick={onArtistClick}
               />
             ))}
+            <div className="w-2 shrink-0" aria-hidden="true" />
           </div>
         </section>
       )}

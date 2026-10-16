@@ -21,8 +21,11 @@ type Props = {
 export function MobileNav({ activeTab, onNavigate, hasTrack: _hasTrack }: Props) {
   return (
     <nav
-      className="fixed z-40 flex lg:hidden items-stretch justify-around border-t border-hair-strong bg-surface safe-bottom w-full left-0 right-0 bottom-0 shadow-lg shadow-black/20"
-      style={{ height: "var(--mobile-nav-height, 56px)" }}
+      className="fixed z-40 flex lg:hidden items-stretch justify-around border-t border-hair-strong bg-surface w-full left-0 right-0 bottom-0 shadow-lg shadow-black/20"
+      style={{
+        height: "calc(var(--mobile-nav-height, 56px) + var(--mm-inset-bottom, 0px))",
+        paddingBottom: "var(--mm-inset-bottom, 0px)",
+      }}
       aria-label="Mobile navigation"
     >
       {MOBILE_TABS.map(({ id, label, icon: Icon }) => {

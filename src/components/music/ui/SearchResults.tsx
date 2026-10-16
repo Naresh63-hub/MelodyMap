@@ -173,7 +173,7 @@ export function SearchResults(props: Props) {
   return (
     <div className="space-y-4 animate-fade-in pt-1">
       {/* Category Pills Header */}
-      <div className="flex max-w-full gap-2 overflow-x-auto py-1.5 scrollbar-hide snap-x scroll-px-4">
+      <div className="flex max-w-full gap-2 overflow-x-auto py-2.5 px-1 scrollbar-hide snap-x scroll-px-4">
         {filterOptions.map((opt) => {
           const active = filter === opt.value;
           return (
@@ -195,6 +195,7 @@ export function SearchResults(props: Props) {
             </button>
           );
         })}
+        <div className="w-3 shrink-0" aria-hidden="true" />
       </div>
 
       {/* Results Song List or No Results */}

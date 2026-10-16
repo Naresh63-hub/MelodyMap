@@ -12,7 +12,7 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: isDev,
-    backgroundColor: '#170d35',
+    backgroundColor: '#10091f',
     // NOTE: `android.adjustMarginsForEdgeToEdge` is not a Capacitor option —
     // it is absent from CapConfig.java and the CLI config type, so it was
     // silently ignored and never kept the WebView out of the system bars.

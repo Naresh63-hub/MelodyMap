@@ -10,18 +10,15 @@ import {
   Layers,
   ListMusic,
   Mic,
-  Moon,
   Pause,
   Play,
   Search,
   Settings,
   SkipForward,
   Sparkles,
-  Sun,
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/hooks/use-theme";
 
 export type NavTab =
   | "foryou"
@@ -107,8 +104,6 @@ export function Sidebar({
   onSignOut,
   onOpenSettings,
 }: Props) {
-  const { mode, setMode } = useTheme();
-
   return (
     <aside
       className={cn(
@@ -315,23 +310,9 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Footer controls: theme switch + settings + collapse toggle */}
+        {/* Footer controls: settings + collapse toggle */}
         <div className={cn("flex items-center", collapsed ? "flex-col gap-2 justify-center" : "justify-between")}>
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setMode(mode === "light" ? "dark" : "light")}
-              aria-label={mode === "light" ? "Switch to Deep Violet dark mode" : "Switch to light mode"}
-              title={mode === "light" ? "Theme: Light (click for Deep Violet)" : "Theme: Deep Violet (click for light)"}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-all duration-200 hover:bg-chip hover:text-foreground button-press focus-ring-neon"
-            >
-              {mode === "light" ? (
-                <Sun className="h-4 w-4 text-amber-400" />
-              ) : (
-                <Moon className="h-4 w-4 text-primary" />
-              )}
-            </button>
-
             {onOpenSettings && (
               <button
                 type="button"

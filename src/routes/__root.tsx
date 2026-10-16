@@ -80,7 +80,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#170d35" },
+      { name: "theme-color", content: "#10091f" },
+      { name: "color-scheme", content: "dark" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "apple-mobile-web-app-title", content: "MelodyMap" },
@@ -128,20 +129,20 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" style={{ colorScheme: "dark" }}>
       <head>
         <HeadContent />
-        {/* Apply persisted light/dark theme before first paint (defaults to deep violet dark theme) */}
+        {/* Enforce permanent Deep Violet theme before first paint */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              '(function(){try{var m=localStorage.getItem("melodymap-theme")||"dark";' +
-              'var l=m==="light"||(m==="auto"&&window.matchMedia("(prefers-color-scheme: light)").matches);' +
-              'if(l){document.documentElement.classList.remove("dark");document.documentElement.classList.add("light");document.documentElement.style.colorScheme="light";' +
-              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#f8fafc";}' +
-              'else{document.documentElement.classList.remove("light");document.documentElement.classList.add("dark");document.documentElement.style.colorScheme="dark";' +
-              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#170d35";}' +
-              'if(window.AndroidTheme&&window.AndroidTheme.setStatusBarTheme){window.AndroidTheme.setStatusBarTheme(l);}' +
+              '(function(){try{' +
+              'localStorage.removeItem("melodymap-theme");' +
+              'document.documentElement.classList.remove("light");' +
+              'document.documentElement.classList.add("dark");' +
+              'document.documentElement.style.colorScheme="dark";' +
+              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#10091f";' +
+              'if(window.AndroidTheme&&window.AndroidTheme.setStatusBarTheme){window.AndroidTheme.setStatusBarTheme(false);}' +
               '}catch(e){}})();',
           }}
         />

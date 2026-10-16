@@ -44,13 +44,18 @@
   --color-chip-strong: var(--chip-strong);
   --color-hair: var(--hair);
   --color-hair-strong: var(--hair-strong);
+  --color-surface-elevated: var(--surface-elevated);
   --font-display: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-sans: "Inter", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --shadow-lift: 0 6px 20px -6px rgba(0, 0, 0, 0.45);
   --shadow-overlay: 0 12px 40px -12px rgba(0, 0, 0, 0.55);
 }
 
-:root {
+:root,
+html,
+html.dark,
+html.light {
+  color-scheme: dark;
   --radius: 0.625rem;
   --mobile-nav-height: 56px;
 
@@ -68,11 +73,12 @@
   --mm-inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
 
   /*
-   * Official Violet Colour Palette (Reference Image Inspired)
-   * Primary Violet: #8B5CF6 | Bright Violet: #A855F7 | Electric Purple: #9333EA
-   * Deep Violet: #6D28D9 | Dark Purple: #2E1065 | Background Purple: #170D35 | Base: #10091F
-   * Dark Surface: #21133F | Glass Surface: rgba(139, 92, 246, 0.12)
-   * Violet Border: rgba(167, 139, 250, 0.22) | Text: #FFFFFF, #D4CBEA, #A69ABD
+   * Permanent Deep Violet Colour Palette
+   * Background: #10091F | Main surface: #170D35 | Sidebar: #170D35
+   * Music cards: #21133F | Elevated surface: #2E1065
+   * Primary violet: #8B5CF6 | Bright violet: #A855F7 | Soft violet: #A78BFA
+   * Primary text: #FFFFFF | Secondary text: #D4CBEA | Muted text: #A69ABD
+   * Borders: rgba(167, 139, 250, 0.20)
    */
   --bg-main: #10091f;
   --bg-sidebar: #170d35;
@@ -102,8 +108,10 @@
   --primary-hover: #a855f7;
   --primary-pressed: #6d28d9;
   --primary-foreground: #ffffff;
-  --accent: #9333ea;
+  --accent: #8b5cf6;
   --accent-foreground: #ffffff;
+  --color-bright-violet: #a855f7;
+  --color-soft-violet: #a78bfa;
 
   /* Secondary: Soft violet atmospheric surfaces */
   --secondary: #2e1065;
@@ -119,8 +127,8 @@
   --success: #22c55e;
   --warning: #f59e0b;
 
-  /* Borders: Violet Border rgba(167, 139, 250, 0.22) */
-  --border: rgba(167, 139, 250, 0.22);
+  /* Borders: rgba(167, 139, 250, 0.20) */
+  --border: rgba(167, 139, 250, 0.20);
   --input: rgba(139, 92, 246, 0.15);
   --ring: #8b5cf6;
   --ring-soft: rgba(139, 92, 246, 0.35);
@@ -133,8 +141,8 @@
   --chip-subtle: rgba(139, 92, 246, 0.08);
   --chip: #21133f;
   --chip-strong: #2e1065;
-  --hair: rgba(167, 139, 250, 0.16);
-  --hair-strong: rgba(167, 139, 250, 0.28);
+  --hair: rgba(167, 139, 250, 0.12);
+  --hair-strong: rgba(167, 139, 250, 0.20);
 
   /* Glass system surfaces */
   --glass-panel-bg: rgba(23, 13, 53, 0.90);
@@ -142,8 +150,8 @@
   --glass-bg-md: rgba(23, 13, 53, 0.90);
   --glass-bg-soft: rgba(139, 92, 246, 0.12);
   --glass-bg-heavy: rgba(16, 9, 31, 0.95);
-  --glass-border: rgba(167, 139, 250, 0.22);
-  --glass-border-strong: rgba(167, 139, 250, 0.35);
+  --glass-border: rgba(167, 139, 250, 0.20);
+  --glass-border-strong: rgba(167, 139, 250, 0.30);
   --glass-hi: rgba(255, 255, 255, 0.12);
 
   --selection-bg: #2e1065;
@@ -151,144 +159,7 @@
   --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
 }
 
-html.dark {
-  --bg-main: #10091f;
-  --bg-sidebar: #170d35;
-  --bg-secondary: #170d35;
-  --bg-card: #21133f;
-  --bg-elevated: #2e1065;
-  --bg-elevated-2: #3b1780;
 
-  --text-primary: #ffffff;
-  --text-secondary: #d4cbea;
-  --text-muted: #a69abd;
-
-  --background: #10091f;
-  --foreground: #ffffff;
-
-  --card: #21133f;
-  --card-foreground: #ffffff;
-  --surface: #170d35;
-  --surface-foreground: #ffffff;
-  --surface-elevated: #2e1065;
-  --popover: #21133f;
-  --popover-foreground: #ffffff;
-
-  --primary: #8b5cf6;
-  --primary-hover: #a855f7;
-  --primary-pressed: #6d28d9;
-  --primary-foreground: #ffffff;
-  --accent: #9333ea;
-  --accent-foreground: #ffffff;
-
-  --secondary: #2e1065;
-  --secondary-foreground: #d4cbea;
-  --muted: #1e123a;
-  --muted-foreground: #a69abd;
-
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --success: #22c55e;
-  --warning: #f59e0b;
-
-  --border: rgba(167, 139, 250, 0.22);
-  --input: rgba(139, 92, 246, 0.15);
-  --ring: #8b5cf6;
-  --ring-soft: rgba(139, 92, 246, 0.35);
-
-  --surface-hover: rgba(139, 92, 246, 0.12);
-  --surface-hover-strong: rgba(139, 92, 246, 0.22);
-
-  --chip-subtle: rgba(139, 92, 246, 0.08);
-  --chip: #21133f;
-  --chip-strong: #2e1065;
-  --hair: rgba(167, 139, 250, 0.16);
-  --hair-strong: rgba(167, 139, 250, 0.28);
-
-  --glass-panel-bg: rgba(23, 13, 53, 0.90);
-  --glass-bg: rgba(23, 13, 53, 0.85);
-  --glass-bg-md: rgba(23, 13, 53, 0.90);
-  --glass-bg-soft: rgba(139, 92, 246, 0.12);
-  --glass-bg-heavy: rgba(16, 9, 31, 0.95);
-  --glass-border: rgba(167, 139, 250, 0.22);
-  --glass-border-strong: rgba(167, 139, 250, 0.35);
-  --glass-hi: rgba(255, 255, 255, 0.12);
-
-  --selection-bg: #2e1065;
-  --scrollbar-thumb: rgba(139, 92, 246, 0.35);
-  --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
-}
-
-/*
- * Light theme: warm cream paper surfaces, deep ink plum text, warm coral rose accent.
- * Activated by adding class="light" to <html> (see src/lib/theme.ts).
- */
-html.light {
-  --bg-main: #f8fafc;
-  --bg-sidebar: #ffffff;
-  --bg-secondary: #f9fafb;
-  --bg-card: #ffffff;
-  --bg-elevated: #f9fafb;
-  --bg-elevated-2: #ede9fe;
-
-  --text-primary: #111827;
-  --text-secondary: #6b7280;
-  --text-muted: #9ca3af;
-
-  --background: #f8fafc;
-  --foreground: #111827;
-  --card: #ffffff;
-  --card-foreground: #111827;
-  --surface: #ffffff;
-  --surface-foreground: #111827;
-  --surface-elevated: #f9fafb;
-  --popover: #ffffff;
-  --popover-foreground: #111827;
-
-  --primary: #8b5cf6;
-  --primary-hover: #7c3aed;
-  --primary-pressed: #6d28d9;
-  --primary-foreground: #ffffff;
-  --accent: #8b5cf6;
-  --accent-foreground: #ffffff;
-
-  --secondary: #ede9fe;
-  --secondary-foreground: #6b7280;
-  --muted: #f3f4f6;
-  --muted-foreground: #9ca3af;
-
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --success: #16a34a;
-  --warning: #d97706;
-
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #8b5cf6;
-  --ring-soft: rgba(139, 92, 246, 0.25);
-
-  --surface-hover: rgba(139, 92, 246, 0.05);
-  --surface-hover-strong: rgba(139, 92, 246, 0.1);
-
-  --chip-subtle: #f8fafc;
-  --chip: #f3f4f6;
-  --chip-strong: #ede9fe;
-  --hair: #e5e7eb;
-  --hair-strong: #ddd6fe;
-
-  --glass-panel-bg: rgba(255, 255, 255, 0.96);
-  --glass-bg: rgba(255, 255, 255, 0.88);
-  --glass-bg-md: rgba(255, 255, 255, 0.82);
-  --glass-bg-soft: rgba(248, 250, 252, 0.75);
-  --glass-bg-heavy: rgba(255, 255, 255, 0.95);
-  --glass-border: #e5e7eb;
-  --glass-border-strong: #ddd6fe;
-  --glass-hi: rgba(255, 255, 255, 0.75);
-
-  --selection-bg: #ede9fe;
-  --scrollbar-thumb: rgba(139, 92, 246, 0.2);
-  --scrollbar-thumb-hover: rgba(139, 92, 246, 0.35);
-}
 
 @layer base {
   * {
@@ -298,16 +169,16 @@ html.light {
   body {
     background-color: var(--color-background);
     background-image: 
-      /* Restrained atmospheric violet lighting from the top */
-      radial-gradient(ellipse 90% 60% at 50% -15%, rgba(139, 92, 246, 0.20) 0%, transparent 65%),
-      /* Soft top-right bright violet ambient bloom */
-      radial-gradient(ellipse 65% 45% at 90% 12%, rgba(168, 85, 247, 0.12) 0%, transparent 55%),
+      /* Deep edge vignette keeping the outer edges and corners in darkest purple */
+      radial-gradient(ellipse 110% 90% at 50% 50%, transparent 45%, rgba(12, 6, 23, 0.92) 100%),
+      /* Controlled violet atmospheric lighting centered behind the main content */
+      radial-gradient(ellipse 75% 45% at 50% 20%, rgba(139, 92, 246, 0.16) 0%, transparent 60%),
+      /* Soft top-right ambient bloom */
+      radial-gradient(ellipse 55% 40% at 85% 10%, rgba(168, 85, 247, 0.09) 0%, transparent 50%),
       /* Center-left subtle deep purple depth */
-      radial-gradient(ellipse 70% 50% at 5% 55%, rgba(46, 16, 101, 0.38) 0%, transparent 65%),
-      /* Subtle bottom vignette */
-      radial-gradient(ellipse 80% 50% at 50% 105%, rgba(16, 9, 31, 0.90) 0%, transparent 70%),
-      /* Layered deep-purple base gradient blending #170D35, #140B2D, #10091F */
-      linear-gradient(180deg, #170d35 0%, #140b2d 35%, #120925 70%, #10091f 100%);
+      radial-gradient(ellipse 60% 45% at 10% 45%, rgba(46, 16, 101, 0.28) 0%, transparent 60%),
+      /* Layered deep-purple base gradient blending #170D35, #130926, #10091F */
+      linear-gradient(180deg, #170d35 0%, #130926 40%, #10091f 100%);
     background-attachment: fixed;
     background-repeat: no-repeat;
     background-size: cover;
@@ -319,10 +190,6 @@ html.light {
     min-height: 100vh;
   }
 
-  html.light body {
-    background-color: var(--color-background);
-    background-image: none;
-  }
 
   h1 {
     font-family: var(--font-display);
