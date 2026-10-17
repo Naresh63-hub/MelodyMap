@@ -59,7 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <img
               src="/brand/app-icon.png"
               alt="MelodyMap"
-              className="h-16 w-16 mx-auto mb-4 rounded-xl object-cover shadow-md"
+              className="h-16 w-16 mx-auto mb-4 rounded-xl object-contain shadow-md"
             />
             <h1 className="text-xl font-bold text-foreground">
               Something went wrong

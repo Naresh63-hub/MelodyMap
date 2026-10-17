@@ -63,7 +63,7 @@ export function MobileHeader({
         <img
           src="/brand/app-icon.png"
           alt="MelodyMap"
-          className="h-7 w-7 rounded-lg object-cover ring-1 ring-primary/30 shrink-0 shadow-sm"
+          className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl object-contain ring-1 ring-primary/30 shrink-0 shadow-sm"
         />
 
         <div className="min-w-0">
