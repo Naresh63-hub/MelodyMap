@@ -118,12 +118,16 @@ export function useAudioPlayer(options: {
       el.preload = "auto";
       el.volume = 1;
       el.muted = false;
+      // 1x1 geometry and 0.01 opacity ensures Chromium layout engines and mobile OSes
+      // treat the audio element as actively visible rendered media rather than
+      // suspended background/hidden elements when the phone locks or tab unfocuses.
       el.style.position = "fixed";
       el.style.bottom = "0";
       el.style.left = "0";
-      el.style.width = "0";
-      el.style.height = "0";
-      el.style.opacity = "0";
+      el.style.width = "1px";
+      el.style.height = "1px";
+      el.style.opacity = "0.01";
+      el.style.zIndex = "-1";
       el.style.pointerEvents = "none";
       try {
         document.body.appendChild(el);
@@ -204,8 +208,14 @@ export function useAudioPlayer(options: {
   const playbackSessionRef = useRef<number>(0);
   const currentDirectUrlRef = useRef<string | null>(null);
   const isRetryingRef = useRef<boolean>(false);
+  const sourceProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wakeLockRef = useRef<any>(null);
 
   const clearPendingTimers = useCallback(() => {
+    if (sourceProbeTimerRef.current) {
+      clearTimeout(sourceProbeTimerRef.current);
+      sourceProbeTimerRef.current = null;
+    }
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
@@ -215,6 +225,29 @@ export function useAudioPlayer(options: {
       stalledTimerRef.current = null;
     }
     isRetryingRef.current = false;
+  }, []);
+
+  const acquireWakeLock = useCallback(async () => {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    try {
+      if (!wakeLockRef.current) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
+        wakeLockRef.current.addEventListener("release", () => {
+          wakeLockRef.current = null;
+        });
+      }
+    } catch {
+      // Non-fatal if wakeLock fails (e.g. low battery, background tab, or lack of permissions)
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      if (wakeLockRef.current) {
+        await wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+    } catch {}
   }, []);
 
   /** Calculate equal-power trigonometric curve for smooth crossfading without volume drop */
@@ -378,7 +411,13 @@ export function useAudioPlayer(options: {
       }
 
       // Detect stream source from proxy header (replacement recording indicator)
-      detectStreamSource(url);
+      // Defer probe slightly so it never races or contends with initial audio GET
+      if (sourceProbeTimerRef.current) {
+        clearTimeout(sourceProbeTimerRef.current);
+      }
+      sourceProbeTimerRef.current = setTimeout(() => {
+        detectStreamSource(url);
+      }, 1500);
 
       try {
         audio.pause();
@@ -674,6 +713,7 @@ export function useAudioPlayer(options: {
     };
     const onCanPlay = () => {
       setIsLoading(false);
+      clearPendingTimers();
       applyPendingSeek();
     };
     const onLoadedMetadata = () => {
@@ -690,7 +730,13 @@ export function useAudioPlayer(options: {
       lastValidPositionRef.current = cur;
       setPosition(cur);
       setDuration(dur);
-      if (cur > 0) setIsLoading(false);
+      if (cur > 0) {
+        setIsLoading(false);
+        if (stalledTimerRef.current) {
+          clearTimeout(stalledTimerRef.current);
+          stalledTimerRef.current = null;
+        }
+      }
 
       // SponsorBlock Auto-Skip: Check if currentTime falls within an intro/sponsor/outro range
       if (getSponsorBlockEnabled() && sponsorSegmentsRef.current.length > 0) {
@@ -910,6 +956,10 @@ export function useAudioPlayer(options: {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
 
+      if (sourceProbeTimerRef.current) {
+        clearTimeout(sourceProbeTimerRef.current);
+        sourceProbeTimerRef.current = null;
+      }
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -929,6 +979,7 @@ export function useAudioPlayer(options: {
         if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
           audioCtxRef.current.resume().catch(() => {});
         }
+        acquireWakeLock();
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
@@ -936,11 +987,25 @@ export function useAudioPlayer(options: {
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, []);
+  }, [acquireWakeLock]);
+
+  // Acquire wake lock while playing to prevent mobile OS screen timeouts during active listening
+  useEffect(() => {
+    if (isPlaying) {
+      acquireWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+  }, [isPlaying, acquireWakeLock, releaseWakeLock]);
 
   /** Cleanup on unmount */
   useEffect(() => {
     return () => {
+      releaseWakeLock();
+      if (sourceProbeTimerRef.current) {
+        clearTimeout(sourceProbeTimerRef.current);
+        sourceProbeTimerRef.current = null;
+      }
       sourceProbeAbortRef.current?.abort();
       const audio = audioRef.current;
       if (audio) {
@@ -956,7 +1021,7 @@ export function useAudioPlayer(options: {
         audioCtxRef.current.close().catch(() => {});
       }
     };
-  }, []);
+  }, [releaseWakeLock]);
 
   /** Use downloaded blob when available in IndexedDB offline storage */
   const playOffline = useCallback(

@@ -120,6 +120,7 @@ async function handleStreamProxy(request: Request): Promise<Response | null> {
   responseHeaders.set("content-type", result.mimeType);
   responseHeaders.set("accept-ranges", "bytes");
   responseHeaders.set("x-melodymap-source", result.source ?? "youtube");
+  responseHeaders.set("cache-control", "public, max-age=3600, stale-while-revalidate=86400");
 
   const contentRange = result.upstream.headers.get("content-range");
   if (contentRange) responseHeaders.set("content-range", contentRange);

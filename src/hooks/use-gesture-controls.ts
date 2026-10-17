@@ -68,7 +68,7 @@ type DoubleTapSeekOptions = {
   seconds?: number;
 };
 
-export function useDoubleTapSeek({ onBackward, onForward, seconds = 10 }: DoubleTapSeekOptions) {
+export function useDoubleTapSeek({ onBackward, onForward, seconds = 5 }: DoubleTapSeekOptions) {
   const lastTapRef = useRef<{ time: number; x: number; y: number } | null>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [flash, setFlash] = useState<SeekFlash>(null);

@@ -82,6 +82,7 @@ export async function streamProxyMiddleware(
     res.setHeader("content-type", result.mimeType);
     res.setHeader("accept-ranges", "bytes");
     res.setHeader("x-melodymap-source", result.source ?? "saavn");
+    res.setHeader("cache-control", "public, max-age=3600, stale-while-revalidate=86400");
     res.end();
     return;
   }
@@ -117,6 +118,7 @@ export async function streamProxyMiddleware(
   res.setHeader("content-type", result.mimeType);
   res.setHeader("accept-ranges", "bytes");
   res.setHeader("x-melodymap-source", result.source ?? "youtube");
+  res.setHeader("cache-control", "public, max-age=3600, stale-while-revalidate=86400");
 
   const contentRange = result.upstream.headers.get("content-range");
   if (contentRange) res.setHeader("content-range", contentRange);

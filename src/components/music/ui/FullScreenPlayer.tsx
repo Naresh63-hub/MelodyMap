@@ -121,12 +121,12 @@ export function FullScreenPlayer({
 }: Props) {
   const { isActive: isSleepTimerActive, formattedRemaining: sleepTimerCountdown } = useSleepTimer();
 
-  // Gesture controls: drag down to dismiss (finger-following), double-tap artwork to seek ±10s, swipe left/right to skip
+  // Gesture controls: drag down to dismiss (finger-following), double-tap artwork to seek ±5s, swipe left/right to skip
   const { dragProps, dragY, dragging } = useDragToDismiss({ onDismiss: onClose });
   const { gestureProps: doubleTapProps, flash } = useDoubleTapSeek({
     onBackward: (s) => (onSkipBackward ? onSkipBackward(s) : onSeek(Math.max(0, position - s))),
     onForward: (s) => (onSkipForward ? onSkipForward(s) : onSeek(Math.min(duration, position + s))),
-    seconds: 10,
+    seconds: 5,
   });
   const { onTouchStart: swipeStart, onTouchEnd: swipeEnd } = useSwipeGestures({
     onSwipeLeft: onNext,
@@ -305,7 +305,7 @@ export function FullScreenPlayer({
                 >
                   <span className="flex flex-col items-center gap-1 text-white">
                     {flash === "left" ? <RotateCcw className="h-6 w-6" /> : <RotateCw className="h-6 w-6" />}
-                    <span className="text-xs font-semibold tabular-nums">10s</span>
+                    <span className="text-xs font-semibold tabular-nums">5s</span>
                   </span>
                 </div>
               )}
@@ -515,16 +515,16 @@ export function FullScreenPlayer({
               <Shuffle className="h-5 w-5" />
             </button>
 
-            {/* Jump Backward 10s */}
+            {/* Jump Backward 5s */}
             {onSkipBackward && (
               <button
                 type="button"
-                onClick={() => onSkipBackward(10)}
+                onClick={() => onSkipBackward(5)}
                 className="relative flex items-center justify-center p-1.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-                title="Rewind 10 seconds"
+                title="Rewind 5 seconds"
               >
                 <RotateCcw className="h-5 w-5" />
-                <span className="absolute text-[8px] font-bold">10</span>
+                <span className="absolute text-[8px] font-bold">5</span>
               </button>
             )}
 
@@ -567,16 +567,16 @@ export function FullScreenPlayer({
               <SkipForward className="h-6 w-6 fill-current" />
             </button>
 
-            {/* Jump Forward 10s */}
+            {/* Jump Forward 5s */}
             {onSkipForward && (
               <button
                 type="button"
-                onClick={() => onSkipForward(10)}
+                onClick={() => onSkipForward(5)}
                 className="relative flex items-center justify-center p-1.5 text-muted-foreground hover:text-foreground active:scale-95 transition-all"
-                title="Forward 10 seconds"
+                title="Forward 5 seconds"
               >
                 <RotateCw className="h-5 w-5" />
-                <span className="absolute text-[8px] font-bold">10</span>
+                <span className="absolute text-[8px] font-bold">5</span>
               </button>
             )}
 

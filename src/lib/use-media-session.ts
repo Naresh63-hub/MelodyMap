@@ -126,19 +126,35 @@ export function useMediaSession(
   }, [isPlaying]);
 
   // 4. Update Position State safely without tearing down handlers
+  // Throttle updates to once every 2 seconds unless user seeks (>2s jump), track changes, or play state toggles
+  const lastReportedPosRef = useRef<number>(-1);
+  const lastReportedTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    lastReportedPosRef.current = -1;
+  }, [track?.id, isPlaying]);
+
   useEffect(() => {
     const ms = typeof navigator !== "undefined" ? navigator.mediaSession : undefined;
     if (!ms || !("setPositionState" in ms)) return;
 
     if (duration > 0 && Number.isFinite(duration) && Number.isFinite(position)) {
-      try {
-        ms.setPositionState({
-          duration,
-          position: Math.min(Math.max(0, position), duration),
-          playbackRate: 1,
-        });
-      } catch {
-        // Ignored if audio is transitioning
+      const now = Date.now();
+      const posDelta = Math.abs(position - lastReportedPosRef.current);
+      const timeDelta = now - lastReportedTimeRef.current;
+
+      if (posDelta > 2 || timeDelta >= 2000 || lastReportedPosRef.current < 0) {
+        lastReportedPosRef.current = position;
+        lastReportedTimeRef.current = now;
+        try {
+          ms.setPositionState({
+            duration,
+            position: Math.min(Math.max(0, position), duration),
+            playbackRate: 1,
+          });
+        } catch {
+          // Ignored if audio is transitioning
+        }
       }
     }
   }, [position, duration]);

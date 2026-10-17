@@ -79,6 +79,25 @@ export default defineConfig({
             if (id.includes("recharts")) {
               return "vendor-charts";
             }
+            if (id.includes("lucide-react")) {
+              return "vendor-icons";
+            }
+            if (id.includes("@radix-ui")) {
+              return "vendor-radix";
+            }
+            if (id.includes("@tanstack")) {
+              return "vendor-tanstack";
+            }
+            if (id.includes("react")) {
+              return "vendor-react";
+            }
+            if (id.includes("ai") || id.includes("@ai-sdk")) {
+              return "vendor-ai";
+            }
+            if (id.includes("zod")) {
+              return "vendor-zod";
+            }
+            return "vendor-misc";
           }
           return undefined;
         },

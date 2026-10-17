@@ -723,7 +723,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       if (repeatModeRef.current === "one") {
         const cur = currentRef.current;
-        if (cur) return { id: cur.id, previewUrl: cur.previewUrl };
+        if (cur) return { id: cur.id, previewUrl: cur.previewUrl, title: cur.title, artist: cur.artist };
       }
       const q = queueRef.current;
       const i = indexRef.current;
@@ -732,7 +732,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       if (nextIdx !== -1) {
         const next = q[nextIdx];
         if (next) {
-          return { id: next.id, previewUrl: next.previewUrl };
+          return { id: next.id, previewUrl: next.previewUrl, title: next.title, artist: next.artist };
         }
       }
       return undefined;

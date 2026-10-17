@@ -281,11 +281,16 @@ function AuthPage() {
         </div>
 
         <div className="flex flex-col items-center">
-          <img
-            src="/brand/app-icon.png"
-            alt="MelodyMap"
-            className="h-14 w-14 rounded-2xl object-contain ring-1 ring-primary/30 shadow-lg mb-3"
-          />
+          <picture>
+            <source srcSet="/brand/app-icon.webp" type="image/webp" />
+            <img
+              src="/brand/app-icon.png"
+              alt="MelodyMap"
+              loading="eager"
+              fetchPriority="high"
+              className="h-14 w-14 rounded-2xl object-contain ring-1 ring-primary/30 shadow-lg mb-3"
+            />
+          </picture>
           <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground font-display">
             {mode === "signin" && "Sign in to MelodyMap"}
             {mode === "signup" && "Create an account"}
@@ -309,7 +314,7 @@ function AuthPage() {
               id="auth-error-note"
               role="alert"
               aria-live="assertive"
-              className="flex items-center gap-2.5 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive"
+              className="flex items-center gap-2.5 rounded-xl bg-destructive/20 border border-destructive/40 p-3 text-xs text-red-200"
             >
               <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
               <p className="flex-1">{errorNote}</p>
@@ -319,7 +324,7 @@ function AuthPage() {
             <div
               role="status"
               aria-live="polite"
-              className="flex items-center gap-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-400"
+              className="flex items-center gap-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 p-3 text-xs text-emerald-200"
             >
               <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" />
               <p className="flex-1">{successNote}</p>
@@ -345,7 +350,7 @@ function AuthPage() {
                 }}
                 className={`flex-1 rounded-lg py-2.5 min-h-[44px] flex items-center justify-center text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   mode === "signin"
-                    ? "bg-primary text-primary-foreground shadow-md"
+                    ? "bg-primary-strong text-primary-foreground shadow-md"
                     : "text-foreground/75 hover:text-foreground"
                 }`}
               >
@@ -363,7 +368,7 @@ function AuthPage() {
                 }}
                 className={`flex-1 rounded-lg py-2.5 min-h-[44px] flex items-center justify-center text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   mode === "signup"
-                    ? "bg-primary text-primary-foreground shadow-md"
+                    ? "bg-primary-strong text-primary-foreground shadow-md"
                     : "text-foreground/75 hover:text-foreground"
                 }`}
               >
@@ -481,7 +486,7 @@ function AuthPage() {
                         setErrorNote(null);
                         setSuccessNote(null);
                       }}
-                      className="text-xs text-primary hover:underline font-medium min-h-[44px] inline-flex items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                      className="text-xs text-primary-soft hover:underline font-medium min-h-[44px] inline-flex items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                     >
                       Forgot password?
                     </button>
@@ -549,7 +554,7 @@ function AuthPage() {
               type="submit"
               disabled={submitting || googleBusy}
               aria-busy={submitting}
-              className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 transition-all text-xs"
+              className="w-full h-11 rounded-xl bg-primary-strong hover:bg-primary-strong/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 transition-all text-xs"
             >
               {submitting ? (
                 <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin mr-2" />

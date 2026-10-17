@@ -62,6 +62,7 @@ export default defineEventHandler(async (event) => {
     "Content-Type": result.mimeType,
     "Accept-Ranges": "bytes",
     "X-MelodyMap-Source": result.source ?? "youtube",
+    "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
   });
 
   const contentRange = result.upstream.headers.get("content-range");
