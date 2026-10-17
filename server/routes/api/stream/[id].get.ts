@@ -37,9 +37,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 429, statusMessage: "Too many stream requests" });
   }
 
+  const title = query.title ? String(query.title).trim() : null;
+  const artist = query.artist ? String(query.artist).trim() : null;
+  const bypassBackoff = Boolean(query._reconnect);
+
   const result = await fetchUpstreamAudio({
     videoId,
     quality,
+    title,
+    artist,
+    bypassBackoff,
     rangeHeader: (req?.headers?.range as string | undefined) ?? null,
   });
 

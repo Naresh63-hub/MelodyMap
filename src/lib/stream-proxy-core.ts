@@ -4,16 +4,18 @@
  * SSR server entry — previously this logic was duplicated in all three places.
  */
 
-export const VIDEO_ID_REGEX = /^(?:saavn:)?[a-zA-Z0-9_-]{1,32}$/;
+export const VIDEO_ID_REGEX =
+  /^(?:(?:saavn|audius|jamendo|deezer|archive|podcast):)?[a-zA-Z0-9_.-]{1,64}$/;
 
 export type StreamQualityParam = "saver" | "standard" | "high";
 
 /**
  * Validate that the upstream URL is a legitimate media endpoint.
  *
- * Google/YouTube hosts cover the primary resolver; audius.co covers the
- * full-length Audius fallback; jamendo.com/jamendo.net covers the full-length
- * Jamendo fallback. 30s Deezer previews are disallowed.
+ * Google/YouTube hosts cover the primary resolver; saavncdn.com covers JioSaavn;
+ * audius.co covers the full-length Audius fallback; jamendo.com/jamendo.net covers
+ * the full-length Jamendo fallback; archive.org covers historical audio.
+ * 30s Deezer previews are disallowed.
  */
 export function isAllowedUpstreamUrl(urlStr: string): boolean {
   try {
@@ -25,15 +27,21 @@ export function isAllowedUpstreamUrl(urlStr: string): boolean {
       host.endsWith(".youtube.com") ||
       host.endsWith(".ytimg.com") ||
       host.endsWith(".saavncdn.com") ||
+      host.endsWith(".saavn.com") ||
+      host.endsWith(".jiosaavn.com") ||
       host.endsWith(".audius.co") ||
       host.endsWith(".jamendo.com") ||
       host.endsWith(".jamendo.net") ||
+      host.endsWith(".archive.org") ||
       host === "googlevideo.com" ||
       host === "youtube.com" ||
       host === "saavncdn.com" ||
+      host === "saavn.com" ||
+      host === "jiosaavn.com" ||
       host === "audius.co" ||
       host === "jamendo.com" ||
-      host === "jamendo.net"
+      host === "jamendo.net" ||
+      host === "archive.org"
     );
   } catch {
     return false;
@@ -184,15 +192,30 @@ export function normalizeUpstreamRange(
  * upstream host (SSRF guard), and bounds the header phase with a timeout.
  * The returned Response body can be piped/streamed by the caller.
  */
-export async function fetchUpstreamAudio(options: {
+export type FetchUpstreamAudioOptions = {
   videoId: string;
   quality: StreamQualityParam;
   rangeHeader?: string | null;
   /** Signal to abort when the client disconnects mid-stream (optional). */
   signal?: AbortSignal;
   timeoutMs?: number;
-}): Promise<UpstreamAudioResult> {
-  const { videoId, quality, rangeHeader, signal, timeoutMs = 30_000 } = options;
+  title?: string | null;
+  artist?: string | null;
+  bypassBackoff?: boolean;
+};
+
+/**
+ * Resolve a verified upstream audio URL for `videoId` and fetch it.
+ * Handles cache invalidation + retry on 403/404, bitrate cascading for JioSaavn CDN
+ * (320kbps -> 160kbps -> 96kbps), validates upstream hosts (SSRF guard),
+ * and bounds the header phase with a timeout.
+ * The returned Response body can be piped/streamed by the caller.
+ */
+export async function fetchUpstreamAudio(
+  options: FetchUpstreamAudioOptions,
+): Promise<UpstreamAudioResult> {
+  const { videoId, quality, rangeHeader, signal, timeoutMs = 30_000, title, artist, bypassBackoff } =
+    options;
   const { resolveStreamUrlWithMeta, invalidateStreamCache } = await import("./stream.server");
 
   const controller = new AbortController();
@@ -207,7 +230,7 @@ export async function fetchUpstreamAudio(options: {
   };
 
   try {
-    let stream = await resolveStreamUrlWithMeta(videoId, quality);
+    let stream = await resolveStreamUrlWithMeta(videoId, quality, { title, artist, bypassBackoff });
     if (!stream?.url || !isAllowedUpstreamUrl(stream.url)) {
       return { ok: false, status: 404, message: "Audio stream not found" };
     }
@@ -217,15 +240,71 @@ export async function fetchUpstreamAudio(options: {
       signal: controller.signal,
     });
 
-    // Expired/throttled upstream URL — invalidate cache and retry once fresh
-    if (upstreamRes.status === 403) {
-      invalidateStreamCache(videoId);
-      stream = await resolveStreamUrlWithMeta(videoId, quality);
-      if (stream?.url && isAllowedUpstreamUrl(stream.url)) {
-        upstreamRes = await fetch(stream.url, {
+    // JioSaavn CDN bitrate cascade: some songs only exist as 160kbps or 96kbps.
+    // If the 320kbps URL returns 404, cascade to 160kbps and 96kbps.
+    if (upstreamRes.status === 404 && stream.url.includes("_320.mp4")) {
+      const fallbackUrl160 = stream.url.replace("_320.mp4", "_160.mp4");
+      if (isAllowedUpstreamUrl(fallbackUrl160)) {
+        const res160 = await fetch(fallbackUrl160, {
           headers: upstreamHeaders,
           signal: controller.signal,
         });
+        if (res160.ok || res160.status === 206) {
+          upstreamRes = res160;
+          stream.url = fallbackUrl160;
+        } else if (res160.status === 404) {
+          const fallbackUrl96 = stream.url.replace("_320.mp4", "_96.mp4");
+          if (isAllowedUpstreamUrl(fallbackUrl96)) {
+            const res96 = await fetch(fallbackUrl96, {
+              headers: upstreamHeaders,
+              signal: controller.signal,
+            });
+            if (res96.ok || res96.status === 206) {
+              upstreamRes = res96;
+              stream.url = fallbackUrl96;
+            }
+          }
+        }
+      }
+    } else if (upstreamRes.status === 404 && stream.url.includes("_160.mp4")) {
+      const fallbackUrl96 = stream.url.replace("_160.mp4", "_96.mp4");
+      if (isAllowedUpstreamUrl(fallbackUrl96)) {
+        const res96 = await fetch(fallbackUrl96, {
+          headers: upstreamHeaders,
+          signal: controller.signal,
+        });
+        if (res96.ok || res96.status === 206) {
+          upstreamRes = res96;
+          stream.url = fallbackUrl96;
+        }
+      }
+    }
+
+    // Expired/throttled upstream URL (403) or not found (404) — invalidate cache and retry once
+    if (upstreamRes.status === 403 || (!upstreamRes.ok && upstreamRes.status === 404)) {
+      invalidateStreamCache(videoId);
+      stream = await resolveStreamUrlWithMeta(videoId, quality, { title, artist, bypassBackoff: true });
+      if (stream?.url && isAllowedUpstreamUrl(stream.url)) {
+        let retryRes = await fetch(stream.url, {
+          headers: upstreamHeaders,
+          signal: controller.signal,
+        });
+        if (retryRes.status === 404 && stream.url.includes("_320.mp4")) {
+          const fallbackUrl160 = stream.url.replace("_320.mp4", "_160.mp4");
+          if (isAllowedUpstreamUrl(fallbackUrl160)) {
+            const r160 = await fetch(fallbackUrl160, {
+              headers: upstreamHeaders,
+              signal: controller.signal,
+            });
+            if (r160.ok || r160.status === 206) {
+              retryRes = r160;
+              stream.url = fallbackUrl160;
+            }
+          }
+        }
+        if (retryRes.ok || retryRes.status === 206) {
+          upstreamRes = retryRes;
+        }
       }
     }
 

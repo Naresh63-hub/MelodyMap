@@ -159,10 +159,10 @@ export function MiniPlayer({
                 triggerHaptic('light');
                 onPrevious();
               }}
-              className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Previous track"
             >
-              <SkipBack className="h-4 w-4" />
+              <SkipBack aria-hidden="true" className="h-4 w-4" />
             </button>
           )}
 
@@ -174,15 +174,15 @@ export function MiniPlayer({
               onTogglePlay();
             }}
             disabled={isLoading}
-            className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 active:bg-primary/80 hover:scale-105 active:scale-95 transition-all disabled:opacity-75"
+            className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md shadow-primary/25 hover:bg-primary/90 active:bg-primary/80 hover:scale-105 active:scale-95 transition-all disabled:opacity-75"
             aria-label={isLoading ? "Loading" : isPlaying ? "Pause" : "Play"}
           >
             {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
             ) : isPlaying ? (
-              <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
+              <Pause aria-hidden="true" className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
             ) : (
-              <Play className="ml-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
+              <Play aria-hidden="true" className="ml-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
             )}
           </button>
 
@@ -192,10 +192,10 @@ export function MiniPlayer({
               triggerHaptic('light');
               onNext();
             }}
-            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Next track"
           >
-            <SkipForward className="h-4 w-4" />
+            <SkipForward aria-hidden="true" className="h-4 w-4" />
           </button>
         </div>
       </div>

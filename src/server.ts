@@ -1,5 +1,14 @@
 import "./lib/error-capture";
 
+// Prioritize IPv4 DNS lookups in Node.js to prevent 10s connect timeouts on unroutable IPv6 addresses
+try {
+  import("node:dns").then((dns) => {
+    if (typeof dns.setDefaultResultOrder === "function") {
+      dns.setDefaultResultOrder("ipv4first");
+    }
+  }).catch(() => {});
+} catch {}
+
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import {
@@ -84,9 +93,16 @@ async function handleStreamProxy(request: Request): Promise<Response | null> {
     return new Response("Too many stream requests", { status: 429 });
   }
 
+  const title = url.searchParams.get("title")?.trim() || null;
+  const artist = url.searchParams.get("artist")?.trim() || null;
+  const bypassBackoff = Boolean(url.searchParams.get("_reconnect"));
+
   const result = await fetchUpstreamAudio({
     videoId,
     quality,
+    title,
+    artist,
+    bypassBackoff,
     rangeHeader: request.headers.get("range"),
   });
   if (!result.ok) {

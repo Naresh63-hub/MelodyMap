@@ -39,6 +39,9 @@ export async function streamProxyMiddleware(
   const rawId = parsedUrl.pathname.slice(PREFIX.length);
   const videoId = decodeURIComponent(rawId || "").trim();
   const quality = (parsedUrl.searchParams.get("quality") || "high") as "saver" | "standard" | "high";
+  const title = parsedUrl.searchParams.get("title")?.trim() || null;
+  const artist = parsedUrl.searchParams.get("artist")?.trim() || null;
+  const bypassBackoff = Boolean(parsedUrl.searchParams.get("_reconnect"));
 
   if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
     res.statusCode = 400;
@@ -61,6 +64,9 @@ export async function streamProxyMiddleware(
     const result = await fetchUpstreamAudio({
       videoId,
       quality,
+      title,
+      artist,
+      bypassBackoff,
       rangeHeader: null,
       signal: AbortSignal.timeout(15_000),
     });
@@ -89,6 +95,9 @@ export async function streamProxyMiddleware(
   const result = await fetchUpstreamAudio({
     videoId,
     quality,
+    title,
+    artist,
+    bypassBackoff,
     rangeHeader: (req.headers.range as string | undefined) ?? null,
     signal: disconnectController.signal,
   });

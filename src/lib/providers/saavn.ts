@@ -179,43 +179,69 @@ export async function resolveSaavnById(
   const cleanId = songId.replace(/^saavn:/, "").trim();
   if (!cleanId) return null;
 
-  const url = `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=${encodeURIComponent(cleanId)}`;
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as any;
-    const raw = data?.[cleanId];
-    if (!raw) return null;
+  const endpoints = [
+    `https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=${encodeURIComponent(cleanId)}`,
+    `https://www.jiosaavn.com/api.php?__call=song.getDetails&pids=${encodeURIComponent(cleanId)}&_format=json&_marker=0&api_version=4&ctx=web6dot0`,
+  ];
 
-    const encryptedUrl = raw.encrypted_media_url || raw.more_info?.encrypted_media_url;
-    if (!encryptedUrl) return null;
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          Accept: "application/json, text/plain, */*",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) continue;
 
-    const mediaUrl = decryptSaavnMediaUrl(encryptedUrl, quality);
-    if (!mediaUrl) return null;
+      const data = (await res.json().catch(() => null)) as any;
+      if (!data || typeof data !== "object") continue;
 
-    const title = cleanHtmlEntities(raw.song || raw.title);
-    const artist = cleanHtmlEntities(raw.primary_artists || raw.singers || raw.music || "");
-    const duration = Number(raw.duration) || 0;
+      // Extract raw song: directly by cleanId, via songs array, or first valid song entry
+      let raw = data[cleanId];
+      if (!raw && Array.isArray(data.songs) && data.songs[0]) {
+        raw = data.songs[0];
+      }
+      if (!raw) {
+        raw = Object.values(data).find(
+          (v: any) =>
+            v &&
+            typeof v === "object" &&
+            (v.id === cleanId ||
+              Boolean(v.encrypted_media_url) ||
+              Boolean(v.more_info?.encrypted_media_url)),
+        );
+      }
+      if (!raw) continue;
 
-    return {
-      url: mediaUrl,
-      mimeType: "audio/mp4",
-      source: "saavn",
-      title,
-      artist,
-      duration,
-    };
-  } catch (err) {
-    console.warn(`[Saavn] Failed to resolve song ID "${cleanId}":`, err);
-    return null;
+      const encryptedUrl = raw.encrypted_media_url || raw.more_info?.encrypted_media_url;
+      if (!encryptedUrl) continue;
+
+      const mediaUrl = decryptSaavnMediaUrl(encryptedUrl, quality);
+      if (!mediaUrl) continue;
+
+      const title = cleanHtmlEntities(raw.song || raw.title);
+      const artist = cleanHtmlEntities(raw.primary_artists || raw.singers || raw.music || "");
+      const duration = Number(raw.duration) || 0;
+
+      return {
+        url: mediaUrl,
+        mimeType: "audio/mp4",
+        source: "saavn",
+        title,
+        artist,
+        duration,
+      };
+    } catch {
+      // try next endpoint
+    }
   }
+
+  console.warn(`[Saavn] Failed to resolve song ID "${cleanId}" across endpoints`);
+  return null;
 }
 
 import { stringSimilarity, norm } from "../track-dedup";

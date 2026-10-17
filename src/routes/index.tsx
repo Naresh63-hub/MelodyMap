@@ -803,7 +803,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           loadedTrackIdRef.current = nextTrack.id;
           if (!autoAdvanced) {
             player.seek(0);
-            void load(nextTrack.id, nextTrack.previewUrl, 0);
+            void load(nextTrack.id, nextTrack.previewUrl, 0, nextTrack.title, nextTrack.artist);
           }
         }
         // Proactively extend upcoming songs before reaching the end
@@ -825,7 +825,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   setIndex(targetIdx);
                   progressTrackerRef.current.reset(firstTrack.id);
                   loadedTrackIdRef.current = firstTrack.id;
-                  void load(firstTrack.id, firstTrack.previewUrl, 0);
+                  void load(firstTrack.id, firstTrack.previewUrl, 0, firstTrack.title, firstTrack.artist);
                 }
                 return prev;
               });
@@ -842,7 +842,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               player.seek(0);
               progressTrackerRef.current.reset(loopTrack.id);
               loadedTrackIdRef.current = loopTrack.id;
-              void load(loopTrack.id, loopTrack.previewUrl, 0);
+              void load(loopTrack.id, loopTrack.previewUrl, 0, loopTrack.title, loopTrack.artist);
             }
           } else {
             player.pause();
@@ -873,7 +873,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           if (altSource && altSource.url && altSource.type !== "preview") {
             setMessage(`Switching source (${altSource.provider})...`);
             setTimeout(() => setMessage(null), 2500);
-            void load(track.id, altSource.url, player.position || 0);
+            void load(track.id, altSource.url, player.position || 0, track.title, track.artist);
             return;
           }
         }
@@ -1036,7 +1036,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       // 3. Mark active track and synchronously load & play ONLY this track
       loadedTrackIdRef.current = track.id;
-      void load(track.id, track.previewUrl, 0);
+      void load(track.id, track.previewUrl, 0, track.title, track.artist);
 
       // 4. Auto-populate upcoming queue with similar songs for continuous screen-off playback
       if (continuousRef.current) {
@@ -1907,7 +1907,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         player.seek(0);
         progressTrackerRef.current.reset(nextTrack.id);
         loadedTrackIdRef.current = nextTrack.id;
-        void load(nextTrack.id, nextTrack.previewUrl, 0);
+        void load(nextTrack.id, nextTrack.previewUrl, 0, nextTrack.title, nextTrack.artist);
       }
       if (nextIdx + 3 >= q.length) {
         void extendQueue();
@@ -1938,7 +1938,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         player.seek(0);
         progressTrackerRef.current.reset(nextTrack.id);
         loadedTrackIdRef.current = nextTrack.id;
-        void load(nextTrack.id, nextTrack.previewUrl, 0);
+        void load(nextTrack.id, nextTrack.previewUrl, 0, nextTrack.title, nextTrack.artist);
       }
       void extendQueue();
       return;
@@ -1957,7 +1957,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               player.seek(0);
               progressTrackerRef.current.reset(firstTrack.id);
               loadedTrackIdRef.current = firstTrack.id;
-              void load(firstTrack.id, firstTrack.previewUrl, 0);
+              void load(firstTrack.id, firstTrack.previewUrl, 0, firstTrack.title, firstTrack.artist);
             }
             return prev;
           });
@@ -1974,7 +1974,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           player.seek(0);
           progressTrackerRef.current.reset(fbTrack.id);
           loadedTrackIdRef.current = fbTrack.id;
-          void load(fbTrack.id, fbTrack.previewUrl, 0);
+          void load(fbTrack.id, fbTrack.previewUrl, 0, fbTrack.title, fbTrack.artist);
         }
       }
     });
@@ -2004,7 +2004,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         player.seek(0);
         progressTrackerRef.current.reset(prevTrack.id);
         loadedTrackIdRef.current = prevTrack.id;
-        void load(prevTrack.id, prevTrack.previewUrl, 0);
+        void load(prevTrack.id, prevTrack.previewUrl, 0, prevTrack.title, prevTrack.artist);
       }
     }
   }, [load, player]);
@@ -2322,7 +2322,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           resumeRef.current = savedPos;
           loadedTrackIdRef.current = targetTrack.id;
           // Always cue on initial restore to avoid NotAllowedError on mobile and audio clashes across devices
-          cue(targetTrack.id, savedPos, targetTrack.previewUrl);
+          cue(targetTrack.id, savedPos, targetTrack.previewUrl, targetTrack.title, targetTrack.artist);
         }
       } else {
         setResumed(true);
@@ -2353,7 +2353,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 isPodcastTrack(targetTrack) ? null : parseDurationSeconds(targetTrack.duration),
               );
               loadedTrackIdRef.current = targetTrack.id;
-              cue(targetTrack.id, savedPos, targetTrack.previewUrl);
+              cue(targetTrack.id, savedPos, targetTrack.previewUrl, targetTrack.title, targetTrack.artist);
             }
           }
         }
@@ -2375,7 +2375,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
     if (resumeAt !== null) {
       resumeRef.current = null;
-      cue(track.id, resumeAt, track.previewUrl);
+      cue(track.id, resumeAt, track.previewUrl, track.title, track.artist);
       setResumed(true);
       return;
     }
@@ -2398,7 +2398,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       return;
     }
 
-    void load(track.id, track.previewUrl);
+    void load(track.id, track.previewUrl, 0, track.title, track.artist);
     // Intentionally keyed on current?.id: reload only when the track changes, not on every
     // `current` object identity change (would interrupt active mobile playback).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3711,7 +3711,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               loadedTrackIdRef.current = target.id;
               player.seek(0);
               progressTrackerRef.current.reset(target.id);
-              void load(target.id, target.previewUrl, 0);
+              void load(target.id, target.previewUrl, 0, target.title, target.artist);
             }
           }}
           onReorder={handleReorderQueue}

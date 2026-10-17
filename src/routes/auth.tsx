@@ -274,16 +274,16 @@ function AuthPage() {
         <div className="flex justify-center mb-2">
           <Link
             to="/"
-            className="flex items-center gap-2 text-xs text-foreground/60 hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-xs text-foreground/75 hover:text-foreground transition-colors py-2 px-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             <span>Back to music</span>
           </Link>
         </div>
 
         <div className="flex flex-col items-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 shadow-lg mb-3">
-            <Sparkles className="h-6 w-6 text-primary" />
+            <Sparkles aria-hidden="true" className="h-6 w-6 text-primary" />
           </div>
           <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground font-display">
             {mode === "signin" && "Sign in to MelodyMap"}
@@ -291,7 +291,7 @@ function AuthPage() {
             {mode === "forgot" && "Reset your password"}
             {mode === "reset_password" && "Set new password"}
           </h2>
-          <p className="mt-1.5 text-center text-xs text-foreground/60">
+          <p className="mt-1.5 text-center text-xs text-foreground/75">
             {mode === "signin" && "Sign in with Google or email to sync across all your devices"}
             {mode === "signup" && "Create an account to keep your listening history and favourites safe"}
             {mode === "forgot" && "Enter your email to receive password reset instructions"}
@@ -304,47 +304,66 @@ function AuthPage() {
         <div className="rounded-2xl bg-card border border-hair-strong p-6 sm:p-8 shadow-2xl space-y-4">
           {/* Notification alerts */}
           {errorNote && (
-            <div className="flex items-center gap-2.5 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" />
+            <div
+              id="auth-error-note"
+              role="alert"
+              aria-live="assertive"
+              className="flex items-center gap-2.5 rounded-xl bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive"
+            >
+              <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
               <p className="flex-1">{errorNote}</p>
             </div>
           )}
           {successNote && (
-            <div className="flex items-center gap-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-600 dark:text-emerald-400">
-              <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-400"
+            >
+              <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" />
               <p className="flex-1">{successNote}</p>
             </div>
           )}
 
           {/* Mode Switcher */}
           {mode !== "reset_password" && mode !== "forgot" && (
-            <div className="flex rounded-xl bg-chip-subtle p-1 border border-hair">
+            <div
+              role="tablist"
+              aria-label="Authentication mode"
+              className="flex rounded-xl bg-chip-subtle p-1 border border-hair"
+            >
               <button
                 type="button"
+                role="tab"
+                aria-selected={mode === "signin"}
+                aria-controls="auth-form"
                 onClick={() => {
                   setMode("signin");
                   setErrorNote(null);
                   setSuccessNote(null);
                 }}
-                className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
+                className={`flex-1 rounded-lg py-2.5 min-h-[44px] flex items-center justify-center text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   mode === "signin"
                     ? "bg-primary text-primary-foreground shadow-md"
-                    : "text-foreground/60 hover:text-foreground"
+                    : "text-foreground/75 hover:text-foreground"
                 }`}
               >
                 Sign In
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={mode === "signup"}
+                aria-controls="auth-form"
                 onClick={() => {
                   setMode("signup");
                   setErrorNote(null);
                   setSuccessNote(null);
                 }}
-                className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
+                className={`flex-1 rounded-lg py-2.5 min-h-[44px] flex items-center justify-center text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   mode === "signup"
                     ? "bg-primary text-primary-foreground shadow-md"
-                    : "text-foreground/60 hover:text-foreground"
+                    : "text-foreground/75 hover:text-foreground"
                 }`}
               >
                 Create Account
@@ -363,9 +382,9 @@ function AuthPage() {
                 className="w-full h-11 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border-none font-medium flex items-center justify-center gap-2.5 shadow-sm active:scale-95 transition-all text-xs"
               >
                 {googleBusy ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-neutral-900" />
+                  <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-neutral-900" />
                 ) : (
-                  <svg className="h-4 w-4" viewBox="0 0 24 24">
+                  <svg aria-hidden="true" focusable="false" className="h-4 w-4" viewBox="0 0 24 24">
                     <path
                       fill="#4285F4"
                       d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -389,26 +408,33 @@ function AuthPage() {
 
               <div className="relative flex items-center justify-center">
                 <div className="border-t border-hair w-full" />
-                <span className="bg-card px-2 text-[10px] text-foreground/50 uppercase tracking-widest font-mono">
+                <span className="bg-card px-2 text-[10px] text-foreground/70 uppercase tracking-widest font-mono">
                   or with email
                 </span>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
+          <form id="auth-form" onSubmit={handleSubmit} className="space-y-3.5">
             {mode === "signup" && (
               <div className="space-y-1.5">
-                <Label className="text-xs text-foreground/80 font-medium">Full Name</Label>
+                <Label htmlFor="auth-name" className="text-xs text-foreground/90 font-medium">
+                  Full Name
+                </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
+                  <User aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/70 pointer-events-none" />
                   <Input
+                    id="auth-name"
+                    name="name"
                     type="text"
+                    autoComplete="name"
                     placeholder="Your Name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary"
+                    aria-invalid={Boolean(errorNote)}
+                    aria-describedby={errorNote ? "auth-error-note" : undefined}
+                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/65 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -417,16 +443,23 @@ function AuthPage() {
 
             {mode !== "reset_password" && (
               <div className="space-y-1.5">
-                <Label className="text-xs text-foreground/80 font-medium">Email Address</Label>
+                <Label htmlFor="auth-email" className="text-xs text-foreground/90 font-medium">
+                  Email Address
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
+                  <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/70 pointer-events-none" />
                   <Input
+                    id="auth-email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary"
+                    aria-invalid={Boolean(errorNote)}
+                    aria-describedby={errorNote ? "auth-error-note" : undefined}
+                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/65 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -436,7 +469,7 @@ function AuthPage() {
             {mode !== "forgot" && (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs text-foreground/80 font-medium">
+                  <Label htmlFor="auth-password" className="text-xs text-foreground/90 font-medium">
                     {mode === "reset_password" ? "New Password" : "Password"}
                   </Label>
                   {mode === "signin" && (
@@ -447,29 +480,40 @@ function AuthPage() {
                         setErrorNote(null);
                         setSuccessNote(null);
                       }}
-                      className="text-[11px] text-primary hover:underline font-medium"
+                      className="text-xs text-primary hover:underline font-medium min-h-[44px] inline-flex items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
                     >
                       Forgot password?
                     </button>
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
+                  <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/70 pointer-events-none" />
                   <Input
+                    id="auth-password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
+                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
                     placeholder="At least 6 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 pr-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary"
+                    aria-invalid={Boolean(errorNote)}
+                    aria-describedby={errorNote ? "auth-error-note" : undefined}
+                    className="pl-9 pr-12 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/65 h-10 rounded-xl focus:border-primary"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? (
+                      <EyeOff aria-hidden="true" className="h-4 w-4" />
+                    ) : (
+                      <Eye aria-hidden="true" className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -477,16 +521,23 @@ function AuthPage() {
 
             {(mode === "signup" || mode === "reset_password") && (
               <div className="space-y-1.5">
-                <Label className="text-xs text-foreground/80 font-medium">Confirm Password</Label>
+                <Label htmlFor="auth-confirm-password" className="text-xs text-foreground/90 font-medium">
+                  Confirm Password
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/40" />
+                  <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/70 pointer-events-none" />
                   <Input
-                    type="password"
+                    id="auth-confirm-password"
+                    name="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="new-password"
                     placeholder="Re-enter password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     disabled={submitting}
-                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/30 h-10 rounded-xl focus:border-primary"
+                    aria-invalid={Boolean(errorNote)}
+                    aria-describedby={errorNote ? "auth-error-note" : undefined}
+                    className="pl-9 pr-12 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/65 h-10 rounded-xl focus:border-primary"
                     required
                   />
                 </div>
@@ -496,10 +547,11 @@ function AuthPage() {
             <Button
               type="submit"
               disabled={submitting || googleBusy}
+              aria-busy={submitting}
               className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 transition-all text-xs"
             >
               {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin mr-2" />
               ) : mode === "signin" ? (
                 "Sign In"
               ) : mode === "signup" ? (
@@ -516,7 +568,7 @@ function AuthPage() {
             <button
               type="button"
               onClick={() => setMode("signin")}
-              className="w-full py-2 text-xs text-foreground/60 hover:text-foreground transition-colors text-center"
+              className="w-full py-2.5 min-h-[44px] flex items-center justify-center text-xs text-foreground/75 hover:text-foreground transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
             >
               Back to Sign In
             </button>
@@ -526,7 +578,7 @@ function AuthPage() {
             <button
               type="button"
               onClick={continueAsGuest}
-              className="text-xs text-foreground/50 hover:text-foreground transition-colors"
+              className="min-h-[44px] py-2.5 px-4 inline-flex items-center justify-center text-xs text-foreground/75 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
             >
               Skip for now · Continue as Guest
             </button>

@@ -9,6 +9,15 @@ import { searchAudius } from "./providers/audius";
 import { searchJamendo } from "./providers/jamendo";
 import { resolveSaavnByMeta, resolveSaavnById } from "./providers/saavn";
 
+// Prioritize IPv4 DNS lookups in Node.js to avoid 10s connect timeouts on unroutable IPv6 addresses
+try {
+  import("node:dns").then((dns) => {
+    if (typeof dns.setDefaultResultOrder === "function") {
+      dns.setDefaultResultOrder("ipv4first");
+    }
+  }).catch(() => {});
+} catch {}
+
 export type StreamQuality = "saver" | "standard" | "high";
 
 export type StreamMeta = {
@@ -105,8 +114,17 @@ const TRACK_BACKOFF_MAX_MS = 10 * 60 * 1000;
 
 const resolveFailures = new Map<string, { count: number; blockedUntil: number }>();
 
+/** Reset backoff for a track (e.g. on user-initiated replay or reconnect). */
+export function clearTrackBackoff(videoId: string) {
+  resolveFailures.delete(videoId);
+}
+
 /** True when this videoId is currently allowed to attempt resolution. */
-function isTrackAllowed(videoId: string): boolean {
+function isTrackAllowed(videoId: string, bypass = false): boolean {
+  if (bypass) {
+    resolveFailures.delete(videoId);
+    return true;
+  }
   const state = resolveFailures.get(videoId);
   if (!state) return true;
   return Date.now() >= state.blockedUntil;
@@ -192,9 +210,44 @@ function cleanTrackTitle(title: string): string {
 export async function resolveWithInnerTubePlayer(
   videoId: string,
   _quality: StreamQuality = "high",
+  options?: { title?: string | null | undefined; artist?: string | null | undefined },
 ): Promise<StreamMeta | null> {
   // If the ID is an explicit JioSaavn track ID, resolve directly from Saavn
   if (videoId.startsWith("saavn:")) {
+    const saavnDirect = await resolveSaavnById(videoId, _quality);
+    if (saavnDirect?.url) {
+      return {
+        url: saavnDirect.url,
+        mimeType: saavnDirect.mimeType || "audio/mp4",
+        contentLength: null,
+        audioBitrate: _quality === "saver" ? 96000 : _quality === "standard" ? 160000 : 320000,
+        source: "saavn",
+      };
+    }
+    // If direct lookup by ID failed, attempt metadata resolution if title is available
+    if (options?.title) {
+      const cleanTitleOpt = cleanTrackTitle(options.title);
+      if (cleanTitleOpt) {
+        const saavnMatch = await resolveSaavnByMeta(
+          cleanTitleOpt,
+          options.artist || undefined,
+          lastSeenDurations.get(videoId) ?? null,
+        ).catch(() => null);
+        if (saavnMatch?.url) {
+          return {
+            url: saavnMatch.url,
+            mimeType: saavnMatch.mimeType || "audio/mp4",
+            contentLength: null,
+            audioBitrate: 160000,
+            source: "saavn",
+          };
+        }
+      }
+    }
+  }
+
+  // Handle purely numeric IDs as potential JioSaavn song IDs
+  if (/^\d{6,12}$/.test(videoId)) {
     const saavnDirect = await resolveSaavnById(videoId, _quality);
     if (saavnDirect?.url) {
       return {
@@ -213,7 +266,7 @@ export async function resolveWithInnerTubePlayer(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ videoId }),
-      signal: AbortSignal.timeout(800),
+      signal: AbortSignal.timeout(1500),
     }).catch(() => null);
     if (res && res.ok) {
       const data = (await res.json().catch(() => null)) as any;
@@ -238,7 +291,10 @@ export async function resolveWithInnerTubePlayer(
   try {
     const oembedRes = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
-      { headers: { "User-Agent": BROWSER_UA } },
+      {
+        headers: { "User-Agent": BROWSER_UA },
+        signal: AbortSignal.timeout(3000),
+      },
     ).catch(() => null);
     if (oembedRes && oembedRes.ok) {
       const oembed = (await oembedRes.json()) as any;
@@ -246,6 +302,12 @@ export async function resolveWithInnerTubePlayer(
       rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
     }
   } catch {}
+
+  // If oembed failed or was blocked, fall back to title and artist provided in options
+  if (!cleanTitle && options?.title) {
+    cleanTitle = cleanTrackTitle(options.title);
+    rawAuthor = (options.artist || "").replace(/ - Topic|VEVO/g, "").trim();
+  }
 
   // Without a verified title, refuse to fuzzy-match against a meaningless id.
   // Returning null triggers the per-track backoff/auto-skip instead of serving a
@@ -335,7 +397,8 @@ export async function resolveWithInnerTubePlayer(
   return null;
 }
 
-const VIDEO_ID_REGEX = /^(?:saavn:)?[a-zA-Z0-9_-]{1,32}$/;
+const VIDEO_ID_REGEX =
+  /^(?:(?:saavn|audius|jamendo|deezer|archive|podcast):)?[a-zA-Z0-9_.-]{1,64}$/;
 
 /** Real track durations captured from videoDetails. */
 const lastSeenDurations = new Map<string, number>();
@@ -344,6 +407,12 @@ const inFlightResolutions = new Map<string, Promise<StreamMeta | null>>();
 
 // ─── Main resolvers ───────────────────────────────────────────────────
 
+export type ResolveStreamOptions = {
+  title?: string | null | undefined;
+  artist?: string | null | undefined;
+  bypassBackoff?: boolean | undefined;
+};
+
 /**
  * Resolve a stream URL *and* return metadata (content length, MIME type,
  * bitrate). Deduplicates concurrent requests from multiple devices or prebuffering.
@@ -351,6 +420,7 @@ const inFlightResolutions = new Map<string, Promise<StreamMeta | null>>();
 export async function resolveStreamUrlWithMeta(
   videoId: string,
   quality: StreamQuality = "high",
+  options?: ResolveStreamOptions,
 ): Promise<StreamMeta | null> {
   if (!videoId || !VIDEO_ID_REGEX.test(videoId)) {
     return null;
@@ -364,9 +434,9 @@ export async function resolveStreamUrlWithMeta(
 
   const resolutionPromise = (async () => {
     try {
-      if (!isTrackAllowed(videoId)) return null;
+      if (!isTrackAllowed(videoId, options?.bypassBackoff)) return null;
 
-      const entry = await resolveWithInnerTubePlayer(videoId, quality);
+      const entry = await resolveWithInnerTubePlayer(videoId, quality, options);
 
       if (entry) {
         streamCache.set(cacheKey, entry);

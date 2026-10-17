@@ -25,10 +25,18 @@ describe("VIDEO_ID_REGEX", () => {
     expect(VIDEO_ID_REGEX.test("saavn:3404128")).toBe(true);
   });
 
+  it("accepts multi-provider track ids", () => {
+    expect(VIDEO_ID_REGEX.test("audius:track_123")).toBe(true);
+    expect(VIDEO_ID_REGEX.test("jamendo:99482")).toBe(true);
+    expect(VIDEO_ID_REGEX.test("deezer:3135556")).toBe(true);
+    expect(VIDEO_ID_REGEX.test("archive:item_id-1")).toBe(true);
+    expect(VIDEO_ID_REGEX.test("podcast:ep_102")).toBe(true);
+  });
+
   it("rejects empty, oversized, or malicious ids", () => {
     expect(VIDEO_ID_REGEX.test("")).toBe(false);
     expect(VIDEO_ID_REGEX.test("../../etc/passwd")).toBe(false);
-    expect(VIDEO_ID_REGEX.test("a".repeat(33))).toBe(false);
+    expect(VIDEO_ID_REGEX.test("a".repeat(66))).toBe(false);
     expect(VIDEO_ID_REGEX.test("<script>")).toBe(false);
   });
 });
@@ -38,8 +46,11 @@ describe("isAllowedUpstreamUrl (SSRF guard)", () => {
     expect(isAllowedUpstreamUrl("https://rr1---sn-xyz.googlevideo.com/videoplayback?x=1")).toBe(true);
     expect(isAllowedUpstreamUrl("https://www.youtube.com/api/manifest")).toBe(true);
     expect(isAllowedUpstreamUrl("https://aac.saavncdn.com/562/abc_320.mp4")).toBe(true);
+    expect(isAllowedUpstreamUrl("https://media.jiosaavn.com/song.mp4")).toBe(true);
+    expect(isAllowedUpstreamUrl("https://cdn.saavn.com/track.mp4")).toBe(true);
     expect(isAllowedUpstreamUrl("https://discoveryprovider.audius.co/v1/tracks/stream/1")).toBe(true);
     expect(isAllowedUpstreamUrl("https://mp3d.jamendo.com/download/track/123/mp32")).toBe(true);
+    expect(isAllowedUpstreamUrl("https://archive.org/download/test/test.mp3")).toBe(true);
   });
 
   it("rejects non-https, non-media hosts, and 30s Deezer preview hosts", () => {

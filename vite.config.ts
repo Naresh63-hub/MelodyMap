@@ -68,6 +68,23 @@ export default defineConfig({
       "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("@supabase")) {
+              return "vendor-supabase";
+            }
+            if (id.includes("recharts")) {
+              return "vendor-charts";
+            }
+          }
+          return undefined;
+        },
+      },
+    },
+  },
   plugins: [
     streamProxyPlugin(),
     ...tanstackStart(),

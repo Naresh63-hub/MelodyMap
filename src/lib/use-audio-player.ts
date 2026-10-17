@@ -55,11 +55,21 @@ export function useAudioPlayer(options: {
   const equalizerSettingsRef = useRef(equalizerSettings);
   equalizerSettingsRef.current = equalizerSettings;
 
-  const streamUrl = useCallback((id: string, quality?: string) => {
-    const isLowNet = isLowNetworkModeEnabled();
-    const q = isLowNet ? "saver" : (quality || equalizerSettingsRef.current.quality || "high");
-    return `/api/stream/${encodeURIComponent(id)}?quality=${encodeURIComponent(q)}`;
-  }, []);
+  const currentTrackMetaRef = useRef<{ title?: string | undefined; artist?: string | undefined } | null>(null);
+
+  const streamUrl = useCallback(
+    (id: string, quality?: string, title?: string, artist?: string) => {
+      const isLowNet = isLowNetworkModeEnabled();
+      const q = isLowNet ? "saver" : (quality || equalizerSettingsRef.current.quality || "high");
+      const t = title ?? currentTrackMetaRef.current?.title;
+      const a = artist ?? currentTrackMetaRef.current?.artist;
+      let url = `/api/stream/${encodeURIComponent(id)}?quality=${encodeURIComponent(q)}`;
+      if (t) url += `&title=${encodeURIComponent(t)}`;
+      if (a) url += `&artist=${encodeURIComponent(a)}`;
+      return url;
+    },
+    [],
+  );
 
   /** Probe the X-MelodyMap-Source header via a lightweight HEAD request. */
   const sourceProbeAbortRef = useRef<AbortController | null>(null);
@@ -887,7 +897,10 @@ export function useAudioPlayer(options: {
 
   /** Load a track and auto-play */
   const load = useCallback(
-    async (id: string, directUrl?: string, startAt = 0) => {
+    async (id: string, directUrl?: string, startAt = 0, title?: string, artist?: string) => {
+      if (title || artist) {
+        currentTrackMetaRef.current = { title, artist };
+      }
       directUrl = sanitizeDirectUrl(id, directUrl);
       wantPlayRef.current = true;
       // Create/resume the AudioContext synchronously while still inside the user
@@ -899,7 +912,7 @@ export function useAudioPlayer(options: {
       // Stop the double-load race: if synchronous gapless advance already started
       // playing this exact track at 0:00, avoid resetting position or restarting audio
       const audio = audioRef.current;
-      const expectedUrl = directUrl || streamUrl(id);
+      const expectedUrl = directUrl || streamUrl(id, undefined, title, artist);
       if (
         currentTrackIdRef.current === id &&
         startAt === 0 &&
@@ -933,14 +946,17 @@ export function useAudioPlayer(options: {
         return;
       }
 
-      setStream(streamUrl(id), startAt);
+      setStream(streamUrl(id, undefined, title, artist), startAt);
     },
     [setStream, streamUrl, initWebAudio],
   );
 
   /** Cue a track at specific second without autoplay */
   const cue = useCallback(
-    async (id: string, startSeconds = 0, directUrl?: string) => {
+    async (id: string, startSeconds = 0, directUrl?: string, title?: string, artist?: string) => {
+      if (title || artist) {
+        currentTrackMetaRef.current = { title, artist };
+      }
       directUrl = sanitizeDirectUrl(id, directUrl);
       wantPlayRef.current = false;
       currentTrackIdRef.current = id;
@@ -966,7 +982,7 @@ export function useAudioPlayer(options: {
         return;
       }
 
-      setStream(streamUrl(id), startSeconds);
+      setStream(streamUrl(id, undefined, title, artist), startSeconds);
     },
     [setStream, streamUrl],
   );
