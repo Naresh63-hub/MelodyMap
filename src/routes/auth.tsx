@@ -288,6 +288,8 @@ function AuthPage() {
               alt="MelodyMap"
               loading="eager"
               fetchPriority="high"
+              width={56}
+              height={56}
               className="h-14 w-14 rounded-2xl object-contain ring-1 ring-primary/30 shadow-lg mb-3"
             />
           </picture>
