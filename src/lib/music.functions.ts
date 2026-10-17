@@ -1623,6 +1623,27 @@ export const getPodcastEpisodesServerFn = createServerFn({ method: "POST" })
     return { episodes, error: null };
   });
 
+const GetPodcastShowInput = z.object({
+  podcastId: z.string().optional(),
+  query: z.string().optional(),
+  language: z.string().optional(),
+  limit: z.number().min(1).max(100).optional(),
+});
+
+export const getPodcastShowServerFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => GetPodcastShowInput.parse(input))
+  .handler(async ({ data }) => {
+    const { getPodcastShow } = await import("./podcast.server");
+    const res = await getPodcastShow({
+      podcastId: data.podcastId,
+      query: data.query,
+      language: data.language,
+      limit: data.limit ?? 60,
+    });
+    return { show: res.show, episodes: res.episodes, error: null };
+  });
+
+
 
 const RadioTracksInput = z.object({
   videoId: z.string().min(1).max(64),

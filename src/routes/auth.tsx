@@ -9,7 +9,6 @@ import {
   Lock,
   Mail,
   User,
-  Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -282,9 +281,11 @@ function AuthPage() {
         </div>
 
         <div className="flex flex-col items-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 shadow-lg mb-3">
-            <Sparkles aria-hidden="true" className="h-6 w-6 text-primary" />
-          </div>
+          <img
+            src="/brand/app-icon.png"
+            alt="MelodyMap"
+            className="h-14 w-14 rounded-2xl object-contain ring-1 ring-primary/30 shadow-lg mb-3"
+          />
           <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground font-display">
             {mode === "signin" && "Sign in to MelodyMap"}
             {mode === "signup" && "Create an account"}

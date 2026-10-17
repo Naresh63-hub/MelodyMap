@@ -3,6 +3,7 @@ import {
   normalizePodcastLanguage,
   searchPodcasts,
   getPodcastEpisodes,
+  getPodcastShow,
 } from "./podcast.server";
 import { episodeToTrack, type PodcastEpisode } from "./podcast.types";
 import { isPodcastTrack } from "./track-filters";
@@ -83,6 +84,7 @@ describe("Podcast Subsystem", () => {
       expect(track.duration).toBe("45:30");
       expect(track.durationSeconds).toBe(2730);
       expect(track.source).toBe("podcast");
+      expect(track.podcastId).toBe("podcast:show:987");
       expect(track.playable).toBe(true);
     });
 
@@ -328,6 +330,126 @@ describe("Podcast Subsystem", () => {
       expect(episodes[1]?.id).toBe("podcast:ep:5002");
       expect(episodes[1]?.duration).toBe("45:00");
       expect(episodes[1]?.durationSeconds).toBe(2700);
+    });
+  });
+
+  describe("getPodcastShow", () => {
+    const originalFetch = globalThis.fetch;
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+    });
+
+    it("retrieves show metadata along with full episodes list by podcastId", async () => {
+      globalThis.fetch = vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resultCount: 3,
+              results: [
+                {
+                  wrapperType: "track",
+                  kind: "podcast",
+                  collectionId: 999,
+                  collectionName: "Telugu Geeks",
+                  artistName: "Geek Host",
+                  artworkUrl600: "https://example.com/geeks-art.jpg",
+                  primaryGenreName: "Technology",
+                  trackCount: 42,
+                },
+                {
+                  wrapperType: "podcastEpisode",
+                  trackId: 7001,
+                  trackName: "Episode 1: React 19 Features",
+                  description: "Exploring React server components.",
+                  episodeUrl: "https://cdn.example.com/geeks-ep1.mp3",
+                  trackTimeMillis: 1800000,
+                  releaseDate: "2026-10-01T00:00:00Z",
+                },
+                {
+                  wrapperType: "podcastEpisode",
+                  trackId: 7002,
+                  trackName: "Episode 2: Modern Web Architecture",
+                  description: "Fullstack patterns with TanStack.",
+                  episodeUrl: "https://cdn.example.com/geeks-ep2.mp3",
+                  trackTimeMillis: 2400000,
+                  releaseDate: "2026-10-08T00:00:00Z",
+                },
+              ],
+            }),
+        }),
+      );
+
+      const res = await getPodcastShow({ podcastId: "podcast:show:999", limit: 10 });
+      expect(res.show).not.toBeNull();
+      expect(res.show?.id).toBe("podcast:show:999");
+      expect(res.show?.title).toBe("Telugu Geeks");
+      expect(res.show?.publisher).toBe("Geek Host");
+      expect(res.show?.artworkUrl).toBe("https://example.com/geeks-art.jpg");
+      expect(res.show?.category).toBe("Technology");
+      expect(res.show?.episodeCount).toBe(42);
+
+      expect(res.episodes.length).toBe(2);
+      expect(res.episodes[0]?.id).toBe("podcast:ep:7001");
+      expect(res.episodes[0]?.title).toBe("Episode 1: React 19 Features");
+      expect(res.episodes[0]?.audioUrl).toBe("https://cdn.example.com/geeks-ep1.mp3");
+      expect(res.episodes[0]?.podcastId).toBe("podcast:show:999");
+      expect(res.episodes[1]?.id).toBe("podcast:ep:7002");
+    });
+
+    it("searches and retrieves show details + episode list by channel query", async () => {
+      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes("/search?")) {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                resultCount: 1,
+                results: [
+                  {
+                    collectionId: 888,
+                    collectionName: "The Ranveer Show",
+                    artistName: "BeerBiceps",
+                  },
+                ],
+              }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resultCount: 2,
+              results: [
+                {
+                  wrapperType: "track",
+                  collectionId: 888,
+                  collectionName: "The Ranveer Show",
+                  artistName: "BeerBiceps",
+                  artworkUrl600: "https://example.com/ranveer.jpg",
+                  trackCount: 150,
+                },
+                {
+                  wrapperType: "podcastEpisode",
+                  trackId: 8001,
+                  trackName: "TRS 150: Fitness & Health",
+                  episodeUrl: "https://cdn.example.com/trs150.mp3",
+                  trackTimeMillis: 3600000,
+                },
+              ],
+            }),
+        });
+      });
+
+      const res = await getPodcastShow({ query: "The Ranveer Show", limit: 5 });
+      expect(res.show).not.toBeNull();
+      expect(res.show?.id).toBe("podcast:show:888");
+      expect(res.show?.title).toBe("The Ranveer Show");
+      expect(res.show?.publisher).toBe("BeerBiceps");
+      expect(res.episodes.length).toBe(1);
+      expect(res.episodes[0]?.id).toBe("podcast:ep:8001");
+      expect(res.episodes[0]?.duration).toBe("1:00:00");
     });
   });
 });

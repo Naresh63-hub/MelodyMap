@@ -28,7 +28,7 @@ type Props = {
   onPlay: (track: Track, index: number) => void;
   onToggleLike: (track: Track) => void;
   onToggleDislike?: (track: Track) => void;
-  onArtistClick?: (artist: string) => void;
+  onArtistClick?: (artist: string, track?: Track) => void;
   emptyMessage?: string;
   playlists?: Playlist[];
   onAddToPlaylist?: (playlistId: string, track: Track) => void;
@@ -140,7 +140,7 @@ export function TrackList({
                     {onArtistClick && displaySubtitle ? (
                       <button
                         type="button"
-                        onClick={() => onArtistClick(displaySubtitle)}
+                        onClick={() => onArtistClick(displaySubtitle, track)}
                         className="hover:text-foreground hover:underline transition-colors"
                       >
                         {displaySubtitle}

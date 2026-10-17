@@ -9,9 +9,11 @@ import {
   X,
   Moon,
   MessageSquare,
+  Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
+import { isPodcastTrack } from "@/lib/track-filters";
 
 type Props = {
   open: boolean;
@@ -25,7 +27,7 @@ type Props = {
   onAddToQueue: (track: Track) => void;
   onOpenLyrics?: (track: Track) => void;
   onOpenSleepTimer?: () => void;
-  onGoToArtist?: (artist: string) => void;
+  onGoToArtist?: (artist: string, track?: Track) => void;
   onShare?: (track: Track) => void;
   onDeleteFromLibrary?: (track: Track) => void;
 };
@@ -179,18 +181,24 @@ export function SongOptionsModal({
             </button>
           )}
 
-          {/* Go to Artist */}
+          {/* Go to Artist or Podcast Show */}
           {onGoToArtist && (
             <button
               type="button"
               onClick={() => {
-                onGoToArtist(track.artist);
+                onGoToArtist(track.artist, track);
                 onClose();
               }}
               className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-foreground hover:bg-chip active:bg-chip-strong transition-colors"
             >
-              <span className="font-medium">Go to Artist</span>
-              <User className="h-5 w-5 text-foreground/40" />
+              <span className="font-medium">
+                {isPodcastTrack(track) ? "Go to Podcast Show" : "Go to Artist"}
+              </span>
+              {isPodcastTrack(track) ? (
+                <Mic className="h-5 w-5 text-primary" />
+              ) : (
+                <User className="h-5 w-5 text-foreground/40" />
+              )}
             </button>
           )}
 

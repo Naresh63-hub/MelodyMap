@@ -191,14 +191,22 @@ export async function probeStream(url: string): Promise<boolean> {
   }
 }
 
-function cleanTrackTitle(title: string): string {
+export function cleanTrackTitle(title: string): string {
   return (title || "")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\[.*?\]|\(.*?\)|\|.*/g, "")
-    .replace(/(full\s+)?(video|audio|lyric|lyrical)\s+song/gi, "")
-    .replace(/(official|original)\s+(music\s+)?(video|audio|track)/gi, "")
-    .replace(/\b(4k|hd|remix|feat|ft\.)\b/gi, "")
+    .replace(/\s+(feat\.?|ft\.?)\s+.*$/gi, "")
+    .replace(/\b(official\s+)?(full\s+)?(music\s+|audio\s+|lyric\s+|lyrical\s+|video\s+)*(video|audio|lyric|lyrical|song|track)\b/gi, "")
+    .replace(/\b(m\/v|mv|hd|4k|remix|prod\.?)\b/gi, "")
+    .replace(/[-–—_]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function cleanAuthorName(author: string): string {
+  return (author || "")
+    .replace(/ - Topic|VEVO|Official|Channel|Record(s)?|Music|Entertainment|Company/gi, "")
     .replace(/[-–—_]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -282,12 +290,32 @@ export async function resolveWithInnerTubePlayer(
     }
   } catch {}
 
-  // Resolve a trustworthy human-readable title/artist for this track id BEFORE
-  // touching any catalog provider. We deliberately do NOT search by the raw id:
-  // an id is not a song title, and querying JioSaavn/Audius/Jamendo with it makes
-  // them return unrelated top results — that is what played the wrong song on tap.
-  let cleanTitle = "";
-  let rawAuthor = "";
+  // Prioritize reliable client-supplied title and artist metadata when present
+  const clientTitle = options?.title ? cleanTrackTitle(options.title) : "";
+  const clientArtist = options?.artist ? cleanAuthorName(options.artist) : "";
+
+  if (clientTitle) {
+    try {
+      const saavnMatch = await resolveSaavnByMeta(
+        clientTitle,
+        clientArtist || undefined,
+        lastSeenDurations.get(videoId) ?? null,
+      ).catch(() => null);
+      if (saavnMatch?.url) {
+        return {
+          url: saavnMatch.url,
+          mimeType: saavnMatch.mimeType || "audio/mp4",
+          contentLength: null,
+          audioBitrate: 160000,
+          source: "saavn",
+        };
+      }
+    } catch {}
+  }
+
+  // Resolve title/artist from oembed if client metadata was absent or failed JioSaavn
+  let cleanTitle = clientTitle;
+  let rawAuthor = clientArtist;
   try {
     const oembedRes = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
@@ -298,16 +326,14 @@ export async function resolveWithInnerTubePlayer(
     ).catch(() => null);
     if (oembedRes && oembedRes.ok) {
       const oembed = (await oembedRes.json()) as any;
-      cleanTitle = cleanTrackTitle(oembed?.title || "");
-      rawAuthor = (oembed?.author_name || "").replace(/ - Topic|VEVO/g, "").trim();
+      if (!cleanTitle) {
+        cleanTitle = cleanTrackTitle(oembed?.title || "");
+      }
+      if (!rawAuthor) {
+        rawAuthor = cleanAuthorName(oembed?.author_name || "");
+      }
     }
   } catch {}
-
-  // If oembed failed or was blocked, fall back to title and artist provided in options
-  if (!cleanTitle && options?.title) {
-    cleanTitle = cleanTrackTitle(options.title);
-    rawAuthor = (options.artist || "").replace(/ - Topic|VEVO/g, "").trim();
-  }
 
   // Without a verified title, refuse to fuzzy-match against a meaningless id.
   // Returning null triggers the per-track backoff/auto-skip instead of serving a

@@ -26,6 +26,7 @@ export type Track = {
   isExplicit?: boolean | undefined;
   durationSeconds?: number | undefined;
   languageCode?: string | undefined;
+  podcastId?: string | undefined;
 };
 
 export type Playlist = {

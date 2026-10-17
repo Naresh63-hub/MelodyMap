@@ -328,6 +328,7 @@ function MusicApp() {
   const [prevVolume, setPrevVolume] = useState(80);
   // Playlist creation dialog state
   const [createPlaylistTrack, setCreatePlaylistTrack] = useState<Track | null>(null);
+  const [podcastTargetShow, setPodcastTargetShow] = useState<{ id?: string | undefined; title?: string | undefined } | null>(null);
   // Undo support for playlist track removal
   const undoRef = useRef<{ timeout: ReturnType<typeof setTimeout>; restore: () => void } | null>(null);
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
@@ -1860,13 +1861,28 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
   }, [searchContinuation, loadingMoreSearch, query, searchFilter, runSearch, results.length, settings.languages]);
 
+  const openPodcastShow = useCallback((target: { id?: string | undefined; title?: string | undefined }) => {
+    setPodcastTargetShow(target);
+    setTab("podcasts");
+    setShowFullScreen(false);
+    setShowFloatingMini(false);
+  }, []);
+
   const openArtist = useCallback(
-    (artist: string) => {
+    (artist: string, track?: Track) => {
+      if (track && isPodcastTrack(track)) {
+        openPodcastShow({ id: track.podcastId, title: track.album || track.artist || artist });
+        return;
+      }
+      if (tab === "podcasts") {
+        openPodcastShow({ title: artist });
+        return;
+      }
       setQuery(artist);
       saveRecentSearch(artist);
       void searchFor(`${artist} songs`);
     },
-    [searchFor],
+    [openPodcastShow, searchFor, tab],
   );
 
   const goNext = useCallback(() => {
@@ -3223,6 +3239,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onPlayHistoryTrack={handlePlayPodcastHistory}
                 userLanguages={settings.languages}
                 onOpenSettings={() => setShowSettings(true)}
+                targetShow={podcastTargetShow}
+                onClearTargetShow={() => setPodcastTargetShow(null)}
               />
               </div>
             )}
@@ -3447,6 +3465,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
           onSeek={(s) => player.seek(s)}
+          onPodcastChannelClick={(t) =>
+            openPodcastShow({ id: t.podcastId, title: t.album || t.artist })
+          }
+          onArtistClick={openArtist}
           sidebarCollapsed={sidebarCollapsed}
         />
       )}
@@ -3528,6 +3550,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             onOpenShortcuts={() => setShowShortcuts(true)}
             onOpenOptions={(t) => setOptionsTrack(t)}
             onAddToPlaylist={(t) => setCreatePlaylistTrack(t)}
+            onPodcastChannelClick={(t) =>
+              openPodcastShow({ id: t.podcastId, title: t.album || t.artist })
+            }
+            onArtistClick={(artist, t) => openArtist(artist, t ?? current ?? undefined)}
             canNext={canNext}
             canPrevious={canPrev}
           />
@@ -3553,7 +3579,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setShowLyrics(true);
           }}
           onOpenSleepTimer={() => setShowSleepTimer(true)}
-          onGoToArtist={(artist) => openArtist(artist)}
+          onGoToArtist={(artist, t) => openArtist(artist, t ?? optionsTrack ?? undefined)}
           onShare={(t) => setShareTrack(t)}
           onDeleteFromLibrary={(t) => {
             if (likedIds.has(t.id)) handleToggleLike(t);

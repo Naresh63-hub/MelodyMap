@@ -130,12 +130,16 @@ describe("/auth Accessibility, Contrast, and Performance verification", () => {
 
     it("marks decorative SVG icons with aria-hidden='true'", () => {
       expect(authSource).toContain('<ArrowLeft aria-hidden="true"');
-      expect(authSource).toContain('<Sparkles aria-hidden="true"');
       expect(authSource).toContain('<User aria-hidden="true"');
       expect(authSource).toContain('<Mail aria-hidden="true"');
       expect(authSource).toContain('<Lock aria-hidden="true"');
       expect(authSource).toContain('<EyeOff aria-hidden="true"');
       expect(authSource).toContain('<Eye aria-hidden="true"');
+    });
+
+    it("renders the official MelodyMap logo image with accessible alt text", () => {
+      expect(authSource).toContain('src="/brand/app-icon.png"');
+      expect(authSource).toContain('alt="MelodyMap"');
     });
   });
 

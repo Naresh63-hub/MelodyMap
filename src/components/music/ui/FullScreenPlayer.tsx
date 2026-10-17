@@ -36,6 +36,7 @@ import type { Track } from "@/lib/library";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import AudioVisualizer from "./AudioVisualizer";
 import { useTrackLyrics } from "@/lib/use-track-lyrics";
+import { isPodcastTrack } from "@/lib/track-filters";
 
 type Props = {
   track: Track | null;
@@ -70,6 +71,8 @@ type Props = {
   onOpenShortcuts?: () => void;
   onOpenOptions?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
+  onArtistClick?: (artist: string, track?: Track) => void;
+  onPodcastChannelClick?: (track: Track) => void;
   canNext: boolean;
   canPrevious: boolean;
   getAnalyser?: () => AnalyserNode | null;
@@ -110,6 +113,8 @@ export function FullScreenPlayer({
   onOpenShortcuts,
   onOpenOptions,
   onAddToPlaylist,
+  onArtistClick,
+  onPodcastChannelClick,
   canNext,
   canPrevious,
   getAnalyser,
@@ -422,9 +427,31 @@ export function FullScreenPlayer({
               <h2 className="text-xl sm:text-2xl font-bold text-white truncate tracking-tight">
                 {track.title}
               </h2>
-              <p className="text-sm sm:text-base font-medium text-[#D4CBEA] truncate mt-0.5">
-                {track.artist}
-              </p>
+              {onPodcastChannelClick || onArtistClick ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isPodcastTrack(track)) {
+                      if (onPodcastChannelClick) onPodcastChannelClick(track);
+                      else onArtistClick?.(track.artist, track);
+                    } else {
+                      onArtistClick?.(track.artist, track);
+                    }
+                  }}
+                  className="text-left text-sm sm:text-base font-medium text-[#D4CBEA] hover:text-[#A855F7] hover:underline truncate mt-0.5 transition-colors cursor-pointer block max-w-full"
+                  title={
+                    isPodcastTrack(track)
+                      ? `View all episodes from ${track.artist}`
+                      : `View ${track.artist}`
+                  }
+                >
+                  {track.artist}
+                </button>
+              ) : (
+                <p className="text-sm sm:text-base font-medium text-[#D4CBEA] truncate mt-0.5">
+                  {track.artist}
+                </p>
+              )}
               {(track.album || track.year) && (
                 <p className="text-xs text-[#A69ABD] truncate mt-0.5">
                   {[track.album, track.year].filter(Boolean).join(" • ")}

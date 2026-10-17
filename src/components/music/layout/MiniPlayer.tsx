@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Loader2, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
+import { isPodcastTrack } from "@/lib/track-filters";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { triggerHaptic } from "@/lib/haptics";
 import { useSwipeGestures } from "@/hooks/use-gesture-controls";
@@ -20,6 +21,8 @@ type Props = {
   onOpenPlayer: () => void;
   onOpenEqualizer?: () => void;
   onSeek?: (seconds: number) => void;
+  onPodcastChannelClick?: (track: Track) => void;
+  onArtistClick?: (artist: string, track?: Track) => void;
   sidebarCollapsed?: boolean;
 };
 
@@ -42,8 +45,11 @@ export function MiniPlayer({
   onOpenPlayer,
   onOpenEqualizer: _onOpenEqualizer,
   onSeek,
+  onPodcastChannelClick,
+  onArtistClick,
   sidebarCollapsed = false,
 }: Props) {
+  const isPodcast = track ? isPodcastTrack(track) : false;
   const barRef = useRef<HTMLDivElement | null>(null);
   // Reset whenever the artwork source changes so a new track can attempt to load again.
   const [thumbError, setThumbError] = useState(false);
@@ -99,10 +105,14 @@ export function MiniPlayer({
       {/* Main Track Row */}
       <div className="flex-1 flex items-center justify-between px-3 gap-2.5">
         {/* Artwork + Title/Artist -> tap anywhere to expand to Full Player */}
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={onOpenPlayer}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") onOpenPlayer();
+          }}
+          className="flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
           aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
           {/* Circular rotating vinyl disc artwork */}
@@ -136,11 +146,26 @@ export function MiniPlayer({
             <p className="truncate text-xs sm:text-[13px] font-semibold text-foreground leading-tight">
               {track?.title ?? "No track"}
             </p>
-            <p className="truncate text-[11px] text-muted-foreground font-normal leading-tight mt-0.5">
-              {track?.artist ?? "—"}
-            </p>
+            {isPodcast ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onPodcastChannelClick && track) onPodcastChannelClick(track);
+                  else if (onArtistClick && track) onArtistClick(track.artist, track);
+                }}
+                className="truncate text-[11px] text-muted-foreground hover:text-primary hover:underline transition-colors font-normal leading-tight mt-0.5 text-left block max-w-full"
+                title={`View all episodes from ${track?.artist ?? "podcast"}`}
+              >
+                {track?.artist ?? "—"}
+              </button>
+            ) : (
+              <p className="truncate text-[11px] text-muted-foreground font-normal leading-tight mt-0.5">
+                {track?.artist ?? "—"}
+              </p>
+            )}
           </div>
-        </button>
+        </div>
 
         {/* Playback Controls */}
         <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">

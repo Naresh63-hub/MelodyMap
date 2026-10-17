@@ -112,10 +112,16 @@ interface ItunesPodcastResult {
 
 interface ItunesEpisodeResult {
   wrapperType: "track" | "podcastEpisode";
-  trackId: number;
-  trackName: string;
+  collectionId?: number;
   collectionName?: string;
   artistName?: string;
+  feedUrl?: string;
+  trackCount?: number;
+  collectionViewUrl?: string;
+  primaryGenreName?: string;
+  artworkUrl100?: string;
+  trackId?: number;
+  trackName?: string;
   episodeUrl?: string;
   description?: string;
   releaseDate?: string;
@@ -251,7 +257,7 @@ export async function getPodcastEpisodes(podcastId: string, limit = 50): Promise
         id: `podcast:ep:${ep.trackId}`,
         podcastId: `podcast:show:${cleanId}`,
         podcastTitle: ep.collectionName || defaultTitle,
-        title: ep.trackName.trim(),
+        title: ep.trackName?.trim() || "Episode",
         description: ep.description,
         artworkUrl: ep.artworkUrl600 || ep.artworkUrl160 || defaultArtwork,
         audioUrl: ep.episodeUrl!,
@@ -266,6 +272,121 @@ export async function getPodcastEpisodes(podcastId: string, limit = 50): Promise
     return [];
   }
 }
+
+/**
+ * Retrieves a specific podcast show details along with its full episode list.
+ * Can lookup by exact podcast show ID (e.g. "podcast:show:123456" or "123456"),
+ * or by podcast show title/query.
+ */
+export async function getPodcastShow(options: {
+  podcastId?: string | undefined;
+  query?: string | undefined;
+  language?: string | undefined;
+  limit?: number | undefined;
+}): Promise<{ show: Podcast | null; episodes: PodcastEpisode[] }> {
+  const limit = options.limit ?? 60;
+  let targetCollectionId = options.podcastId ? options.podcastId.replace("podcast:show:", "").trim() : "";
+
+  // If no numeric collection ID provided but query is present, search for the show first
+  if (!targetCollectionId && options.query) {
+    const cleanQuery = options.query.trim();
+    if (cleanQuery) {
+      try {
+        const normLang = options.language ? normalizePodcastLanguage(options.language) : null;
+        const countryParam = normLang?.country ? `&country=${normLang.country}` : "";
+        const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&media=podcast&entity=podcast&limit=5${countryParam}`;
+        const searchRes = await fetch(searchUrl, {
+          headers: {
+            "User-Agent": "MelodyMap/1.0",
+            Accept: "application/json",
+          },
+          signal: AbortSignal.timeout(8000),
+        });
+
+        if (searchRes.ok) {
+          const searchData = (await searchRes.json()) as { results?: ItunesPodcastResult[] };
+          if (searchData.results && searchData.results.length > 0 && searchData.results[0]?.collectionId) {
+            targetCollectionId = String(searchData.results[0].collectionId);
+          }
+        }
+      } catch (err) {
+        console.warn("[podcast] Show title search notice:", err);
+      }
+    }
+  }
+
+  if (!targetCollectionId) {
+    return { show: null, episodes: [] };
+  }
+
+  const lookupUrl = `https://itunes.apple.com/lookup?id=${encodeURIComponent(targetCollectionId)}&entity=podcastEpisode&limit=${limit}`;
+
+  try {
+    const res = await fetch(lookupUrl, {
+      headers: {
+        "User-Agent": "MelodyMap/1.0",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(9000),
+    });
+
+    if (!res.ok) {
+      return { show: null, episodes: [] };
+    }
+
+    const data = (await res.json()) as { results?: ItunesEpisodeResult[] };
+    if (!data.results || !Array.isArray(data.results)) {
+      return { show: null, episodes: [] };
+    }
+
+    const showInfo = data.results.find((r) => r.wrapperType === "track");
+    const episodesData = data.results.filter(
+      (r) => r.wrapperType === "podcastEpisode" && r.episodeUrl && r.trackName,
+    );
+
+    const defaultArtwork =
+      showInfo?.artworkUrl600 ||
+      showInfo?.artworkUrl100 ||
+      "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=300&h=300&fit=crop";
+    const defaultTitle = showInfo?.collectionName || options.query || "Podcast";
+    const defaultPublisher = showInfo?.artistName || "Podcast Host";
+
+    const show: Podcast = {
+      id: `podcast:show:${showInfo?.collectionId || targetCollectionId}`,
+      title: defaultTitle,
+      publisher: defaultPublisher,
+      artworkUrl: defaultArtwork,
+      category: showInfo?.primaryGenreName,
+      feedUrl: showInfo?.feedUrl,
+      episodeCount: showInfo?.trackCount || episodesData.length,
+      provider: "itunes",
+      externalUrl: showInfo?.collectionViewUrl,
+    };
+
+    const episodes: PodcastEpisode[] = episodesData.map((ep) => {
+      const durSecs = Math.round((ep.trackTimeMillis || 0) / 1000);
+      return {
+        id: `podcast:ep:${ep.trackId}`,
+        podcastId: `podcast:show:${targetCollectionId}`,
+        podcastTitle: ep.collectionName || defaultTitle,
+        title: ep.trackName?.trim() || "Episode",
+        description: ep.description,
+        artworkUrl: ep.artworkUrl600 || ep.artworkUrl160 || defaultArtwork,
+        audioUrl: ep.episodeUrl!,
+        duration: formatDuration(ep.trackTimeMillis),
+        durationSeconds: durSecs > 0 ? durSecs : 1800,
+        publishedAt: ep.releaseDate,
+        provider: "itunes" as const,
+      };
+    });
+
+    return { show, episodes };
+  } catch (err) {
+    console.warn("[podcast] getPodcastShow notice:", err);
+    return { show: null, episodes: [] };
+  }
+}
+
 
 /**
  * Backward compatibility helper for legacy episode searches.
@@ -296,7 +417,7 @@ export async function searchPodcastEpisodes(query: string, limit = 20): Promise<
         const durSecs = Math.round((ep.trackTimeMillis || 0) / 1000);
         return {
           id: `podcast:${ep.trackId}`,
-          title: ep.trackName,
+          title: ep.trackName || "Episode",
           artist: ep.collectionName || ep.artistName || "Podcast",
           duration: formatDuration(ep.trackTimeMillis),
           durationSeconds: durSecs > 0 ? durSecs : 1800,

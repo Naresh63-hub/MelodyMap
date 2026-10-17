@@ -15,7 +15,11 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { discoverPodcastsServerFn, getPodcastEpisodesServerFn } from "@/lib/music.functions";
+import {
+  discoverPodcastsServerFn,
+  getPodcastEpisodesServerFn,
+  getPodcastShowServerFn,
+} from "@/lib/music.functions";
 import type { Podcast, PodcastEpisode } from "@/lib/podcast.types";
 import type { Track } from "@/lib/library";
 import { cn } from "@/lib/utils";
@@ -55,6 +59,8 @@ export interface PodcastsPanelProps {
   onPlayHistoryTrack: (track: Track, allHistory: Track[], index: number) => void;
   userLanguages: string[];
   onOpenSettings?: () => void;
+  targetShow?: { id?: string | undefined; title?: string | undefined } | null | undefined;
+  onClearTargetShow?: () => void;
 }
 
 export function PodcastsPanel({
@@ -68,9 +74,12 @@ export function PodcastsPanel({
   onPlayHistoryTrack,
   userLanguages,
   onOpenSettings,
+  targetShow,
+  onClearTargetShow,
 }: PodcastsPanelProps) {
   const runDiscover = useServerFn(discoverPodcastsServerFn);
   const runGetEpisodes = useServerFn(getPodcastEpisodesServerFn);
+  const runGetShow = useServerFn(getPodcastShowServerFn);
 
   // Active language state (prioritize user preference)
   const initialLanguage =
@@ -177,10 +186,55 @@ export function PodcastsPanel({
     [runGetEpisodes],
   );
 
+  const handleSelectShowByChannel = useCallback(
+    async (target: { id?: string | undefined; title?: string | undefined }) => {
+      setLoadingEpisodes(true);
+      setEpisodesError(null);
+      setEpisodes([]);
+      setShowFullDescription(false);
+      setSelectedShow({
+        id: target.id || `podcast:show:${target.title || "show"}`,
+        title: target.title || "Podcast Show",
+        publisher: "Loading channel…",
+        artworkUrl: "",
+        provider: "itunes",
+      });
+
+      try {
+        const res = await runGetShow({
+          data: {
+            podcastId: target.id,
+            query: target.title,
+            language: selectedLanguage,
+            limit: 60,
+          },
+        });
+        if (res.show) {
+          setSelectedShow(res.show);
+        }
+        setEpisodes(res.episodes || []);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to load episodes";
+        setEpisodesError(msg);
+      } finally {
+        setLoadingEpisodes(false);
+      }
+    },
+    [runGetShow, selectedLanguage],
+  );
+
+  // Open specific show when targetShow changes
+  useEffect(() => {
+    if (targetShow && (targetShow.id || targetShow.title)) {
+      void handleSelectShowByChannel(targetShow);
+    }
+  }, [targetShow, handleSelectShowByChannel]);
+
   const handleBackToShows = useCallback(() => {
     setSelectedShow(null);
     setEpisodes([]);
-  }, []);
+    onClearTargetShow?.();
+  }, [onClearTargetShow]);
 
   const handleLanguageChange = useCallback((lang: string) => {
     setSelectedLanguage(lang);
@@ -586,46 +640,62 @@ export function PodcastsPanel({
             {podcastHistory.slice(0, 10).map((ep, idx) => {
               const isCurrent = currentTrackId === ep.id;
               return (
-                <button
+                <div
                   key={ep.id}
-                  type="button"
-                  onClick={() => {
-                    if (isCurrent) {
-                      if (isPlaying) onPause?.();
-                      else onResume?.();
-                    } else {
-                      onPlayHistoryTrack(ep, podcastHistory, idx);
-                    }
-                  }}
-                  className="w-36 shrink-0 snap-start text-left group p-2 rounded-xl bg-chip-subtle hover:bg-chip border border-hair transition-colors"
+                  className="w-36 shrink-0 snap-start text-left group p-2 rounded-xl bg-chip-subtle hover:bg-chip border border-hair transition-colors flex flex-col justify-between"
                 >
-                  <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair">
-                    {ep.thumbnail ? (
-                      <img
-                        src={ep.thumbnail}
-                        alt=""
-                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Mic className="h-6 w-6 text-foreground/20" />
-                      </div>
-                    )}
-                    {isCurrent && isPlaying && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <div className="flex items-end gap-0.5 h-4">
-                          <span className="w-1 bg-primary animate-pulse" />
-                          <span className="w-1 bg-primary animate-pulse delay-75" />
-                          <span className="w-1 bg-primary animate-pulse delay-150" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isCurrent) {
+                        if (isPlaying) onPause?.();
+                        else onResume?.();
+                      } else {
+                        onPlayHistoryTrack(ep, podcastHistory, idx);
+                      }
+                    }}
+                    className="w-full text-left"
+                  >
+                    <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-card border border-hair">
+                      {ep.thumbnail ? (
+                        <img
+                          src={ep.thumbnail}
+                          alt=""
+                          className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center">
+                          <Mic className="h-6 w-6 text-foreground/20" />
                         </div>
-                      </div>
-                    )}
-                  </div>
-                  <p className="truncate text-xs font-medium text-foreground group-hover:text-primary transition-colors">
-                    {ep.title}
-                  </p>
-                  <p className="truncate text-[11px] text-foreground/40 mt-0.5">{ep.artist}</p>
-                </button>
+                      )}
+                      {isCurrent && isPlaying && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <div className="flex items-end gap-0.5 h-4">
+                            <span className="w-1 bg-primary animate-pulse" />
+                            <span className="w-1 bg-primary animate-pulse delay-75" />
+                            <span className="w-1 bg-primary animate-pulse delay-150" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <p className="truncate text-xs font-medium text-foreground group-hover:text-primary transition-colors">
+                      {ep.title}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleSelectShowByChannel({
+                        id: ep.podcastId,
+                        title: ep.album || ep.artist,
+                      })
+                    }
+                    className="truncate text-[11px] text-foreground/40 hover:text-primary hover:underline transition-colors mt-0.5 text-left block w-full"
+                    title={`View all episodes from ${ep.artist}`}
+                  >
+                    {ep.artist}
+                  </button>
+                </div>
               );
             })}
           </div>

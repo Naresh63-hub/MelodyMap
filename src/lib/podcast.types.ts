@@ -63,6 +63,7 @@ export function episodeToTrack(ep: PodcastEpisode): Track {
     source: "podcast",
     provider: "archive", // Internal playback adapter source
     providerTrackId: ep.id,
+    podcastId: ep.podcastId,
     playable: Boolean(ep.audioUrl),
   };
 }
