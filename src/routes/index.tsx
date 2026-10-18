@@ -708,6 +708,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const sleepTimerHaltedRef = useRef<boolean>(false);
   const extendQueueRef = useRef<(() => Promise<Track[]>) | null>(null);
+  const autoDjPageRef = useRef<number>(1);
+  const isExtendingRef = useRef<boolean>(false);
 
   // --- Player ---
   const player = useAudioPlayer({
@@ -727,7 +729,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
       const q = queueRef.current;
       const i = indexRef.current;
-      const loopMode = repeatModeRef.current === "all" || continuousRef.current;
+      const loopMode = repeatModeRef.current === "all";
       const nextIdx = findNextValidTrackIndex(q, i, loopMode);
       if (nextIdx !== -1) {
         const next = q[nextIdx];
@@ -792,7 +794,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       const q = queueRef.current;
       const i = indexRef.current;
-      const loopMode = repeatModeRef.current === "all" || continuousRef.current;
+      const loopMode = repeatModeRef.current === "all";
       const nextIdx = findNextValidTrackIndex(q, i, loopMode);
 
       if (nextIdx !== -1) {
@@ -833,19 +835,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               return;
             }
           }
-          const updated = queueRef.current;
-          const loopIdx = findNextValidTrackIndex(updated, -1, false);
-          if (loopIdx !== -1) {
-            indexRef.current = loopIdx;
-            setIndex(loopIdx);
-            const loopTrack = updated[loopIdx];
-            if (loopTrack) {
-              player.seek(0);
-              progressTrackerRef.current.reset(loopTrack.id);
-              loadedTrackIdRef.current = loopTrack.id;
-              void load(loopTrack.id, loopTrack.previewUrl, 0, loopTrack.title, loopTrack.artist);
+          if (repeatModeRef.current === "all") {
+            const updated = queueRef.current;
+            const loopIdx = findNextValidTrackIndex(updated, -1, false);
+            if (loopIdx !== -1) {
+              indexRef.current = loopIdx;
+              setIndex(loopIdx);
+              const loopTrack = updated[loopIdx];
+              if (loopTrack) {
+                player.seek(0);
+                progressTrackerRef.current.reset(loopTrack.id);
+                loadedTrackIdRef.current = loopTrack.id;
+                void load(loopTrack.id, loopTrack.previewUrl, 0, loopTrack.title, loopTrack.artist);
+              }
+            } else {
+              player.pause();
             }
           } else {
+            // Queue genuinely exhausted and repeat is disabled: stop cleanly
             player.pause();
           }
         });
@@ -1008,6 +1015,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       player.seek(0);
       progressTrackerRef.current.reset(track.id);
       currentRef.current = track;
+      autoDjPageRef.current = 1;
 
       // 2. Set up queue of independent tracks
       if (surroundingQueue && surroundingQueue.length > 0) {
@@ -1573,11 +1581,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   );
 
   const extendQueue = useCallback(async (): Promise<Track[]> => {
-    if (extending) return [];
+    // Synchronous mutex guard against overlapping concurrent extensions
+    if (isExtendingRef.current) return [];
+    isExtendingRef.current = true;
     setExtending(true);
     try {
       const currentTrack = currentRef.current;
       const currentQueue = queueRef.current;
+      const startingTrackId = currentTrack?.id;
       let candidateTracks: Track[] = [];
 
       // AutoDJ 1–3 recent seed tracks from current track and recent queue/history
@@ -1590,35 +1601,50 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (seedTracks.length >= 3) break;
       }
 
-      // 1. Try Song Radio across recent seeds for continuous similar vibe
+      const curPage = autoDjPageRef.current;
+
+      // 1. Try Song Radio across recent seeds with deep pagination (delving into discographies)
       for (const seed of seedTracks) {
         if (!seed.id) continue;
-        try {
-          const radioRes = await getSongRadio({
-            data: {
-              videoId: seed.id,
-              title: seed.title,
-              artist: seed.artist,
-              album: seed.album,
-              languages: settings.languages,
-              limit: 15,
-              continuation: radioContinuationRef.current,
-            },
-          });
-          if (radioRes.continuation) {
-            radioContinuationRef.current = radioRes.continuation;
+        for (const pageOffset of [curPage, curPage + 1]) {
+          try {
+            const radioRes = await getSongRadio({
+              data: {
+                videoId: seed.id,
+                title: seed.title,
+                artist: seed.artist,
+                album: seed.album,
+                languages: settings.languages,
+                limit: 15,
+                page: pageOffset,
+                continuation: radioContinuationRef.current,
+              },
+            });
+            if (radioRes.continuation) {
+              radioContinuationRef.current = radioRes.continuation;
+            }
+            if (radioRes.tracks && radioRes.tracks.length > 0) {
+              const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(radioRes.tracks as Track[]), getSessionContext());
+              const fresh = ranked.filter(
+                (t) =>
+                  !trackExistsIn(currentQueue, t as TrackLike) &&
+                  !trackExistsIn(candidateTracks, t as TrackLike) &&
+                  !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
+                  !dislikedIdsRef.current.has(t.id),
+              );
+              candidateTracks.push(...fresh);
+              if (candidateTracks.length >= 12) break;
+            }
+          } catch {
+            // fall through to next seed or AI recommendation
           }
-          if (radioRes.tracks && radioRes.tracks.length > 0) {
-            const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(radioRes.tracks as Track[]), getSessionContext());
-            const fresh = ranked.filter(
-              (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
-            );
-            candidateTracks.push(...fresh);
-            if (candidateTracks.length >= 10) break;
-          }
-        } catch {
-          // fall through to next seed or AI recommendation
         }
+        if (candidateTracks.length >= 12) break;
+      }
+
+      // Guard against stale asynchronous resolution if user navigated away during fetch
+      if (currentRef.current?.id !== startingTrackId) {
+        return [];
       }
 
       // 2. Fallback to recommendation engine with circadian, affinity, and discovery context
@@ -1647,9 +1673,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (res.tracks && res.tracks.length > 0) {
           const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(res.tracks as Track[]), getSessionContext());
           candidateTracks = ranked.filter(
-            (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
+            (t) =>
+              !trackExistsIn(currentQueue, t as TrackLike) &&
+              !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
+              !dislikedIdsRef.current.has(t.id),
           );
         }
+      }
+
+      // Stale check after second fetch
+      if (currentRef.current?.id !== startingTrackId) {
+        return [];
       }
 
       // 3. Last resort: cached pool passed through the same freshness filter
@@ -1664,11 +1698,32 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         ]);
         const rankedPool = thompsonSamplingPolicy.rankCandidates(pool, getSessionContext());
         candidateTracks = rankedPool.filter(
-          (t) => !trackExistsIn(currentQueue, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
+          (t) =>
+            !trackExistsIn(currentQueue, t as TrackLike) &&
+            !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
+            !dislikedIdsRef.current.has(t.id),
+        );
+      }
+
+      // Secondary fallback: allow unplayed tracks from cached pool, still strictly enforcing history exclusion
+      if (candidateTracks.length === 0) {
+        const fallbackPool = applyFeedFilters([
+          ...recsRef.current,
+          ...trendingRef.current,
+          ...oldSongsRef.current,
+        ]);
+        candidateTracks = fallbackPool.filter(
+          (t) =>
+            !trackExistsIn(currentQueue, t as TrackLike) &&
+            !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
+            !dislikedIdsRef.current.has(t.id),
         );
       }
 
       if (candidateTracks.length > 0) {
+        // Advance AutoDJ pagination depth for the next cycle
+        autoDjPageRef.current = (curPage % 5) + 1;
+
         const deduped = dedupeTracks(candidateTracks);
         // Diversify to guarantee no more than 2 tracks per artist, 1 per movie, and spaced out
         const diversifiedBatch = diversifyTrackList(deduped, {
@@ -1707,14 +1762,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
 
         const finalBatch = diversifiedBatch.slice(0, 15);
+        markFeedDisplayed(finalBatch);
         setQueue((prev) => [...prev, ...finalBatch]);
         return finalBatch;
       }
       return [];
     } finally {
+      isExtendingRef.current = false;
       setExtending(false);
     }
-  }, [extending, runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters]);
+  }, [runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed]);
   extendQueueRef.current = extendQueue;
 
   const searchFor = useCallback(
@@ -1940,7 +1997,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       ...(mixTracksRef.current?.newrelease || []),
     ]);
     const candidateTracks = pool.filter(
-      (t) => !trackExistsIn(q, t as TrackLike) && !dislikedIdsRef.current.has(t.id),
+      (t) =>
+        !trackExistsIn(q, t as TrackLike) &&
+        !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
+        !dislikedIdsRef.current.has(t.id),
     );
 
     if (candidateTracks.length > 0) {
@@ -1980,18 +2040,25 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           return;
         }
       }
-      const updated = queueRef.current;
-      const fallbackIdx = findNextValidTrackIndex(updated, i, true);
-      if (fallbackIdx !== -1) {
-        indexRef.current = fallbackIdx;
-        setIndex(fallbackIdx);
-        const fbTrack = updated[fallbackIdx];
-        if (fbTrack) {
-          player.seek(0);
-          progressTrackerRef.current.reset(fbTrack.id);
-          loadedTrackIdRef.current = fbTrack.id;
-          void load(fbTrack.id, fbTrack.previewUrl, 0, fbTrack.title, fbTrack.artist);
+      if (repeatModeRef.current === "all") {
+        const updated = queueRef.current;
+        const fallbackIdx = findNextValidTrackIndex(updated, i, true);
+        if (fallbackIdx !== -1) {
+          indexRef.current = fallbackIdx;
+          setIndex(fallbackIdx);
+          const fbTrack = updated[fallbackIdx];
+          if (fbTrack) {
+            player.seek(0);
+            progressTrackerRef.current.reset(fbTrack.id);
+            loadedTrackIdRef.current = fbTrack.id;
+            void load(fbTrack.id, fbTrack.previewUrl, 0, fbTrack.title, fbTrack.artist);
+          }
+        } else {
+          player.pause();
         }
+      } else {
+        // Queue genuinely exhausted and repeat is disabled: stop cleanly
+        player.pause();
       }
     });
   }, [extendQueue, findNextValidTrackIndex, logSkip, player, load, getSessionContext, applyFeedFilters]);

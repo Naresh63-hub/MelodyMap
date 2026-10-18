@@ -78,6 +78,7 @@ export interface UnifiedTrack {
  */
 export interface ProviderSearchOptions {
   limit?: number | undefined;
+  page?: number | undefined;
   language?: string | undefined;
   languageCode?: string | undefined;
   genre?: string | undefined;

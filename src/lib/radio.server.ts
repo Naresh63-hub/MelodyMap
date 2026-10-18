@@ -14,6 +14,7 @@ export interface RadioOptions {
   artist?: string | undefined;
   album?: string | undefined;
   languages?: string[] | undefined;
+  page?: number | undefined;
 }
 
 export async function getRadioTracks(
@@ -26,6 +27,7 @@ export async function getRadioTracks(
     let title = options?.title?.trim() || "";
     const artist = options?.artist?.trim() || "";
     const album = options?.album?.trim() || "";
+    const page = Math.max(1, Math.floor(options?.page ?? 1));
 
     if (!title && videoId) {
       const clean = videoId.replace(/^saavn:/, "").replace(/[-_]/g, " ").trim();
@@ -56,48 +58,56 @@ export async function getRadioTracks(
 
     const primaryLang = languages[0] || "";
 
-    // Build balanced queries:
-    // 1 query for seed artist top hits (max 6 tracks)
-    // 1 query for seed album/soundtrack (if valid and distinct from track title)
-    // 2-3 queries for distinct co-artists in the same language or user languages
-    const queries: { query: string; limit: number }[] = [];
+    // Build deep, taste-weighted catalog queries across albums, discography & co-artists:
+    // (Notice: no shallow "top songs" or "hit songs" bias that traps recommendations in 3 viral singles)
+    const queries: { query: string; limit: number; page?: number }[] = [];
 
     if (artist) {
-      const artistQuery = primaryLang ? `${artist} ${primaryLang} top songs` : `${artist} top songs`;
-      queries.push({ query: artistQuery, limit: 6 });
+      // 1. Primary artist natural discography at current pagination depth
+      queries.push({ query: `${artist} songs`, limit: 8, page });
+
+      // 2. Specific album/deep cut exploration for the artist
+      if (page === 1) {
+        queries.push({ query: `${artist} album songs`, limit: 5, page: 1 });
+      } else if (page === 2) {
+        queries.push({ query: `${artist} melodies`, limit: 5, page: 1 });
+      } else {
+        queries.push({ query: `${artist} unplugged`, limit: 5, page: 1 });
+      }
     }
 
     if (album && album.length > 2 && norm(album) !== normalizedSeedTitle) {
-      queries.push({ query: `${album} songs`, limit: 4 });
+      queries.push({ query: `${album} album`, limit: 5, page: Math.min(page, 2) });
     }
 
-    // Co-artists for musical variety in the listener's language(s)
+    // Co-artists for sonic variety in listener's language(s)
     const availableCoArtists = (primaryLang && LANGUAGE_ARTISTS[primaryLang]
       ? LANGUAGE_ARTISTS[primaryLang]
       : Object.values(LANGUAGE_ARTISTS).flat()
     ).filter((a) => !artist || a.toLowerCase() !== artist.toLowerCase());
 
     if (availableCoArtists.length > 0) {
-      // Pick up to 3 distinct random co-artists
+      // Pick up to 3 distinct co-artists
       const shuffled = [...availableCoArtists].sort(() => Math.random() - 0.5);
       const pickedCoArtists = shuffled.slice(0, 3);
-      for (const ca of pickedCoArtists) {
-        queries.push({ query: `${ca} hit songs`, limit: 6 });
-      }
+      pickedCoArtists.forEach((ca, idx) => {
+        const coArtistPage = page > 1 && idx % 2 === 1 ? 2 : 1;
+        queries.push({ query: `${ca} songs`, limit: 6, page: coArtistPage });
+      });
     }
 
     // Fallback if no queries were formed
     if (queries.length === 0) {
       if (cleanTitle) {
-        queries.push({ query: `${cleanTitle} song`, limit: 10 });
+        queries.push({ query: `${cleanTitle} songs`, limit: 10, page });
       } else {
-        queries.push({ query: `${primaryLang || "top"} superhit songs`, limit: 12 });
+        queries.push({ query: `${primaryLang || "trending"} melodies`, limit: 12, page });
       }
     }
 
-    // Fetch queries concurrently on JioSaavn with timeout protection
-    const searchPromises = queries.map(({ query, limit: qLimit }) =>
-      searchSaavn(query, { limit: qLimit }).catch(() => [] as Track[]),
+    // Fetch queries concurrently on JioSaavn with timeout protection and pagination depth
+    const searchPromises = queries.map(({ query, limit: qLimit, page: qPage }) =>
+      searchSaavn(query, { limit: qLimit, page: qPage }).catch(() => [] as Track[]),
     );
     const searchResults = await Promise.all(searchPromises);
 

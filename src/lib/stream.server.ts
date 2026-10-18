@@ -240,13 +240,14 @@ export async function resolveWithInnerTubePlayer(
           cleanTitleOpt,
           options.artist || undefined,
           lastSeenDurations.get(videoId) ?? null,
+          _quality,
         ).catch(() => null);
         if (saavnMatch?.url) {
           return {
             url: saavnMatch.url,
             mimeType: saavnMatch.mimeType || "audio/mp4",
             contentLength: null,
-            audioBitrate: 160000,
+            audioBitrate: _quality === "saver" ? 96000 : _quality === "standard" ? 160000 : 320000,
             source: "saavn",
           };
         }
@@ -278,7 +279,11 @@ export async function resolveWithInnerTubePlayer(
     }).catch(() => null);
     if (res && res.ok) {
       const data = (await res.json().catch(() => null)) as any;
-      const fmt = data?.streamingData?.adaptiveFormats?.[0];
+      const audioFormats = (data?.streamingData?.adaptiveFormats || []).filter(
+        (f: any) => f.mimeType && f.mimeType.startsWith("audio/"),
+      );
+      audioFormats.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0));
+      const fmt = audioFormats[0] || data?.streamingData?.adaptiveFormats?.[0];
       if (fmt?.url) {
         return {
           url: fmt.url,
@@ -300,13 +305,14 @@ export async function resolveWithInnerTubePlayer(
         clientTitle,
         clientArtist || undefined,
         lastSeenDurations.get(videoId) ?? null,
+        _quality,
       ).catch(() => null);
       if (saavnMatch?.url) {
         return {
           url: saavnMatch.url,
           mimeType: saavnMatch.mimeType || "audio/mp4",
           contentLength: null,
-          audioBitrate: 160000,
+          audioBitrate: _quality === "saver" ? 96000 : _quality === "standard" ? 160000 : 320000,
           source: "saavn",
         };
       }
@@ -350,13 +356,14 @@ export async function resolveWithInnerTubePlayer(
       cleanTitle,
       rawAuthor,
       lastSeenDurations.get(videoId) ?? null,
+      _quality,
     ).catch(() => null);
     if (saavnMatch?.url) {
       return {
         url: saavnMatch.url,
         mimeType: saavnMatch.mimeType || "audio/mp4",
         contentLength: null,
-        audioBitrate: 160000,
+        audioBitrate: _quality === "saver" ? 96000 : _quality === "standard" ? 160000 : 320000,
         source: "saavn",
       };
     }

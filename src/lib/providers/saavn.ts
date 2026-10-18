@@ -18,7 +18,7 @@ const DES_KEY = "38346591";
  */
 export function decryptSaavnMediaUrl(
   encryptedUrl: string,
-  quality: "saver" | "standard" | "high" = "standard",
+  quality: "saver" | "standard" | "high" = "high",
 ): string {
   if (!encryptedUrl) return "";
   try {
@@ -88,7 +88,7 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
   const durationSeconds = Number(raw.more_info?.duration || raw.duration) || 0;
   const artwork = upgradeArtwork(raw.image);
   const encryptedUrl = raw.more_info?.encrypted_media_url || raw.encrypted_media_url;
-  const streamUrl = decryptSaavnMediaUrl(encryptedUrl, "standard");
+  const streamUrl = decryptSaavnMediaUrl(encryptedUrl, "high");
 
   return {
     id: `saavn:${songId}`,
@@ -113,7 +113,7 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
           providerTrackId: songId,
           url: streamUrl,
           type: "full",
-          bitrateKbps: 160,
+          bitrateKbps: 320,
           format: "mp4",
         }
       : undefined,
@@ -131,8 +131,9 @@ export async function searchSaavn(
   if (!clean) return [];
 
   const limit = Math.min(options.limit ?? 20, 30);
+  const page = Math.max(1, Math.floor(options.page ?? 1));
   const fetchLimit = Math.min(Math.max(limit * 2, 30), 50);
-  const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=${encodeURIComponent(clean)}&p=1&n=${fetchLimit}`;
+  const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=${encodeURIComponent(clean)}&p=${page}&n=${fetchLimit}`;
 
   try {
     const res = await fetch(url, {
@@ -255,6 +256,7 @@ export async function resolveSaavnByMeta(
   title: string,
   artist?: string,
   targetDurationSeconds?: number | null,
+  quality: "saver" | "standard" | "high" = "high",
 ): Promise<{
   url: string;
   mimeType: string;
@@ -323,8 +325,11 @@ export async function resolveSaavnByMeta(
 
   // Only accept if bestScore meets confidence threshold and has direct playback source
   if (best && bestScore >= 0.55 && best.playbackSource?.url) {
+    const targetSuffix =
+      quality === "saver" ? "_96.mp4" : quality === "standard" ? "_160.mp4" : "_320.mp4";
+    const mediaUrl = best.playbackSource.url.replace(/_(?:96|160|320)\.mp4/, targetSuffix);
     return {
-      url: best.playbackSource.url,
+      url: mediaUrl,
       mimeType: "audio/mp4",
       source: "saavn",
       title: best.title,

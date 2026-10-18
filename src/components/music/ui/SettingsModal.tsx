@@ -42,6 +42,10 @@ import {
   getSponsorBlockEnabled,
   setSponsorBlockEnabled,
 } from "@/lib/sponsorblock";
+import {
+  isVolumeLevelingEnabled,
+  setVolumeLevelingEnabled,
+} from "@/lib/audio-leveling";
 import type { Profile } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { isSafeAvatarUrl, getSafeAvatarUrl } from "@/lib/avatar-url";
@@ -108,6 +112,7 @@ export function SettingsModal({
   const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "insights">("account");
   const [sponsorBlockOn, setSponsorBlockOn] = useState<boolean>(getSponsorBlockEnabled);
   const [lowNetworkOn, setLowNetworkOn] = useState<boolean>(isLowNetworkModeEnabled);
+  const [levelingOn, setLevelingOn] = useState<boolean>(isVolumeLevelingEnabled);
   const [internalCrossfade, setInternalCrossfade] = useState<number>(() => {
     return crossfade ?? loadEqualizerSettings().crossfade;
   });
@@ -158,6 +163,11 @@ export function SettingsModal({
   const handleToggleSponsorBlock = (val: boolean) => {
     setSponsorBlockOn(val);
     setSponsorBlockEnabled(val);
+  };
+
+  const handleToggleLeveling = (val: boolean) => {
+    setLevelingOn(val);
+    setVolumeLevelingEnabled(val);
   };
 
   const handleSaveProfile = async () => {
@@ -803,6 +813,23 @@ export function SettingsModal({
                     </p>
                   </div>
                   <Switch checked={sponsorBlockOn} onCheckedChange={handleToggleSponsorBlock} />
+                </div>
+
+                <div className="h-px bg-chip" />
+
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-foreground">Safe Loudness Leveling &amp; Peak Protection</h3>
+                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 border border-emerald-500/30">
+                        Safe
+                      </span>
+                    </div>
+                    <p className="text-xs text-foreground/40 mt-0.5">
+                      Smooth 50ms volume micro-transitions across tracks with element ceiling protection
+                    </p>
+                  </div>
+                  <Switch checked={levelingOn} onCheckedChange={handleToggleLeveling} />
                 </div>
 
                 <div className="h-px bg-chip" />

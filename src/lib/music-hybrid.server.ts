@@ -38,7 +38,7 @@ export async function searchHybrid(
   // JioSaavn Pure Original Music Strategy:
   try {
     const { searchSaavn } = await import("./providers/saavn");
-    let saavnRes = await searchSaavn(cleanQ, { limit });
+    let saavnRes = await searchSaavn(cleanQ, { limit, page });
     let originalTracks = saavnRes.filter(isOriginalSong);
     if (originalTracks.length > 0) {
       return { tracks: originalTracks as HybridTrack[] };
@@ -52,7 +52,7 @@ export async function searchHybrid(
       .trim();
 
     if (simplified && simplified.toLowerCase() !== cleanQ.toLowerCase()) {
-      saavnRes = await searchSaavn(simplified, { limit });
+      saavnRes = await searchSaavn(simplified, { limit, page });
       originalTracks = saavnRes.filter(isOriginalSong);
       if (originalTracks.length > 0) {
         return { tracks: originalTracks as HybridTrack[] };

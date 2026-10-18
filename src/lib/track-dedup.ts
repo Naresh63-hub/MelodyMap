@@ -121,7 +121,10 @@ export function getTrackIdentity(track: TrackLike): string {
 export function calculateTrackSimilarity(a: TrackLike, b: TrackLike): number {
   if (a.id === b.id) return 1.0;
 
-  const titleScore = stringSimilarity(a.title, b.title);
+  const titleScore = Math.max(
+    stringSimilarity(a.title, b.title),
+    stringSimilarity(cleanSongTitle(a.title), cleanSongTitle(b.title)),
+  );
   const artistScore = stringSimilarity(a.artist, b.artist);
 
   const durA = durationSec(a.duration);

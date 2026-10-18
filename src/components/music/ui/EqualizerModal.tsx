@@ -234,9 +234,9 @@ export function EqualizerModal({
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { id: "saver", label: "Data Saver", desc: "Low data (64k)" },
-                  { id: "standard", label: "Standard", desc: "Balanced (128k)" },
-                  { id: "high", label: "Ultra HD", desc: "Studio (256k+)" },
+                  { id: "saver", label: "Data Saver", desc: "96 kbps AAC" },
+                  { id: "standard", label: "Standard", desc: "160 kbps AAC" },
+                  { id: "high", label: "Ultra HD", desc: "Up to 320 kbps AAC" },
                 ].map((q) => {
                   const active = settings.quality === q.id;
                   return (
@@ -260,6 +260,9 @@ export function EqualizerModal({
                   );
                 })}
               </div>
+              <p className="text-[10px] text-muted-foreground/75 mt-1.5">
+                Maximum stream quality is source-dependent and adapts dynamically to network conditions.
+              </p>
             </div>
           </div>
         )}

@@ -148,6 +148,7 @@ const RadioInput = z.object({
   artist: z.string().optional(),
   album: z.string().optional(),
   languages: z.array(z.string()).optional(),
+  page: z.number().optional(),
 });
 
 /** Fetches song radio / next queue recommendations using JioSaavn */
@@ -161,6 +162,7 @@ export const getSongRadio = createServerFn({ method: "POST" })
         artist: data.artist,
         album: data.album,
         languages: data.languages,
+        page: data.page,
       });
       return { tracks: res.tracks, continuation: res.continuation, error: null };
     } catch {
@@ -192,13 +194,14 @@ const CURRENT_YEAR = new Date().getFullYear();
 const PREV_YEAR = CURRENT_YEAR - 1;
 
 const DIVERSE_THEMES = [
-  `top songs ${CURRENT_YEAR}`,
-  `popular songs ${CURRENT_YEAR}`,
-  `latest songs ${CURRENT_YEAR}`,
-  `trending hits ${CURRENT_YEAR}`,
-  `chartbusters ${CURRENT_YEAR}`,
+  `melodies ${CURRENT_YEAR}`,
+  `soundtrack songs ${CURRENT_YEAR}`,
   `movie songs ${CURRENT_YEAR}`,
-  `top tracks`,
+  `album tracks`,
+  `unplugged acoustic`,
+  `evergreen melodies`,
+  `soulful songs`,
+  `classics`,
 ];
 
 function getDynamicQueries(
@@ -239,7 +242,7 @@ function getDynamicQueries(
   const generalNewQ: string[] = [];
   const generalOldQ: string[] = [];
 
-  // 1. High-priority queries for user's affinity + favorited artists
+  // 1. High-priority queries for user's affinity + favorited artists (delving into discographies)
   // When user is starting fresh or has few artists, seed from the top language artists pool!
   const effectiveUserArtists = filteredUserArtists.length > 0
     ? filteredUserArtists
@@ -251,9 +254,9 @@ function getDynamicQueries(
     for (const art of priorityArtists.slice(0, 6)) {
       userNewQ.push(art);
       userNewQ.push(`${art}${langQualifier} songs`);
-      userNewQ.push(`${art} hits`);
+      userNewQ.push(`${art} album songs`);
       userOldQ.push(art);
-      userOldQ.push(`${art} songs`);
+      userOldQ.push(`${art} melodies`);
     }
   }
 
@@ -264,7 +267,7 @@ function getDynamicQueries(
       generalNewQ.push(art);
       generalNewQ.push(`${art} songs`);
       generalOldQ.push(art);
-      generalOldQ.push(`${art} hits`);
+      generalOldQ.push(`${art} album songs`);
     }
   }
 
@@ -284,7 +287,7 @@ function getDynamicQueries(
       generalNewQ.push(art);
       generalNewQ.push(`${art} ${langPrefix}songs`);
       generalOldQ.push(art);
-      generalOldQ.push(`${art} hits`);
+      generalOldQ.push(`${art} melodies`);
     }
 
     for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 2)) {
@@ -316,6 +319,7 @@ export async function runQueryBatch(
   perQueryLimit = 10,
   musicOnly = true,
   bypassCache = false,
+  page = 1,
 ): Promise<Track[]> {
   const { searchSaavn } = await import("./providers/saavn");
   const seenIds = new Set<string>();
@@ -323,16 +327,17 @@ export async function runQueryBatch(
   const results: Track[] = [];
 
   const batchResults = await Promise.allSettled(
-    queries.map(async (q) => {
+    queries.map(async (q, idx) => {
       try {
-        const saavnRes = await searchSaavn(q, { limit: perQueryLimit });
+        const queryPage = Math.max(1, page + (idx % 2));
+        const saavnRes = await searchSaavn(q, { limit: perQueryLimit, page: queryPage });
         if (saavnRes.length > 0) return saavnRes as Track[];
       } catch {}
 
       if (!musicOnly) {
         try {
           const { searchMultiProvider } = await import("./providers/multi-search");
-          const multi = await searchMultiProvider(q, { limit: perQueryLimit });
+          const multi = await searchMultiProvider(q, { limit: perQueryLimit, page });
           if (multi.tracks.length > 0) return multi.tracks as Track[];
         } catch {}
       }

@@ -14,6 +14,13 @@ import {
 import { isLowNetworkModeEnabled } from "@/lib/network-mode";
 import { hasFullLengthDirectSource } from "@/lib/track-stream-policy";
 import { getBlob } from "@/lib/offline";
+import { audioPrefetchManager } from "@/lib/audio-prefetch";
+import {
+  isVolumeLevelingEnabled,
+  setVolumeLevelingEnabled,
+  computeEffectiveVolume,
+  rampAudioVolume,
+} from "@/lib/audio-leveling";
 
 export type NextTrackInfo = {
   id: string;
@@ -210,8 +217,34 @@ export function useAudioPlayer(options: {
   const isRetryingRef = useRef<boolean>(false);
   const sourceProbeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wakeLockRef = useRef<any>(null);
+  const userVolumeRef = useRef<number>(1.0);
+  const volumeRampCleanupRef = useRef<(() => void) | null>(null);
+
+  const applySafeVolumeLeveling = useCallback(
+    (track?: { id?: string | undefined; source?: string | undefined } | null, smooth = true) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      const enabled = isVolumeLevelingEnabled();
+      const effectiveVol = computeEffectiveVolume(userVolumeRef.current, track, enabled);
+      if (volumeRampCleanupRef.current) {
+        volumeRampCleanupRef.current();
+        volumeRampCleanupRef.current = null;
+      }
+      if (smooth && !audio.paused) {
+        volumeRampCleanupRef.current = rampAudioVolume(audio, effectiveVol, 50);
+      } else {
+        audio.volume = effectiveVol;
+      }
+    },
+    [],
+  );
 
   const clearPendingTimers = useCallback(() => {
+    audioPrefetchManager.abort();
+    if (volumeRampCleanupRef.current) {
+      volumeRampCleanupRef.current();
+      volumeRampCleanupRef.current = null;
+    }
     if (sourceProbeTimerRef.current) {
       clearTimeout(sourceProbeTimerRef.current);
       sourceProbeTimerRef.current = null;
@@ -444,10 +477,10 @@ export function useAudioPlayer(options: {
 
       audio.loop = false;
       audio.muted = false;
-      if (audio.volume === 0) audio.volume = 1;
       audio.src = url;
       const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
       audio.playbackRate = validSpeed;
+      applySafeVolumeLeveling({ id: currentTrackIdRef.current ?? undefined }, false);
       audio.load();
 
       isFadingOutRef.current = false;
@@ -489,6 +522,7 @@ export function useAudioPlayer(options: {
       initWebAudio,
       detectStreamSource,
       clearPendingTimers,
+      applySafeVolumeLeveling,
     ],
   );
 
@@ -503,10 +537,19 @@ export function useAudioPlayer(options: {
       // Seamlessly hot-swap active stream at current position
       const audio = audioRef.current;
       const activeId = currentTrackIdRef.current;
-      if (audio && activeId && audio.src && audio.src.includes("/api/stream/")) {
+      if (audio && activeId) {
         const cur = audio.currentTime || 0;
-        const newUrl = streamUrl(activeId, quality);
-        setStream(newUrl, cur);
+        if (audio.src && audio.src.includes("/api/stream/")) {
+          const newUrl = streamUrl(activeId, quality);
+          setStream(newUrl, cur);
+        } else if (audio.src && audio.src.includes("saavncdn.com")) {
+          const targetSuffix =
+            quality === "saver" ? "_96.mp4" : quality === "standard" ? "_160.mp4" : "_320.mp4";
+          const newUrl = audio.src.replace(/_(?:96|160|320)\.mp4/, targetSuffix);
+          if (newUrl !== audio.src) {
+            setStream(newUrl, cur);
+          }
+        }
       }
     },
     [equalizerSettings, applyEqualizerGains, streamUrl, setStream],
@@ -638,18 +681,29 @@ export function useAudioPlayer(options: {
 
     const applyPendingSeek = () => {
       if (pendingSeekRef.current !== null) {
+        if (audio.readyState < 1) {
+          // Media timeline not yet available (HAVE_NOTHING).
+          // Retain pendingSeekRef.current until loadedmetadata or canplay fires.
+          return;
+        }
         const target = pendingSeekRef.current;
         pendingSeekRef.current = null;
         const dur = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : target;
         const clamped = Math.max(0, Math.min(target, dur));
-        audio.currentTime = clamped;
-        setPosition(clamped);
+        try {
+          audio.currentTime = clamped;
+          setPosition(clamped);
+        } catch (e) {
+          console.warn("[MelodyMap] Failed to seek to pending position:", e);
+        }
       }
     };
 
     const onPlay = () => {
       audio.muted = false;
-      if (audio.volume === 0) audio.volume = 1;
+      if (audio.volume === 0 && userVolumeRef.current > 0) {
+        applySafeVolumeLeveling({ id: currentTrackIdRef.current ?? undefined }, false);
+      }
       initWebAudio();
       // 'play' fires the instant play() is called, BEFORE any audio bytes have
       // arrived. Do NOT clear isLoading here: a cold stream can buffer for many
@@ -661,7 +715,9 @@ export function useAudioPlayer(options: {
     };
     const onPlaying = () => {
       audio.muted = false;
-      if (audio.volume === 0) audio.volume = 1;
+      if (audio.volume === 0 && userVolumeRef.current > 0) {
+        applySafeVolumeLeveling({ id: currentTrackIdRef.current ?? undefined }, false);
+      }
       clearPendingTimers();
       reconnectAttemptsRef.current = 0;
       isRetryingRef.current = false;
@@ -735,6 +791,19 @@ export function useAudioPlayer(options: {
         if (stalledTimerRef.current) {
           clearTimeout(stalledTimerRef.current);
           stalledTimerRef.current = null;
+        }
+      }
+
+      // Proactive Prefetch for next track in queue when <= 20s remaining
+      if (audioPrefetchManager.shouldTriggerPrefetch(cur, dur)) {
+        const nextTrack = getNextTrackRef.current?.();
+        if (nextTrack?.id) {
+          audioPrefetchManager.prefetchNextTrack({
+            nextTrack,
+            quality: equalizerSettingsRef.current.quality,
+            sessionId: playbackSessionRef.current,
+            streamUrlResolver: streamUrl,
+          }).catch(() => {});
         }
       }
 
@@ -815,12 +884,15 @@ export function useAudioPlayer(options: {
         lastValidPositionRef.current = 0;
         setPosition(0);
         setDuration(0);
+        const prewarmed = audioPrefetchManager.getPrewarmedUrl(nextTrack.id);
         const nextUrl =
+          prewarmed ||
           currentDirectUrlRef.current ||
           streamUrl(nextTrack.id, equalizerSettingsRef.current.quality, nextTrack.title, nextTrack.artist);
         audio.src = nextUrl;
         const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
         audio.playbackRate = validSpeed;
+        applySafeVolumeLeveling(nextTrack, true);
         audio.load();
         const p = audio.play();
         if (p !== undefined) {
@@ -969,7 +1041,7 @@ export function useAudioPlayer(options: {
         stalledTimerRef.current = null;
       }
     };
-  }, [initWebAudio, streamUrl, triggerReconnect]);
+  }, [initWebAudio, streamUrl, triggerReconnect, applySafeVolumeLeveling]);
 
   // Maintain uninterrupted playback across tab switches and app foreground/background
   useEffect(() => {
@@ -998,10 +1070,27 @@ export function useAudioPlayer(options: {
     }
   }, [isPlaying, acquireWakeLock, releaseWakeLock]);
 
+  // Dynamically update audio volume if loudness leveling is toggled in user preferences
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleLevelingChange = () => {
+      applySafeVolumeLeveling({ id: currentTrackIdRef.current ?? undefined }, true);
+    };
+    window.addEventListener("melodymap:leveling-change", handleLevelingChange);
+    return () => {
+      window.removeEventListener("melodymap:leveling-change", handleLevelingChange);
+    };
+  }, [applySafeVolumeLeveling]);
+
   /** Cleanup on unmount */
   useEffect(() => {
     return () => {
       releaseWakeLock();
+      audioPrefetchManager.clear();
+      if (volumeRampCleanupRef.current) {
+        volumeRampCleanupRef.current();
+        volumeRampCleanupRef.current = null;
+      }
       if (sourceProbeTimerRef.current) {
         clearTimeout(sourceProbeTimerRef.current);
         sourceProbeTimerRef.current = null;
@@ -1051,9 +1140,18 @@ export function useAudioPlayer(options: {
   /**
    * Direct URLs are only honored for providers whose streams are full-length
    * (saavn/audius/jamendo/archive/podcast).
+   * For JioSaavn, automatically adapts bitrate suffix to match user's quality preference.
    */
-  const sanitizeDirectUrl = (trackId: string, directUrl?: string): string | undefined =>
-    directUrl && hasFullLengthDirectSource(trackId) ? directUrl : undefined;
+  const sanitizeDirectUrl = (trackId: string, directUrl?: string): string | undefined => {
+    if (!directUrl || !hasFullLengthDirectSource(trackId)) return undefined;
+    if (directUrl.includes("saavncdn.com")) {
+      const isLowNet = isLowNetworkModeEnabled();
+      const q = isLowNet ? "saver" : (equalizerSettingsRef.current.quality || "high");
+      const targetSuffix = q === "saver" ? "_96.mp4" : q === "standard" ? "_160.mp4" : "_320.mp4";
+      return directUrl.replace(/_(?:96|160|320)\.mp4/, targetSuffix);
+    }
+    return directUrl;
+  };
 
   /** Load a track and auto-play */
   const load = useCallback(
@@ -1249,6 +1347,7 @@ export function useAudioPlayer(options: {
   }, []);
 
   const seek = useCallback((seconds: number) => {
+    audioPrefetchManager.abort();
     const target = Math.max(0, seconds);
     lastValidPositionRef.current = target;
     setPosition(target);
@@ -1295,12 +1394,13 @@ export function useAudioPlayer(options: {
 
   const setVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(100, v));
+    userVolumeRef.current = clamped / 100;
     const audio = audioRef.current;
     if (audio) {
-      audio.volume = clamped / 100;
+      applySafeVolumeLeveling({ id: currentTrackIdRef.current ?? undefined }, false);
       audio.muted = clamped === 0;
     }
-  }, []);
+  }, [applySafeVolumeLeveling]);
 
   const isReplacementSource = false;
 
