@@ -306,8 +306,8 @@ public class MediaPlaybackService extends Service {
                             PlaybackStateCompat.ACTION_PLAY
                                     | PlaybackStateCompat.ACTION_PAUSE
                                     | PlaybackStateCompat.ACTION_PLAY_PAUSE
-                                    | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
                                     | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                                    | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
                                     | PlaybackStateCompat.ACTION_SEEK_TO
                                     | PlaybackStateCompat.ACTION_STOP)
                     .addCustomAction(likeCustomAction)
@@ -401,9 +401,12 @@ public class MediaPlaybackService extends Service {
                 .addAction(R.drawable.ic_skip_next, "Next", serviceActionIntent(ACTION_NEXT));
 
         if (mediaSession != null) {
+            // Include Action 0 (Like), Action 1 (Prev), Action 2 (Play/Pause), and Action 3 (Next)
+            // in compact view so SystemUI displays all 4 buttons on the lock screen row:
+            // [ Heart (Like) ] [ Prev ] [ Play/Pause ] [ Next ] [ Output Switcher ]
             builder.setStyle(new MediaStyle()
                     .setMediaSession(mediaSession.getSessionToken())
-                    .setShowActionsInCompactView(1, 2, 3));
+                    .setShowActionsInCompactView(0, 1, 2, 3));
         }
         return builder.build();
     }
