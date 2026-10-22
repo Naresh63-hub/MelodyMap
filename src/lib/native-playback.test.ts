@@ -4,6 +4,7 @@ import { Capacitor } from "@capacitor/core";
 import {
   installMediaCommandHandler,
   isNativePlaybackEnv,
+  notifyLikedState,
   notifyPlaybackPosition,
   notifyPlaybackState,
   requestBatteryOptimizationExemption,
@@ -15,6 +16,7 @@ type BridgeMock = {
   onPause?: ReturnType<typeof vi.fn>;
   onStop?: ReturnType<typeof vi.fn>;
   onPosition?: ReturnType<typeof vi.fn>;
+  onLiked?: ReturnType<typeof vi.fn>;
   requestIgnoreBatteryOptimizations?: ReturnType<typeof vi.fn>;
 };
 
@@ -147,6 +149,27 @@ describe("notifyPlaybackState", () => {
     };
     expect(() => notifyPlaybackState("playing", { title: "Song" })).not.toThrow();
   });
+
+  it("serializes liked state into the payload", () => {
+    const onPlay = vi.fn();
+    windowMock.AndroidPlayback = { onPlay };
+    notifyPlaybackState("playing", {
+      id: "track-1",
+      title: "Song",
+      liked: true,
+    });
+    expect(onPlay).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(onPlay.mock.calls[0]?.[0] as string) as Record<string, unknown>;
+    expect(payload["liked"]).toBe(true);
+
+    notifyPlaybackState("playing", {
+      id: "track-1",
+      title: "Song",
+      liked: false,
+    });
+    const payload2 = JSON.parse(onPlay.mock.calls[1]?.[0] as string) as Record<string, unknown>;
+    expect(payload2["liked"]).toBe(false);
+  });
 });
 
 describe("notifyPlaybackPosition", () => {
@@ -163,6 +186,32 @@ describe("notifyPlaybackPosition", () => {
   });
 });
 
+describe("notifyLikedState", () => {
+  it("forwards the liked state to AndroidPlayback.onLiked", () => {
+    const onLiked = vi.fn();
+    windowMock.AndroidPlayback = { onLiked };
+    notifyLikedState(true);
+    expect(onLiked).toHaveBeenCalledWith(true);
+
+    notifyLikedState(false);
+    expect(onLiked).toHaveBeenCalledWith(false);
+  });
+
+  it("is a safe no-op without a bridge or when onLiked is missing", () => {
+    windowMock.AndroidPlayback = {};
+    expect(() => notifyLikedState(true)).not.toThrow();
+  });
+
+  it("does not throw when the bridge throws", () => {
+    windowMock.AndroidPlayback = {
+      onLiked: vi.fn(() => {
+        throw new Error("bridge threw");
+      }),
+    };
+    expect(() => notifyLikedState(true)).not.toThrow();
+  });
+});
+
 describe("installMediaCommandHandler", () => {
   it("dispatches play/pause/next/prev commands", () => {
     const handlers = { play: vi.fn(), pause: vi.fn(), next: vi.fn(), prev: vi.fn() };
@@ -175,6 +224,16 @@ describe("installMediaCommandHandler", () => {
     expect(handlers.pause).toHaveBeenCalledTimes(1);
     expect(handlers.next).toHaveBeenCalledTimes(1);
     expect(handlers.prev).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
+  it("dispatches like, unlike, and toggle_like commands", () => {
+    const handlers = { like: vi.fn() };
+    const cleanup = installMediaCommandHandler(handlers);
+    windowMock.__melodymap_media_command?.("like");
+    windowMock.__melodymap_media_command?.("unlike");
+    windowMock.__melodymap_media_command?.("toggle_like");
+    expect(handlers.like).toHaveBeenCalledTimes(3);
     cleanup();
   });
 

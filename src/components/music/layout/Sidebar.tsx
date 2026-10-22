@@ -12,6 +12,7 @@ import {
   Mic,
   Pause,
   Play,
+  Radio,
   Search,
   Settings,
   SkipForward,
@@ -83,6 +84,9 @@ type Props = {
   onSignIn?: () => void;
   onSignOut?: () => Promise<void> | void;
   onOpenSettings?: () => void;
+  onOpenJam?: () => void;
+  jamActive?: boolean;
+  jamParticipantsCount?: number;
 };
 
 export function Sidebar({
@@ -103,6 +107,9 @@ export function Sidebar({
   onSignIn,
   onSignOut,
   onOpenSettings,
+  onOpenJam,
+  jamActive = false,
+  jamParticipantsCount = 1,
 }: Props) {
   return (
     <aside
@@ -194,6 +201,46 @@ export function Sidebar({
             </div>
           </div>
         ))}
+
+        {/* Live Jam Collaborative Listening section */}
+        {onOpenJam && (
+          <div className="pt-2 border-t border-hair/50">
+            {!collapsed && (
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8B5CF6]">
+                Live Jam
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={onOpenJam}
+              title={collapsed ? (jamActive ? `Jam (${jamParticipantsCount} live)` : "Jam Session") : undefined}
+              className={cn(
+                "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition-all duration-150 border",
+                collapsed && "justify-center px-2 py-2.5",
+                jamActive
+                  ? "bg-[#8B5CF6]/20 border-[#8B5CF6]/50 text-[#8B5CF6] font-semibold shadow-xs"
+                  : "border-transparent text-secondary-foreground font-medium hover:bg-[#8B5CF6]/10 hover:border-[#8B5CF6]/30 hover:text-foreground",
+              )}
+            >
+              {jamActive && (
+                <div className="absolute left-1.5 top-1/2 -translate-y-1/2 h-4 w-[3px] rounded-full bg-[#8B5CF6]" />
+              )}
+              <Radio className={cn("h-[18px] w-[18px] shrink-0 text-[#8B5CF6]", jamActive && "animate-pulse")} />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 text-left truncate">Jam Session</span>
+                  {jamActive ? (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#8B5CF6]/30 text-[#8B5CF6]">
+                      {jamParticipantsCount} LIVE
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground font-medium">New</span>
+                  )}
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* Mini-player (collapsed only) */}

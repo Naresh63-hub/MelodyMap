@@ -5,9 +5,10 @@
  * (PlaybackBridge.java). This module is the ONLY place that talks to it:
  *
  *  - notifyPlaybackState()  → start/stop the foreground media service and
- *    update its notification + MediaSession (track title, artist, position).
+ *    update its notification + MediaSession (track title, artist, position, liked).
  *  - notifyPlaybackPosition() → lightweight periodic position sync.
- *  - installMediaCommandHandler() → receives play/pause/next/prev/seek
+ *  - notifyLikedState() → immediate like/unlike state synchronization.
+ *  - installMediaCommandHandler() → receives play/pause/next/prev/like/seek
  *    commands from the lockscreen, notification buttons, and headset.
  *  - requestBatteryOptimizationExemption() → once-per-install system prompt
  *    so aggressive OEM battery savers (Xiaomi/Oppo/Realme...) don't kill the
@@ -29,6 +30,8 @@ export interface NativeTrackMeta {
   duration?: number | undefined;
   /** Current position in seconds. */
   position?: number | undefined;
+  /** Whether the active track is saved in user likes / favorites. */
+  liked?: boolean | undefined;
 }
 
 interface AndroidPlaybackBridge {
@@ -36,6 +39,7 @@ interface AndroidPlaybackBridge {
   onPause?: (payloadJson: string) => void;
   onStop?: () => void;
   onPosition?: (positionSeconds: number) => void;
+  onLiked?: (liked: boolean) => void;
   requestIgnoreBatteryOptimizations?: () => void;
 }
 
@@ -107,6 +111,7 @@ function buildPayload(meta: NativeTrackMeta | undefined): string {
     artist: meta?.artist ?? "",
     duration: sanitizeSeconds(meta?.duration),
     position: sanitizeSeconds(meta?.position),
+    liked: Boolean(meta?.liked),
   });
 }
 
@@ -148,12 +153,25 @@ export function notifyPlaybackPosition(positionSeconds: number): void {
   }
 }
 
+/** Lightweight notification to the native service when active track like state toggles. */
+export function notifyLikedState(liked: boolean): void {
+  if (typeof window === "undefined") return;
+  const bridge = window.AndroidPlayback;
+  if (!bridge?.onLiked) return;
+  try {
+    bridge.onLiked(Boolean(liked));
+  } catch (err) {
+    console.warn("[NativePlayback] notifyLikedState bridge call failed:", err);
+  }
+}
+
 export interface NativeMediaCommandHandlers {
   play?: () => void;
   pause?: () => void;
   next?: () => void;
   prev?: () => void;
   stop?: () => void;
+  like?: () => void;
   /** Receives the seek target in seconds (native sends "seek:<seconds>"). */
   seek?: (seconds: number) => void;
 }
@@ -189,6 +207,11 @@ export function installMediaCommandHandler(
           break;
         case "stop":
           handlers.stop?.();
+          break;
+        case "like":
+        case "unlike":
+        case "toggle_like":
+          handlers.like?.();
           break;
         default:
           break;

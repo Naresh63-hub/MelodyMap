@@ -59,6 +59,9 @@ const OnboardingModal = lazy(() =>
 const FloatingMiniPlayer = lazy(() =>
   import("@/components/music/ui/FloatingMiniPlayer").then((m) => ({ default: m.FloatingMiniPlayer }))
 );
+const JamSessionModal = lazy(() =>
+  import("@/components/music/ui/JamSessionModal").then((m) => ({ default: m.JamSessionModal }))
+);
 import { MixesPanel, type MixId } from "@/components/music/MixesPanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { PodcastsPanel } from "@/components/music/ui/PodcastsPanel";
@@ -70,6 +73,7 @@ import { Button } from "@/components/ui/button";
 import { AuthModal } from "@/components/common/AuthModal";
 
 import { useAuth } from "@/lib/auth";
+import { useJamSession } from "@/lib/use-jam-session";
 import {
   useLibrary,
   trackLabel,
@@ -128,6 +132,7 @@ import {
   isNativePlaybackEnv,
   notifyPlaybackPosition,
   notifyPlaybackState,
+  notifyLikedState,
   requestBatteryOptimizationExemption,
 } from "@/lib/native-playback";
 import {
@@ -313,9 +318,11 @@ function MusicApp() {
   const [quickFilterLoading, setQuickFilterLoading] = useState(false);
 
   const [loadingMoreRecs, setLoadingMoreRecs] = useState(false);
+  const [exploreExhausted, setExploreExhausted] = useState(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
+  const [showJamModal, setShowJamModal] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showFloatingMini, setShowFloatingMini] = useState(false);
   const [optionsTrack, setOptionsTrack] = useState<Track | null>(null);
@@ -710,6 +717,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const extendQueueRef = useRef<(() => Promise<Track[]>) | null>(null);
   const autoDjPageRef = useRef<number>(1);
   const isExtendingRef = useRef<boolean>(false);
+  const moreRecsPageRef = useRef<number>(1);
+  const isLoadingMoreRecsRef = useRef<boolean>(false);
+  const recsGenerationRef = useRef<number>(0);
+  const jamRef = useRef<ReturnType<typeof useJamSession> | null>(null);
 
   // --- Player ---
   const player = useAudioPlayer({
@@ -970,13 +981,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const togglePlay = useCallback(() => {
     if (!current) return;
     if (player.isPlaying) {
+      jamRef.current?.notifyPause(player.position);
       pause();
     } else {
       sleepTimerHaltedRef.current = false;
       sleepTimerService.resetExpired();
+      jamRef.current?.notifyPlay(player.position);
       play();
     }
-  }, [current, player.isPlaying, pause, play]);
+  }, [current, player.isPlaying, player.position, pause, play]);
 
   const toggleMute = useCallback(() => {
     if (isMuted) {
@@ -1046,6 +1059,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       // 3. Mark active track and synchronously load & play ONLY this track
       loadedTrackIdRef.current = track.id;
       void load(track.id, track.previewUrl, 0, track.title, track.artist);
+      jamRef.current?.notifyPlay(0, track);
 
       // 4. Auto-populate upcoming queue with similar songs for continuous screen-off playback
       if (continuousRef.current) {
@@ -1339,6 +1353,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const loadHomeFeeds = useCallback(
     async (mood?: string, refreshNonce?: number | string) => {
+      moreRecsPageRef.current = 1;
+      recsGenerationRef.current += 1;
+      setExploreExhausted(false);
       setRecLoading(true);
       const nonce = refreshNonce ?? `${Date.now()}-${safeUUID()}`;
       const clientHour = new Date().getHours();
@@ -1523,14 +1540,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const loadMoreRecommendations = useCallback(
     async (mood?: string) => {
-      if (loadingMoreRecs) return;
+      // Synchronous mutex guard against overlapping concurrent triggers
+      if (isLoadingMoreRecsRef.current || loadingMoreRecs) return;
+      isLoadingMoreRecsRef.current = true;
       setLoadingMoreRecs(true);
       try {
+        moreRecsPageRef.current += 1;
+        const targetPage = moreRecsPageRef.current;
+        const currentGen = recsGenerationRef.current;
         const clientHour = new Date().getHours();
         const affinity = contextEngine.getAffinityWeights(stats);
         const moreCandidates: Track[] = [];
         let fresh: Track[] = [];
         const baseNonce = Date.now();
+
+        // 1. Primary AI / Deep Local Recommendation with deep ocean pagination
         for (let depth = 1; depth <= 3; depth++) {
           const res = await runRecommend({
             data: {
@@ -1540,11 +1564,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               sequence: sequenceBrief(history, stats),
               skipped: skippedLabels(stats),
               count: 16,
+              page: targetPage + (depth - 1),
               ...(mood ? { mood } : {}),
               languages: settings.languages,
               brief: settingsToBrief(settings),
               artists: topArtists(stats, likes),
-              refreshNonce: `${baseNonce}-more-${depth}`,
+              refreshNonce: `${baseNonce}-more-p${targetPage}-d${depth}`,
               discovery: settings.discovery ?? 40,
               affinityArtists: affinity.affinityArtists,
               penalizedArtists: affinity.penalizedArtists,
@@ -1553,7 +1578,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           });
           if (res.tracks && res.tracks.length > 0) {
             for (const t of res.tracks as Track[]) {
-              if (!moreCandidates.some((existing) => sameSong(existing, t))) {
+              if (
+                t &&
+                isOriginalSong(t) &&
+                hasPlayableDuration(t) &&
+                !moreCandidates.some((existing) => sameSong(existing, t))
+              ) {
                 moreCandidates.push(t);
               }
             }
@@ -1561,23 +1591,122 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             if (fresh.length >= 8) break;
           }
         }
-        if (fresh.length > 0) {
-          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
-          setRecs((prev) =>
-            diversifyTrackList(dedupeTracks([...prev, ...ranked]), {
+
+        // 2. Song Radio Deep Fallback across recent seeds if candidates are sparse
+        if (fresh.length < 6) {
+          const seedCandidates: Track[] = [
+            ...recsRef.current.slice(-6).reverse(),
+            ...likes.slice(0, 6),
+            ...history.slice(0, 6),
+          ].filter((s) => Boolean(s?.id));
+
+          const pickedSeeds = seedCandidates.slice(0, 2);
+          for (const seed of pickedSeeds) {
+            try {
+              const radioRes = await getSongRadio({
+                data: {
+                  videoId: seed.id,
+                  title: seed.title,
+                  artist: seed.artist,
+                  album: seed.album,
+                  languages: settings.languages,
+                  limit: 15,
+                  page: targetPage,
+                },
+              });
+              if (radioRes.tracks && radioRes.tracks.length > 0) {
+                for (const t of radioRes.tracks as Track[]) {
+                  if (
+                    t &&
+                    isOriginalSong(t) &&
+                    hasPlayableDuration(t) &&
+                    !moreCandidates.some((existing) => sameSong(existing, t))
+                  ) {
+                    moreCandidates.push(t);
+                  }
+                }
+                fresh = applyFeedFilters(moreCandidates);
+                if (fresh.length >= 8) break;
+              }
+            } catch {
+              // fall through to next seed or relaxed freshness
+            }
+          }
+        }
+
+        // 3. Relaxed Session Freshness Fallback:
+        // If fresh is still sparse (< 6) due to session-level displayed sets,
+        // relax previouslyDisplayedIds exclusion, but STILL strictly enforce:
+        // - never duplicate tracks currently displayed in recs
+        // - never repeat recently played songs (history.slice(0, 50))
+        // - never include disliked tracks
+        // - enforce language consistency, duration, and original song criteria
+        let candidatesToRank = fresh;
+        if (candidatesToRank.length < 6 && moreCandidates.length > 0) {
+          const currentRecs = recsRef.current;
+          const currentHistory = history.slice(0, 50);
+          const relaxed = moreCandidates.filter(
+            (t) =>
+              hasPlayableDuration(t) &&
+              isOriginalSong(t) &&
+              !trackExistsIn(currentRecs, t as TrackLike) &&
+              !trackExistsIn(currentHistory, t as TrackLike) &&
+              !dislikedIdsRef.current.has(t.id) &&
+              (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)),
+          );
+          if (relaxed.length > candidatesToRank.length) {
+            candidatesToRank = dedupeTracks([...candidatesToRank, ...relaxed]);
+          }
+        }
+
+        // 4. Thompson Sampling Ranking & Diversified Batch Append
+        if (candidatesToRank.length > 0) {
+          if (currentGen !== recsGenerationRef.current) return;
+          const ranked = thompsonSamplingPolicy.rankCandidates(candidatesToRank, getSessionContext());
+          let addedCount = 0;
+          setRecs((prev) => {
+            const trulyNew = ranked.filter(
+              (cand) => !prev.some((p) => p.id === cand.id || sameSong(p, cand)),
+            );
+            if (trulyNew.length === 0) return prev;
+            const diversifiedBatch = diversifyTrackList(trulyNew, {
               maxPerArtist: 2,
               maxPerAlbum: 1,
               minArtistSpacing: 2,
               minAlbumSpacing: 3,
-            }),
-          );
-          markFeedDisplayed(ranked);
+            });
+            addedCount = diversifiedBatch.length;
+            const updated = [...prev, ...diversifiedBatch];
+            writeHomeCache({ recs: updated });
+            return updated;
+          });
+          if (addedCount > 0) {
+            markFeedDisplayed(ranked);
+            setExploreExhausted(false);
+          } else {
+            setExploreExhausted(true);
+          }
+        } else {
+          setExploreExhausted(true);
         }
       } finally {
+        isLoadingMoreRecsRef.current = false;
         setLoadingMoreRecs(false);
       }
     },
-    [loadingMoreRecs, runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
+    [
+      loadingMoreRecs,
+      runRecommend,
+      getSongRadio,
+      likes,
+      history,
+      dislikes,
+      stats,
+      settings,
+      getSessionContext,
+      applyFeedFilters,
+      markFeedDisplayed,
+    ],
   );
 
   const extendQueue = useCallback(async (): Promise<Track[]> => {
@@ -2096,6 +2225,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     (track: Track) => {
       const wasLiked = likedIds.has(track.id);
       toggleLike(track);
+      if (track.id === currentRef.current?.id) {
+        notifyLikedState(!wasLiked);
+      }
       if (!wasLiked && !isPodcastTrack(track)) {
         const ctx = getSessionContext();
         const event = telemetry.logEvent({
@@ -2495,8 +2627,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   // ─── Native Android background playback (Spotify-style) ───
   // Keeps the foreground media service, lockscreen notification, and headset
   // buttons in sync with the player. Every call no-ops outside the APK.
-  const nativeHandlersRef = useRef({ togglePlay, goNext, goPrev, seek: player.seek });
-  nativeHandlersRef.current = { togglePlay, goNext, goPrev, seek: player.seek };
+  const nativeHandlersRef = useRef({ togglePlay, goNext, goPrev, seek: player.seek, toggleLike: handleToggleLike });
+  nativeHandlersRef.current = { togglePlay, goNext, goPrev, seek: player.seek, toggleLike: handleToggleLike };
 
   // Media commands arriving from the lockscreen, notification action buttons,
   // and headset/hardware media keys (installed once, dispatches via refs).
@@ -2512,6 +2644,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       next: () => nativeHandlersRef.current.goNext(),
       prev: () => nativeHandlersRef.current.goPrev(),
       seek: (seconds) => nativeHandlersRef.current.seek(seconds),
+      like: () => {
+        const cur = currentRef.current;
+        if (cur) nativeHandlersRef.current.toggleLike(cur);
+      },
     });
   }, []);
 
@@ -2527,11 +2663,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       // Position is intentionally read from a ref: the periodic interval below
       // keeps the lockscreen progress bar fresh without spamming the bridge.
       position: playerPositionRef.current,
+      liked: likedIds.has(current.id),
     });
     if (player.isPlaying) {
       requestBatteryOptimizationExemption();
     }
-  }, [current, player.isPlaying, player.duration]);
+  }, [current, player.isPlaying, player.duration, likedIds]);
 
   // Lightweight periodic position sync for the lockscreen progress bar.
   useEffect(() => {
@@ -2772,6 +2909,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       trendingRef.current = [];
       oldSongsRef.current = [];
       mixTracksRef.current = { explore: [], discover: [], newrelease: [] };
+      moreRecsPageRef.current = 1;
+      recsGenerationRef.current += 1;
+      setExploreExhausted(false);
       setRecs([]);
       setTrendingList([]);
       setOldSongsList([]);
@@ -2861,11 +3001,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, []);
 
   const userNameDisplay =
-    auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+    (auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
       ? auth.profile.display_name
       : auth.email && auth.email !== "listener@google.com"
-        ? auth.email.split("@")[0]
-        : "My Account";
+        ? (auth.email.split("@")[0] ?? "My Account")
+        : "My Account") || "My Account";
 
   const userInitialDisplay = (
     auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
@@ -2874,6 +3014,22 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         ? auth.email[0]
         : "M"
   )?.toUpperCase() ?? "M";
+
+  const jam = useJamSession({
+    userId: auth.userId,
+    userName: userNameDisplay,
+    userAvatar: auth.profile?.avatar_url,
+    currentTrackId: current?.id,
+    currentTrack: current,
+    playbackPosition: player.position,
+    isPlaying: player.isPlaying,
+    onPlaySong: (track) => playSong(track),
+    onSeek: (seconds) => player.seek(seconds),
+    onPause: () => player.pause(),
+    onResume: () => player.play(),
+    onAdvanceTrack: () => goNext(),
+  });
+  jamRef.current = jam;
 
   return (
     <div className="flex h-dvh bg-transparent text-foreground selection:bg-primary/20 overflow-hidden w-full relative">
@@ -2901,6 +3057,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setTimeout(() => setMessage(null), 3000);
           }}
           onOpenSettings={() => setShowSettings(true)}
+          onOpenJam={() => setShowJamModal(true)}
+          jamActive={!!jam.session}
+          jamParticipantsCount={jam.participants.length}
         />
       </div>
 
@@ -2914,6 +3073,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           setDrawerOpen(false);
           setShowSettings(true);
         }}
+        onOpenJam={() => {
+          setDrawerOpen(false);
+          setShowJamModal(true);
+        }}
+        jamActive={!!jam.session}
+        jamParticipantsCount={jam.participants.length}
         isSynced={!!auth.userId}
         isPlaying={player.isPlaying}
         userName={userNameDisplay}
@@ -2948,6 +3113,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
             userAvatar={auth.profile?.avatar_url ?? null}
             onOpenAuth={() => setShowAuthModal(true)}
+            onOpenJam={() => setShowJamModal(true)}
+            jamActive={!!jam.session}
+            jamParticipantsCount={jam.participants.length}
           />
         )}
 
@@ -3131,17 +3299,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
                 {/* Explore More Songs for low-bandwidth incremental discovery */}
                 {recs.length > 0 && (
-                  <div className="flex justify-center pt-2 pb-6">
+                  <div className="flex flex-col items-center justify-center pt-2 pb-6 gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => void loadMoreRecommendations()}
-                      disabled={loadingMoreRecs}
+                      disabled={loadingMoreRecs || exploreExhausted}
                       className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
                     >
                       {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" /> : null}
-                      Explore more songs
+                      {exploreExhausted ? "All caught up" : "Explore more songs"}
                     </Button>
+                    {exploreExhausted && (
+                      <p className="text-[11px] text-muted-foreground">You've explored all currently available recommendations.</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -3531,7 +3702,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onPrevious={goPrev}
           onOpenPlayer={() => setShowFullScreen(true)}
           onOpenEqualizer={() => setShowEqualizer(true)}
-          onSeek={(s) => player.seek(s)}
+          onOpenJam={() => setShowJamModal(true)}
+          jamActive={!!jam.session}
+          onSeek={(s) => {
+            player.seek(s);
+            jam.notifySeek(s);
+          }}
           onPodcastChannelClick={(t) =>
             openPodcastShow({ id: t.podcastId, title: t.album || t.artist })
           }
@@ -3787,6 +3963,33 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         <KeyboardShortcutsModal
           open={showShortcuts}
           onOpenChange={setShowShortcuts}
+        />
+
+        {/* JAM SESSION COLLABORATIVE LISTENING MODAL */}
+        <JamSessionModal
+          open={showJamModal}
+          onOpenChange={setShowJamModal}
+          session={jam.session}
+          participant={jam.participant}
+          participants={jam.participants}
+          queue={jam.queue}
+          isHost={jam.isHost}
+          isConnecting={jam.isConnecting}
+          error={jam.error}
+          hostDisconnected={jam.hostDisconnected}
+          hostGraceSeconds={jam.hostGraceSeconds}
+          skipVotes={jam.skipVotes}
+          currentTrack={current}
+          isPlaying={player.isPlaying}
+          onCreateJam={jam.createJam}
+          onJoinJam={jam.joinJam}
+          onLeaveJam={jam.leaveJam}
+          onRemoveFromQueue={jam.removeFromJamQueue}
+          onVoteToSkip={jam.voteToSkip}
+          onOpenSearch={() => {
+            setShowJamModal(false);
+            setTab("search");
+          }}
         />
       </Suspense>
 

@@ -55,9 +55,13 @@ public class MediaPlaybackService extends Service {
     public static final String ACTION_UPDATE_POSITION = "com.melodymap.music.action.UPDATE_POSITION";
     public static final String ACTION_NEXT = "com.melodymap.music.action.NEXT";
     public static final String ACTION_PREV = "com.melodymap.music.action.PREV";
+    public static final String ACTION_LIKE = "com.melodymap.music.action.LIKE";
+    public static final String ACTION_UPDATE_LIKED = "com.melodymap.music.action.UPDATE_LIKED";
+    public static final String CUSTOM_ACTION_LIKE = "com.melodymap.music.action.CUSTOM_LIKE";
 
     public static final String EXTRA_PAYLOAD = "payload";
     public static final String EXTRA_POSITION = "position";
+    public static final String EXTRA_LIKED = "liked";
 
     public static final String CHANNEL_ID = "melodymap_media_playback";
     public static final int NOTIFICATION_ID = 1001;
@@ -81,6 +85,7 @@ public class MediaPlaybackService extends Service {
     private double trackDurationSec = 0;
     private double trackPositionSec = 0;
     private boolean isJsPlaying = false;
+    private boolean isTrackLiked = false;
     private boolean resumeOnFocusGain = false;
     private long lastFocusLossAt = 0;
 
@@ -138,6 +143,16 @@ public class MediaPlaybackService extends Service {
                 break;
             case ACTION_PREV:
                 dispatchMediaCommand("prev");
+                break;
+            case ACTION_LIKE:
+                dispatchMediaCommand("like");
+                break;
+            case ACTION_UPDATE_LIKED:
+                if (intent != null && intent.hasExtra(EXTRA_LIKED)) {
+                    isTrackLiked = intent.getBooleanExtra(EXTRA_LIKED, isTrackLiked);
+                    refreshMediaSession();
+                    updateNotification();
+                }
                 break;
             case ACTION_START:
             default:
@@ -197,6 +212,9 @@ public class MediaPlaybackService extends Service {
             if (payload.has("position")) {
                 trackPositionSec = payload.optDouble("position", trackPositionSec);
             }
+            if (payload.has("liked")) {
+                isTrackLiked = payload.optBoolean("liked", isTrackLiked);
+            }
             if (!payload.isNull("id")) {
                 trackTitle = trackTitle == null || trackTitle.isEmpty()
                         ? payload.optString("id", "MelodyMap")
@@ -242,6 +260,13 @@ public class MediaPlaybackService extends Service {
                 public void onStop() {
                     dispatchMediaCommand("stop");
                 }
+
+                @Override
+                public void onCustomAction(String action, android.os.Bundle extras) {
+                    if (CUSTOM_ACTION_LIKE.equals(action) || "like".equalsIgnoreCase(action) || "toggle_like".equalsIgnoreCase(action)) {
+                        dispatchMediaCommand("like");
+                    }
+                }
             });
             mediaSession.setActive(true);
             refreshMediaSession();
@@ -266,6 +291,12 @@ public class MediaPlaybackService extends Service {
             }
             mediaSession.setMetadata(metaBuilder.build());
 
+            PlaybackStateCompat.CustomAction likeCustomAction = new PlaybackStateCompat.CustomAction.Builder(
+                    CUSTOM_ACTION_LIKE,
+                    isTrackLiked ? "Unlike" : "Like",
+                    isTrackLiked ? R.drawable.ic_heart_filled : R.drawable.ic_heart_outline)
+                    .build();
+
             int state = isJsPlaying
                     ? PlaybackStateCompat.STATE_PLAYING
                     : PlaybackStateCompat.STATE_PAUSED;
@@ -279,6 +310,7 @@ public class MediaPlaybackService extends Service {
                                     | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
                                     | PlaybackStateCompat.ACTION_SEEK_TO
                                     | PlaybackStateCompat.ACTION_STOP)
+                    .addCustomAction(likeCustomAction)
                     .setState(state, (long) (trackPositionSec * 1000L), speed,
                             SystemClock.elapsedRealtime())
                     .build();
@@ -357,16 +389,21 @@ public class MediaPlaybackService extends Service {
                 .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .addAction(R.mipmap.ic_launcher, "Prev", serviceActionIntent(ACTION_PREV))
-                .addAction(R.mipmap.ic_launcher,
+                .addAction(
+                        isTrackLiked ? R.drawable.ic_heart_filled : R.drawable.ic_heart_outline,
+                        isTrackLiked ? "Unlike" : "Like",
+                        serviceActionIntent(ACTION_LIKE))
+                .addAction(R.drawable.ic_skip_previous, "Prev", serviceActionIntent(ACTION_PREV))
+                .addAction(
+                        isJsPlaying ? R.drawable.ic_pause : R.drawable.ic_play,
                         isJsPlaying ? "Pause" : "Play",
                         serviceActionIntent(isJsPlaying ? ACTION_PAUSE : ACTION_PLAY))
-                .addAction(R.mipmap.ic_launcher, "Next", serviceActionIntent(ACTION_NEXT));
+                .addAction(R.drawable.ic_skip_next, "Next", serviceActionIntent(ACTION_NEXT));
 
         if (mediaSession != null) {
             builder.setStyle(new MediaStyle()
                     .setMediaSession(mediaSession.getSessionToken())
-                    .setShowActionsInCompactView(0, 1, 2));
+                    .setShowActionsInCompactView(1, 2, 3));
         }
         return builder.build();
     }

@@ -1,5 +1,6 @@
-import { Menu, Settings2, User } from "lucide-react";
+import { Menu, Radio, Settings2, User } from "lucide-react";
 import { StreakBadge } from "@/components/music/ui/StreakBadge";
+import { cn } from "@/lib/utils";
 
 type Props = {
   tab?: string;
@@ -8,6 +9,9 @@ type Props = {
   userInitial?: string;
   userAvatar?: string | null;
   onOpenAuth?: () => void;
+  onOpenJam?: () => void;
+  jamActive?: boolean;
+  jamParticipantsCount?: number;
 };
 
 export function MobileHeader({
@@ -17,6 +21,9 @@ export function MobileHeader({
   userInitial,
   userAvatar,
   onOpenAuth,
+  onOpenJam,
+  jamActive = false,
+  jamParticipantsCount = 1,
 }: Props) {
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -83,6 +90,25 @@ export function MobileHeader({
 
       <div className="flex items-center gap-1.5">
         <StreakBadge />
+
+        {onOpenJam && (
+          <button
+            type="button"
+            onClick={onOpenJam}
+            aria-label="Jam Session"
+            title={jamActive ? `Jam Session active (${jamParticipantsCount} listening)` : "Start or Join a Jam"}
+            className={cn(
+              "flex h-8 sm:h-9 items-center gap-1.5 px-2.5 rounded-full text-xs font-medium active:scale-95 transition-all shadow-xs",
+              jamActive
+                ? "bg-[#8B5CF6]/20 border border-[#8B5CF6]/50 text-[#8B5CF6]"
+                : "bg-chip hover:bg-chip-strong border border-hair text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Radio className={cn("h-3.5 w-3.5", jamActive ? "animate-pulse text-[#8B5CF6]" : "text-muted-foreground")} />
+            <span className="hidden sm:inline font-semibold text-[11px]">{jamActive ? `${jamParticipantsCount} in Jam` : "Jam"}</span>
+            {jamActive && <span className="sm:hidden h-1.5 w-1.5 rounded-full bg-[#8B5CF6] animate-ping" />}
+          </button>
+        )}
         
         {onOpenSettings && (
           <button

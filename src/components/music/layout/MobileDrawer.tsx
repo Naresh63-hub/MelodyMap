@@ -9,6 +9,7 @@ import {
   LogIn,
   LogOut,
   Mic,
+  Radio,
   Search,
   Settings2,
   Sparkles,
@@ -23,6 +24,9 @@ type Props = {
   onClose: () => void;
   onNavigate: (tab: NavTab) => void;
   onOpenSettings: () => void;
+  onOpenJam?: () => void;
+  jamActive?: boolean;
+  jamParticipantsCount?: number;
   isSynced: boolean;
   isPlaying?: boolean;
   userName?: string | undefined;
@@ -38,6 +42,9 @@ export function MobileDrawer({
   onClose,
   onNavigate,
   onOpenSettings,
+  onOpenJam,
+  jamActive = false,
+  jamParticipantsCount = 1,
   isSynced,
   isPlaying = false,
   userName = "Listener",
@@ -201,6 +208,34 @@ export function MobileDrawer({
 
         {/* Bottom Actions */}
         <div className="p-3 border-t border-hair-strong space-y-1">
+          {onOpenJam && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenJam();
+              }}
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-left transition-all border",
+                jamActive
+                  ? "bg-[#8B5CF6]/20 border-[#8B5CF6]/40 text-[#8B5CF6]"
+                  : "border-transparent bg-chip text-foreground/80 hover:bg-[#8B5CF6]/15 hover:text-[#8B5CF6] hover:border-[#8B5CF6]/30",
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <Radio className={cn("h-4 w-4 text-[#8B5CF6]", jamActive && "animate-pulse")} />
+                <span>Jam Session</span>
+              </div>
+              {jamActive ? (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#8B5CF6]/30 text-[#8B5CF6]">
+                  {jamParticipantsCount} LIVE
+                </span>
+              ) : (
+                <span className="text-[10px] text-muted-foreground">New</span>
+              )}
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => {

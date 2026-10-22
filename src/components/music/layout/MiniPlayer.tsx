@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Loader2, Music2, Pause, Play, SkipBack, SkipForward } from "lucide-react";
+import { Loader2, Music2, Pause, Play, Radio, SkipBack, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
 import { isPodcastTrack } from "@/lib/track-filters";
@@ -20,6 +20,8 @@ type Props = {
   onPrevious?: () => void;
   onOpenPlayer: () => void;
   onOpenEqualizer?: () => void;
+  onOpenJam?: () => void;
+  jamActive?: boolean;
   onSeek?: (seconds: number) => void;
   onPodcastChannelClick?: (track: Track) => void;
   onArtistClick?: (artist: string, track?: Track) => void;
@@ -44,6 +46,8 @@ export function MiniPlayer({
   onPrevious,
   onOpenPlayer,
   onOpenEqualizer: _onOpenEqualizer,
+  onOpenJam,
+  jamActive = false,
   onSeek,
   onPodcastChannelClick,
   onArtistClick,
@@ -169,6 +173,24 @@ export function MiniPlayer({
 
         {/* Playback Controls */}
         <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+          {onOpenJam && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenJam();
+              }}
+              className={cn(
+                "hidden sm:flex h-9 w-9 items-center justify-center rounded-full transition-colors",
+                jamActive ? "text-[#8B5CF6] bg-[#8B5CF6]/15 animate-pulse" : "text-muted-foreground hover:text-foreground",
+              )}
+              title={jamActive ? "Jam active" : "Start or Join Jam"}
+              aria-label="Jam Session"
+            >
+              <Radio className="h-4 w-4" />
+            </button>
+          )}
+
           {onToggleLike && (
             <HeartLikeButton
               liked={liked}

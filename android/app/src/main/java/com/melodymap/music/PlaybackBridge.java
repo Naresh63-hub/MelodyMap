@@ -59,6 +59,15 @@ public class PlaybackBridge {
         startService(intent, false);
     }
 
+    /** User liked/unliked the active track. */
+    @JavascriptInterface
+    public void onLiked(boolean liked) {
+        Intent intent = new Intent(activity, MediaPlaybackService.class);
+        intent.setAction(MediaPlaybackService.ACTION_UPDATE_LIKED);
+        intent.putExtra(MediaPlaybackService.EXTRA_LIKED, liked);
+        startService(intent, false);
+    }
+
     /**
      * One-time system prompt so battery savers on aggressive OEMs
      * (Xiaomi/Oppo/Realme/Vivo...) don't kill background playback after a few

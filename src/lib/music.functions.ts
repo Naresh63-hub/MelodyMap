@@ -180,6 +180,7 @@ const RecommendInput = z.object({
   mood: z.string().max(120).optional(),
   brief: z.string().max(800).optional(),
   count: z.number().min(1).max(50).optional(),
+  page: z.number().min(1).max(50).default(1).optional(),
   artists: z.array(z.string()).max(20).default([]),
   languages: z.array(z.string()).max(10).default([]),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
@@ -367,6 +368,7 @@ async function getLocalPicks(data: {
   currentArtist?: string | undefined;
   mode?: "feed" | "discover" | "nextup" | undefined;
   count?: number | undefined;
+  page?: number | undefined;
   languages?: string[] | undefined;
   refreshNonce?: string | number | undefined;
   exclude?: string[] | undefined;
@@ -376,7 +378,8 @@ async function getLocalPicks(data: {
   clientHour?: number | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
-  const bypassCache = !!data.refreshNonce;
+  const page = Math.max(1, data.page ?? 1);
+  const bypassCache = !!data.refreshNonce || page > 1;
   const artists = data.artists.map((a) => a.trim()).filter(Boolean);
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
   const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
@@ -403,14 +406,23 @@ async function getLocalPicks(data: {
     clientHour: data.clientHour,
   });
 
-  // Sample queries concurrently with randomized selection
-  const pickedNew = shuffleArray(newQueries).slice(0, 5);
-  const pickedOld = shuffleArray(oldQueries).slice(0, 5);
+  // Sample queries with offset rotation based on page depth so deeper pages explore different facets/discographies
+  const queryOffset = (page - 1) * 3;
+  const rotateQueries = (arr: string[], offset: number) => {
+    if (arr.length === 0) return [];
+    const normalized = offset % arr.length;
+    return [...arr.slice(normalized), ...arr.slice(0, normalized)];
+  };
+
+  const pickedNew = rotateQueries(newQueries, queryOffset).slice(0, 5);
+  const pickedOld = rotateQueries(oldQueries, queryOffset).slice(0, 5);
 
   const [newCandidates, oldCandidates, trendingCandidates] = await Promise.all([
-    runQueryBatch(pickedNew, 10, true, bypassCache),
-    runQueryBatch(pickedOld, 10, true, bypassCache),
+    runQueryBatch(pickedNew, 12, true, bypassCache, page),
+    runQueryBatch(pickedOld, 12, true, bypassCache, page),
     (async () => {
+      // On page > 1, do not fetch trending songs because page 1 trending songs are duplicate
+      if (page > 1) return [] as Track[];
       try {
         const { getSaavnTrendingSongs } = await import("./providers/saavn");
         return (await getSaavnTrendingSongs(languages, 12)) as Track[];
@@ -447,6 +459,23 @@ async function getLocalPicks(data: {
     (t) => !chosenIds.has(t.id) && !chosenKeys.has(getTrackDedupeKey(t.title, t.artist)),
   );
   const selectedOld = distinctOldCandidates.slice(0, oldQuota);
+
+  // If one bucket is short on deeper pages, backfill from the other bucket
+  if (selectedNew.length < newQuota) {
+    const needed = count - (selectedNew.length + selectedOld.length);
+    if (needed > 0) {
+      const extraOld = distinctOldCandidates.slice(selectedOld.length, selectedOld.length + needed);
+      selectedOld.push(...extraOld);
+    }
+  } else if (selectedOld.length < oldQuota) {
+    const needed = count - (selectedNew.length + selectedOld.length);
+    if (needed > 0) {
+      const extraNew = filteredNew
+        .filter((t) => !chosenIds.has(t.id) && !chosenKeys.has(getTrackDedupeKey(t.title, t.artist)))
+        .slice(0, needed);
+      selectedNew.push(...extraNew);
+    }
+  }
 
   // Interleave New and Old tracks: [New1, Old1, New2, Old2, New3, Old3, ...] to enforce exact 50/50 balance
   const interleaved: Track[] = [];
@@ -675,6 +704,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         artists,
         mode: "feed",
         count: data.count ?? 24,
+        page: data.page ?? 1,
         languages: data.languages,
         refreshNonce: data.refreshNonce,
         exclude: data.recent,
@@ -746,6 +776,30 @@ export const recommendTracks = createServerFn({ method: "POST" })
       .filter(Boolean)
       .join("\n");
 
+    const fallbackToLocal = async () => {
+      const artists = [
+        ...new Set(
+          [...(data.affinityArtists ?? []), ...data.liked, ...data.recent, ...(data.artists ?? [])]
+            .map((s) => s.split(" - ")[0]?.trim())
+            .filter((a): a is string => !!a),
+        ),
+      ].slice(0, 8);
+      const tracks = await getLocalPicks({
+        artists,
+        mode: "feed",
+        count: data.count ?? 24,
+        page: data.page ?? 1,
+        languages: data.languages,
+        refreshNonce: data.refreshNonce,
+        exclude: data.recent,
+        discovery: data.discovery,
+        affinityArtists: data.affinityArtists,
+        penalizedArtists: data.penalizedArtists,
+        clientHour: data.clientHour,
+      });
+      return { tracks, error: null };
+    };
+
     let raw = "";
     try {
       const gateway = createAiGatewayProvider(key);
@@ -755,22 +809,18 @@ export const recommendTracks = createServerFn({ method: "POST" })
         temperature: 0.95,
       });
       raw = result.text;
-    } catch (err) {
-      const message = String(err);
-      if (message.includes("429")) return { tracks: [], error: "Too many requests — try again shortly." };
-      if (message.includes("402") || /credit|payment_required/i.test(message))
-        return { tracks: [], error: "AI credits are exhausted — add credits to keep generating picks." };
-      return { tracks: [], error: "Recommendations are unavailable right now." };
+    } catch {
+      return await fallbackToLocal();
     }
 
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return { tracks: [], error: "Could not read the recommendations." };
+    if (!jsonMatch) return await fallbackToLocal();
 
     let picks: Array<{ title?: string; artist?: string; reason?: string }> = [];
     try {
       picks = JSON.parse(jsonMatch[0]);
     } catch {
-      return { tracks: [], error: "Could not read the recommendations." };
+      return await fallbackToLocal();
     }
 
     const recentSet = new Set(data.recent.map((s) => norm(s)));
@@ -815,6 +865,10 @@ export const recommendTracks = createServerFn({ method: "POST" })
           resolved.push(t);
         }
       }
+    }
+
+    if (resolved.length === 0) {
+      return await fallbackToLocal();
     }
 
     return { tracks: resolved, error: null };
