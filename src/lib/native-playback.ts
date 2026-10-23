@@ -171,7 +171,11 @@ export interface NativeMediaCommandHandlers {
   next?: () => void;
   prev?: () => void;
   stop?: () => void;
-  like?: () => void;
+  /**
+   * Lock-screen / notification Like/Unlike tap. Receives the track id the native
+   * media session was showing, when the command carried one (`like:<id>`).
+   */
+  like?: (trackId?: string) => void;
   /** Receives the seek target in seconds (native sends "seek:<seconds>"). */
   seek?: (seconds: number) => void;
 }
@@ -192,6 +196,14 @@ export function installMediaCommandHandler(
         if (Number.isFinite(seconds)) handlers.seek?.(seconds);
         return;
       }
+      // Native identifies the track it is advertising so the player can reject a
+      // tap that raced an auto-advance. Ids contain ':' (e.g. "saavn:trackid:xxx"),
+      // so only the first segment is the command name.
+      if (typeof command === "string" && (command === "like" || command.startsWith("like:"))) {
+        const trackId = command.slice(5).trim();
+        handlers.like?.(trackId.length > 0 ? trackId : undefined);
+        return;
+      }
       switch (command) {
         case "play":
           handlers.play?.();
@@ -208,7 +220,6 @@ export function installMediaCommandHandler(
         case "stop":
           handlers.stop?.();
           break;
-        case "like":
         case "unlike":
         case "toggle_like":
           handlers.like?.();

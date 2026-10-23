@@ -135,6 +135,7 @@ import {
   notifyLikedState,
   requestBatteryOptimizationExemption,
 } from "@/lib/native-playback";
+import { createNativeLikeGuard } from "@/lib/native-like";
 import {
   filterFeedCandidates,
   hasPlayableDuration,
@@ -2632,6 +2633,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   // Media commands arriving from the lockscreen, notification action buttons,
   // and headset/hardware media keys (installed once, dispatches via refs).
+  // The Like button goes through a guard: OEM SystemUI can re-fire a tap, and the
+  // queue may have advanced since the heart was drawn, so the request is validated
+  // against the active track before it is allowed to write to the library.
+  const nativeLikeGuardRef = useRef(createNativeLikeGuard());
   useEffect(() => {
     if (!isNativePlaybackEnv()) return;
     return installMediaCommandHandler({
@@ -2644,9 +2649,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       next: () => nativeHandlersRef.current.goNext(),
       prev: () => nativeHandlersRef.current.goPrev(),
       seek: (seconds) => nativeHandlersRef.current.seek(seconds),
-      like: () => {
+      like: (trackId) => {
         const cur = currentRef.current;
-        if (cur) nativeHandlersRef.current.toggleLike(cur);
+        nativeLikeGuardRef.current.request(
+          trackId,
+          cur?.id,
+          () => {
+            if (!cur) return;
+            nativeHandlersRef.current.toggleLike(cur);
+          },
+        );
       },
     });
   }, []);

@@ -113,24 +113,28 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
-     * Forward a media button command (play/pause/next/prev/seek) from the
+     * Forward a media button command (play/pause/next/prev/seek/like) from the
      * MediaSession / notification / headset into the web player.
+     *
+     * @return true when a live WebView was available to receive the command. Callers
+     *         that must not silently swallow a user tap (the lock-screen Like button)
+     *         use this to decide whether to undo their own de-duplication guard.
      */
-    public void dispatchMediaCommand(String command) {
-        if (command == null || command.isEmpty()) return;
+    public boolean dispatchMediaCommand(String command) {
+        if (command == null || command.isEmpty()) return false;
+        final WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+        if (webView == null) return false;
         runOnUiThread(() -> {
             try {
-                WebView webView = getBridge() != null ? getBridge().getWebView() : null;
-                if (webView != null) {
-                    String escaped = command
-                            .replace("\\", "\\\\")
-                            .replace("'", "\\'");
-                    webView.evaluateJavascript(
-                            "if (window.__melodymap_media_command) { window.__melodymap_media_command('" + escaped + "'); }",
-                            null);
-                }
+                String escaped = command
+                        .replace("\\", "\\\\")
+                        .replace("'", "\\'");
+                webView.evaluateJavascript(
+                        "if (window.__melodymap_media_command) { window.__melodymap_media_command('" + escaped + "'); }",
+                        null);
             } catch (Exception ignored) {}
         });
+        return true;
     }
 
     public void handleSleepTimerExpired() {

@@ -69,6 +69,13 @@ public class MediaPlaybackService extends Service {
     /** How long a paused session keeps its notification before cleaning up. */
     private static final long PAUSED_STOP_GRACE_MS = 30_000L;
 
+    /**
+     * Guards the lock-screen Like/Unlike button against accidental duplicate taps.
+     * A rapid double tap must not queue two library writes. The window is tracked
+     * per track id, so skipping to the next song makes its heart instantly usable.
+     */
+    private static final long LIKE_TAP_DEBOUNCE_MS = 400L;
+
     private PowerManager.WakeLock wakeLock;
     private WifiManager.WifiLock wifiLock;
     private MediaSessionCompat mediaSession;
@@ -80,14 +87,17 @@ public class MediaPlaybackService extends Service {
     private final Runnable graceStopRunnable = this::graceStopIfStillPaused;
 
     // Last known playback info (survives service restarts for re-notification).
+    private String trackId = "";
     private String trackTitle = "";
     private String trackArtist = "";
     private double trackDurationSec = 0;
     private double trackPositionSec = 0;
     private boolean isJsPlaying = false;
     private boolean isTrackLiked = false;
+    private long lastLikeTapAt = 0L;
     private boolean resumeOnFocusGain = false;
     private long lastFocusLossAt = 0;
+    private String lastLikeTrackId = "";
 
     private static final long FOCUS_LOSS_DEBOUNCE_MS = 500;
     private boolean started = false;
@@ -102,12 +112,19 @@ public class MediaPlaybackService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
-        initMediaSession();
+        ensureMediaSession();
         registerNoisyReceiver();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // stopForegroundService() releases the session and nulls it. If a fresh intent
+        // is delivered to this same (not yet destroyed) service instance, onCreate()
+        // never runs again -- without this the MediaSession would stay null and the
+        // lock-screen controls (including the Like custom action) would silently
+        // disappear for the rest of the process lifetime.
+        ensureMediaSession();
+
         String action = intent != null ? intent.getAction() : null;
         if (action == null) {
             // Sticky restart (e.g. process death): re-show with last known info.
@@ -145,7 +162,7 @@ public class MediaPlaybackService extends Service {
                 dispatchMediaCommand("prev");
                 break;
             case ACTION_LIKE:
-                dispatchMediaCommand("like");
+                handleLikeTap();
                 break;
             case ACTION_UPDATE_LIKED:
                 if (intent != null && intent.hasExtra(EXTRA_LIKED)) {
@@ -169,6 +186,21 @@ public class MediaPlaybackService extends Service {
         isJsPlaying = true;
         resumeOnFocusGain = false;
         cancelGraceStop();
+        // Re-assert ownership: the session can be dropped by the framework after a
+        // focus loss / inactive period, and the SystemUI media player only renders
+        // PlaybackState custom actions for an active session.
+        try {
+            if (mediaSession != null && !mediaSession.isActive()) {
+                mediaSession.setActive(true);
+            }
+        } catch (Exception ignored) {}
+
+        // Publish the MediaSession state FIRST. On Android 13+ (this app targets
+        // API 36) SystemUI derives the whole media panel — including the custom
+        // Like action — from PlaybackState, so the notification must never be
+        // posted ahead of the state it is meant to advertise.
+        acquireLocks();
+        refreshMediaSession();
 
         if (!started) {
             startForegroundWithNotification();
@@ -176,8 +208,6 @@ public class MediaPlaybackService extends Service {
         } else {
             updateNotification();
         }
-        acquireLocks();
-        refreshMediaSession();
         isRunning = true;
     }
 
@@ -186,8 +216,8 @@ public class MediaPlaybackService extends Service {
         // A real pause (user, notification, headset, or focus loss) must never be
         // silently auto-resumed later by a stale transient-focus-loss flag.
         resumeOnFocusGain = false;
-        updateNotification();
         refreshMediaSession();
+        updateNotification();
         releaseLocks();
         graceStopHandler.postDelayed(graceStopRunnable, PAUSED_STOP_GRACE_MS);
     }
@@ -206,6 +236,15 @@ public class MediaPlaybackService extends Service {
         if (payloadJson == null || payloadJson.isEmpty()) return;
         try {
             JSONObject payload = new JSONObject(payloadJson);
+            // Track identity first: a track change must clear the Like debounce so the
+            // new song's heart is tappable immediately.
+            String newId = payload.optString("id", trackId);
+            if (newId == null) newId = "";
+            if (!newId.equals(trackId)) {
+                trackId = newId;
+                lastLikeTapAt = 0;
+                lastLikeTrackId = "";
+            }
             trackTitle = payload.optString("title", trackTitle);
             trackArtist = payload.optString("artist", trackArtist);
             trackDurationSec = payload.optDouble("duration", trackDurationSec);
@@ -227,7 +266,8 @@ public class MediaPlaybackService extends Service {
 
     // ─── MediaSession ────────────────────────────────────────────────────
 
-    private void initMediaSession() {
+    private void ensureMediaSession() {
+        if (mediaSession != null) return;
         try {
             mediaSession = new MediaSessionCompat(this, "MelodyMapMediaSession");
             mediaSession.setFlags(
@@ -267,7 +307,7 @@ public class MediaPlaybackService extends Service {
                 @Override
                 public void onCustomAction(String action, android.os.Bundle extras) {
                     if (CUSTOM_ACTION_LIKE.equals(action) || "like".equalsIgnoreCase(action) || "toggle_like".equalsIgnoreCase(action)) {
-                        dispatchMediaCommand("like");
+                        handleLikeTap();
                     }
                 }
             });
@@ -391,7 +431,7 @@ public class MediaPlaybackService extends Service {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle(title)
                 .setContentText(text)
-                .setSmallIcon(R.mipmap.ic_launcher)
+                .setSmallIcon(R.drawable.ic_stat_melodymap)
                 .setContentIntent(contentIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
@@ -409,12 +449,25 @@ public class MediaPlaybackService extends Service {
                 .addAction(R.drawable.ic_skip_next, "Next", serviceActionIntent(ACTION_NEXT));
 
         if (mediaSession != null) {
-            // MediaStyle.setShowActionsInCompactView allows AT MOST 3 actions.
-            // Passing >3 actions throws java.lang.IllegalArgumentException across Android.
-            // In compact view (lock screen on older Android), Action 0 (Like), Action 2 (Play/Pause),
-            // and Action 3 (Next) are displayed. Action 1 (Prev) is in the expanded view.
-            // On Android 13/14 SystemUI, all 5 slots are rendered from PlaybackStateCompat:
-            // [ Heart (Like) ] [ Prev ] [ Play/Pause ] [ Next ] [ Output Switcher ]
+            // Notification actions are added in this order:
+            //   0 = Like/Unlike, 1 = Previous, 2 = Play/Pause, 3 = Next
+            //
+            // Two rendering paths exist and both are covered here:
+            //
+            //  * Android 13+ (this app targets API 36): SystemUI builds the media
+            //    panel from the session PlaybackState, NOT from these notification
+            //    actions. Preview/Next claim slots 2-3, so the Like custom action
+            //    lands in slot 4 of the 5 available slots:
+            //    [ Prev ] [ Play/Pause ] [ Next ] [ Like ] [ 5th slot ]
+            //
+            //  * Legacy path: the notification action row is used, and
+            //    setShowActionsInCompactView() picks at most THREE indices for the
+            //    collapsed/compact layout. Passing more than three throws
+            //    IllegalArgumentException, so exactly three are passed: Like (0),
+            //    Play/Pause (2), Next (3).
+            //
+            // Keeping the Like action at index 0 is what guarantees it appears in
+            // the compact layout on the legacy path.
             builder.setStyle(new MediaStyle()
                     .setMediaSession(mediaSession.getSessionToken())
                     .setShowActionsInCompactView(0, 2, 3));
@@ -424,10 +477,43 @@ public class MediaPlaybackService extends Service {
 
     // ─── Media button dispatch into the WebView player ──────────────────
 
-    private void dispatchMediaCommand(String command) {
+    /** @return true when the command actually reached the WebView player. */
+    private boolean dispatchMediaCommand(String command) {
         MainActivity activity = MainActivity.getInstance();
-        if (activity == null) return;
-        activity.dispatchMediaCommand(command);
+        if (activity == null) return false;
+        return activity.dispatchMediaCommand(command);
+    }
+
+    /**
+     * Lock-screen / notification Like/Unlike tap.
+     *
+     * <p>Three guarantees, in order:
+     * <ol>
+     *   <li>No identifiable track means no action -- the tap is dropped instead of
+     *       guessing which song the user meant.</li>
+     *   <li>Repeated taps on the same track inside {@link #LIKE_TAP_DEBOUNCE_MS} are
+     *       ignored, so a double tap cannot write the library twice.</li>
+     *   <li>The command carries the track id, letting the web player verify that the
+     *       song it is about to like is still the one the lock screen is showing.</li>
+     * </ol>
+     *
+     * <p>The heart reflects the saved state the web player reports back through
+     * {@link #ACTION_UPDATE_LIKED} -- never the tap itself -- so a failed write can
+     * not leave the icon lying. Dispatch is best-effort: if the WebView is gone the
+     * debounce is rolled back so a later tap can still work, and playback is
+     * unaffected either way.
+     */
+    private void handleLikeTap() {
+        if (trackId == null || trackId.isEmpty()) return;
+        long now = SystemClock.elapsedRealtime();
+        if (trackId.equals(lastLikeTrackId) && now - lastLikeTapAt < LIKE_TAP_DEBOUNCE_MS) return;
+        lastLikeTapAt = now;
+        lastLikeTrackId = trackId;
+        if (!dispatchMediaCommand("like:" + trackId)) {
+            // No player to receive it: undo the guard rather than swallow the tap.
+            lastLikeTapAt = 0;
+            lastLikeTrackId = "";
+        }
     }
 
     // ─── Audio focus ─────────────────────────────────────────────────────
@@ -514,6 +600,9 @@ public class MediaPlaybackService extends Service {
         abandonAudioFocus();
         unregisterNoisyReceiver();
         if (mediaSession != null) {
+            try {
+                mediaSession.setActive(false);
+            } catch (Exception ignored) {}
             try {
                 mediaSession.release();
             } catch (Exception ignored) {}

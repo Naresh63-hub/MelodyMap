@@ -237,6 +237,23 @@ describe("installMediaCommandHandler", () => {
     cleanup();
   });
 
+  it("passes the track id through from a like:<id> command", () => {
+    const like = vi.fn();
+    const cleanup = installMediaCommandHandler({ like });
+    // Native ids contain ':' themselves, so only the first segment is the command.
+    windowMock.__melodymap_media_command?.("like:saavn:trackid:XYZ123");
+    expect(like).toHaveBeenCalledWith("saavn:trackid:XYZ123");
+    cleanup();
+  });
+
+  it("omits the track id for a bare like command", () => {
+    const like = vi.fn();
+    const cleanup = installMediaCommandHandler({ like });
+    windowMock.__melodymap_media_command?.("like:");
+    expect(like).toHaveBeenCalledWith(undefined);
+    cleanup();
+  });
+
   it("parses seek:<seconds> commands", () => {
     const seek = vi.fn();
     installMediaCommandHandler({ seek });
