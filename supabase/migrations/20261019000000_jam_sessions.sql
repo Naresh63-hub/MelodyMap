@@ -3,22 +3,7 @@
 -- Version: 20261019000000
 -- ====================================================================
 
--- 1. Helper function: check if an authenticated user is an active participant in a session
--- Uses SECURITY DEFINER to avoid RLS recursion when policies query membership
-CREATE OR REPLACE FUNCTION public.is_jam_participant(p_session_id UUID, p_user_id UUID)
-RETURNS BOOLEAN
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-STABLE
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.jam_participants
-    WHERE session_id = p_session_id AND user_id = p_user_id AND status = 'active'
-  );
-$$;
-
--- 2. Jam Sessions: Core session state, host identity, and authoritative playback
+-- 1. Jam Sessions: Core session state, host identity, and authoritative playback
 CREATE TABLE IF NOT EXISTS public.jam_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   code VARCHAR(10) NOT NULL UNIQUE,
@@ -101,6 +86,23 @@ ALTER TABLE public.jam_join_attempts ENABLE ROW LEVEL SECURITY;
 -- Ensures WAL records for DELETE contain all columns including session_id,
 -- allowing Supabase Realtime to evaluate filter: session_id=eq.${sessionId} on deletion.
 ALTER TABLE public.jam_queue REPLICA IDENTITY FULL;
+
+-- 8c. Helper function: check if an authenticated user is an active participant in a session
+-- Uses SECURITY DEFINER to avoid RLS recursion when policies query membership
+CREATE OR REPLACE FUNCTION public.is_jam_participant(p_session_id UUID, p_user_id UUID)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+STABLE
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.jam_participants
+    WHERE session_id = p_session_id AND user_id = p_user_id AND status = 'active'
+  );
+END;
+$$;
 
 -- 9. Participant Identity Protection Trigger
 -- Strictly prevents modifying session_id, user_id, or escalating is_host
