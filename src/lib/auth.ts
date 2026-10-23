@@ -106,7 +106,7 @@ export function useAuth() {
       setReady(true);
     });
 
-    // Check initial session
+    // Check initial session and seamlessly unify app & Jam session authentication
     void supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
       if (session?.user) {
@@ -114,6 +114,65 @@ export function useAuth() {
         setIsCloudAuth(true);
         setEmail(session.user.email || null);
         await fetchProfile(session.user);
+        setReady(true);
+        return;
+      }
+
+      // Attempt seamless anonymous sign-in so local listening and Jam sessions share one cloud identity
+      if (typeof supabase.auth.signInAnonymously === "function") {
+        try {
+          const raw = typeof window !== "undefined" ? localStorage.getItem("melodymap.local_user") : null;
+          let savedName = "Listener";
+          let savedAvatar: string | null = null;
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed?.name || parsed?.display_name) savedName = parsed.name || parsed.display_name;
+              if (parsed?.avatar_url) savedAvatar = parsed.avatar_url;
+            } catch {}
+          }
+          const { data: anonData, error: anonErr } = await supabase.auth.signInAnonymously({
+            options: {
+              data: {
+                display_name: savedName,
+                avatar_url: savedAvatar,
+              },
+            },
+          });
+          if (anonData?.user && !anonErr) {
+            setUserId(anonData.user.id);
+            setIsCloudAuth(true);
+            setEmail(null);
+            await fetchProfile(anonData.user);
+            setReady(true);
+            return;
+          }
+        } catch (err) {
+          console.warn("[Auth] Automatic anonymous auth attempt:", err);
+        }
+      }
+
+      // Fallback to local profile when anonymous sign-in is disabled in Supabase
+      if (typeof window !== "undefined") {
+        const raw = localStorage.getItem("melodymap.local_user");
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              const localId = parsed.id || "local-listener";
+              setUserId(localId);
+              setIsCloudAuth(false);
+              setEmail(parsed.email || null);
+              setProfile({
+                id: localId,
+                display_name: parsed.name || parsed.display_name || "Listener",
+                avatar_url: parsed.avatar_url || null,
+              });
+              setReady(true);
+              return;
+            }
+          } catch {}
+        }
       }
       setReady(true);
     });

@@ -48,6 +48,12 @@ export async function ensureJamAuth(displayName?: string): Promise<{ userId: str
       }
       if (anonErr) {
         console.warn("[JamAuth] signInAnonymously notice:", anonErr.message);
+        if (anonErr.message?.includes("disabled") || (anonErr as any).code === "anonymous_provider_disabled") {
+          return {
+            userId: "",
+            error: "Anonymous Sign-Ins are disabled in Supabase. Please enable Anonymous Sign-Ins in your Supabase Dashboard (Authentication -> Providers) or sign in with Google/Email.",
+          };
+        }
       }
     }
   } catch (err: any) {

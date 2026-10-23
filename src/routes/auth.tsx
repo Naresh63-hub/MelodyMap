@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 export function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -260,7 +261,16 @@ function AuthPage() {
     }
   };
 
-  const continueAsGuest = () => {
+  const continueAsGuest = async () => {
+    try {
+      if (typeof supabase?.auth?.signInAnonymously === "function") {
+        await supabase.auth.signInAnonymously({
+          options: {
+            data: { display_name: "Listener" },
+          },
+        });
+      }
+    } catch {}
     if (typeof window !== "undefined") {
       localStorage.setItem("melodymap.guest_mode", "true");
     }
