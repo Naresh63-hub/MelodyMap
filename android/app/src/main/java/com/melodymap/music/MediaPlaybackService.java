@@ -230,6 +230,9 @@ public class MediaPlaybackService extends Service {
     private void initMediaSession() {
         try {
             mediaSession = new MediaSessionCompat(this, "MelodyMapMediaSession");
+            mediaSession.setFlags(
+                    MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS
+                            | MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS);
             mediaSession.setCallback(new MediaSessionCompat.Callback() {
                 @Override
                 public void onPlay() {
@@ -295,6 +298,7 @@ public class MediaPlaybackService extends Service {
                     CUSTOM_ACTION_LIKE,
                     isTrackLiked ? "Unlike" : "Like",
                     isTrackLiked ? R.drawable.ic_heart_filled : R.drawable.ic_heart_outline)
+                    .setExtras(new android.os.Bundle())
                     .build();
 
             int state = isJsPlaying
@@ -344,11 +348,15 @@ public class MediaPlaybackService extends Service {
     }
 
     private void startForegroundWithNotification() {
-        Notification notification = buildNotification();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
+        try {
+            Notification notification = buildNotification();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            // Defense-in-depth: keep foreground running cleanly even on abnormal OEM notification parser errors
         }
     }
 
@@ -401,12 +409,15 @@ public class MediaPlaybackService extends Service {
                 .addAction(R.drawable.ic_skip_next, "Next", serviceActionIntent(ACTION_NEXT));
 
         if (mediaSession != null) {
-            // Include Action 0 (Like), Action 1 (Prev), Action 2 (Play/Pause), and Action 3 (Next)
-            // in compact view so SystemUI displays all 4 buttons on the lock screen row:
+            // MediaStyle.setShowActionsInCompactView allows AT MOST 3 actions.
+            // Passing >3 actions throws java.lang.IllegalArgumentException across Android.
+            // In compact view (lock screen on older Android), Action 0 (Like), Action 2 (Play/Pause),
+            // and Action 3 (Next) are displayed. Action 1 (Prev) is in the expanded view.
+            // On Android 13/14 SystemUI, all 5 slots are rendered from PlaybackStateCompat:
             // [ Heart (Like) ] [ Prev ] [ Play/Pause ] [ Next ] [ Output Switcher ]
             builder.setStyle(new MediaStyle()
                     .setMediaSession(mediaSession.getSessionToken())
-                    .setShowActionsInCompactView(0, 1, 2, 3));
+                    .setShowActionsInCompactView(0, 2, 3));
         }
         return builder.build();
     }
