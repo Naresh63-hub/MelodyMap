@@ -62,10 +62,12 @@ export function AuthModal({
       setName(currentName);
       setEmail(currentEmail);
 
-      if (auth.userId && defaultMode !== "signup") {
+      if (defaultMode && (defaultMode === "signin" || defaultMode === "signup")) {
+        setMode(defaultMode);
+      } else if (auth.isCloudAuth) {
         setMode("profile");
       } else {
-        setMode(defaultMode);
+        setMode(defaultMode || "signin");
       }
     }
   }, [open, auth.userId, auth.profile, auth.email, defaultMode]);
@@ -348,6 +350,32 @@ export function AuthModal({
                 or with email
               </span>
             </div>
+          </div>
+        )}
+
+        {mode === "profile" && !auth.isCloudAuth && (
+          <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-400" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-300">Local Offline Profile</p>
+                <p className="text-[11px] text-amber-300/80 mt-0.5 leading-relaxed">
+                  You are currently using a local device profile. Connect your MelodyMap cloud account to use Jam Sessions and sync playlists.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setMode("signin");
+                setErrorMsg(null);
+                setSuccessMsg(null);
+              }}
+              className="w-full bg-amber-500 hover:bg-amber-600 text-black font-semibold text-xs h-8 rounded-lg shadow-sm"
+            >
+              Sign In or Create Cloud Account
+            </Button>
           </div>
         )}
 

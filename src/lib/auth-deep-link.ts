@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
+import { supabase } from "./supabase";
 
 /**
  * Dedicated callback URI for Android deep linking.
@@ -155,6 +156,24 @@ export async function handleAuthCallback(
 
   activeExchangePromise = (async () => {
     try {
+      const client = _authClient || supabase;
+      if (client?.auth) {
+        if (parsed.code) {
+          const { error } = await client.auth.exchangeCodeForSession(parsed.code);
+          if (error) {
+            console.warn("[AuthDeepLink] exchangeCodeForSession notice:", error.message);
+          }
+        } else if (parsed.accessToken && parsed.refreshToken) {
+          const { error } = await client.auth.setSession({
+            access_token: parsed.accessToken,
+            refresh_token: parsed.refreshToken,
+          });
+          if (error) {
+            console.warn("[AuthDeepLink] setSession notice:", error.message);
+          }
+        }
+      }
+
       processedCodes.add(uniqueKey);
 
       if (typeof window !== "undefined") {
@@ -184,8 +203,25 @@ export async function handleAuthCallback(
  * Initiates Google OAuth login.
  * Dynamically passes the native deep link on Android/iOS, or the web origin on browsers.
  */
-export async function startGoogleOAuth(_authClient?: any): Promise<{ success: boolean; error?: string }> {
-  return { success: true };
+export async function startGoogleOAuth(authClient?: any): Promise<{ success: boolean; error?: string }> {
+  const client = authClient || supabase;
+  const redirectTo = getOAuthRedirectUrl();
+  try {
+    const { error } = await client.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
+    });
+    if (error) throw error;
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Could not initiate Google authentication" };
+  }
 }
 
 /**

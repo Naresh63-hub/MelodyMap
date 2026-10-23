@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getOAuthRedirectUrl } from "@/lib/auth-deep-link";
+import {
+  isNativeGoogleAuthSupported,
+  getGoogleWebClientId,
+  signInWithNativeGoogle,
+} from "@/lib/native-google-auth";
 import type { User } from "@supabase/supabase-js";
 
 export type Profile = {
@@ -12,6 +17,7 @@ export type Profile = {
 /** Session + profile for the signed-in listener backed by Supabase Auth & PostgreSQL */
 export function useAuth() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [isCloudAuth, setIsCloudAuth] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ready, setReady] = useState(false);
@@ -66,6 +72,7 @@ export function useAuth() {
       if (!mounted) return;
       if (session?.user) {
         setUserId(session.user.id);
+        setIsCloudAuth(true);
         setEmail(session.user.email || null);
         await fetchProfile(session.user);
       } else {
@@ -78,6 +85,7 @@ export function useAuth() {
               if (parsed && typeof parsed === "object") {
                 const localId = parsed.id || "local-listener";
                 setUserId(localId);
+                setIsCloudAuth(false);
                 setEmail(parsed.email || null);
                 setProfile({
                   id: localId,
@@ -91,6 +99,7 @@ export function useAuth() {
           }
         }
         setUserId(null);
+        setIsCloudAuth(false);
         setEmail(null);
         setProfile(null);
       }
@@ -102,6 +111,7 @@ export function useAuth() {
       if (!mounted) return;
       if (session?.user) {
         setUserId(session.user.id);
+        setIsCloudAuth(true);
         setEmail(session.user.email || null);
         await fetchProfile(session.user);
       }
@@ -185,6 +195,7 @@ export function useAuth() {
         localStorage.removeItem("melodymap.local_user");
       }
       setUserId(null);
+      setIsCloudAuth(false);
       setEmail(null);
       setProfile(null);
     }
@@ -192,6 +203,22 @@ export function useAuth() {
 
   const signInWithGoogle = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     try {
+      const webClientId = getGoogleWebClientId();
+      if (isNativeGoogleAuthSupported() && webClientId) {
+        const nativeRes = await signInWithNativeGoogle(supabase, webClientId);
+        if (nativeRes.success) {
+          if (nativeRes.user) {
+            await fetchProfile(nativeRes.user);
+          }
+          return { success: true };
+        }
+        if (nativeRes.error && !nativeRes.error.toLowerCase().includes("cancel")) {
+          console.warn("[Auth] Native Google Auth failed, trying OAuth redirect:", nativeRes.error);
+        } else if (nativeRes.error && nativeRes.error.toLowerCase().includes("cancel")) {
+          return { success: false, error: "Sign in was cancelled." };
+        }
+      }
+
       const redirectUrl = getOAuthRedirectUrl();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -209,7 +236,7 @@ export function useAuth() {
       console.warn("[Auth] signInWithGoogle error:", err);
       return { success: false, error: err?.message || "Google sign in failed" };
     }
-  }, []);
+  }, [fetchProfile]);
 
   const signInWithEmail = useCallback(async (emailInput: string, passwordInput: string) => {
     try {
@@ -266,6 +293,7 @@ export function useAuth() {
   return {
     ready,
     userId,
+    isCloudAuth,
     email,
     profile,
     updateProfile,

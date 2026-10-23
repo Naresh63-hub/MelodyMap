@@ -303,6 +303,7 @@ function MusicApp() {
   const [volume, setVolume] = useState(80);
   const [showSettings, setShowSettings] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<"signin" | "signup" | "profile">("signin");
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [continuous, setContinuous] = useState(true);
@@ -3052,7 +3053,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
           onNavigate={setTab}
-          isSynced={!!auth.userId}
+          isSynced={auth.isCloudAuth}
           userName={userNameDisplay}
           userInitial={userInitialDisplay}
           userAvatar={auth.profile?.avatar_url ?? null}
@@ -3062,7 +3063,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           isPlaying={player.isPlaying}
           onPlayPause={togglePlay}
           onNext={goNext}
-          onSignIn={() => setShowAuthModal(true)}
+          onSignIn={() => { setAuthModalMode("signin"); setShowAuthModal(true); }}
           onSignOut={async () => {
             await auth.signOut();
             setMessage("Signed out successfully");
@@ -3091,13 +3092,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }}
         jamActive={!!jam.session}
         jamParticipantsCount={jam.participants.length}
-        isSynced={!!auth.userId}
+        isSynced={auth.isCloudAuth}
         isPlaying={player.isPlaying}
         userName={userNameDisplay}
         userInitial={userInitialDisplay}
         userAvatar={auth.profile?.avatar_url ?? null}
         onSignIn={() => {
           setDrawerOpen(false);
+          setAuthModalMode("signin");
           setShowAuthModal(true);
         }}
         onSignOut={async () => {
@@ -3124,7 +3126,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               )?.toUpperCase() ?? "U"
             }
             userAvatar={auth.profile?.avatar_url ?? null}
-            onOpenAuth={() => setShowAuthModal(true)}
+            onOpenAuth={() => { setAuthModalMode(auth.isCloudAuth ? "profile" : "signin"); setShowAuthModal(true); }}
             onOpenJam={() => setShowJamModal(true)}
             jamActive={!!jam.session}
             jamParticipantsCount={jam.participants.length}
@@ -3945,7 +3947,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         <AuthModal
           open={showAuthModal}
           onOpenChange={setShowAuthModal}
-          defaultMode={auth.userId ? "profile" : "signin"}
+          defaultMode={authModalMode}
         />
 
 
@@ -4001,6 +4003,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onOpenSearch={() => {
             setShowJamModal(false);
             setTab("search");
+          }}
+          onOpenAuth={() => {
+            setShowJamModal(false);
+            setAuthModalMode("signin");
+            setShowAuthModal(true);
           }}
         />
       </Suspense>

@@ -101,6 +101,12 @@ export const jamService = {
         .single();
 
       if (sessionErr || !sessionData) {
+        if (sessionErr?.code === "PGRST205" || sessionErr?.message?.includes("jam_sessions")) {
+          return {
+            data: null,
+            error: "Jam Session database tables are not installed yet. Please apply the migration in your Supabase SQL Editor.",
+          };
+        }
         return {
           data: null,
           error: sessionErr?.message || "Failed to create Jam session.",
@@ -166,6 +172,12 @@ export const jamService = {
       });
 
       if (rpcErr) {
+        if (rpcErr.code === "PGRST202" || rpcErr.message?.includes("join_jam_session")) {
+          return {
+            data: null,
+            error: "Jam Session database functions are not installed yet. Please apply the migration in your Supabase SQL Editor.",
+          };
+        }
         if (rpcErr.message.includes("Jam session not found")) {
           return { data: null, error: "Jam session not found or has already ended." };
         }
@@ -173,7 +185,7 @@ export const jamService = {
           return { data: null, error: "Too many join attempts. Please wait a minute before trying again." };
         }
         if (rpcErr.message.includes("Not authenticated")) {
-          return { data: null, error: "Authentication required to join a Jam session." };
+          return { data: null, error: "Please sign in to your MelodyMap account to start or join a Jam Session." };
         }
         return { data: null, error: rpcErr.message || "Failed to join Jam session." };
       }

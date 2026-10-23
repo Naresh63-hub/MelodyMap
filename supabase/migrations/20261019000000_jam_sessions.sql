@@ -118,10 +118,7 @@ BEGIN
 
   -- Prevent non-hosts from escalating or changing is_host
   IF NEW.is_host <> OLD.is_host THEN
-    IF NOT EXISTS (
-      SELECT 1 FROM public.jam_sessions s
-      WHERE s.id = NEW.session_id AND s.host_id = auth.uid()
-    ) THEN
+    IF NOT EXISTS (SELECT 1 FROM public.jam_sessions s WHERE s.id = NEW.session_id AND s.host_id = auth.uid()) THEN
       RAISE EXCEPTION 'Only the session host can set or modify host status';
     END IF;
   END IF;
@@ -558,36 +555,33 @@ $$;
 -- 13. Enable Supabase Realtime Publication for Jam Tables
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime' AND tablename = 'jam_sessions'
-  ) THEN
+  BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.jam_sessions;
-  END IF;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN undefined_object THEN NULL;
+  END;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime' AND tablename = 'jam_participants'
-  ) THEN
+  BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.jam_participants;
-  END IF;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN undefined_object THEN NULL;
+  END;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime' AND tablename = 'jam_queue'
-  ) THEN
+  BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.jam_queue;
-  END IF;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN undefined_object THEN NULL;
+  END;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime' AND tablename = 'jam_votes'
-  ) THEN
+  BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.jam_votes;
-  END IF;
-EXCEPTION
-  WHEN undefined_object THEN
-    NULL;
+  EXCEPTION
+    WHEN duplicate_object THEN NULL;
+    WHEN undefined_object THEN NULL;
+  END;
 END $$;
 
 -- 14. Explicit Permissions and Hardened Revocations

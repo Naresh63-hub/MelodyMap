@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  AlertCircle,
   Check,
   Copy,
   Crown,
@@ -44,6 +45,7 @@ type Props = {
   onRemoveFromQueue: (queueItemId: string) => Promise<void>;
   onVoteToSkip: () => Promise<void>;
   onOpenSearch?: () => void;
+  onOpenAuth?: () => void;
 };
 
 export function JamSessionModal({
@@ -67,6 +69,7 @@ export function JamSessionModal({
   onRemoveFromQueue,
   onVoteToSkip,
   onOpenSearch,
+  onOpenAuth,
 }: Props) {
   // Not in a session view tab
   const [entryTab, setEntryTab] = useState<"create" | "join">("create");
@@ -129,8 +132,33 @@ export function JamSessionModal({
         </DialogHeader>
 
         {error && (
-          <div className="mt-3 p-3 rounded-xl bg-destructive/15 border border-destructive/30 text-xs text-destructive">
-            {error}
+          <div className="mt-3 p-3.5 rounded-xl bg-destructive/15 border border-destructive/30 text-xs text-destructive space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-destructive" />
+              <div className="flex-1 space-y-1">
+                <p className="font-semibold leading-snug">{error}</p>
+                {error.includes("sign in") && onOpenAuth && (
+                  <p className="text-[11px] text-destructive/80 leading-relaxed">
+                    Jam sessions sync collaboratively across listeners and require a signed-in MelodyMap cloud account.
+                  </p>
+                )}
+              </div>
+            </div>
+            {error.includes("sign in") && onOpenAuth && (
+              <div className="pt-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    onOpenChange(false);
+                    onOpenAuth();
+                  }}
+                  className="w-full bg-[#8B5CF6] hover:bg-[#7C3AED] text-white font-semibold text-xs h-8 rounded-lg shadow-sm"
+                >
+                  Sign In or Create Account
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
