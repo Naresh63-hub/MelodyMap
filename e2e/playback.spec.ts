@@ -59,7 +59,7 @@ test.describe("MelodyMap Spotify-Style Playback E2E Flow", () => {
     await expect(page.getByText("Song Alpha")).toBeVisible({ timeout: 10000 });
 
     // Open full player
-    const openPlayerBtn = page.locator('button[aria-label^="Open player for"], button[aria-label^="Open now playing view for"]').first();
+    const openPlayerBtn = page.getByRole("button", { name: /Open (player|now playing view) for/i }).first();
     await openPlayerBtn.click();
 
     // Click forward 5 seconds button
@@ -100,7 +100,7 @@ test.describe("MelodyMap Spotify-Style Playback E2E Flow", () => {
     await expect(page.getByText("Song Beta")).toBeVisible({ timeout: 5000 });
 
     // Open full player to access Previous button
-    const openPlayerBtn = page.locator('button[aria-label^="Open player for"], button[aria-label^="Open now playing view for"]').first();
+    const openPlayerBtn = page.getByRole("button", { name: /Open (player|now playing view) for/i }).first();
     await openPlayerBtn.click();
 
     // Click Previous track
