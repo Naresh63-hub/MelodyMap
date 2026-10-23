@@ -48,7 +48,6 @@ Additionally, YouTube-derived entries still mixed into the feeds carried
 | `src/lib/providers/saavn.ts` | The mapper now emits a clean `title` and stores the **movie name** in `album`. |
 | `src/lib/track-dedup.ts` | `cleanTrackDisplayMetadata` (the central feed cleaner) derives the movie and now **replaces** a polluted album instead of discarding the result. |
 | `src/components/music/ui/MobileHomeSections.tsx` | Home cards + list rows show `trackSubtitle(track)`. |
-| `src/components/music/ui/HomeSections.tsx` | Desktop grid card subtitle uses `trackSubtitle(track)`. |
 | `src/components/music/ui/SearchResults.tsx` | Search result rows use `trackSubtitle(track)`. |
 | `src/components/music/ui/ExploreSections.tsx` | Explore-tab card rows + lists use `trackSubtitle(track)`. |
 
