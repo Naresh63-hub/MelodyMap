@@ -58,6 +58,7 @@ public class MediaPlaybackService extends Service {
     public static final String ACTION_LIKE = "com.melodymap.music.action.LIKE";
     public static final String ACTION_UPDATE_LIKED = "com.melodymap.music.action.UPDATE_LIKED";
     public static final String CUSTOM_ACTION_LIKE = "com.melodymap.music.action.CUSTOM_LIKE";
+    public static final String CUSTOM_ACTION_PREV = "com.melodymap.music.action.CUSTOM_PREV";
 
     public static final String EXTRA_PAYLOAD = "payload";
     public static final String EXTRA_POSITION = "position";
@@ -308,6 +309,11 @@ public class MediaPlaybackService extends Service {
                 public void onCustomAction(String action, android.os.Bundle extras) {
                     if (CUSTOM_ACTION_LIKE.equals(action) || "like".equalsIgnoreCase(action) || "toggle_like".equalsIgnoreCase(action)) {
                         handleLikeTap();
+                    } else if (CUSTOM_ACTION_PREV.equals(action) || "prev".equalsIgnoreCase(action)) {
+                        // Previous was demoted out of the compact transport slot to make
+                        // room for the Like button; it still reaches us as a custom action
+                        // from the expanded notification (slot 4) and must keep working.
+                        dispatchMediaCommand("prev");
                     }
                 }
             });
@@ -334,10 +340,29 @@ public class MediaPlaybackService extends Service {
             }
             mediaSession.setMetadata(metaBuilder.build());
 
+            // Compact lock-screen layout experiment (branch experiment/lockscreen-like-slot):
+            // Android 13+ renders only the FIRST THREE PlaybackState slots on the lock
+            // screen (slot 1 = Play/Pause, slot 2 = Previous, slot 3 = Next); custom
+            // actions overflow to slots 4-5, which compact mode hides. That is why the
+            // heart never appeared before. Per the official media-controls documentation,
+            // slot 2 falls back to the first *unplaced custom action* when
+            // ACTION_SKIP_TO_PREVIOUS is NOT advertised. So we deliberately omit
+            // ACTION_SKIP_TO_PREVIOUS and register Like as the first custom action: the
+            // heart is promoted into the compact "back" slot -> [Like][Play/Pause][Next].
+            // Previous is registered as the SECOND custom action, landing in slot 4, so it
+            // stays reachable from the expanded notification (and in-app) while being
+            // omitted from the compact row by design. This is fully reversible: restoring
+            // ACTION_SKIP_TO_PREVIOUS and dropping prevCustomAction returns the old layout.
             PlaybackStateCompat.CustomAction likeCustomAction = new PlaybackStateCompat.CustomAction.Builder(
                     CUSTOM_ACTION_LIKE,
                     isTrackLiked ? "Unlike" : "Like",
                     isTrackLiked ? R.drawable.ic_heart_filled : R.drawable.ic_heart_outline)
+                    .setExtras(new android.os.Bundle())
+                    .build();
+            PlaybackStateCompat.CustomAction prevCustomAction = new PlaybackStateCompat.CustomAction.Builder(
+                    CUSTOM_ACTION_PREV,
+                    "Previous",
+                    R.drawable.ic_skip_previous)
                     .setExtras(new android.os.Bundle())
                     .build();
 
@@ -350,11 +375,11 @@ public class MediaPlaybackService extends Service {
                             PlaybackStateCompat.ACTION_PLAY
                                     | PlaybackStateCompat.ACTION_PAUSE
                                     | PlaybackStateCompat.ACTION_PLAY_PAUSE
-                                    | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
                                     | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
                                     | PlaybackStateCompat.ACTION_SEEK_TO
                                     | PlaybackStateCompat.ACTION_STOP)
                     .addCustomAction(likeCustomAction)
+                    .addCustomAction(prevCustomAction)
                     .setState(state, (long) (trackPositionSec * 1000L), speed,
                             SystemClock.elapsedRealtime())
                     .build();
