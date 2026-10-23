@@ -356,7 +356,7 @@ public class MediaPlaybackService extends Service {
             PlaybackStateCompat.CustomAction likeCustomAction = new PlaybackStateCompat.CustomAction.Builder(
                     CUSTOM_ACTION_LIKE,
                     isTrackLiked ? "Unlike" : "Like",
-                    isTrackLiked ? R.drawable.ic_heart_filled : R.drawable.ic_heart_outline)
+                    isTrackLiked ? R.drawable.ic_heart_like : R.drawable.ic_heart_unlike)
                     .setExtras(new android.os.Bundle())
                     .build();
             PlaybackStateCompat.CustomAction prevCustomAction = new PlaybackStateCompat.CustomAction.Builder(
@@ -463,7 +463,7 @@ public class MediaPlaybackService extends Service {
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .addAction(
-                        isTrackLiked ? R.drawable.ic_heart_filled : R.drawable.ic_heart_outline,
+                        isTrackLiked ? R.drawable.ic_heart_like : R.drawable.ic_heart_unlike,
                         isTrackLiked ? "Unlike" : "Like",
                         serviceActionIntent(ACTION_LIKE))
                 .addAction(R.drawable.ic_skip_previous, "Prev", serviceActionIntent(ACTION_PREV))
