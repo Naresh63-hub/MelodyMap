@@ -27,7 +27,7 @@
     "@capacitor/android": "^8.5.2",
     "@capacitor/app": "^8.1.2",
     "@capacitor/cli": "^8.5.2",
-    "@capacitor/core": "^8.5.2",
+    "@capacitor/core": "^8.5.3",
     "@capacitor/haptics": "^8.0.0",
     "@radix-ui/react-checkbox": "^1.4.0",
     "@radix-ui/react-dialog": "^1.1.15",
