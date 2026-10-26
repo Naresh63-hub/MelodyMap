@@ -348,7 +348,7 @@ export function ExploreSections({
         <section>
           <SectionHeader title="Trending Songs" icon={TrendingUp} subtitle="Top charts in your language" />
           <VerticalSongList
-            tracks={trending.slice(0, 12)}
+            tracks={trending.slice(0, 30)}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}

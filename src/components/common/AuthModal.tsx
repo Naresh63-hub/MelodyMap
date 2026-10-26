@@ -118,12 +118,12 @@ export function AuthModal({
             onSuccess?.();
           }, 800);
         } else {
-          setBusy(false);
           setErrorMsg(res.error || "Failed to update profile.");
+          setBusy(false);
         }
       } catch (err: any) {
+        setErrorMsg(err?.message || "Profile update error.");
         setBusy(false);
-        setErrorMsg(err?.message || "Failed to update profile.");
       }
       return;
     }
@@ -139,14 +139,18 @@ export function AuthModal({
         const res = await auth.resetPassword(trimmedEmail);
         if (res.success) {
           setSuccessMsg("Password reset email sent! Check your inbox.");
-          setTimeout(() => setMode("signin"), 2000);
+          setTimeout(() => {
+            setBusy(false);
+            setMode("signin");
+          }, 2000);
         } else {
           setErrorMsg(res.error || "Failed to send reset email.");
+          setBusy(false);
         }
       } catch (err: any) {
-        setErrorMsg(err?.message || "Failed to send reset email.");
+        setErrorMsg(err?.message || "Reset password error.");
+        setBusy(false);
       }
-      setBusy(false);
       return;
     }
 
@@ -163,7 +167,7 @@ export function AuthModal({
         setErrorMsg("Please enter a valid email address.");
         return;
       }
-      if (!password || password.length < 6) {
+      if (password.length < 6) {
         setBusy(false);
         setErrorMsg("Password must be at least 6 characters.");
         return;
@@ -177,12 +181,12 @@ export function AuthModal({
       try {
         const res = await auth.signUpWithEmail(trimmedEmail, password, trimmedName);
         if (res.success) {
-          setSuccessMsg(`Welcome, ${trimmedName}! Account created.`);
+          setSuccessMsg("Account created! Please check your email to confirm.");
           setTimeout(() => {
             setBusy(false);
             onOpenChange(false);
             onSuccess?.();
-          }, 800);
+          }, 1200);
         } else {
           setErrorMsg(res.error || "Sign-up failed.");
           setBusy(false);
@@ -263,42 +267,6 @@ export function AuthModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Tab Switcher for Sign In / Sign Up */}
-        {mode !== "profile" && mode !== "forgot" && (
-          <div className="flex rounded-xl bg-chip p-1 border border-hair">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signin");
-                setErrorMsg(null);
-                setSuccessMsg(null);
-              }}
-              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
-                mode === "signin"
-                  ? "bg-primary text-primary-foreground shadow-md"
-                  : "text-foreground/60 hover:text-foreground"
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signup");
-                setErrorMsg(null);
-                setSuccessMsg(null);
-              }}
-              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
-                mode === "signup"
-                  ? "bg-primary text-primary-foreground shadow-md"
-                  : "text-foreground/60 hover:text-foreground"
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
-        )}
-
         {/* Feedback alerts */}
         {errorMsg && (
           <div className="flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-500/20 px-3.5 py-2.5 text-xs text-red-400 animate-in fade-in">
@@ -313,17 +281,17 @@ export function AuthModal({
           </div>
         )}
 
-        {/* Google One-Tap / OAuth Button */}
+        {/* Primary Hero: Google One-Tap / OAuth Button */}
         {mode !== "profile" && (
-          <div className="space-y-3 pt-1">
+          <div className="space-y-2.5 pt-1">
             <Button
               type="button"
               variant="outline"
               disabled={busy}
               onClick={handleGoogleSignIn}
-              className="w-full h-10 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border-none font-medium flex items-center justify-center gap-2.5 shadow-sm active:scale-95 transition-all text-xs"
+              className="w-full h-11 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border-none font-semibold flex items-center justify-center gap-2.5 shadow-md active:scale-95 transition-all text-xs"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
+              <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -341,15 +309,54 @@ export function AuthModal({
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
               </svg>
-              Continue with Google
+              <span>Continue with Google</span>
             </Button>
+            <p className="text-center text-[11px] text-muted-foreground font-medium">
+              Instant 1-tap sign-in & account creation
+            </p>
 
-            <div className="relative flex items-center justify-center">
+            <div className="relative flex items-center justify-center my-3">
               <div className="border-t border-hair-strong w-full" />
-              <span className="bg-background px-2 text-[10px] text-foreground/40 uppercase tracking-widest font-mono">
+              <span className="bg-popover px-2.5 text-[10px] text-foreground/50 uppercase tracking-widest font-mono">
                 or with email
               </span>
             </div>
+
+            {/* Email Mode Switcher */}
+            {mode !== "forgot" && (
+              <div className="flex rounded-xl bg-chip p-1 border border-hair">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signin");
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                  }}
+                  className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
+                    mode === "signin"
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "text-foreground/60 hover:text-foreground"
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signup");
+                    setErrorMsg(null);
+                    setSuccessMsg(null);
+                  }}
+                  className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
+                    mode === "signup"
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "text-foreground/60 hover:text-foreground"
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -520,6 +527,18 @@ export function AuthModal({
               >
                 Back to Sign In
               </Button>
+            )}
+
+            {mode !== "profile" && (
+              <div className="pt-2 border-t border-hair text-center">
+                <button
+                  type="button"
+                  onClick={() => onOpenChange(false)}
+                  className="min-h-[36px] py-1 px-3 inline-flex items-center justify-center text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg"
+                >
+                  Skip for now · Continue as Guest
+                </button>
+              </div>
             )}
           </div>
         </form>

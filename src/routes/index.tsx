@@ -14,6 +14,7 @@ import { MobileDrawer } from "@/components/music/layout/MobileDrawer";
 import { MiniPlayer } from "@/components/music/layout/MiniPlayer";
 import { MobileHeader } from "@/components/music/layout/MobileHeader";
 import { MobileHomeSections } from "@/components/music/ui/MobileHomeSections";
+import { MoodCardsSection } from "@/components/music/ui/MoodCardsSection";
 import { MobileLibrary } from "@/components/music/ui/MobileLibrary";
 import { MobileQueue } from "@/components/music/ui/MobileQueue";
 import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
@@ -71,6 +72,7 @@ import { episodeToTrack, type PodcastEpisode } from "@/lib/podcast.types";
 import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
 import { AuthModal } from "@/components/common/AuthModal";
+import { AccountSheet } from "@/components/common/AccountSheet";
 
 import { useAuth } from "@/lib/auth";
 import { useJamSession } from "@/lib/use-jam-session";
@@ -298,11 +300,14 @@ function MusicApp() {
     },
   });
   const [message, setMessage] = useState<string | null>(null);
+  const [activeMood, setActiveMood] = useState<string | null>(null);
+  const [loadingMood, setLoadingMood] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [index, setIndex] = useState(0);
   const [volume, setVolume] = useState(80);
   const [showSettings, setShowSettings] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAccountSheet, setShowAccountSheet] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signin" | "signup" | "profile">("signin");
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
@@ -1277,7 +1282,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             const res = await runTrending({
               data: {
                 languages: settings.languages,
-                count: 24,
+                count: 50,
                 refreshNonce: nonce,
                 clientHour,
               },
@@ -1299,7 +1304,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           (async () => {
             const artistList = topArtists(stats, likes);
             const res = await runNewSongs({
-              data: { artists: artistList, languages: settings.languages, count: 24 },
+              data: { artists: artistList, languages: settings.languages, count: 30, refreshNonce: nonce },
             });
             if (res.tracks && res.tracks.length > 0) {
               const pool = (res.tracks as Track[]).filter((t) => !isOldEraTrack(t));
@@ -1323,7 +1328,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             const res = await runOldSongs({
               data: {
                 languages: settings.languages,
-                count: 24,
+                count: 50,
                 refreshNonce: nonce,
                 artists: topArtists(stats, likes),
               },
@@ -1523,6 +1528,48 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     setQuickFilterTracks([]);
     setQuickFilterLoading(false);
   }, []);
+
+  const handlePlayMood = useCallback(
+    async (moodKey: string, moodLabel: string) => {
+      if (activeMood === moodKey && current) {
+        if (player.isPlaying) {
+          pause();
+        } else {
+          play();
+        }
+        return;
+      }
+
+      setLoadingMood(moodKey);
+      try {
+        const preferredLang = settings.languages?.[0];
+        const res = await runMoodPicks({
+          data: {
+            mood: moodKey,
+            language: preferredLang,
+          },
+        });
+
+        const tracks = (res.tracks ?? []) as Track[];
+        if (tracks.length > 0) {
+          setActiveMood(moodKey);
+          startQueue(tracks, 0);
+          setMessage(`Playing ${moodLabel} vibe • ${tracks.length} songs`);
+          setTimeout(() => setMessage(null), 3500);
+        } else {
+          setMessage(`Could not load ${moodLabel} songs right now. Please try again.`);
+          setTimeout(() => setMessage(null), 3500);
+        }
+      } catch (err) {
+        console.error("Failed to load mood picks:", err);
+        setMessage(`Could not load ${moodLabel} songs. Check connection.`);
+        setTimeout(() => setMessage(null), 3500);
+      } finally {
+        setLoadingMood(null);
+      }
+    },
+    [activeMood, current, player.isPlaying, pause, play, settings.languages, runMoodPicks, startQueue],
+  );
 
   // Reload every home feed when language/artist preferences change. Previously
   // only the Settings modal's Apply button (and onboarding save) refreshed —
@@ -3063,7 +3110,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           isPlaying={player.isPlaying}
           onPlayPause={togglePlay}
           onNext={goNext}
-          onSignIn={() => { setAuthModalMode("signin"); setShowAuthModal(true); }}
+          onSignIn={() => setShowAccountSheet(true)}
           onSignOut={async () => {
             await auth.signOut();
             setMessage("Signed out successfully");
@@ -3126,7 +3173,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               )?.toUpperCase() ?? "U"
             }
             userAvatar={auth.profile?.avatar_url ?? null}
-            onOpenAuth={() => { setAuthModalMode(auth.isCloudAuth ? "profile" : "signin"); setShowAuthModal(true); }}
+            onOpenAuth={() => setShowAccountSheet(true)}
             onOpenJam={() => setShowJamModal(true)}
             jamActive={!!jam.session}
             jamParticipantsCount={jam.participants.length}
@@ -3203,6 +3250,27 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   </div>
                 </div>
               </form>
+
+              {/* Unified Profile & Settings Avatar — always accessible on Search Tab */}
+              <button
+                type="button"
+                onClick={() => setShowAccountSheet(true)}
+                aria-label="Profile and Settings"
+                title="Profile, Settings & Account"
+                className="flex lg:hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ring-2 ring-primary/40 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[40px] min-w-[40px]"
+              >
+                {auth.profile?.avatar_url ? (
+                  <img src={auth.profile.avatar_url} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-foreground tracking-wide">
+                    {((auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
+                      ? auth.profile.display_name[0]
+                      : auth.email && auth.email !== "listener@google.com"
+                        ? auth.email[0]
+                        : "U") || "U").toUpperCase()}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         )}
@@ -3265,6 +3333,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       </Button>
                     </div>
                   </div>
+
+                  {/* 1-Tap Mood & Vibe Selector (Spotify / YouTube Music style) */}
+                  <MoodCardsSection
+                    activeMood={activeMood}
+                    loadingMood={loadingMood}
+                    isPlaying={player.isPlaying}
+                    onSelectMood={handlePlayMood}
+                  />
 
                   {/* Genre & Mood quick filters — instant, local filtering */}
                   <GenreMoodFilterBar
@@ -3941,6 +4017,28 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setShowSettings(false);
             void loadRecommendations();
           }}
+        />
+
+        {/* UNIFIED ACCOUNT & SETTINGS SHEET */}
+        <AccountSheet
+          open={showAccountSheet}
+          onOpenChange={setShowAccountSheet}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenEqualizer={() => setShowEqualizer(true)}
+          onOpenJam={() => setShowJamModal(true)}
+          onOpenSleepTimer={() => setShowSleepTimer(true)}
+          onOpenLanguages={() => setTab("languages")}
+          onSignIn={() => {
+            setAuthModalMode("signin");
+            setShowAuthModal(true);
+          }}
+          onSignOut={async () => {
+            await auth.signOut();
+            setMessage("Signed out successfully");
+            setTimeout(() => setMessage(null), 3000);
+          }}
+          jamActive={!!jam.session}
+          jamParticipantsCount={jam.participants.length}
         />
 
         {/* IN-APP MODAL AUTH (LOGIN, SIGN UP & ACCOUNT PROFILE) */}

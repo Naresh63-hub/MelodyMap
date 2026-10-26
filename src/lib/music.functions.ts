@@ -1286,11 +1286,18 @@ const NewSongsInput = z.object({
   artists: z.array(z.string()).max(50).default([]),
   count: z.number().min(1).max(30).optional(),
   languages: z.array(z.string()).max(30).default([]),
+  refreshNonce: z.union([z.string(), z.number()]).optional(),
 });
 
 /** Language names from Tune picks → search terms for YouTube queries. */
 const LANG_SEARCH: Record<string, string> = {
   Hindi: "hindi",
+
+
+
+
+
+  
   Telugu: "telugu",
   Tamil: "tamil",
   Malayalam: "malayalam",
@@ -1314,12 +1321,19 @@ export const newSongs = createServerFn({ method: "POST" })
     const count = data.count ?? 24;
     const year = new Date().getFullYear();
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
+    // When a refresh nonce is supplied, pull a larger candidate pool and rotate
+    // through it so pull-to-refresh surfaces genuinely different new releases.
+    const poolLimit = data.refreshNonce ? Math.max(count, 50) : count;
 
     try {
       const { getSaavnNewReleases } = await import("./providers/saavn");
-      const releases = await getSaavnNewReleases(langs, count);
+      const releases = await getSaavnNewReleases(langs, poolLimit);
       if (releases.length > 0) {
-        return { tracks: releases as Track[], error: null };
+        const pool = releases as Track[];
+        return {
+          tracks: data.refreshNonce ? shuffleArray(pool).slice(0, count) : pool.slice(0, count),
+          error: null,
+        };
       }
     } catch (err) {
       console.warn("[newSongs] Saavn new releases feed notice:", err);
@@ -1727,7 +1741,10 @@ export const radioTracks = createServerFn({ method: "POST" })
   });
 
 
-const MoodPicksInput = z.object({ mood: z.string().min(1).max(40) });
+const MoodPicksInput = z.object({
+  mood: z.string().min(1).max(40),
+  language: z.string().max(40).optional(),
+});
 
 /** Curated search per mood — YouTube-Music-style radio that needs no AI key. */
 const MOOD_QUERIES: Record<string, string> = {
@@ -1747,7 +1764,32 @@ const MOOD_QUERIES: Record<string, string> = {
 export const moodPicks = createServerFn({ method: "POST" })
   .validator((input: unknown) => MoodPicksInput.parse(input))
   .handler(async ({ data }) => {
-    const query = MOOD_QUERIES[data.mood] ?? `${data.mood} songs`;
+    const lang = data.language?.trim();
+    let query: string;
+
+    if (lang && lang.toLowerCase() !== "english") {
+      if (data.mood === "focus") {
+        query = "focus music instrumental concentration study";
+      } else if (data.mood === "devotional") {
+        query = `${lang} devotional bhakti songs`;
+      } else if (data.mood === "romantic") {
+        query = `${lang} romantic love melody songs`;
+      } else if (data.mood === "upbeat workout") {
+        query = `${lang} energetic workout gym songs`;
+      } else if (data.mood === "party") {
+        query = `${lang} party dance mass songs`;
+      } else if (data.mood === "sad hours") {
+        query = `${lang} sad soulful heartbreak songs`;
+      } else if (data.mood === "chill") {
+        query = `${lang} chill calm acoustic melody songs`;
+      } else if (data.mood === "late night") {
+        query = `${lang} late night melody songs`;
+      } else {
+        query = `${lang} ${data.mood} songs`;
+      }
+    } else {
+      query = MOOD_QUERIES[data.mood] ?? `${data.mood} songs`;
+    }
     try {
       const { searchSaavn } = await import("./providers/saavn");
       const saavnHits = await searchSaavn(query, { limit: 30 });

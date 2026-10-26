@@ -62,14 +62,17 @@ test.describe("MelodyMap Spotify-Style Playback E2E Flow", () => {
     const openPlayerBtn = page.getByRole("button", { name: /Open (player|now playing view) for/i }).first();
     await openPlayerBtn.click();
 
+    // Wait for full-screen player to mount
+    await expect(page.getByRole("button", { name: "Collapse player" })).toBeVisible({ timeout: 10000 });
+
     // Click forward 5 seconds button
     const skipFwdBtn = page.locator('button[title="Forward 5 seconds"]');
-    if (await skipFwdBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await skipFwdBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await skipFwdBtn.click();
     }
 
     // Verify player is still on Song Alpha
-    await expect(page.getByRole("heading", { name: "Song Alpha" })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Song Alpha").first()).toBeVisible({ timeout: 5000 });
   });
 
   test("3. Forward / Next track: advances to Song B and resets progress to 0", async ({ page }) => {

@@ -449,6 +449,21 @@ html.light {
   animation: fade-in 0.2s ease-out forwards;
 }
 
+@keyframes sheet-slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0.9;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@utility animate-sheet-up {
+  animation: sheet-slide-up 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Safe area insets for mobile */
 @utility safe-bottom {
   padding-bottom: max(var(--mm-inset-bottom), 16px);

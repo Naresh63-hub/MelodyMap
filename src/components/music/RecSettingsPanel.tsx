@@ -1,11 +1,10 @@
-import { useMemo, useState, useCallback } from "react";
-import { RotateCcw, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { GENRES, MOODS, PODCAST_TOPICS, type RecSettings } from "@/lib/library";
+import { GENRES, PODCAST_TOPICS, type RecSettings } from "@/lib/library";
 import { LanguageArtistPicker } from "@/components/music/ui/LanguageArtistPicker";
 import { cn } from "@/lib/utils";
+import { RotateCcw } from "lucide-react";
 
 type Props = {
   settings: RecSettings;
@@ -25,30 +24,6 @@ export function RecSettingsPanel({
   loading,
   onOpenLanguages,
 }: Props) {
-  /** Track pending slider changes so we debounce updates. */
-  const [pendingMoods, setPendingMoods] = useState<Record<string, number> | null>(null);
-
-  /** Validate: warn if all moods are at 0. */
-  const allMoodsZero = useMemo(
-    () => Object.values(settings.moods).every((v) => v === 0),
-    [settings.moods],
-  );
-
-  const handleMoodSlider = useCallback(
-    (mood: string, value: number) => {
-      setPendingMoods({ ...settings.moods, [mood]: value });
-    },
-    [settings.moods],
-  );
-
-  /** Commit pending mood changes on slider release (debounce). */
-  const commitMoods = useCallback(() => {
-    if (pendingMoods) {
-      onChange({ moods: pendingMoods });
-      setPendingMoods(null);
-    }
-  }, [pendingMoods, onChange]);
-
   const toggleGenre = (genre: string) =>
     onChange({
       genres: settings.genres.includes(genre)
@@ -63,14 +38,13 @@ export function RecSettingsPanel({
         : [...settings.podcastTopics, topic],
     });
 
-
   return (
     <section className="rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Tune your picks</h2>
           <p className="text-xs text-muted-foreground">
-            Weight the moods, genres and energy the AI should chase.
+            Configure your favorite genres, languages, and recommendation flow.
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={onReset} className="shrink-0">
@@ -80,30 +54,19 @@ export function RecSettingsPanel({
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <div className="space-y-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Mood weighting
-          </p>
-          {MOODS.map((mood) => (
-            <div key={mood} className="flex items-center gap-3">
-              <span className="w-28 shrink-0 text-xs capitalize text-muted-foreground">{mood}</span>
-              <Slider
-                value={[pendingMoods?.[mood] ?? settings.moods[mood] ?? 50]}
-                max={100}
-                step={5}
-                onValueChange={([v]) => handleMoodSlider(mood, v ?? 0)}
-                onValueCommit={commitMoods}
-                className="flex-1"
-                aria-label={`${mood} weighting`}
-              />
-              <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">
-                {pendingMoods?.[mood] ?? settings.moods[mood] ?? 50}%
-              </span>
-            </div>
-          ))}
-        </div>
-
+        {/* Left Column: Languages, Artists, Genres & Podcasts */}
         <div className="space-y-4">
+          <div>
+            <LanguageArtistPicker
+              languages={settings.languages}
+              artists={settings.artists}
+              onChange={(patch) => onChange(patch)}
+              {...(onOpenLanguages
+                ? { actionLabel: "Play language songs", onAction: onOpenLanguages }
+                : {})}
+            />
+          </div>
+
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Genres
@@ -132,17 +95,6 @@ export function RecSettingsPanel({
           </div>
 
           <div>
-            <LanguageArtistPicker
-              languages={settings.languages}
-              artists={settings.artists}
-              onChange={(patch) => onChange(patch)}
-              {...(onOpenLanguages
-                ? { actionLabel: "Play language songs", onAction: onOpenLanguages }
-                : {})}
-            />
-          </div>
-
-          <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Podcast topics
             </p>
@@ -168,10 +120,14 @@ export function RecSettingsPanel({
               })}
             </div>
           </div>
+        </div>
 
-
-
+        {/* Right Column: Discovery, Energy & Playback Preferences */}
+        <div className="space-y-4">
           <div className="space-y-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Discovery & Energy
+            </p>
             <div className="flex items-center gap-3">
               <span className="w-28 shrink-0 text-xs text-muted-foreground">Familiar → Deep</span>
               <Slider
@@ -200,6 +156,9 @@ export function RecSettingsPanel({
                 {settings.energy}%
               </span>
             </div>
+          </div>
+
+          <div className="space-y-3 pt-1">
             <label className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
               Instrumental only
               <Switch
@@ -217,7 +176,6 @@ export function RecSettingsPanel({
               <Switch
                 checked={settings.notifyNewDrops}
                 onCheckedChange={async (v) => {
-                  // Asking for permission needs a user gesture — this toggle is one.
                   if (v && "Notification" in window && Notification.permission === "default") {
                     await Notification.requestPermission();
                   }
@@ -254,13 +212,6 @@ export function RecSettingsPanel({
           </div>
         </div>
       </div>
-
-      {allMoodsZero && (
-        <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300">
-          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-          <p>All moods are set to 0%. Recommendations may be less personalized. Increase at least one mood for better results.</p>
-        </div>
-      )}
 
       <Button className="mt-5 w-full rounded-full font-semibold" onClick={onApply} disabled={loading}>
         {loading ? "Refreshing…" : "Apply & refresh For you"}

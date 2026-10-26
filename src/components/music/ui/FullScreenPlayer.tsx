@@ -226,7 +226,7 @@ export function FullScreenPlayer({
   return (
     <div
       {...dragProps}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-hidden animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-hidden animate-sheet-up"
       style={{
         transform: dragY ? `translateY(${dragY}px)` : undefined,
         opacity: dragY ? 1 - dismissProgress * 0.85 : undefined,

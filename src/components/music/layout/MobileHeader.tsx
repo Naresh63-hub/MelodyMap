@@ -1,4 +1,4 @@
-import { Menu, Radio, Settings2, User } from "lucide-react";
+import { Menu, Radio, User } from "lucide-react";
 import { StreakBadge } from "@/components/music/ui/StreakBadge";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +17,7 @@ type Props = {
 export function MobileHeader({
   tab = "foryou",
   onOpenMenu,
-  onOpenSettings,
+  onOpenSettings: _onOpenSettings,
   userInitial,
   userAvatar,
   onOpenAuth,
@@ -88,54 +88,39 @@ export function MobileHeader({
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         <StreakBadge />
 
-        {onOpenJam && (
+        {/* Live Jam badge if active session is running */}
+        {onOpenJam && jamActive && (
           <button
             type="button"
             onClick={onOpenJam}
-            aria-label="Jam Session"
-            title={jamActive ? `Jam Session active (${jamParticipantsCount} listening)` : "Start or Join a Jam"}
-            className={cn(
-              "flex h-8 sm:h-9 items-center gap-1.5 px-2.5 rounded-full text-xs font-medium active:scale-95 transition-all shadow-xs",
-              jamActive
-                ? "bg-[#8B5CF6]/20 border border-[#8B5CF6]/50 text-[#8B5CF6]"
-                : "bg-chip hover:bg-chip-strong border border-hair text-muted-foreground hover:text-foreground",
-            )}
+            aria-label="Jam Session active"
+            title={`Jam Session active (${jamParticipantsCount} listening)`}
+            className="flex h-8 sm:h-9 items-center gap-1.5 px-2.5 rounded-full text-xs font-medium bg-[#8B5CF6]/20 border border-[#8B5CF6]/50 text-[#8B5CF6] active:scale-95 transition-all shadow-xs"
           >
-            <Radio className={cn("h-3.5 w-3.5", jamActive ? "animate-pulse text-[#8B5CF6]" : "text-muted-foreground")} />
-            <span className="hidden sm:inline font-semibold text-[11px]">{jamActive ? `${jamParticipantsCount} in Jam` : "Jam"}</span>
-            {jamActive && <span className="sm:hidden h-1.5 w-1.5 rounded-full bg-[#8B5CF6] animate-ping" />}
-          </button>
-        )}
-        
-        {onOpenSettings && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            aria-label="Settings"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-card active:scale-95 transition-all"
-          >
-            <Settings2 className="h-4 w-4" />
+            <Radio className="h-3.5 w-3.5 animate-pulse text-[#8B5CF6]" />
+            <span className="hidden sm:inline font-semibold text-[11px]">{jamParticipantsCount} in Jam</span>
+            <span className="sm:hidden h-1.5 w-1.5 rounded-full bg-[#8B5CF6] animate-ping" />
           </button>
         )}
 
-        {/* Top-of-app circle user mark */}
+        {/* Unified Profile & Settings Avatar — Tapping opens Account & Settings Sheet */}
         {onOpenAuth && (
           <button
             type="button"
             onClick={onOpenAuth}
-            aria-label="User account info"
-            title="User account info"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ml-0.5 ring-1 ring-primary/30"
+            aria-label="Profile and Settings"
+            title="Profile, Settings & Account"
+            className="flex h-9 w-9 sm:h-9.5 sm:w-9.5 shrink-0 items-center justify-center rounded-full bg-chip hover:bg-chip-strong border border-hair-strong text-foreground overflow-hidden active:scale-95 transition-all ring-2 ring-primary/40 shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[40px] min-w-[40px]"
           >
             {userAvatar ? (
               <img src={userAvatar} alt="Profile" className="h-full w-full object-cover" />
             ) : userInitial ? (
-              <span className="text-xs font-semibold text-foreground tracking-wide">{userInitial}</span>
+              <span className="text-xs font-bold text-foreground tracking-wide">{userInitial}</span>
             ) : (
-              <User className="h-3.5 w-3.5 text-foreground/70" />
+              <User className="h-4 w-4 text-foreground/80" />
             )}
           </button>
         )}
