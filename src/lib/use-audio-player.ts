@@ -1429,6 +1429,7 @@ export function useAudioPlayer(options: {
     skipBackward,
     setSpeed,
     setVolume,
+    playOffline,
     getAnalyser: () => analyserRef.current,
   };
 }

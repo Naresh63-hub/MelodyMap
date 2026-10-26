@@ -117,7 +117,8 @@ import {
 import { GenreMoodFilterBar } from "@/components/music/ui/GenreMoodFilterBar";
 import { useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
-import { clearDownloads, listDownloads, removeDownload, saveDownload, type DownloadInfo } from "@/lib/offline";
+import { clearDownloads, listDownloads, removeDownload, saveDownload, hasDownload, type DownloadInfo } from "@/lib/offline";
+import { hasFullLengthDirectSource } from "@/lib/track-stream-policy";
 import { cn } from "@/lib/utils";
 import {
   trackExistsIn,
@@ -348,12 +349,56 @@ function MusicApp() {
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
   const radioContinuationRef = useRef<string | undefined>(undefined);
 
+  const hasSwitchedOfflineOnStartupRef = useRef(false);
+
+  // Network online/offline event detection
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => {
+      setMessage("Back online â€” live recommendations restored");
+      setTimeout(() => setMessage(null), 3500);
+    };
+
+    const handleOffline = () => {
+      setMessage("You are offline â€” downloaded songs are available");
+      setTimeout(() => setMessage(null), 4000);
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   // Refresh downloads on mount & hydrate context engine
   useEffect(() => {
     contextEngine.loadFromStorage();
     void listDownloads().then((items: DownloadInfo[]) => {
-      setDownloadedIds(new Set(items.map((t: DownloadInfo) => t.track.id)));
-      setDownloadedTracks(items.map((t: DownloadInfo) => t.track));
+      const ids = new Set(items.map((t: DownloadInfo) => t.track.id));
+      setDownloadedIds(ids);
+      const tracks = items.map((t: DownloadInfo) => t.track);
+      setDownloadedTracks(tracks);
+
+      // On offline startup, show downloaded songs if any are available
+      if (
+        !hasSwitchedOfflineOnStartupRef.current &&
+        typeof navigator !== "undefined" &&
+        navigator.onLine === false
+      ) {
+        hasSwitchedOfflineOnStartupRef.current = true;
+        if (tracks.length > 0) {
+          setTab("downloads");
+          setMessage("Offline mode: showing your downloaded songs");
+          setTimeout(() => setMessage(null), 4000);
+        } else {
+          setMessage("You are offline. Connect to internet to stream music.");
+          setTimeout(() => setMessage(null), 4000);
+        }
+      }
     });
   }, []);
 
@@ -447,9 +492,36 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     // Standard download -> saved to IndexedDB for in-app offline play AND triggered to save to phone/disk
     setDownloadingIds((prev) => new Set([...prev, track.id]));
     try {
-      const res = await fetch(`/api/stream/${encodeURIComponent(track.id)}`);
-      if (!res.ok) throw new Error("Download failed");
+      let res: Response | null = null;
+
+      // 1. Primary path: Stream proxy (guarantees full-length resolution and fallback chain)
+      try {
+        const proxyRes = await fetch(`/api/stream/${encodeURIComponent(track.id)}`);
+        if (proxyRes.ok) {
+          res = proxyRes;
+        }
+      } catch (proxyErr) {
+        console.warn("[MelodyMap] Stream proxy download attempt failed, checking direct fallback", proxyErr);
+      }
+
+      // 2. Direct URL fallback: ONLY if full-length provider (JioSaavn, Audius, Jamendo, Archive, Podcast)
+      // Never treat 30-second Deezer preview clips as complete downloads.
+      if (!res && track.previewUrl && hasFullLengthDirectSource(track.id)) {
+        try {
+          const directRes = await fetch(track.previewUrl);
+          if (directRes.ok) {
+            res = directRes;
+          }
+        } catch (directErr) {
+          console.warn("[MelodyMap] Direct previewUrl download attempt failed", directErr);
+        }
+      }
+
+      if (!res || !res.ok) throw new Error("Download failed");
       const blob = await res.blob();
+      if (blob.size < 50 * 1024) {
+        throw new Error("Downloaded audio file is incomplete");
+      }
 
       let imgBlob: Blob | undefined;
       if (track.thumbnail && track.thumbnail.startsWith("http")) {
@@ -483,8 +555,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
 
       setMessage(`Downloaded "${track.title}" to storage & offline library`);
-    } catch {
-      setMessage("Failed to download song");
+    } catch (err) {
+      console.warn("[MelodyMap] handleDownload failed:", err);
+      setMessage(`Failed to download "${track.title || "song"}" â€” please check connection`);
     } finally {
       setDownloadingIds((prev) => {
         const next = new Set(prev);
@@ -903,6 +976,45 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             return;
           }
         }
+      }
+
+      // 1. Safe offline fallback: if this exact track is downloaded, play its local Blob
+      if (track) {
+        void hasDownload(track.id).then((isDownloaded) => {
+          if (isDownloaded) {
+            void load(track.id, undefined, 0, track.title, track.artist);
+            setMessage(`Playing "${track.title}" from downloads`);
+            setTimeout(() => setMessage(null), 3500);
+            return;
+          }
+        });
+      }
+
+      // 2. Check if network is offline or connection is lost
+      const isOfflineNow = typeof navigator !== "undefined" && navigator.onLine === false;
+      if (isOfflineNow) {
+        player.pause();
+        // Do not silently replace the queue or endlessly skip tracks.
+        // If downloaded tracks exist, offer the user an action to open Downloads.
+        if (downloadedTracks.length > 0) {
+          setMessage("Offline: Online stream unavailable. Tap Downloads to listen offline.");
+          setUndoLabel("Downloads");
+          undoRef.current = {
+            timeout: setTimeout(() => setUndoLabel(null), 8000),
+            restore: () => setTab("downloads"),
+          };
+        } else {
+          // If no playable download is available, show a clear offline message and a Retry action.
+          setMessage("You are offline. Tap Retry when connected.");
+          setUndoLabel("Retry");
+          undoRef.current = {
+            timeout: setTimeout(() => setUndoLabel(null), 8000),
+            restore: () => {
+              if (track) playSong(track, queueRef.current);
+            },
+          };
+        }
+        return;
       }
 
       const now = Date.now();

@@ -1,10 +1,10 @@
 import type { Track } from "@/lib/library";
+import { hasFullLengthDirectSource } from "./track-stream-policy";
 
 /**
  * Offline music storage. Downloads are saved as blobs in IndexedDB so
  * songs keep playing with no connection. The bytes come from our own
- * /api/stream/:videoId proxy because YouTube's stream URLs don't allow
- * cross-origin reads.
+ * /api/stream/:videoId proxy (or direct CDN for verified full-length providers).
  */
 
 const DB_NAME = "melodymap-offline";
@@ -54,6 +54,95 @@ function txDone(tx: IDBTransaction): Promise<void> {
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
   });
+}
+
+/**
+ * All recognized provider prefixes in MelodyMap.
+ */
+export const KNOWN_PROVIDERS = [
+  "saavn",
+  "yt",
+  "youtube",
+  "audius",
+  "jamendo",
+  "deezer",
+  "archive",
+  "podcast",
+] as const;
+
+/**
+ * Strips duplicate and repeated provider prefixes (e.g. "saavn:saavn:123" -> "saavn:123").
+ * Extracts provider (if any), pure identifier, and canonical ID.
+ */
+export function normalizeTrackId(id: string): { provider?: string | undefined; pureId: string; canonicalId: string } {
+  if (!id) return { pureId: "", canonicalId: "" };
+  let current = id.trim();
+  let provider: string | undefined;
+
+  // Unpack repeated prefixes (e.g. "saavn:saavn:123" -> provider="saavn", pureId="123")
+  while (true) {
+    const colonIdx = current.indexOf(":");
+    if (colonIdx === -1) break;
+    const prefix = current.slice(0, colonIdx).toLowerCase();
+    const rest = current.slice(colonIdx + 1);
+    if ((KNOWN_PROVIDERS as readonly string[]).includes(prefix)) {
+      provider = prefix === "youtube" ? "yt" : prefix;
+      current = rest;
+    } else {
+      break;
+    }
+  }
+
+  const pureId = current;
+  const canonicalId = provider ? `${provider}:${pureId}` : pureId;
+  return { provider, pureId, canonicalId };
+}
+
+/**
+ * Standard key for storing downloads.
+ * Guarantees exactly one provider prefix and prevents "saavn:saavn:..." double prefixing.
+ */
+export function getDownloadKey(trackOrId: Track | string, source?: string): string {
+  const rawId = typeof trackOrId === "string" ? trackOrId : trackOrId.id;
+  const rawSource = typeof trackOrId !== "string" ? trackOrId.source : source;
+  const { provider, pureId } = normalizeTrackId(rawId);
+  const finalProvider = provider || (rawSource ? (rawSource === "youtube" ? "yt" : rawSource) : "yt");
+  return `${finalProvider}:${pureId}`;
+}
+
+/**
+ * Returns candidate lookup keys for a track ID, supporting:
+ * - Exact ID as given (e.g. "saavn:123" or "123")
+ * - Canonical ID (single-prefixed)
+ * - Bare pure ID without provider prefix
+ * - Legacy double-prefixed IDs ("saavn:saavn:123", "yt:yt:abc")
+ * - Provider-prefixed variants across all known providers
+ */
+export function getCandidateDownloadKeys(id: string, source?: string): string[] {
+  const keys = new Set<string>();
+  if (!id) return [];
+
+  keys.add(id);
+  const { provider, pureId, canonicalId } = normalizeTrackId(id);
+  keys.add(canonicalId);
+  keys.add(pureId);
+
+  const effSource = source === "youtube" ? "yt" : source;
+  if (effSource) {
+    keys.add(`${effSource}:${pureId}`);
+    keys.add(`${effSource}:${effSource}:${pureId}`);
+  }
+  if (provider) {
+    keys.add(`${provider}:${pureId}`);
+    keys.add(`${provider}:${provider}:${pureId}`);
+  }
+
+  for (const p of KNOWN_PROVIDERS) {
+    keys.add(`${p}:${pureId}`);
+    keys.add(`${p}:${p}:${pureId}`);
+  }
+
+  return Array.from(keys);
 }
 
 /**
@@ -117,14 +206,6 @@ async function evictOldestDownloadsIfNeeded(
   }
 }
 
-function getDownloadKey(trackOrId: Track | string, source?: string): string {
-  if (typeof trackOrId === "string") {
-    return trackOrId;
-  }
-  const s = trackOrId.source || source || "yt";
-  return `${s}:${trackOrId.id}`;
-}
-
 export async function saveDownload(track: Track, blob: Blob, imageBlob?: Blob): Promise<void> {
   let finalImageBlob = imageBlob;
   if (!finalImageBlob && track.thumbnail && track.thumbnail.startsWith("http")) {
@@ -156,22 +237,40 @@ export async function saveDownload(track: Track, blob: Blob, imageBlob?: Blob): 
   await txDone(tx);
 }
 
+/**
+ * Retrieves the local audio Blob for a track.
+ * Supports canonical, bare, and legacy double-prefixed keys across all providers.
+ */
 export async function getBlob(id: string): Promise<Blob | null> {
   try {
     const db = await openDb();
     const tx = db.transaction(STORE, "readonly");
     const store = tx.objectStore(STORE);
-    // Try exact id, then source prefixed keys
-    let rec = await request<DownloadRecord | undefined>(store.get(id));
-    if (!rec && !id.includes(":")) {
-      rec = (await request<DownloadRecord | undefined>(store.get(`yt:${id}`))) ||
-            (await request<DownloadRecord | undefined>(store.get(`deezer:${id}`)));
+
+    const candidates = getCandidateDownloadKeys(id);
+    for (const key of candidates) {
+      try {
+        const rec = await request<DownloadRecord | undefined>(store.get(key));
+        if (rec && rec.blob && rec.blob.size > 0) {
+          return rec.blob;
+        }
+      } catch {
+        // try next candidate
+      }
     }
-    return rec?.blob ?? null;
+    return null;
   } catch (err) {
     console.warn("[MelodyMap] getBlob failed for", id, err);
     return null;
   }
+}
+
+/**
+ * Checks whether a track is downloaded in offline storage.
+ */
+export async function hasDownload(id: string): Promise<boolean> {
+  const blob = await getBlob(id);
+  return Boolean(blob && blob.size > 10000);
 }
 
 export type DownloadInfo = {
@@ -203,8 +302,9 @@ export async function listDownloads(): Promise<DownloadInfo[]> {
               localThumb = URL.createObjectURL(val.imageBlob);
             } catch {}
           }
+          const { canonicalId } = normalizeTrackId(val.track.id || val.id);
           results.push({
-            track: { ...val.track, thumbnail: localThumb },
+            track: { ...val.track, id: canonicalId, thumbnail: localThumb },
             size: val.size,
             savedAt: val.savedAt,
           });
@@ -222,15 +322,19 @@ export async function listDownloads(): Promise<DownloadInfo[]> {
   }
 }
 
+/**
+ * Removes a download from storage. Cleans up canonical and legacy key variants.
+ */
 export async function removeDownload(id: string): Promise<void> {
   try {
     const db = await openDb();
     const tx = db.transaction(STORE, "readwrite");
     const store = tx.objectStore(STORE);
-    store.delete(id);
-    if (!id.includes(":")) {
-      store.delete(`yt:${id}`);
-      store.delete(`deezer:${id}`);
+    const candidates = getCandidateDownloadKeys(id);
+    for (const key of candidates) {
+      try {
+        store.delete(key);
+      } catch {}
     }
     await txDone(tx);
   } catch (err) {
@@ -260,7 +364,7 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** Fetches a song through our proxy and stores it offline, with progress. */
+/** Fetches a song through our proxy (or verified direct full-length source) and stores it offline, with progress. */
 export async function downloadTrack(
   track: Track,
   onProgress?: (percent: number) => void,
@@ -269,16 +373,43 @@ export async function downloadTrack(
   const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 min timeout
 
   try {
-    const res = await fetch(`/api/stream/${encodeURIComponent(track.id)}`, {
-      signal: controller.signal,
-    });
+    let res: Response | null = null;
+
+    // 1. Primary path: Stream proxy (guarantees full-length resolution and fallback chain)
+    try {
+      const proxyRes = await fetch(`/api/stream/${encodeURIComponent(track.id)}`, {
+        signal: controller.signal,
+      });
+      if (proxyRes.ok) {
+        res = proxyRes;
+      }
+    } catch {
+      // Proxy failed; fall back to verified full-length direct source if available
+    }
+
+    // 2. Direct URL fallback: ONLY if full-length provider (JioSaavn, Audius, Jamendo, Archive, Podcast)
+    // Never treat 30-second Deezer preview clips as complete downloads.
+    if (!res && track.previewUrl && hasFullLengthDirectSource(track.id)) {
+      try {
+        const directRes = await fetch(track.previewUrl, {
+          signal: controller.signal,
+        });
+        if (directRes.ok) {
+          res = directRes;
+        }
+      } catch {
+        // Direct fallback also failed
+      }
+    }
+
     clearTimeout(timeoutId);
 
-    if (!res.ok) throw new Error(`Download failed (${res.status})`);
+    if (!res || !res.ok) throw new Error(`Download failed (${res?.status ?? "no response"})`);
     const total = Number(res.headers.get("content-length")) || 0;
 
     if (!res.body) {
       const blob = await res.blob();
+      if (blob.size < 50 * 1024) throw new Error("Downloaded file is incomplete");
       await saveDownload(track, blob);
       return;
     }
@@ -295,6 +426,8 @@ export async function downloadTrack(
         if (total > 0 && onProgress) onProgress(Math.round((received / total) * 100));
       }
     }
+
+    if (received < 50 * 1024) throw new Error("Downloaded audio file is incomplete");
 
     const type = res.headers.get("content-type") ?? "audio/mp4";
     const merged = new Uint8Array(received);
