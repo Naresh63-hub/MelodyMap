@@ -289,8 +289,8 @@ function SectionHeader({
  * JioSaavn Explore Feed:
  * STRICTLY contains ONLY:
  * 1. New Releases (fresh official JioSaavn releases)
- * 2. Trending Songs (top charts in user's language)
- * 3. Old Songs (Golden Era & Retro classics)
+ * 2. Old Songs (Golden Era & Retro classics)
+ * 3. Trending Songs (top charts in user's language)
  */
 export function ExploreSections({
   trending,
@@ -343,23 +343,7 @@ export function ExploreSections({
         </section>
       )}
 
-      {/* 2. Trending Songs */}
-      {trending.length > 0 && (
-        <section>
-          <SectionHeader title="Trending Songs" icon={TrendingUp} subtitle="Top charts in your language" />
-          <VerticalSongList
-            tracks={trending.slice(0, 30)}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onOpenOptions={onOpenOptions}
-            onToggleLike={onToggleLike}
-            likedIds={likedIds}
-          />
-        </section>
-      )}
-
-      {/* 3. Old Songs / Golden Era */}
+      {/* 2. Old Songs / Golden Era */}
       {oldSongs && oldSongs.length > 0 && (
         <section>
           <SectionHeader title="Old Songs" icon={Disc3} subtitle="Golden Era & Retro hits" />
@@ -370,6 +354,22 @@ export function ExploreSections({
             onPlayTrack={onPlayTrack}
             onToggleLike={onToggleLike}
             onOpenOptions={onOpenOptions}
+            likedIds={likedIds}
+          />
+        </section>
+      )}
+
+      {/* 3. Trending Songs */}
+      {trending.length > 0 && (
+        <section>
+          <SectionHeader title="Trending Songs" icon={TrendingUp} subtitle="Top charts in your language" />
+          <VerticalSongList
+            tracks={trending.slice(0, 30)}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+            onOpenOptions={onOpenOptions}
+            onToggleLike={onToggleLike}
             likedIds={likedIds}
           />
         </section>
