@@ -12,6 +12,8 @@ export type Profile = {
   id: string;
   display_name: string | null;
   avatar_url: string | null;
+  email?: string | null;
+  provider?: string | null;
 };
 
 /** Session + profile for the signed-in listener backed by Supabase Auth & PostgreSQL */
@@ -25,9 +27,10 @@ export function useAuth() {
   // Sync profile from Supabase profiles table
   const fetchProfile = useCallback(async (user: User) => {
     try {
+      const userProvider = user.app_metadata?.provider || (user.is_anonymous ? "anonymous" : "email");
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, display_name, avatar_url")
+        .select("id, display_name, avatar_url, email, provider")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -36,6 +39,8 @@ export function useAuth() {
           id: user.id,
           display_name: data.display_name || user.user_metadata?.["display_name"] || user.email?.split("@")[0] || "Listener",
           avatar_url: data.avatar_url || user.user_metadata?.["avatar_url"] || null,
+          email: data.email || user.email || null,
+          provider: data.provider || userProvider,
         });
         return;
       }
@@ -43,23 +48,39 @@ export function useAuth() {
       // Upsert default profile if not exists
       const fallbackName = user.user_metadata?.["display_name"] || user.user_metadata?.["full_name"] || user.email?.split("@")[0] || "Listener";
       const fallbackAvatar = user.user_metadata?.["avatar_url"] || null;
-      await supabase.from("profiles").upsert({
-        id: user.id,
-        display_name: fallbackName,
-        avatar_url: fallbackAvatar,
-        updated_at: new Date().toISOString(),
-      });
+      try {
+        await supabase.from("profiles").upsert({
+          id: user.id,
+          email: user.email || null,
+          provider: userProvider,
+          display_name: fallbackName,
+          avatar_url: fallbackAvatar,
+          updated_at: new Date().toISOString(),
+        });
+      } catch {
+        // Fallback if table does not yet have email/provider columns
+        await supabase.from("profiles").upsert({
+          id: user.id,
+          display_name: fallbackName,
+          avatar_url: fallbackAvatar,
+          updated_at: new Date().toISOString(),
+        });
+      }
 
       setProfile({
         id: user.id,
         display_name: fallbackName,
         avatar_url: fallbackAvatar,
+        email: user.email || null,
+        provider: userProvider,
       });
     } catch {
       setProfile({
         id: user.id,
         display_name: user.user_metadata?.["display_name"] || user.email?.split("@")[0] || "Listener",
         avatar_url: user.user_metadata?.["avatar_url"] || null,
+        email: user.email || null,
+        provider: user.app_metadata?.provider || (user.is_anonymous ? "anonymous" : "email"),
       });
     }
   }, []);
@@ -72,7 +93,7 @@ export function useAuth() {
       if (!mounted) return;
       if (session?.user) {
         setUserId(session.user.id);
-        setIsCloudAuth(true);
+        setIsCloudAuth(!session.user.is_anonymous);
         setEmail(session.user.email || null);
         await fetchProfile(session.user);
       } else {
@@ -106,73 +127,14 @@ export function useAuth() {
       setReady(true);
     });
 
-    // Check initial session and seamlessly unify app & Jam session authentication
+    // Check initial session
     void supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
       if (session?.user) {
         setUserId(session.user.id);
-        setIsCloudAuth(true);
+        setIsCloudAuth(!session.user.is_anonymous);
         setEmail(session.user.email || null);
         await fetchProfile(session.user);
-        setReady(true);
-        return;
-      }
-
-      // Attempt seamless anonymous sign-in so local listening and Jam sessions share one cloud identity
-      if (typeof supabase.auth.signInAnonymously === "function") {
-        try {
-          const raw = typeof window !== "undefined" ? localStorage.getItem("melodymap.local_user") : null;
-          let savedName = "Listener";
-          let savedAvatar: string | null = null;
-          if (raw) {
-            try {
-              const parsed = JSON.parse(raw);
-              if (parsed?.name || parsed?.display_name) savedName = parsed.name || parsed.display_name;
-              if (parsed?.avatar_url) savedAvatar = parsed.avatar_url;
-            } catch {}
-          }
-          const { data: anonData, error: anonErr } = await supabase.auth.signInAnonymously({
-            options: {
-              data: {
-                display_name: savedName,
-                avatar_url: savedAvatar,
-              },
-            },
-          });
-          if (anonData?.user && !anonErr) {
-            setUserId(anonData.user.id);
-            setIsCloudAuth(true);
-            setEmail(null);
-            await fetchProfile(anonData.user);
-            setReady(true);
-            return;
-          }
-        } catch (err) {
-          console.warn("[Auth] Automatic anonymous auth attempt:", err);
-        }
-      }
-
-      // Fallback to local profile when anonymous sign-in is disabled in Supabase
-      if (typeof window !== "undefined") {
-        const raw = localStorage.getItem("melodymap.local_user");
-        if (raw) {
-          try {
-            const parsed = JSON.parse(raw);
-            if (parsed && typeof parsed === "object") {
-              const localId = parsed.id || "local-listener";
-              setUserId(localId);
-              setIsCloudAuth(false);
-              setEmail(parsed.email || null);
-              setProfile({
-                id: localId,
-                display_name: parsed.name || parsed.display_name || "Listener",
-                avatar_url: parsed.avatar_url || null,
-              });
-              setReady(true);
-              return;
-            }
-          } catch {}
-        }
       }
       setReady(true);
     });
