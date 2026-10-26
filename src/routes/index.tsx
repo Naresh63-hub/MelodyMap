@@ -3470,6 +3470,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 selectedFilter={searchFilter}
                 userHistory={history}
                 userLikes={likes}
+                userLanguages={settings.languages}
+                onOpenLanguages={() => setTab("languages")}
                 onFilterChange={(newFilter) => {
                   setSearchFilter(newFilter);
                   if (query.trim()) {

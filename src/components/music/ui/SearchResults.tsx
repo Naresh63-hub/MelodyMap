@@ -7,15 +7,24 @@ import {
   ListMusic,
   Loader2,
   Clock,
+  Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
-import type { Track } from "@/lib/library";
+import { LANGUAGES, type Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { trackSubtitle, getTrackDisplayDuration } from "@/lib/track-metadata";
 import { useSearchHistory, type RecentSearchItem } from "@/lib/search-history";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export type SearchFilter = "all" | "songs" | "artists" | "albums" | "playlists";
 
@@ -41,6 +50,8 @@ type Props = {
   onClearRecentSearches?: () => void;
   userHistory?: Track[];
   userLikes?: Track[];
+  userLanguages?: string[];
+  onOpenLanguages?: () => void;
 };
 
 export function SearchResults(props: Props) {
@@ -63,9 +74,12 @@ export function SearchResults(props: Props) {
     recentSearches: propsRecentSearches,
     onRemoveRecentSearch,
     onClearRecentSearches,
+    userLanguages,
+    onOpenLanguages,
   } = props;
 
   const [internalFilter, setInternalFilter] = useState<SearchFilter>("all");
+  const [isLanguagePickerOpen, setIsLanguagePickerOpen] = useState(false);
   const filter = selectedFilter ?? internalFilter;
 
   const hookHistory = useSearchHistory();
@@ -100,10 +114,112 @@ export function SearchResults(props: Props) {
     );
   }
 
+  // Language Picker Modal Dialog
+  const languagePickerDialog = (
+    <Dialog open={isLanguagePickerOpen} onOpenChange={setIsLanguagePickerOpen}>
+      <DialogContent className="max-w-md bg-card/95 backdrop-blur-2xl border border-hair-strong text-foreground p-5 rounded-2xl shadow-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader className="space-y-1 text-left pb-3 border-b border-hair">
+          <div className="flex items-center gap-2.5">
+            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+              <Globe2 className="h-5 w-5" />
+            </div>
+            <div>
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Browse by Language
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Select a language to discover top hits and trending songs
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        {/* User Preferred Languages */}
+        {userLanguages && userLanguages.length > 0 && (
+          <div className="pt-3 space-y-2">
+            <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+              Your Languages
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {userLanguages.map((lang) => (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => {
+                    setIsLanguagePickerOpen(false);
+                    onSearch?.(`top ${lang.toLowerCase()} hits songs`, "songs");
+                  }}
+                  className="flex items-center justify-between p-3 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/30 text-left transition-all active:scale-[0.98]"
+                >
+                  <div>
+                    <p className="text-xs font-semibold text-primary">{lang}</p>
+                    <p className="text-[10px] text-primary/80">Top hit songs</p>
+                  </div>
+                  <span className="text-xs text-primary font-bold">&rarr;</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* All Available Languages */}
+        <div className="pt-3 space-y-2">
+          <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+            All Languages
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {LANGUAGES.map((lang) => {
+              const isUserLang = userLanguages?.includes(lang);
+              return (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => {
+                    setIsLanguagePickerOpen(false);
+                    onSearch?.(`top ${lang.toLowerCase()} hits songs`, "songs");
+                  }}
+                  className={cn(
+                    "flex items-center justify-between p-2.5 rounded-xl border text-left transition-all active:scale-[0.98]",
+                    isUserLang
+                      ? "bg-chip-strong border-hair-strong text-foreground font-semibold"
+                      : "bg-chip-subtle hover:bg-chip border-hair text-secondary-foreground hover:text-foreground"
+                  )}
+                >
+                  <span className="text-xs font-medium">{lang}</span>
+                  {isUserLang && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {onOpenLanguages && (
+          <div className="pt-3 border-t border-hair mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                setIsLanguagePickerOpen(false);
+                onOpenLanguages();
+              }}
+              className="w-full py-2.5 px-3 rounded-xl bg-chip hover:bg-chip-strong border border-hair text-xs font-medium text-foreground text-center transition-colors flex items-center justify-center gap-1.5"
+            >
+              <span>Manage Languages &amp; Artists preferences</span>
+              <span>&rarr;</span>
+            </button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
   // When no query or no results, show Recent Searches & Browse Cards
   if (!query.trim() && results.length === 0) {
     return (
       <div className="space-y-6 animate-fade-in pt-2">
+        {languagePickerDialog}
+
         {/* Recent Searches (stores last 5 searched artist or song terms locally) */}
         <RecentSearchesSection
           onSelectQuery={(q) => onSearch?.(q, "songs")}
@@ -119,29 +235,28 @@ export function SearchResults(props: Props) {
                 title: "Top Hits",
                 subtitle: "Popular chart songs",
                 icon: Music2,
-                query: "top hit songs",
-                type: "songs" as const,
+                onClick: () => onSearch?.("top hit songs", "songs"),
               },
               {
                 title: "Podcasts & Shows",
                 subtitle: "Talks, Tech, True Crime",
                 icon: Mic,
-                query: "best podcast episodes",
-                type: "podcasts" as const,
+                onClick: () => onSearch?.("best podcast episodes", "podcasts"),
               },
               {
                 title: "Languages",
-                subtitle: "Hindi, English, Telugu...",
+                subtitle:
+                  userLanguages && userLanguages.length > 0
+                    ? `${userLanguages.slice(0, 3).join(", ")}${userLanguages.length > 3 ? "..." : ""}`
+                    : "Hindi, English, Telugu...",
                 icon: Globe2,
-                query: "top hindi hits songs",
-                type: "songs" as const,
+                onClick: () => setIsLanguagePickerOpen(true),
               },
               {
                 title: "Chill Mixes",
                 subtitle: "Lofi, Focus, Relax",
                 icon: ListMusic,
-                query: "chill relaxing songs",
-                type: "songs" as const,
+                onClick: () => onSearch?.("chill relaxing songs", "songs"),
               },
             ].map((cat) => {
               const Icon = cat.icon;
@@ -149,7 +264,7 @@ export function SearchResults(props: Props) {
                 <button
                   key={cat.title}
                   type="button"
-                  onClick={() => onSearch?.(cat.query, cat.type)}
+                  onClick={cat.onClick}
                   className="flex flex-col justify-between p-4 rounded-xl bg-card hover:bg-popover border border-hair text-left transition-all active:scale-[0.98] h-28 group"
                 >
                   <Icon className="h-5 w-5 text-secondary-foreground group-hover:text-primary transition-colors" />
@@ -166,12 +281,47 @@ export function SearchResults(props: Props) {
             })}
           </div>
         </section>
+
+        {/* Explore Languages Quick Row */}
+        <section className="space-y-2.5">
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="text-sm font-semibold text-foreground/90">Explore by Language</h2>
+            <button
+              type="button"
+              onClick={() => setIsLanguagePickerOpen(true)}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              See all ({LANGUAGES.length})
+            </button>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1 snap-x">
+            {LANGUAGES.map((lang) => {
+              const isUserLang = userLanguages?.includes(lang);
+              return (
+                <button
+                  key={lang}
+                  type="button"
+                  onClick={() => onSearch?.(`top ${lang.toLowerCase()} hits songs`, "songs")}
+                  className={cn(
+                    "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs font-medium transition-all active:scale-95 whitespace-nowrap border",
+                    isUserLang
+                      ? "bg-primary/15 border-primary/40 text-primary font-semibold shadow-xs"
+                      : "bg-card border-hair text-secondary-foreground hover:bg-chip-strong hover:text-foreground hover:border-hair-strong"
+                  )}
+                >
+                  {lang}
+                </button>
+              );
+            })}
+          </div>
+        </section>
       </div>
     );
   }
 
   return (
     <div className="space-y-4 animate-fade-in pt-1">
+      {languagePickerDialog}
       {/* Category Pills Header */}
       <div className="flex max-w-full gap-2 overflow-x-auto py-2.5 px-1 scrollbar-hide snap-x scroll-px-4">
         {filterOptions.map((opt) => {
