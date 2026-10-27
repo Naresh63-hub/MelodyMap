@@ -297,7 +297,6 @@ function SectionHeader({
   title,
   icon: Icon,
   subtitle,
-  count,
 }: {
   title: string;
   icon?: typeof TrendingUp | typeof Flame | typeof Disc3;
@@ -309,11 +308,6 @@ function SectionHeader({
       <div className="flex items-center gap-2">
         {Icon && <Icon className="h-4 w-4 text-primary" />}
         <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
-        {typeof count === "number" && count > 0 && (
-          <span className="text-[11px] font-semibold text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full">
-            {count} songs
-          </span>
-        )}
       </div>
       {subtitle && (
         <span className="text-[11px] font-normal text-muted-foreground">
@@ -420,7 +414,6 @@ export function ExploreSections({
         <section>
           <SectionHeader
             title="New Releases"
-            count={newReleases.length}
             icon={Flame}
             subtitle="Fresh official drops"
           />
@@ -444,7 +437,6 @@ export function ExploreSections({
         <section>
           <SectionHeader
             title="Old Songs"
-            count={oldSongs.length}
             icon={Disc3}
             subtitle="2000s Hits & Nostalgia"
           />

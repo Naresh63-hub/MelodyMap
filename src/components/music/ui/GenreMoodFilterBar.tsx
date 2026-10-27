@@ -44,11 +44,6 @@ function FilterChip({
       )}
     >
       {filter.label}
-      {typeof count === "number" && count > 0 ? (
-        <span className={cn("ml-1.5 text-[10px] tabular-nums", active ? "text-primary-foreground/90" : "text-muted-foreground")}>
-          {count}
-        </span>
-      ) : null}
       {active ? <X className="ml-1.5 inline-block h-3 w-3 opacity-90" aria-hidden="true" /> : null}
     </button>
   );

@@ -116,7 +116,6 @@ export function PlaylistsPanel({
               >
                 <ListMusic className="h-4 w-4" />
                 {p.name}
-                <span className="text-xs opacity-70">{p.tracks.length}</span>
               </button>
             ))}
           </div>

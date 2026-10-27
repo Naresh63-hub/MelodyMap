@@ -41,7 +41,7 @@ export function MobileLibrary({
       id: "liked" as const,
       label: "Favourites",
       icon: Heart,
-      detail: `${likes.length} songs`,
+      detail: "Your favorites",
       iconBg: "bg-chip text-primary border border-hair-strong",
     },
     {
@@ -55,14 +55,14 @@ export function MobileLibrary({
       id: "playlists" as const,
       label: "Playlists",
       icon: ListMusic,
-      detail: `${playlists.length} playlists`,
+      detail: "Custom collections",
       iconBg: "bg-chip text-foreground/70 border border-hair-strong",
     },
     {
       id: "downloads" as const,
       label: "Downloads",
       icon: Download,
-      detail: `${downloads.length} songs`,
+      detail: "Offline listening",
       iconBg: "bg-chip text-foreground/70 border border-hair-strong",
     },
   ];

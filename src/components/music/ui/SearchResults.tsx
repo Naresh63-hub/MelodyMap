@@ -385,9 +385,6 @@ export function SearchResults(props: Props) {
               <span className="text-[10px] font-bold tracking-wider text-primary uppercase bg-primary/20 px-2 py-0.5 rounded-full">
                 Artist Discography
               </span>
-              <span className="text-[11px] text-muted-foreground font-medium">
-                {results.length}+ songs loaded
-              </span>
             </div>
             <h2 className="text-base sm:text-lg font-bold text-foreground truncate mt-1">
               {matchedArtist.name}

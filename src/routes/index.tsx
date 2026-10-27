@@ -1884,7 +1884,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           if (autoPlay) {
             startQueue(tracks, 0);
             const langLabel = userLanguages.length > 0 ? ` (${userLanguages.join(", ")})` : "";
-            setMessage(`Playing ${item.label} vibe${langLabel} • ${tracks.length} songs`);
+            setMessage(`Playing ${item.label} vibe${langLabel}`);
             setTimeout(() => setMessage(null), 3500);
           }
         } else {
@@ -4118,16 +4118,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                           ? "Downloaded Songs"
                           : "Recently Played"}
                     </h2>
-                    {tab === "history" && history.length > 0 && (
-                      <span className="text-xs text-muted-foreground font-medium">
-                        ({historyQuery ? `${filteredHistory.length} of ${history.length}` : `${history.length}`})
-                      </span>
-                    )}
-                    {tab === "downloads" && downloadedTracks.length > 0 && (
-                      <span className="text-xs text-muted-foreground font-medium">
-                        ({downloadedTracks.length})
-                      </span>
-                    )}
                   </div>
                   {tab === "history" && history.length > 0 && (
                     <Button

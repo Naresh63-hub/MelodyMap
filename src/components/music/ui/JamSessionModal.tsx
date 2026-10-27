@@ -394,7 +394,7 @@ export function JamSessionModal({
                 )}
               >
                 <Music className="h-3.5 w-3.5 text-[#8B5CF6]" />
-                Shared Queue ({queue.length})
+                Shared Queue
               </button>
               <button
                 type="button"

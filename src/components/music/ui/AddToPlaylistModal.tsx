@@ -143,7 +143,7 @@ export function AddToPlaylistModal({
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-foreground">{pl.name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {pl.tracks.length} song{pl.tracks.length === 1 ? "" : "s"}
+                          Playlist
                         </p>
                       </div>
                     </div>

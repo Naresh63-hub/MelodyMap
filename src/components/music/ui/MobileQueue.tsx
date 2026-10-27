@@ -55,9 +55,6 @@ export function MobileQueue({
         <div className="flex items-center justify-between px-5 py-2 border-b border-hair">
           <h3 className="text-base font-bold text-foreground">Queue</h3>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {tracks.length} track{tracks.length === 1 ? "" : "s"}
-            </span>
             <Button
               variant="ghost"
               size="sm"

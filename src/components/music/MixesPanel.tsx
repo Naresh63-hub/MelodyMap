@@ -114,7 +114,7 @@ export function MixesPanel({
             {id === "newrelease" && drops && drops.length > 0 && (
               <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
                 <Sparkles className="h-3 w-3" />
-                {drops.length} new
+                New
               </span>
             )}
             <span

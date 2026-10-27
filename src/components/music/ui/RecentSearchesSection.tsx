@@ -30,9 +30,6 @@ export function RecentSearchesSection({
           <h2 className="text-sm font-semibold tracking-normal text-foreground/90">
             Recent Searches
           </h2>
-          <span className="text-[10px] font-normal text-foreground/50 px-1.5 py-0.5 rounded-full bg-chip border border-hair">
-            Last {last5.length}
-          </span>
         </div>
 
         <button
