@@ -4,8 +4,8 @@ import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
+import { DownloadThumbnailOverlay, DownloadStatusBadge } from "@/components/music/ui/DownloadAnimation";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
-import { GenreMoodFilterBar } from "@/components/music/ui/GenreMoodFilterBar";
 import { filterTracksByQuickFilters } from "@/lib/mood-genre-filters";
 import { trackSubtitle, getTrackDisplayDuration } from "@/lib/track-metadata";
 import { ArtistCard } from "./ArtistCard";
@@ -54,6 +54,9 @@ type Props = {
   onOpenOptions?: ((track: Track) => void) | undefined;
   onArtistClick?: ((artist: JioSaavnArtist) => void) | undefined;
   likedIds: Set<string>;
+  downloadedIds?: Set<string> | undefined;
+  downloadingIds?: Set<string> | undefined;
+  downloadProgress?: Record<string, number> | undefined;
   currentId?: string | null | undefined;
   isPlaying: boolean;
   loading?: boolean | undefined;
@@ -80,6 +83,9 @@ function HorizontalScrollRow({
   onToggleLike,
   onOpenOptions,
   likedIds,
+  downloadedIds,
+  downloadingIds,
+  downloadProgress,
 }: {
   tracks: Track[];
   currentId?: string | null | undefined;
@@ -88,6 +94,9 @@ function HorizontalScrollRow({
   onToggleLike?: ((track: Track) => void) | undefined;
   onOpenOptions?: ((track: Track) => void) | undefined;
   likedIds?: Set<string> | undefined;
+  downloadedIds?: Set<string> | undefined;
+  downloadingIds?: Set<string> | undefined;
+  downloadProgress?: Record<string, number> | undefined;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -149,6 +158,10 @@ function HorizontalScrollRow({
                     )}
                   </span>
                 </div>
+
+                {downloadingIds?.has(track.id) && (
+                  <DownloadThumbnailOverlay progress={downloadProgress?.[track.id]} />
+                )}
               </button>
 
               {/* Bottom-Left Heart Button (Inside Artwork Overlay) */}
@@ -221,6 +234,9 @@ function VerticalSongList({
   onOpenOptions,
   onToggleLike,
   likedIds,
+  downloadedIds,
+  downloadingIds,
+  downloadProgress,
 }: {
   tracks: Track[];
   currentId?: string | null | undefined;
@@ -229,6 +245,9 @@ function VerticalSongList({
   onOpenOptions?: ((track: Track) => void) | undefined;
   onToggleLike?: ((track: Track) => void) | undefined;
   likedIds?: Set<string> | undefined;
+  downloadedIds?: Set<string> | undefined;
+  downloadingIds?: Set<string> | undefined;
+  downloadProgress?: Record<string, number> | undefined;
 }) {
   return (
     <div className="space-y-1">
@@ -274,6 +293,9 @@ function VerticalSongList({
                   <Equalizer active className="h-4 w-4 text-primary" />
                 </div>
               )}
+              {downloadingIds?.has(track.id) && (
+                <DownloadThumbnailOverlay progress={downloadProgress?.[track.id]} />
+              )}
             </button>
 
             {/* Track Info */}
@@ -297,6 +319,11 @@ function VerticalSongList({
 
             {/* Song duration time & like button matching reference image */}
             <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <DownloadStatusBadge
+                isDownloading={Boolean(downloadingIds?.has(track.id))}
+                isDownloaded={Boolean(downloadedIds?.has(track.id))}
+                progress={downloadProgress?.[track.id]}
+              />
               <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium">
                 {getTrackDisplayDuration(track)}
               </span>
@@ -373,6 +400,9 @@ export function MobileHomeSections({
   onOpenOptions,
   onArtistClick,
   likedIds,
+  downloadedIds,
+  downloadingIds,
+  downloadProgress,
   currentId,
   isPlaying,
   loading = false,
@@ -412,15 +442,7 @@ export function MobileHomeSections({
 
   const hasAny = visibleDailyMix.length > 0 || visibleRecommended.length > 0;
 
-  const filterBar = onToggleQuickFilter ? (
-    <GenreMoodFilterBar
-      activeIds={quickFilterIds}
-      onToggle={onToggleQuickFilter}
-      onClear={onClearQuickFilters ?? (() => {})}
-      counts={quickFilterCounts}
-      className="-mx-4 px-4"
-    />
-  ) : null;
+  const filterBar = null;
 
   if (!hasAny && quickFilterIds.length > 0) {
     return (
@@ -448,9 +470,6 @@ export function MobileHomeSections({
 
   return (
     <div className="space-y-7">
-      {/* Genre & Mood quick filters */}
-      {filterBar}
-
       {/* 1. Daily Mix (JioSaavn Square Cards) */}
       {visibleDailyMix.length > 0 && (
         <section className="animate-fade-in">
@@ -468,6 +487,9 @@ export function MobileHomeSections({
             onToggleLike={onToggleLike}
             onOpenOptions={onOpenOptions}
             likedIds={likedIds}
+            downloadedIds={downloadedIds}
+            downloadingIds={downloadingIds}
+            downloadProgress={downloadProgress}
           />
         </section>
       )}
@@ -510,6 +532,9 @@ export function MobileHomeSections({
             onOpenOptions={onOpenOptions}
             onToggleLike={onToggleLike}
             likedIds={likedIds}
+            downloadedIds={downloadedIds}
+            downloadingIds={downloadingIds}
+            downloadProgress={downloadProgress}
           />
         </section>
       )}

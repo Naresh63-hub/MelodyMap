@@ -501,32 +501,44 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
     // Standard download -> saved to IndexedDB for in-app offline play AND triggered to save to phone/disk
     setDownloadingIds((prev) => new Set([...prev, track.id]));
-    setDownloadProgress((prev) => ({ ...prev, [track.id]: 0 }));
+    setDownloadProgress((prev) => ({ ...prev, [track.id]: 10 }));
     setActiveDownloadTrack({ track, isDone: false });
     try {
       let res: Response | null = null;
 
-      // 1. Primary path: Stream proxy (guarantees full-length resolution and fallback chain)
-      try {
-        const proxyRes = await fetch(`/api/stream/${encodeURIComponent(track.id)}`);
-        if (proxyRes.ok) {
-          res = proxyRes;
-        }
-      } catch (proxyErr) {
-        console.warn("[MelodyMap] Stream proxy download attempt failed, checking direct fallback", proxyErr);
-      }
-
-      // 2. Direct URL fallback: ONLY if full-length provider (JioSaavn, Audius, Jamendo, Archive, Podcast)
-      // Never treat 30-second Deezer preview clips as complete downloads.
-      if (!res && track.previewUrl && hasFullLengthDirectSource(track.id)) {
+      // 1. Fast Direct Path: If the track has a direct full-length CDN source (JioSaavn, Audius, Jamendo, Archive, Podcast),
+      // fetch directly from CDN — connects in 50ms without server proxy bottleneck.
+      if (track.previewUrl && hasFullLengthDirectSource(track.id)) {
         try {
           const directRes = await fetch(track.previewUrl);
           if (directRes.ok) {
             res = directRes;
           }
         } catch (directErr) {
-          console.warn("[MelodyMap] Direct previewUrl download attempt failed", directErr);
+          console.warn("[MelodyMap] Direct previewUrl download attempt failed, falling back to proxy", directErr);
         }
+      }
+
+      // 2. Stream proxy path: Used when direct URL is absent or failed (guarantees full resolution and fallback chain)
+      if (!res) {
+        try {
+          const proxyRes = await fetch(`/api/stream/${encodeURIComponent(track.id)}`);
+          if (proxyRes.ok) {
+            res = proxyRes;
+          }
+        } catch (proxyErr) {
+          console.warn("[MelodyMap] Stream proxy download attempt failed", proxyErr);
+        }
+      }
+
+      // 3. Last fallback: Check direct previewUrl if not already tried
+      if (!res && track.previewUrl && hasFullLengthDirectSource(track.id)) {
+        try {
+          const directRes = await fetch(track.previewUrl);
+          if (directRes.ok) {
+            res = directRes;
+          }
+        } catch {}
       }
 
       if (!res || !res.ok) throw new Error("Download failed");
@@ -535,7 +547,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const contentLength = res.headers.get("content-length");
       const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
 
-      if (res.body && totalBytes > 0) {
+      if (res.body) {
         const reader = res.body.getReader();
         const chunks: BlobPart[] = [];
         let receivedBytes = 0;
@@ -545,7 +557,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           if (value) {
             chunks.push(value as unknown as BlobPart);
             receivedBytes += value.length;
-            const pct = Math.min(99, Math.round((receivedBytes / totalBytes) * 100));
+            const pct =
+              totalBytes > 0
+                ? Math.min(99, Math.round((receivedBytes / totalBytes) * 100))
+                : Math.min(95, 10 + Math.round((receivedBytes / (4 * 1024 * 1024)) * 85));
             setDownloadProgress((prev) => ({ ...prev, [track.id]: pct }));
           }
         }
@@ -1746,25 +1761,36 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setMoodLoading(true);
 
       try {
-        const preferredLang = settings.languages?.[0];
+        const userLanguages = settings.languages || [];
+        const preferredLang = userLanguages[0];
         const res = await runMoodPicks({
           data: {
             mood: item.key,
             language: preferredLang,
+            languages: userLanguages,
           },
         });
 
-        const tracks = (res.tracks ?? []) as Track[];
+        let tracks = (res.tracks ?? []) as Track[];
+        // Strict language check: ensure all loaded tracks belong to user's selected languages
+        if (userLanguages.length > 0) {
+          const consistentTracks = tracks.filter((t) => isLanguageConsistent(t, userLanguages));
+          if (consistentTracks.length > 0) {
+            tracks = consistentTracks;
+          }
+        }
+
         setMoodTracks(tracks);
 
         if (tracks.length > 0) {
           if (autoPlay) {
             startQueue(tracks, 0);
-            setMessage(`Playing ${item.label} vibe • ${tracks.length} songs`);
+            const langLabel = userLanguages.length > 0 ? ` (${userLanguages.join(", ")})` : "";
+            setMessage(`Playing ${item.label} vibe${langLabel} • ${tracks.length} songs`);
             setTimeout(() => setMessage(null), 3500);
           }
         } else {
-          setMoodError(`Could not find ${item.label} songs right now. Please try again.`);
+          setMoodError(`Could not find ${item.label} songs in your selected languages right now. Please try again.`);
         }
       } catch (err) {
         console.error("Failed to load mood picks:", err);
@@ -3594,7 +3620,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       playlists={playlists}
                       downloadedIds={downloadedIds}
                       downloadingIds={downloadingIds}
-                      userLanguage={settings.languages?.[0]}
+                      userLanguage={settings.languages?.length > 0 ? settings.languages.join(", ") : undefined}
                       onBack={() => setSelectedMood(null)}
                       onPlayAll={() => {
                         if (moodTracks.length > 0) {

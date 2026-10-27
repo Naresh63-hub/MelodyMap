@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import { LANGUAGES, type Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
+import { DownloadThumbnailOverlay, DownloadStatusBadge } from "@/components/music/ui/DownloadAnimation";
 import { trackSubtitle, getTrackDisplayDuration } from "@/lib/track-metadata";
 import { useSearchHistory, type RecentSearchItem } from "@/lib/search-history";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";

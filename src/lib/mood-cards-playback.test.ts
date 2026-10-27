@@ -46,6 +46,11 @@ describe("1-Tap Visual Moods & Vibes (Spotify / YouTube Music style)", () => {
     const hindiSad = getMoodSearchQueries("sad hours", "Hindi");
     expect(hindiSad).toContain("Hindi sad songs");
 
+    // Multi-language user (Telugu + Hindi)
+    const multiLangRomantic = getMoodSearchQueries("romantic", undefined, ["Telugu", "Hindi"]);
+    expect(multiLangRomantic).toContain("Telugu love songs");
+    expect(multiLangRomantic).toContain("Hindi love songs");
+
     // English / Default
     const defaultRomantic = getMoodSearchQueries("romantic");
     expect(defaultRomantic).toContain("romantic love songs");

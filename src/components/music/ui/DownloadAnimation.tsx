@@ -136,9 +136,9 @@ export function DownloadFloatingPill({
     <div
       role="status"
       aria-live="polite"
-      className="pointer-events-auto fixed bottom-24 sm:bottom-28 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-300"
+      className="pointer-events-auto fixed top-4 sm:top-6 left-1/2 z-[100] -translate-x-1/2 animate-in fade-in slide-in-from-top-4 duration-300 max-w-[92vw]"
     >
-      <div className="flex items-center gap-3 rounded-full border border-primary/30 bg-card/95 px-4 py-2.5 shadow-2xl backdrop-blur-xl ring-1 ring-white/10">
+      <div className="flex items-center gap-3 rounded-full border border-primary/40 bg-card/95 px-4 py-2.5 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 shadow-primary/10">
         {/* Track Thumbnail or Icon */}
         <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-lg bg-card border border-hair">
           {track.thumbnail ? (

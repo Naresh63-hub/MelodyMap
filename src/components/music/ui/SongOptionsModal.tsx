@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Heart,
   ListMusic,
@@ -53,6 +54,7 @@ export function SongOptionsModal({
   onShare,
   onDeleteFromLibrary,
 }: Props) {
+  const [justTriggered, setJustTriggered] = useState(false);
   if (!open || !track) return null;
 
   return (
@@ -126,32 +128,41 @@ export function SongOptionsModal({
           {/* Download */}
           <button
             type="button"
-            disabled={isDownloading}
+            disabled={isDownloading || justTriggered}
             onClick={() => {
-              if (isDownloading) return;
+              if (isDownloading || justTriggered) return;
+              if (isDownloaded) {
+                onDownload(track);
+                onClose();
+                return;
+              }
+              setJustTriggered(true);
               onDownload(track);
-              onClose();
+              setTimeout(() => {
+                onClose();
+                setJustTriggered(false);
+              }, 450);
             }}
             className={cn(
-              "flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm transition-colors",
-              isDownloading
-                ? "bg-primary/10 text-primary cursor-default"
+              "flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm transition-all duration-200",
+              (isDownloading || justTriggered)
+                ? "bg-primary/15 text-primary border border-primary/30 shadow-xs"
                 : "text-foreground hover:bg-chip active:bg-chip-strong",
             )}
           >
             <span className="font-medium">
-              {isDownloading
+              {isDownloading || justTriggered
                 ? `Downloading${typeof downloadProgress === "number" && downloadProgress > 0 ? ` (${Math.round(downloadProgress)}%)` : "…"}`
                 : isDownloaded
                   ? "Remove Download"
                   : "Download for Offline Play"}
             </span>
-            {isDownloading ? (
+            {isDownloading || justTriggered ? (
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
             ) : (
               <Download
                 className={cn(
-                  "h-5 w-5",
+                  "h-5 w-5 transition-colors",
                   isDownloaded ? "text-primary fill-primary/20" : "text-foreground/40",
                 )}
               />

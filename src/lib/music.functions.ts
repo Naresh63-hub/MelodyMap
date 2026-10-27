@@ -1754,69 +1754,100 @@ export const radioTracks = createServerFn({ method: "POST" })
 const MoodPicksInput = z.object({
   mood: z.string().min(1).max(40),
   language: z.string().max(40).optional(),
+  languages: z.array(z.string().max(40)).max(10).optional(),
 });
 
-/** Curated search per mood — clean 2-3 word queries optimized for JioSaavn original music index. */
-export function getMoodSearchQueries(mood: string, language?: string): string[] {
-  const lang = language?.trim();
-  const hasLang = !!lang && lang.toLowerCase() !== "english";
+/** Curated search per mood — clean 2-3 word queries strictly aligned with user's selected languages. */
+export function getMoodSearchQueries(
+  mood: string,
+  language?: string,
+  languages?: string[],
+): string[] {
+  const rawLangs = languages && languages.length > 0 ? languages : language ? [language] : [];
+  const userLangs = rawLangs
+    .map((l) => l.trim())
+    .filter((l) => l && l.toLowerCase() !== "english");
+
   const cleanMood = mood.toLowerCase().trim();
 
+  // If user has specific regional languages selected (e.g. Telugu, Hindi, Tamil)
+  if (userLangs.length > 0) {
+    const allQueries: string[] = [];
+
+    for (const lang of userLangs) {
+      switch (cleanMood) {
+        case "romantic":
+          allQueries.push(`${lang} love songs`, `${lang} melody songs`, `${lang} romantic hits`);
+          break;
+        case "chill":
+          allQueries.push(`${lang} slow songs`, `${lang} chill songs`, `${lang} melody songs`);
+          break;
+        case "upbeat workout":
+        case "workout":
+          allQueries.push(`${lang} mass songs`, `${lang} beat songs`, `${lang} energetic songs`);
+          break;
+        case "party":
+          allQueries.push(`${lang} party songs`, `${lang} dance songs`, `${lang} dj hits`);
+          break;
+        case "sad hours":
+        case "sad":
+          allQueries.push(`${lang} sad songs`, `${lang} emotional songs`, `${lang} heartbreak songs`);
+          break;
+        case "focus":
+          allQueries.push(`${lang} peaceful songs`, `${lang} melody songs`, "focus study instrumental");
+          break;
+        case "late night":
+          allQueries.push(`${lang} night songs`, `${lang} melody songs`, `${lang} soft songs`);
+          break;
+        case "devotional":
+          allQueries.push(`${lang} devotional songs`, `${lang} bhakti songs`, `${lang} stotram songs`);
+          break;
+        default:
+          allQueries.push(`${lang} ${mood} songs`, `${lang} hits`);
+          break;
+      }
+    }
+    return allQueries;
+  }
+
+  // Universal / English / No language specified
   switch (cleanMood) {
     case "romantic":
-      return hasLang
-        ? [`${lang} love songs`, `${lang} melody songs`, `${lang} romantic songs`]
-        : ["romantic love songs", "love hits", "romantic melody songs"];
-
+      return ["romantic love songs", "love hits", "romantic melody songs"];
     case "chill":
-      return hasLang
-        ? [`${lang} slow songs`, `${lang} chill songs`, `${lang} melody songs`]
-        : ["chill relaxing songs", "calm acoustic songs", "chill melody songs"];
-
+      return ["chill relaxing songs", "calm acoustic songs", "chill melody songs"];
     case "upbeat workout":
     case "workout":
-      return hasLang
-        ? [`${lang} mass songs`, `${lang} beat songs`, `${lang} energetic songs`]
-        : ["workout motivation songs", "energetic gym songs", "high energy songs"];
-
+      return ["workout motivation songs", "energetic gym songs", "high energy songs"];
     case "party":
-      return hasLang
-        ? [`${lang} party songs`, `${lang} dance songs`, `${lang} dj hits`]
-        : ["party dance songs", "dance hits", "club bangers"];
-
+      return ["party dance songs", "dance hits", "club bangers"];
     case "sad hours":
     case "sad":
-      return hasLang
-        ? [`${lang} sad songs`, `${lang} emotional songs`, `${lang} heartbreak songs`]
-        : ["sad emotional songs", "heartbreak soulful songs", "sad hits"];
-
+      return ["sad emotional songs", "heartbreak soulful songs", "sad hits"];
     case "focus":
-      return hasLang
-        ? [`${lang} peaceful songs`, `${lang} melody songs`, "focus study instrumental"]
-        : ["focus study instrumental", "ambient concentration piano", "calm focus songs"];
-
+      return ["focus study instrumental", "ambient concentration piano", "calm focus songs"];
     case "late night":
-      return hasLang
-        ? [`${lang} night songs`, `${lang} melody songs`, `${lang} soft songs`]
-        : ["late night songs", "midnight drive songs", "calm night songs"];
-
+      return ["late night songs", "midnight drive songs", "calm night songs"];
     case "devotional":
-      return hasLang
-        ? [`${lang} devotional songs`, `${lang} bhakti songs`, `${lang} stotram songs`]
-        : ["devotional bhakti songs", "peaceful spiritual songs", "bhajan songs"];
-
+      return ["devotional bhakti songs", "peaceful spiritual songs", "bhajan songs"];
     default:
-      return hasLang
-        ? [`${lang} ${mood} songs`, `${lang} hits`]
-        : [`${mood} songs`, "top hits"];
+      return [`${mood} songs`, "top hits"];
   }
 }
 
-/** Builds a mood radio instantly from JioSaavn catalog — no AI required. */
+/** Builds a mood radio instantly from JioSaavn catalog — strictly locked to user's selected languages. */
 export const moodPicks = createServerFn({ method: "POST" })
   .validator((input: unknown) => MoodPicksInput.parse(input))
   .handler(async ({ data }) => {
-    const queries = getMoodSearchQueries(data.mood, data.language);
+    // Resolve user's full selected languages array
+    const selectedLanguages =
+      data.languages && data.languages.length > 0
+        ? data.languages.map((l) => l.trim()).filter(Boolean)
+        : data.language?.trim()
+        ? [data.language.trim()]
+        : [];
+
+    const queries = getMoodSearchQueries(data.mood, data.language, selectedLanguages);
     const seenIds = new Set<string>();
     const seenKeys = new Set<string>();
     const tracks: Track[] = [];
@@ -1825,11 +1856,15 @@ export const moodPicks = createServerFn({ method: "POST" })
       const { searchSaavn } = await import("./providers/saavn");
 
       for (const q of queries) {
-        if (tracks.length >= 25) break;
+        if (tracks.length >= 30) break;
         try {
           const hits = await searchSaavn(q, { limit: 15 });
           for (const t of hits) {
             if (!t?.id || seenIds.has(t.id)) continue;
+            // STRICT LANGUAGE CHECK: Reject any song from an unselected language
+            if (selectedLanguages.length > 0 && !isLanguageConsistent(t, selectedLanguages)) {
+              continue;
+            }
             const key = getTrackDedupeKey(t.title, t.artist);
             if (key && seenKeys.has(key)) continue;
             if (key) seenKeys.add(key);
@@ -1840,21 +1875,38 @@ export const moodPicks = createServerFn({ method: "POST" })
       }
 
       if (tracks.length > 0) {
-        return { tracks: tracks.slice(0, 30), error: null };
+        return { tracks: tracks.slice(0, 35), error: null };
       }
     } catch {}
 
-    // Fallback: If regional Saavn query returned 0, try universal fallback
+    // Fallback: strictly locked to user's selected languages! Never unlocalized generic queries.
     try {
       const { searchSaavn } = await import("./providers/saavn");
-      const hits = await searchSaavn(`${data.mood} songs`, { limit: 20 });
-      for (const t of hits) {
-        if (!t?.id || seenIds.has(t.id)) continue;
-        seenIds.add(t.id);
-        tracks.push(t as Track);
+
+      if (selectedLanguages.length > 0) {
+        for (const lang of selectedLanguages) {
+          if (tracks.length >= 25) break;
+          try {
+            const fallbackHits = await searchSaavn(`${lang} top hits`, { limit: 15 });
+            for (const t of fallbackHits) {
+              if (!t?.id || seenIds.has(t.id)) continue;
+              if (!isLanguageConsistent(t, selectedLanguages)) continue;
+              seenIds.add(t.id);
+              tracks.push(t as Track);
+            }
+          } catch {}
+        }
+      } else {
+        const hits = await searchSaavn(`${data.mood} songs`, { limit: 20 });
+        for (const t of hits) {
+          if (!t?.id || seenIds.has(t.id)) continue;
+          seenIds.add(t.id);
+          tracks.push(t as Track);
+        }
       }
+
       if (tracks.length > 0) {
-        return { tracks: tracks.slice(0, 30), error: null };
+        return { tracks: tracks.slice(0, 35), error: null };
       }
     } catch {}
 
