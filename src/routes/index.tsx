@@ -116,7 +116,6 @@ import {
   quickFilterRadioQueries,
   toggleQuickFilter,
 } from "@/lib/mood-genre-filters";
-import { GenreMoodFilterBar } from "@/components/music/ui/GenreMoodFilterBar";
 import { useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
 import { clearDownloads, listDownloads, removeDownload, saveDownload, hasDownload, type DownloadInfo } from "@/lib/offline";
@@ -3570,102 +3569,147 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               {/* FOR YOU TAB */}
               {tab === "foryou" && (
                 <div className={cn("space-y-6", tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
-                  {/* Greeting & Moods */}
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                      <h1 suppressHydrationWarning className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-                        Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, <span className="text-animated-gradient">{auth.profile?.display_name?.split(" ")[0] || "Listener"}</span>
-                      </h1>
-                      <p className="text-xs text-muted-foreground font-normal mt-0.5">Recommended based on your recent listening</p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="rounded-full bg-chip-subtle text-secondary-foreground hover:bg-chip-strong hover:text-foreground border-hair text-xs font-normal button-modern-hover"
-                        onClick={() => void loadHomeFeeds(undefined, Date.now())}
-                        disabled={recLoading}
-                      >
-                        {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
-                        Refresh
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* 1-Tap Mood & Vibe Selector (Spotify / YouTube Music style) */}
-                  <MoodCardsSection
-                    activeMood={activeMood}
-                    loadingMood={loadingMood}
-                    isPlaying={player.isPlaying}
-                    onSelectMood={(item) => void handlePlayMood(item.key, item.label)}
-                  />
-
-                  {/* Genre & Mood quick filters — instant, local filtering */}
-                  <GenreMoodFilterBar
-                    activeIds={quickFilters}
-                    onToggle={handleToggleQuickFilter}
-                    onClear={handleClearQuickFilters}
-                    counts={quickFilterCounts}
-                  />
-
-                  {/* Home Sections — mobile horizontal scroll */}
-                  <MobileHomeSections
-                    dailyMix={quickFilters.length > 0 ? [] : dailyMixTracks}
-                    recommended={quickFilters.length > 0 ? quickFilteredFeed : recs}
-                    userLanguages={settings.languages}
-                    onArtistClick={(artist: JioSaavnArtist) => {
-                      setTab("search");
-                      setQuery(artist.name);
-                      setSearchFilter("all");
-                      saveRecentSearch(artist.name);
-                      void searchFor(artist.name, "songs", "all", 60);
-                    }}
-                    quickFilterIds={quickFilters}
-                    onClearQuickFilters={handleClearQuickFilters}
-                    onPlayTrack={(track, sectionTracks, i) => {
-                      if (current?.id === track.id) {
-                        if (player.isPlaying) {
-                          setShowFullScreen(true);
-                        } else {
-                          play();
+                  {selectedMood ? (
+                    <MoodDetailView
+                      mood={selectedMood}
+                      tracks={moodTracks}
+                      loading={moodLoading}
+                      error={moodError}
+                      currentId={current?.id}
+                      isPlaying={player.isPlaying}
+                      likedIds={likedIds}
+                      dislikedIds={dislikedIds}
+                      playlists={playlists}
+                      downloadedIds={downloadedIds}
+                      downloadingIds={downloadingIds}
+                      userLanguage={settings.languages?.[0]}
+                      onBack={() => setSelectedMood(null)}
+                      onPlayAll={() => {
+                        if (moodTracks.length > 0) {
+                          if (player.isPlaying && moodTracks.some((t) => t.id === current?.id)) {
+                            pause();
+                          } else if (current && moodTracks.some((t) => t.id === current?.id)) {
+                            play();
+                          } else {
+                            startQueue(moodTracks, 0);
+                          }
                         }
-                        return;
-                      }
-                      startQueue(sectionTracks, i);
-                    }}
-                    onToggleLike={handleToggleLike}
-                    onOpenOptions={(t) => setOptionsTrack(t)}
-                    likedIds={likedIds}
-                    currentId={current?.id ?? null}
-                    isPlaying={player.isPlaying}
-                    loading={
-                      !hydrated ||
-                      (recLoading && recs.length === 0) ||
-                      (quickFilters.length > 0 && quickFilterLoading && quickFilteredFeed.length === 0)
-                    }
-                  />
+                      }}
+                      onShuffle={() => {
+                        if (moodTracks.length > 0) {
+                          const shuffled = [...moodTracks].sort(() => Math.random() - 0.5);
+                          startQueue(shuffled, 0);
+                        }
+                      }}
+                      onPlayTrack={(track, i) => {
+                        if (current?.id === track.id) {
+                          if (player.isPlaying) {
+                            setShowFullScreen(true);
+                          } else {
+                            play();
+                          }
+                          return;
+                        }
+                        startQueue(moodTracks, i);
+                      }}
+                      onToggleLike={handleToggleLike}
+                      onToggleDislike={toggleDislike}
+                      onArtistClick={openArtist}
+                      onAddToPlaylist={handleAddToPlaylist}
+                      onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
+                      onAddToQueue={(track) => enqueue([track])}
+                      onDownload={(track) => void handleDownload(track)}
+                      onRemoveDownload={(track) => void handleRemoveDownload(track)}
+                      onRetry={() => {
+                        if (selectedMood) void handleSelectMood(selectedMood, false);
+                      }}
+                    />
+                  ) : (
+                    <>
+                      {/* Greeting & Moods */}
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <h1 suppressHydrationWarning className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+                            Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, <span className="text-animated-gradient">{auth.profile?.display_name?.split(" ")[0] || "Listener"}</span>
+                          </h1>
+                          <p className="text-xs text-muted-foreground font-normal mt-0.5">Recommended based on your recent listening</p>
+                        </div>
 
-                {/* Explore More Songs for low-bandwidth incremental discovery */}
-                {recs.length > 0 && (
-                  <div className="flex flex-col items-center justify-center pt-2 pb-6 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void loadMoreRecommendations()}
-                      disabled={loadingMoreRecs || exploreExhausted}
-                      className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
-                    >
-                      {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" /> : null}
-                      {exploreExhausted ? "All caught up" : "Explore more songs"}
-                    </Button>
-                    {exploreExhausted && (
-                      <p className="text-[11px] text-muted-foreground">You've explored all currently available recommendations.</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="rounded-full bg-chip-subtle text-secondary-foreground hover:bg-chip-strong hover:text-foreground border-hair text-xs font-normal button-modern-hover"
+                            onClick={() => void loadHomeFeeds(undefined, Date.now())}
+                            disabled={recLoading}
+                          >
+                            {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
+                            Refresh
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* 1-Tap Mood & Vibe Selector (Spotify / YouTube Music style) */}
+                      <MoodCardsSection
+                        activeMood={activeMood}
+                        loadingMood={loadingMood}
+                        isPlaying={player.isPlaying}
+                        onSelectMood={(item) => void handleSelectMood(item)}
+                      />
+
+                      {/* Home Sections — mobile horizontal scroll */}
+                      <MobileHomeSections
+                        dailyMix={dailyMixTracks}
+                        recommended={recs}
+                        userLanguages={settings.languages}
+                        onArtistClick={(artist: JioSaavnArtist) => {
+                          setTab("search");
+                          setQuery(artist.name);
+                          setSearchFilter("all");
+                          saveRecentSearch(artist.name);
+                          void searchFor(artist.name, "songs", "all", 60);
+                        }}
+                        onPlayTrack={(track, sectionTracks, i) => {
+                          if (current?.id === track.id) {
+                            if (player.isPlaying) {
+                              setShowFullScreen(true);
+                            } else {
+                              play();
+                            }
+                            return;
+                          }
+                          startQueue(sectionTracks, i);
+                        }}
+                        onToggleLike={handleToggleLike}
+                        onOpenOptions={(t) => setOptionsTrack(t)}
+                        likedIds={likedIds}
+                        currentId={current?.id ?? null}
+                        isPlaying={player.isPlaying}
+                        loading={!hydrated || (recLoading && recs.length === 0)}
+                      />
+
+                      {/* Explore More Songs for low-bandwidth incremental discovery */}
+                      {recs.length > 0 && (
+                        <div className="flex flex-col items-center justify-center pt-2 pb-6 gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void loadMoreRecommendations()}
+                            disabled={loadingMoreRecs || exploreExhausted}
+                            className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
+                          >
+                            {loadingMoreRecs ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" /> : null}
+                            {exploreExhausted ? "All caught up" : "Explore more songs"}
+                          </Button>
+                          {exploreExhausted && (
+                            <p className="text-[11px] text-muted-foreground">You've explored all currently available recommendations.</p>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
             {/* EXPLORE TAB */}
             {tab === "explore" && (
