@@ -14,7 +14,8 @@ import { MobileDrawer } from "@/components/music/layout/MobileDrawer";
 import { MiniPlayer } from "@/components/music/layout/MiniPlayer";
 import { MobileHeader } from "@/components/music/layout/MobileHeader";
 import { MobileHomeSections } from "@/components/music/ui/MobileHomeSections";
-import { MoodCardsSection } from "@/components/music/ui/MoodCardsSection";
+import { MoodCardsSection, type MoodItem } from "@/components/music/ui/MoodCardsSection";
+import { MoodDetailView } from "@/components/music/ui/MoodDetailView";
 import { MobileLibrary } from "@/components/music/ui/MobileLibrary";
 import { MobileQueue } from "@/components/music/ui/MobileQueue";
 import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
@@ -28,6 +29,7 @@ import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
 import { sleepTimerService } from "@/lib/sleep-timer";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { DownloadFloatingPill } from "@/components/music/ui/DownloadAnimation";
 
 // Code-split heavy modals and overlays for optimal initial load performance
 const FullScreenPlayer = lazy(() =>
@@ -303,6 +305,10 @@ function MusicApp() {
   const [message, setMessage] = useState<string | null>(null);
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const [loadingMood, setLoadingMood] = useState<string | null>(null);
+  const [selectedMood, setSelectedMood] = useState<MoodItem | null>(null);
+  const [moodTracks, setMoodTracks] = useState<Track[]>([]);
+  const [moodLoading, setMoodLoading] = useState(false);
+  const [moodError, setMoodError] = useState<string | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
   const [index, setIndex] = useState(0);
   const [volume, setVolume] = useState(80);
@@ -342,6 +348,8 @@ function MusicApp() {
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [downloadedTracks, setDownloadedTracks] = useState<Track[]>([]);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
+  const [activeDownloadTrack, setActiveDownloadTrack] = useState<{ track: Track; isDone?: boolean } | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(80);
   // Playlist creation dialog state
@@ -494,6 +502,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
     // Standard download -> saved to IndexedDB for in-app offline play AND triggered to save to phone/disk
     setDownloadingIds((prev) => new Set([...prev, track.id]));
+    setDownloadProgress((prev) => ({ ...prev, [track.id]: 0 }));
+    setActiveDownloadTrack({ track, isDone: false });
     try {
       let res: Response | null = null;
 
@@ -521,7 +531,30 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
 
       if (!res || !res.ok) throw new Error("Download failed");
-      const blob = await res.blob();
+
+      let blob: Blob;
+      const contentLength = res.headers.get("content-length");
+      const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
+
+      if (res.body && totalBytes > 0) {
+        const reader = res.body.getReader();
+        const chunks: BlobPart[] = [];
+        let receivedBytes = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            chunks.push(value as unknown as BlobPart);
+            receivedBytes += value.length;
+            const pct = Math.min(99, Math.round((receivedBytes / totalBytes) * 100));
+            setDownloadProgress((prev) => ({ ...prev, [track.id]: pct }));
+          }
+        }
+        blob = new Blob(chunks, { type: res.headers.get("content-type") || "audio/mp4" });
+      } else {
+        blob = await res.blob();
+      }
+
       if (blob.size < 50 * 1024) {
         throw new Error("Downloaded audio file is incomplete");
       }
@@ -557,14 +590,26 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         console.warn("[MelodyMap] Disk save failed, in-app offline saved successfully", saveErr);
       }
 
+      setDownloadProgress((prev) => ({ ...prev, [track.id]: 100 }));
+      setActiveDownloadTrack({ track, isDone: true });
+      setTimeout(() => {
+        setActiveDownloadTrack((curr) => (curr?.track.id === track.id ? null : curr));
+      }, 3000);
+
       setMessage(`Downloaded "${track.title}" to storage & offline library`);
     } catch (err) {
       console.warn("[MelodyMap] handleDownload failed:", err);
+      setActiveDownloadTrack(null);
       setMessage(`Failed to download "${track.title || "song"}" — please check connection`);
     } finally {
       setDownloadingIds((prev) => {
         const next = new Set(prev);
         next.delete(track.id);
+        return next;
+      });
+      setDownloadProgress((prev) => {
+        const next = { ...prev };
+        delete next[track.id];
         return next;
       });
       setTimeout(() => setMessage(null), 3000);
@@ -2625,6 +2670,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           setDrawerOpen(false);
           return;
         }
+        if (selectedMood) {
+          setSelectedMood(null);
+          return;
+        }
         if (tab !== "foryou") {
           setTab("foryou");
           return;
@@ -3850,6 +3899,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 }}
                 downloadedIds={downloadedIds}
                 downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
                 onDownload={(track) => void handleDownload(track)}
                 onRemoveDownload={(track) => void handleRemoveDownload(track)}
               />
@@ -3972,6 +4022,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   dislikedIds={dislikedIds}
                   downloadedIds={downloadedIds}
                   downloadingIds={downloadingIds}
+                  downloadProgress={downloadProgress}
                   onDownload={(track) => void handleDownload(track)}
                   onRemoveDownload={(track) => void handleRemoveDownload(track)}
                   onPlay={(track, i) => {
@@ -4068,6 +4119,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         />
       )}
 
+      {/* Floating Download Notification Pill */}
+      {activeDownloadTrack && (
+        <DownloadFloatingPill
+          track={activeDownloadTrack.track}
+          progress={downloadProgress[activeDownloadTrack.track.id]}
+          isDone={activeDownloadTrack.isDone}
+          onClose={() => setActiveDownloadTrack(null)}
+        />
+      )}
+
       {/* 5-Tab Bottom Navigation */}
       <MobileNav
         activeTab={tab}
@@ -4133,6 +4194,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           track={optionsTrack}
           isLiked={likedIds.has(optionsTrack?.id ?? "")}
           isDownloaded={downloadedIds.has(optionsTrack?.id ?? "")}
+          isDownloading={downloadingIds.has(optionsTrack?.id ?? "")}
+          downloadProgress={optionsTrack ? downloadProgress[optionsTrack.id] : undefined}
           onClose={() => setOptionsTrack(null)}
           onToggleLike={(t) => handleToggleLike(t)}
           onAddToPlaylist={(t) => setCreatePlaylistTrack(t)}
@@ -4152,6 +4215,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onDeleteFromLibrary={(t) => {
             if (likedIds.has(t.id)) handleToggleLike(t);
           }}
+        />
+
+        {/* FLOATING DOWNLOAD PROGRESS PILL */}
+        <DownloadFloatingPill
+          track={activeDownloadTrack?.track ?? null}
+          progress={activeDownloadTrack ? downloadProgress[activeDownloadTrack.track.id] : undefined}
+          isDone={activeDownloadTrack?.isDone}
+          onClose={() => setActiveDownloadTrack(null)}
         />
 
         {/* SLEEP TIMER MODAL */}
