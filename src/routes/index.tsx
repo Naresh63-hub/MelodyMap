@@ -3721,6 +3721,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         onToggleLike={handleToggleLike}
                         onOpenOptions={(t) => setOptionsTrack(t)}
                         likedIds={likedIds}
+                        downloadedIds={downloadedIds}
+                        downloadingIds={downloadingIds}
+                        downloadProgress={downloadProgress}
                         currentId={current?.id ?? null}
                         isPlaying={player.isPlaying}
                         loading={!hydrated || (recLoading && recs.length === 0)}
@@ -3794,6 +3797,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   onOpenOptions={(t) => setOptionsTrack(t)}
                   onToggleLike={handleToggleLike}
                   likedIds={likedIds}
+                  downloadedIds={downloadedIds}
+                  downloadingIds={downloadingIds}
+                  downloadProgress={downloadProgress}
                   currentId={current?.id ?? null}
                   isPlaying={player.isPlaying}
                   loading={!hydrated || (exploreLoading && trendingList.length === 0 && oldSongsList.length === 0 && (!mixTracks.newrelease || mixTracks.newrelease.length === 0))}
@@ -3854,6 +3860,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onToggleLike={handleToggleLike}
                 onOpenOptions={(t) => setOptionsTrack(t)}
                 likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
                 currentId={current?.id ?? null}
                 isPlaying={player.isPlaying}
                 onClear={() => {
