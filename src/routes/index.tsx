@@ -999,16 +999,56 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       player.pause();
     },
-    onError: (msg) => {
+    onError: async (msg, details) => {
       if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
         player.pause();
         return;
       }
 
-      console.warn("[Player] Stream notice:", msg);
+      console.warn("[Player] Stream notice:", msg, details);
       const track = currentRef.current;
 
-      // Multi-Provider Fallback:
+      // 1. Safe offline fallback: if this exact track is downloaded in offline storage, play its local Blob!
+      if (track) {
+        const isDownloaded = await hasDownload(track.id);
+        if (isDownloaded) {
+          void load(track.id, undefined, 0, track.title, track.artist);
+          setMessage(`Playing "${track.title}" from downloads`);
+          setTimeout(() => setMessage(null), 3500);
+          return;
+        }
+      }
+
+      // 2. Check if the problem is OFFLINE / network disconnection
+      const isOfflineNow =
+        details?.isOffline === true ||
+        details?.code === "OFFLINE" ||
+        (typeof navigator !== "undefined" && navigator.onLine === false);
+
+      if (isOfflineNow) {
+        player.pause();
+        // NEVER skip to the next song when offline! Keep the current song active.
+        if (downloadedTracks.length > 0) {
+          setMessage("You're offline. Tap Downloads to listen to your saved songs.");
+          setUndoLabel("Downloads");
+          undoRef.current = {
+            timeout: setTimeout(() => setUndoLabel(null), 8000),
+            restore: () => setTab("downloads"),
+          };
+        } else {
+          setMessage("You're offline. Check your internet connection.");
+          setUndoLabel("Retry");
+          undoRef.current = {
+            timeout: setTimeout(() => setUndoLabel(null), 8000),
+            restore: () => {
+              if (track) playSong(track, queueRef.current);
+            },
+          };
+        }
+        return;
+      }
+
+      // 3. Multi-Provider Fallback (only when online):
       // If the current provider audio source fails, try an available alternative source
       // for the SAME logical song before skipping to a different track.
       if (track && track.availableAlternatives && track.availableAlternatives.length > 0) {
@@ -1025,45 +1065,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       }
 
-      // 1. Safe offline fallback: if this exact track is downloaded, play its local Blob
-      if (track) {
-        void hasDownload(track.id).then((isDownloaded) => {
-          if (isDownloaded) {
-            void load(track.id, undefined, 0, track.title, track.artist);
-            setMessage(`Playing "${track.title}" from downloads`);
-            setTimeout(() => setMessage(null), 3500);
-            return;
-          }
-        });
-      }
-
-      // 2. Check if network is offline or connection is lost
-      const isOfflineNow = typeof navigator !== "undefined" && navigator.onLine === false;
-      if (isOfflineNow) {
+      // 4. Rate-limiting or transient connection backoff
+      if (
+        details?.code === "TIMEOUT" ||
+        details?.code === "RECONNECT_FAILED" ||
+        (msg && (msg.toLowerCase().includes("retry") || msg.toLowerCase().includes("tap play")))
+      ) {
         player.pause();
-        // Do not silently replace the queue or endlessly skip tracks.
-        // If downloaded tracks exist, offer the user an action to open Downloads.
-        if (downloadedTracks.length > 0) {
-          setMessage("Offline: Online stream unavailable. Tap Downloads to listen offline.");
-          setUndoLabel("Downloads");
-          undoRef.current = {
-            timeout: setTimeout(() => setUndoLabel(null), 8000),
-            restore: () => setTab("downloads"),
-          };
-        } else {
-          // If no playable download is available, show a clear offline message and a Retry action.
-          setMessage("You are offline. Tap Retry when connected.");
-          setUndoLabel("Retry");
-          undoRef.current = {
-            timeout: setTimeout(() => setUndoLabel(null), 8000),
-            restore: () => {
-              if (track) playSong(track, queueRef.current);
-            },
-          };
-        }
+        setMessage(msg || "Stream connection timed out. Tap play to retry.");
+        setTimeout(() => setMessage(null), 4000);
         return;
       }
 
+      // 5. Track consecutive track failures to prevent infinite skip loops
       const now = Date.now();
       if (now - lastErrorTimeRef.current < 60_000) {
         consecutiveErrorsRef.current += 1;
@@ -1072,32 +1086,30 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
       lastErrorTimeRef.current = now;
 
-      // Protection for screen-off error loops: stop if 4 consecutive tracks fail
       if (consecutiveErrorsRef.current >= 4) {
         player.pause();
-        setMessage("Playback stopped — several tracks failed to load");
+        setMessage("Playback stopped — several tracks failed to stream");
         setTimeout(() => setMessage(null), 5000);
         return;
       }
 
-      // If the message asks the user to retry or tap play, do NOT force-skip:
-      // pause and let the user decide when to tap play.
-      if (
-        msg &&
-        (msg.toLowerCase().includes("retry") ||
-          msg.toLowerCase().includes("tap play") ||
-          msg.toLowerCase().includes("interrupted"))
-      ) {
-        player.pause();
-        setMessage(msg);
-        setTimeout(() => setMessage(null), 4000);
-        return;
-      }
+      // 6. Display EXACT problem for genuine track errors (never a generic catch-all)
+      const exactProblem =
+        details?.code === "DECODE_ERROR"
+          ? "Audio format decode error. Skipping to next track..."
+          : details?.code === "SRC_NOT_SUPPORTED"
+          ? "Audio source unavailable for this track. Skipping to next track..."
+          : details?.code === "NETWORK_ERROR"
+          ? "Network error during stream. Skipping to next track..."
+          : msg || "Audio playback error. Skipping to next track...";
 
-      setMessage(msg || "Audio stream unavailable, skipping to next track...");
+      setMessage(exactProblem);
       setTimeout(() => setMessage(null), 3500);
       setTimeout(() => {
-        goNext();
+        // Only advance to next track if device is confirmed online
+        if (typeof navigator === "undefined" || navigator.onLine !== false) {
+          goNext();
+        }
       }, 1500);
     },
   });
