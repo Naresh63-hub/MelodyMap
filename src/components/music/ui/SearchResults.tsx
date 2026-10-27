@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Music2,
   MoreVertical,
@@ -9,6 +9,7 @@ import {
   Clock,
   Sparkles,
   ExternalLink,
+  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
@@ -18,6 +19,7 @@ import { trackSubtitle, getTrackDisplayDuration } from "@/lib/track-metadata";
 import { useSearchHistory, type RecentSearchItem } from "@/lib/search-history";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
+import { TOP_JIOSAAVN_ARTISTS } from "@/lib/artists-data";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +83,19 @@ export function SearchResults(props: Props) {
   const [internalFilter, setInternalFilter] = useState<SearchFilter>("all");
   const [isLanguagePickerOpen, setIsLanguagePickerOpen] = useState(false);
   const filter = selectedFilter ?? internalFilter;
+
+  const matchedArtist = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return null;
+    return (
+      TOP_JIOSAAVN_ARTISTS.find(
+        (a) =>
+          a.name.toLowerCase() === q ||
+          q === `${a.name.toLowerCase()} songs` ||
+          q === `${a.name.toLowerCase()} hits`,
+      ) || null
+    );
+  }, [query]);
 
   const hookHistory = useSearchHistory();
   const recentSearches = propsRecentSearches ?? hookHistory.recentSearches;
@@ -347,6 +362,48 @@ export function SearchResults(props: Props) {
         })}
         <div className="w-3 shrink-0" aria-hidden="true" />
       </div>
+
+      {/* Artist Hero Banner when an artist is queried */}
+      {matchedArtist && results.length > 0 && (
+        <div className="flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-primary/20 via-primary/10 to-card border border-primary/25 backdrop-blur-md shadow-sm mb-2">
+          <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-full border-2 border-primary/50 shadow-md">
+            <img
+              src={matchedArtist.image}
+              alt={matchedArtist.name}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-bold tracking-wider text-primary uppercase bg-primary/20 px-2 py-0.5 rounded-full">
+                Artist Discography
+              </span>
+              <span className="text-[11px] text-muted-foreground font-medium">
+                {results.length}+ songs loaded
+              </span>
+            </div>
+            <h2 className="text-base sm:text-lg font-bold text-foreground truncate mt-1">
+              {matchedArtist.name}
+            </h2>
+            <p className="text-xs text-muted-foreground truncate">
+              {matchedArtist.role} • {matchedArtist.languages.join(", ")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (results[0]) {
+                onPlayTrack(results[0], 0);
+              }
+            }}
+            aria-label={`Play all songs by ${matchedArtist.name}`}
+            className="flex items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3.5 sm:px-4 py-2 text-xs font-semibold shadow-md hover:bg-primary/90 active:scale-95 transition-all shrink-0"
+          >
+            <Play className="h-3.5 w-3.5 fill-current" />
+            <span>Play All</span>
+          </button>
+        </div>
+      )}
 
       {/* Results Song List or No Results */}
       {results.length === 0 ? (

@@ -96,7 +96,7 @@ type Props = {
   activeMood?: string | null | undefined;
   loadingMood?: string | null | undefined;
   isPlaying?: boolean | undefined;
-  onSelectMood: (moodKey: string, moodLabel: string) => void;
+  onSelectMood: (item: MoodItem) => void;
   className?: string | undefined;
 };
 
@@ -115,7 +115,7 @@ export function MoodCardsSection({
 
   const handleClick = (item: MoodItem) => {
     triggerHaptic("selection");
-    onSelectMood(item.key, item.label);
+    onSelectMood(item);
   };
 
   return (
@@ -128,7 +128,7 @@ export function MoodCardsSection({
           </h2>
         </div>
         <span className="text-[11px] font-normal text-muted-foreground">
-          1-Tap Instant Play
+          Tap to Explore
         </span>
       </div>
 

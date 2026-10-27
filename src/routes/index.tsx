@@ -21,7 +21,7 @@ import { LanguagesPanel } from "@/components/music/ui/LanguagesPanel";
 import { SearchResults, type SearchFilter } from "@/components/music/ui/SearchResults";
 import { VoiceSearchButton } from "@/components/music/ui/VoiceSearchButton";
 import { saveRecentSearch } from "@/lib/search-history";
-import type { JioSaavnArtist } from "@/lib/artists-data";
+import { TOP_JIOSAAVN_ARTISTS, type JioSaavnArtist } from "@/lib/artists-data";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
@@ -327,6 +327,9 @@ function MusicApp() {
 
   const [loadingMoreRecs, setLoadingMoreRecs] = useState(false);
   const [exploreExhausted, setExploreExhausted] = useState(false);
+  const [loadingMoreExplore, setLoadingMoreExplore] = useState(false);
+  const [exploreExhaustedTrending, setExploreExhaustedTrending] = useState(false);
+  const moreTrendingPageRef = useRef(1);
   const [showFullScreen, setShowFullScreen] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
@@ -356,12 +359,12 @@ function MusicApp() {
     if (typeof window === "undefined") return;
 
     const handleOnline = () => {
-      setMessage("Back online â€” live recommendations restored");
+      setMessage("Back online — live recommendations restored");
       setTimeout(() => setMessage(null), 3500);
     };
 
     const handleOffline = () => {
-      setMessage("You are offline â€” downloaded songs are available");
+      setMessage("You are offline — downloaded songs are available");
       setTimeout(() => setMessage(null), 4000);
     };
 
@@ -557,7 +560,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setMessage(`Downloaded "${track.title}" to storage & offline library`);
     } catch (err) {
       console.warn("[MelodyMap] handleDownload failed:", err);
-      setMessage(`Failed to download "${track.title || "song"}" â€” please check connection`);
+      setMessage(`Failed to download "${track.title || "song"}" — please check connection`);
     } finally {
       setDownloadingIds((prev) => {
         const next = new Set(prev);
@@ -1339,7 +1342,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             languages: settings.languages,
             artists: topArtists(stats, likes),
             liked: likes.slice(0, 15).map(trackLabel),
-            count: 24,
+            count: 40,
             refreshNonce: nonce,
           },
         });
@@ -1347,13 +1350,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           const pureMusic = res.tracks as Track[];
           // Freshness: fetch MORE candidates instead of re-serving displayed songs.
           let fresh = applyFeedFilters(pureMusic);
-          if (fresh.length < 8) {
+          if (fresh.length < 15) {
             const res2 = await runDailyMix({
               data: {
                 languages: settings.languages,
                 artists: topArtists(stats, likes),
                 liked: likes.slice(0, 15).map(trackLabel),
-                count: 24,
+                count: 40,
                 refreshNonce: `${nonce}-2`,
               },
             });
@@ -1368,7 +1371,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           }
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           const diversified = diversifyTrackList(ranked, {
-            maxPerArtist: 2,
+            maxPerArtist: 3,
             maxPerAlbum: 1,
             minArtistSpacing: 2,
             minAlbumSpacing: 3,
@@ -1385,6 +1388,22 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const loadExploreFeeds = useCallback(
     async (refreshNonce?: number | string) => {
       setExploreLoading(true);
+      const isExplicitRefresh = Boolean(refreshNonce);
+      if (isExplicitRefresh) {
+        moreTrendingPageRef.current = 1;
+        setExploreExhaustedTrending(false);
+      }
+
+      // Snapshot currently displayed tracks to strictly avoid repeating the same songs on refresh
+      const prevTrendingIds = new Set(trendingRef.current.map((t) => t.id));
+      const prevTrendingTitles = new Set(trendingRef.current.map((t) => (t.title || "").toLowerCase().trim()));
+
+      const prevNewIds = new Set((mixTracksRef.current?.newrelease || []).map((t) => t.id));
+      const prevNewTitles = new Set((mixTracksRef.current?.newrelease || []).map((t) => (t.title || "").toLowerCase().trim()));
+
+      const prevOldIds = new Set(oldSongsRef.current.map((t) => t.id));
+      const prevOldTitles = new Set(oldSongsRef.current.map((t) => (t.title || "").toLowerCase().trim()));
+
       const nonce = refreshNonce ?? `${Date.now()}-${safeUUID()}`;
       const clientHour = new Date().getHours();
 
@@ -1394,7 +1413,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             const res = await runTrending({
               data: {
                 languages: settings.languages,
-                count: 50,
+                count: 70,
                 refreshNonce: nonce,
                 clientHour,
               },
@@ -1404,19 +1423,26 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               const finalTracks = fresh.length > 0 ? fresh : (res.tracks as Track[]);
               const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
               const diversified = diversifyTrackList(ranked, {
-                maxPerArtist: 2,
+                maxPerArtist: 3,
                 maxPerAlbum: 1,
                 minArtistSpacing: 2,
                 minAlbumSpacing: 3,
               });
-              setTrendingList(diversified);
-              writeHomeCache({ trendingList: diversified });
+              let resultTracks = diversified;
+              if (isExplicitRefresh && prevTrendingIds.size > 0) {
+                const nonDupes = diversified.filter(
+                  (t) => !prevTrendingIds.has(t.id) && !prevTrendingTitles.has((t.title || "").toLowerCase().trim()),
+                );
+                resultTracks = nonDupes.length >= 20 ? nonDupes : [...nonDupes, ...diversified.filter((t) => !nonDupes.some((nd) => nd.id === t.id))];
+              }
+              setTrendingList(resultTracks);
+              writeHomeCache({ trendingList: resultTracks });
             }
           })(),
           (async () => {
             const artistList = topArtists(stats, likes);
             const res = await runNewSongs({
-              data: { artists: artistList, languages: settings.languages, count: 30, refreshNonce: nonce },
+              data: { artists: artistList, languages: settings.languages, count: 50, refreshNonce: nonce },
             });
             if (res.tracks && res.tracks.length > 0) {
               const pool = (res.tracks as Track[]).filter((t) => !isOldEraTrack(t));
@@ -1424,13 +1450,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               const finalTracks = fresh.length > 0 ? fresh : pool;
               const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
               const diversified = diversifyTrackList(ranked, {
-                maxPerArtist: 2,
+                maxPerArtist: 3,
                 maxPerAlbum: 1,
                 minArtistSpacing: 2,
                 minAlbumSpacing: 3,
               });
+              let resultTracks = diversified;
+              if (isExplicitRefresh && prevNewIds.size > 0) {
+                const nonDupes = diversified.filter(
+                  (t) => !prevNewIds.has(t.id) && !prevNewTitles.has((t.title || "").toLowerCase().trim()),
+                );
+                resultTracks = nonDupes.length >= 15 ? nonDupes : [...nonDupes, ...diversified.filter((t) => !nonDupes.some((nd) => nd.id === t.id))];
+              }
               setMixTracks((prev) => {
-                const next = { ...prev, newrelease: diversified };
+                const next = { ...prev, newrelease: resultTracks };
                 writeHomeCache({ mixTracks: next });
                 return next;
               });
@@ -1451,13 +1484,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               const finalTracks = fresh.length > 0 ? fresh : (res.tracks as Track[]);
               const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
               const diversified = diversifyTrackList(ranked, {
-                maxPerArtist: 2,
+                maxPerArtist: 3,
                 maxPerAlbum: 1,
                 minArtistSpacing: 2,
                 minAlbumSpacing: 3,
               });
-              setOldSongsList(diversified);
-              writeHomeCache({ oldSongsList: diversified });
+              let resultTracks = diversified;
+              if (isExplicitRefresh && prevOldIds.size > 0) {
+                const nonDupes = diversified.filter(
+                  (t) => !prevOldIds.has(t.id) && !prevOldTitles.has((t.title || "").toLowerCase().trim()),
+                );
+                resultTracks = nonDupes.length >= 15 ? nonDupes : [...nonDupes, ...diversified.filter((t) => !nonDupes.some((nd) => nd.id === t.id))];
+              }
+              setOldSongsList(resultTracks);
+              writeHomeCache({ oldSongsList: resultTracks });
             }
           })(),
         ]);
@@ -1485,8 +1525,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           (async () => {
             const pureMusic: Track[] = [];
             let fresh: Track[] = [];
-            // Fast 2-depth query instead of slow 4 sequential loops
-            const maxDepth = 2;
+            // Query for a robust initial feed (35-40+ songs)
+            const maxDepth = 3;
             for (let depth = 1; depth <= maxDepth; depth++) {
               const res = await runRecommend({
                 data: {
@@ -1495,7 +1535,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   disliked: dislikes.slice(0, 15).map(trackLabel),
                   sequence: sequenceBrief(history, stats),
                   skipped: skippedLabels(stats),
-                  count: 24,
+                  count: 40,
                   ...(mood ? { mood } : {}),
                   languages: settings.languages,
                   brief: settingsToBrief(settings),
@@ -1514,16 +1554,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   }
                 }
                 fresh = applyFeedFilters(pureMusic);
-                if (fresh.length >= 10) break;
+                if (fresh.length >= 35) break;
               }
             }
 
             // Fallback to trending catalog if deep search is still sparse
-            if (fresh.length < 6) {
+            if (fresh.length < 15) {
               const fallbackRes = await runTrending({
                 data: {
                   languages: settings.languages,
-                  count: 24,
+                  count: 40,
                   refreshNonce: `${nonce}-fallback`,
                   clientHour,
                 },
@@ -1544,7 +1584,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             );
             const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
             const diversified = diversifyTrackList(distributed, {
-              maxPerArtist: 2,
+              maxPerArtist: 3,
               maxPerAlbum: 1,
               minArtistSpacing: 2,
               minAlbumSpacing: 3,
@@ -1870,6 +1910,50 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     ],
   );
 
+  const loadMoreExploreSongs = useCallback(async () => {
+    if (loadingMoreExplore || exploreExhaustedTrending) return;
+    setLoadingMoreExplore(true);
+    try {
+      moreTrendingPageRef.current += 1;
+      const targetPage = moreTrendingPageRef.current;
+      const clientHour = new Date().getHours();
+      const res = await runTrending({
+        data: {
+          languages: settings.languages,
+          count: 40,
+          refreshNonce: `more-trending-${Date.now()}-p${targetPage}`,
+          clientHour,
+        },
+      });
+      if (res.tracks && res.tracks.length > 0) {
+        const fresh = applyExploreFilters(res.tracks as Track[]);
+        const incoming = fresh.length > 0 ? fresh : (res.tracks as Track[]);
+        let addedCount = 0;
+        setTrendingList((prev) => {
+          const trulyNew = incoming.filter(
+            (cand) => !prev.some((p) => p.id === cand.id || sameSong(p, cand)),
+          );
+          if (trulyNew.length === 0) return prev;
+          addedCount = trulyNew.length;
+          const combined = dedupeTracks([...prev, ...trulyNew]);
+          writeHomeCache({ trendingList: combined });
+          return combined;
+        });
+        if (addedCount > 0) {
+          setExploreExhaustedTrending(false);
+        } else {
+          setExploreExhaustedTrending(true);
+        }
+      } else {
+        setExploreExhaustedTrending(true);
+      }
+    } catch (e) {
+      console.error("[loadMoreExploreSongs] error:", e);
+    } finally {
+      setLoadingMoreExplore(false);
+    }
+  }, [loadingMoreExplore, exploreExhaustedTrending, runTrending, settings.languages, applyExploreFilters]);
+
   const extendQueue = useCallback(async (): Promise<Track[]> => {
     // Synchronous mutex guard against overlapping concurrent extensions
     if (isExtendingRef.current) return [];
@@ -2065,7 +2149,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   extendQueueRef.current = extendQueue;
 
   const searchFor = useCallback(
-    async (term: string, searchType?: "songs" | "podcasts", filter?: SearchFilter) => {
+    async (term: string, searchType?: "songs" | "podcasts", filter?: SearchFilter, targetLimit?: number) => {
       // Clear any pending debounce timer on explicit search trigger
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
@@ -2083,6 +2167,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       const t = searchType ?? "songs";
       const f = filter ?? searchFilter;
+      const queryLower = q.toLowerCase();
+      const isArtistSearch = Boolean(
+        targetLimit === 60 ||
+        TOP_JIOSAAVN_ARTISTS.some(
+          (a) => a.name.toLowerCase() === queryLower || queryLower.includes(a.name.toLowerCase()),
+        ),
+      );
+
       setTab("search");
       setSearching(true);
       setSearchContinuation(undefined);
@@ -2091,12 +2183,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setMessage(null);
 
       const requestId = ++activeSearchIdRef.current;
+      const reqLimit = targetLimit ?? (isArtistSearch ? 60 : 50);
 
       try {
         const res = await runSearch({
           data: {
             query: q,
-            limit: 50,
+            limit: reqLimit,
             type: t,
             filter: f,
             page: 1,
@@ -2111,8 +2204,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (res.tracks) {
           const raw = res.tracks as Track[];
           let filtered = t === "songs" ? raw.filter(isOriginalSong) : raw.filter(isPodcastTrack);
-          if (t === "songs" && settings.languages && settings.languages.length > 0) {
-            const queryLower = q.toLowerCase();
+          if (t === "songs" && settings.languages && settings.languages.length > 0 && !isArtistSearch) {
             const queryHasExplicitLang = LANGUAGES.some((l) => queryLower.includes(l.toLowerCase()));
             if (!queryHasExplicitLang) {
               const consistent = filtered.filter((track) => isLanguageConsistent(track, settings.languages));
@@ -2172,7 +2264,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const loadMoreResults = useCallback(async () => {
     if (loadingMoreSearch || !query.trim()) return;
     setLoadingMoreSearch(true);
-    const nextPage = searchPageRef.current + 1;
+    const nextPage = searchContinuation
+      ? Number(searchContinuation) || (searchPageRef.current + 1)
+      : searchPageRef.current + 1;
+    const queryLower = query.toLowerCase();
+    const isArtistSearch = Boolean(
+      TOP_JIOSAAVN_ARTISTS.some(
+        (a) => a.name.toLowerCase() === queryLower || queryLower.includes(a.name.toLowerCase()),
+      ),
+    );
     try {
       const res = await runSearch({
         data: {
@@ -2180,6 +2280,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           filter: searchFilter,
           continuation: searchContinuation,
           page: nextPage,
+          limit: 60,
           offset: results.length,
         },
       });
@@ -2187,8 +2288,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         searchPageRef.current = nextPage;
         const raw = res.tracks as Track[];
         let incoming = tab === "podcasts" ? raw.filter(isPodcastTrack) : raw.filter(isOriginalSong);
-        if (settings.languages && settings.languages.length > 0) {
-          const queryLower = query.toLowerCase();
+        if (settings.languages && settings.languages.length > 0 && !isArtistSearch) {
           const queryHasExplicitLang = LANGUAGES.some((l) => queryLower.includes(l.toLowerCase()));
           if (!queryHasExplicitLang) {
             const consistent = incoming.filter((track) => isLanguageConsistent(track, settings.languages));
@@ -2206,7 +2306,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     } finally {
       setLoadingMoreSearch(false);
     }
-  }, [searchContinuation, loadingMoreSearch, query, searchFilter, runSearch, results.length, settings.languages]);
+  }, [searchContinuation, loadingMoreSearch, query, searchFilter, runSearch, results.length, settings.languages, tab]);
 
   const openPodcastShow = useCallback((target: { id?: string | undefined; title?: string | undefined }) => {
     setPodcastTargetShow(target);
@@ -2227,7 +2327,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
       setQuery(artist);
       saveRecentSearch(artist);
-      void searchFor(`${artist} songs`);
+      void searchFor(artist, "songs", "all", 60);
     },
     [openPodcastShow, searchFor, tab],
   );
@@ -3451,7 +3551,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     activeMood={activeMood}
                     loadingMood={loadingMood}
                     isPlaying={player.isPlaying}
-                    onSelectMood={handlePlayMood}
+                    onSelectMood={(item) => void handlePlayMood(item.key, item.label)}
                   />
 
                   {/* Genre & Mood quick filters — instant, local filtering */}
@@ -3472,7 +3572,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       setQuery(artist.name);
                       setSearchFilter("all");
                       saveRecentSearch(artist.name);
-                      void searchFor(artist.name, "songs", "all");
+                      void searchFor(artist.name, "songs", "all", 60);
                     }}
                     quickFilterIds={quickFilters}
                     onClearQuickFilters={handleClearQuickFilters}
@@ -3550,7 +3650,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 <ExploreSections
                   trending={trendingList}
                   oldSongs={oldSongsList.length > 0 ? (oldSongsList.some(isOldEraTrack) ? oldSongsList.filter(isOldEraTrack) : oldSongsList) : []}
-                  newReleases={mixTracks.newrelease.slice(0, 16)}
+                  newReleases={mixTracks.newrelease || []}
                   onPlayTrack={(track, sectionTracks, i) => {
                     if (current?.id === track.id) {
                       if (player.isPlaying) {
@@ -3568,7 +3668,28 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   currentId={current?.id ?? null}
                   isPlaying={player.isPlaying}
                   loading={!hydrated || (exploreLoading && trendingList.length === 0 && oldSongsList.length === 0 && (!mixTracks.newrelease || mixTracks.newrelease.length === 0))}
+                  onLoadMoreTrending={loadMoreExploreSongs}
+                  loadingMoreTrending={loadingMoreExplore}
                 />
+
+                {/* Explore More Songs in explore section like in home page */}
+                {trendingList.length > 0 && (
+                  <div className="flex flex-col items-center justify-center pt-2 pb-6 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void loadMoreExploreSongs()}
+                      disabled={loadingMoreExplore || exploreExhaustedTrending}
+                      className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
+                    >
+                      {loadingMoreExplore ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" /> : null}
+                      {exploreExhaustedTrending ? "All caught up" : "Explore more songs"}
+                    </Button>
+                    {exploreExhaustedTrending && (
+                      <p className="text-[11px] text-muted-foreground">You've explored all currently available trending songs.</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

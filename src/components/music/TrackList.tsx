@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { DownloadThumbnailOverlay, DownloadStatusBadge } from "@/components/music/ui/DownloadAnimation";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import { cleanSongTitle, trackSubtitle, isChannelOrLabelName, getTrackDisplayDuration } from "@/lib/track-metadata";
 
@@ -24,18 +25,19 @@ type Props = {
   currentId?: string | undefined;
   isPlaying: boolean;
   likedIds: Set<string>;
-  dislikedIds?: Set<string>;
+  dislikedIds?: Set<string> | undefined;
   onPlay: (track: Track, index: number) => void;
   onToggleLike: (track: Track) => void;
-  onToggleDislike?: (track: Track) => void;
-  onArtistClick?: (artist: string, track?: Track) => void;
-  emptyMessage?: string;
-  playlists?: Playlist[];
-  onAddToPlaylist?: (playlistId: string, track: Track) => void;
-  onCreatePlaylistWith?: (track: Track) => void;
-  onAddToQueue?: (track: Track) => void;
+  onToggleDislike?: ((track: Track) => void) | undefined;
+  onArtistClick?: ((artist: string, track?: Track) => void) | undefined;
+  emptyMessage?: string | undefined;
+  playlists?: Playlist[] | undefined;
+  onAddToPlaylist?: ((playlistId: string, track: Track) => void) | undefined;
+  onCreatePlaylistWith?: ((track: Track) => void) | undefined;
+  onAddToQueue?: ((track: Track) => void) | undefined;
   downloadedIds?: Set<string> | undefined;
   downloadingIds?: Set<string> | undefined;
+  downloadProgress?: Record<string, number> | undefined;
   onDownload?: ((track: Track) => void) | undefined;
   onRemoveDownload?: ((track: Track) => void) | undefined;
 };
@@ -57,6 +59,7 @@ export function TrackList({
   onAddToQueue,
   downloadedIds,
   downloadingIds,
+  downloadProgress,
   onDownload,
   onRemoveDownload,
 }: Props) {
@@ -78,6 +81,9 @@ export function TrackList({
       {tracks.map((track, index) => {
         const active = track.id === currentId;
         const liked = likedIds.has(track.id);
+        const isDownloading = Boolean(downloadingIds?.has(track.id));
+        const isDownloaded = Boolean(downloadedIds?.has(track.id));
+        const progress = downloadProgress?.[track.id];
         return (
           <li
             key={track.id}
@@ -114,6 +120,9 @@ export function TrackList({
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:hidden">
                   <Equalizer active className="h-3.5 w-3.5 text-primary" />
                 </div>
+              )}
+              {isDownloading && (
+                <DownloadThumbnailOverlay progress={progress} />
               )}
             </button>
 
@@ -156,6 +165,11 @@ export function TrackList({
 
               {/* Song duration time & like button matching reference image */}
               <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                <DownloadStatusBadge
+                  isDownloading={isDownloading}
+                  isDownloaded={isDownloaded}
+                  progress={progress}
+                />
                 <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium">
                   {getTrackDisplayDuration(track)}
                 </span>

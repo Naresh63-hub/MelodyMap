@@ -26,7 +26,7 @@ export type HybridSearchResult = {
  */
 export async function searchHybrid(
   query: string,
-  limit = 20,
+  limit = 50,
   continuation?: string,
   filter: SearchFilter = "all",
   offset?: number,
@@ -35,13 +35,21 @@ export async function searchHybrid(
   const cleanQ = query.trim();
   if (!cleanQ) return { tracks: [] };
 
+  const currentPage = page ?? (continuation ? Number(continuation) || 1 : 1);
+
   // JioSaavn Pure Original Music Strategy:
   try {
     const { searchSaavn } = await import("./providers/saavn");
-    let saavnRes = await searchSaavn(cleanQ, { limit, page });
+    let saavnRes = await searchSaavn(cleanQ, { limit, page: currentPage });
     let originalTracks = saavnRes.filter(isOriginalSong);
     if (originalTracks.length > 0) {
-      return { tracks: originalTracks as HybridTrack[] };
+      // Calculate next page continuation for infinite scrolling / load more
+      const pageAdvance = limit >= 45 && currentPage === 1 ? 2 : 1;
+      const nextPage = currentPage + pageAdvance;
+      return {
+        tracks: originalTracks as HybridTrack[],
+        continuation: originalTracks.length >= 8 ? String(nextPage) : undefined,
+      };
     }
 
     // Smart query simplification retry: e.g. "Song (From Movie)" -> "Song Movie"
@@ -52,10 +60,15 @@ export async function searchHybrid(
       .trim();
 
     if (simplified && simplified.toLowerCase() !== cleanQ.toLowerCase()) {
-      saavnRes = await searchSaavn(simplified, { limit, page });
+      saavnRes = await searchSaavn(simplified, { limit, page: currentPage });
       originalTracks = saavnRes.filter(isOriginalSong);
       if (originalTracks.length > 0) {
-        return { tracks: originalTracks as HybridTrack[] };
+        const pageAdvance = limit >= 45 && currentPage === 1 ? 2 : 1;
+        const nextPage = currentPage + pageAdvance;
+        return {
+          tracks: originalTracks as HybridTrack[],
+          continuation: originalTracks.length >= 8 ? String(nextPage) : undefined,
+        };
       }
     }
   } catch (err) {

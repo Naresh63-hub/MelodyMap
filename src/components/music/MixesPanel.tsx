@@ -60,6 +60,7 @@ type Props = {
   onAddToQueue: (track: Track) => void;
   downloadedIds?: Set<string>;
   downloadingIds?: Set<string>;
+  downloadProgress?: Record<string, number>;
   onDownload?: (track: Track) => void;
   onRemoveDownload?: (track: Track) => void;
   drops?: Array<{ artist: string; title: string; videoId: string; thumbnail: string }> | undefined;
@@ -87,6 +88,7 @@ export function MixesPanel({
   onAddToQueue,
   downloadedIds,
   downloadingIds,
+  downloadProgress,
   onDownload,
   onRemoveDownload,
   drops,
@@ -214,6 +216,7 @@ export function MixesPanel({
           onAddToQueue={onAddToQueue}
           downloadedIds={downloadedIds}
           downloadingIds={downloadingIds}
+          downloadProgress={downloadProgress}
           onDownload={onDownload}
           onRemoveDownload={onRemoveDownload}
           emptyMessage={

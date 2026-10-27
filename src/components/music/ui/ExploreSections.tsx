@@ -1,6 +1,7 @@
-import { Disc3, Flame, MoreHorizontal, MoreVertical, Music2, Pause, Play, TrendingUp } from "lucide-react";
+import { Disc3, Flame, Loader2, MoreHorizontal, MoreVertical, Music2, Pause, Play, TrendingUp } from "lucide-react";
 import { useRef } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
@@ -17,6 +18,8 @@ type Props = {
   currentId?: string | null | undefined;
   isPlaying: boolean;
   loading?: boolean | undefined;
+  onLoadMoreTrending?: () => void;
+  loadingMoreTrending?: boolean;
 };
 
 /** Horizontal scrollable row of JioSaavn-styled track cards */
@@ -192,6 +195,16 @@ function VerticalSongList({
               active ? "bg-chip-strong" : "hover:bg-chip-subtle",
             )}
           >
+            {/* Queue / Chart position number */}
+            <span
+              className={cn(
+                "w-5 text-center text-xs font-semibold tabular-nums shrink-0",
+                active ? "text-primary font-bold" : "text-muted-foreground/80",
+              )}
+            >
+              {i + 1}
+            </span>
+
             {/* Thumbnail + Play Action */}
             <button
               type="button"
@@ -265,16 +278,23 @@ function SectionHeader({
   title,
   icon: Icon,
   subtitle,
+  count,
 }: {
   title: string;
   icon?: typeof TrendingUp | typeof Flame | typeof Disc3;
   subtitle?: string;
+  count?: number;
 }) {
   return (
     <div className="flex items-center justify-between mb-3 px-0.5">
       <div className="flex items-center gap-2">
         {Icon && <Icon className="h-4 w-4 text-primary" />}
         <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        {typeof count === "number" && count > 0 && (
+          <span className="text-[11px] font-semibold text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full">
+            {count} songs
+          </span>
+        )}
       </div>
       {subtitle && (
         <span className="text-[11px] font-normal text-muted-foreground">
@@ -303,6 +323,8 @@ export function ExploreSections({
   currentId,
   isPlaying,
   loading = false,
+  onLoadMoreTrending,
+  loadingMoreTrending = false,
 }: Props) {
   if (loading) {
     return (
@@ -330,7 +352,12 @@ export function ExploreSections({
       {/* 1. New Releases */}
       {newReleases.length > 0 && (
         <section>
-          <SectionHeader title="New Releases" icon={Flame} subtitle="Fresh official drops" />
+          <SectionHeader
+            title="New Releases"
+            count={newReleases.length}
+            icon={Flame}
+            subtitle="Fresh official drops"
+          />
           <HorizontalScrollRow
             tracks={newReleases}
             currentId={currentId}
@@ -346,7 +373,12 @@ export function ExploreSections({
       {/* 2. Old Songs / Golden Era */}
       {oldSongs && oldSongs.length > 0 && (
         <section>
-          <SectionHeader title="Old Songs" icon={Disc3} subtitle="Golden Era & Retro hits" />
+          <SectionHeader
+            title="Old Songs"
+            count={oldSongs.length}
+            icon={Disc3}
+            subtitle="Golden Era & Retro hits"
+          />
           <HorizontalScrollRow
             tracks={oldSongs}
             currentId={currentId}
@@ -362,9 +394,14 @@ export function ExploreSections({
       {/* 3. Trending Songs */}
       {trending.length > 0 && (
         <section>
-          <SectionHeader title="Trending Songs" icon={TrendingUp} subtitle="Top charts in your language" />
+          <SectionHeader
+            title="Trending Songs"
+            count={trending.length}
+            icon={TrendingUp}
+            subtitle="Top charts in your language"
+          />
           <VerticalSongList
-            tracks={trending.slice(0, 30)}
+            tracks={trending}
             currentId={currentId}
             isPlaying={isPlaying}
             onPlayTrack={onPlayTrack}
@@ -372,6 +409,22 @@ export function ExploreSections({
             onToggleLike={onToggleLike}
             likedIds={likedIds}
           />
+          {onLoadMoreTrending && (
+            <div className="flex justify-center pt-4 pb-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onLoadMoreTrending}
+                disabled={loadingMoreTrending}
+                className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
+              >
+                {loadingMoreTrending ? (
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
+                ) : null}
+                Load more trending songs
+              </Button>
+            </div>
+          )}
         </section>
       )}
     </div>

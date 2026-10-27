@@ -41,7 +41,7 @@ const SearchInput = z.object({
 export const searchTracks = createServerFn({ method: "POST" })
   .validator((input: unknown) => SearchInput.parse(input))
   .handler(async ({ data }) => {
-    const limit = data.limit ?? 20;
+    const limit = data.limit ?? 50;
     const isMusicOnly = data.type !== "podcasts";
     const filter = data.filter ?? "all";
 
@@ -179,7 +179,7 @@ const RecommendInput = z.object({
   skipped: z.array(z.string()).max(20).default([]),
   mood: z.string().max(120).optional(),
   brief: z.string().max(800).optional(),
-  count: z.number().min(1).max(50).optional(),
+  count: z.number().min(1).max(100).optional(),
   page: z.number().min(1).max(50).default(1).optional(),
   artists: z.array(z.string()).max(20).default([]),
   languages: z.array(z.string()).max(10).default([]),
@@ -500,7 +500,7 @@ async function getLocalPicks(data: {
 
 const TrendingInput = z.object({
   languages: z.array(z.string()).max(10).default([]),
-  count: z.number().min(1).max(50).optional(),
+  count: z.number().min(1).max(100).optional(),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   clientHour: z.number().min(0).max(23).optional(),
 });
@@ -536,12 +536,17 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const count = data.count ?? 20;
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
+    const poolLimit = data.refreshNonce ? Math.max(count * 2, 80) : count;
 
     try {
       const { getSaavnTrendingSongs } = await import("./providers/saavn");
-      const saavnTrending = await getSaavnTrendingSongs(langs, count);
+      const saavnTrending = await getSaavnTrendingSongs(langs, poolLimit, data.refreshNonce);
       if (saavnTrending.length > 0) {
-        return { tracks: saavnTrending as Track[], error: null };
+        const pool = saavnTrending as Track[];
+        return {
+          tracks: data.refreshNonce ? shuffleArray(pool).slice(0, count) : pool.slice(0, count),
+          error: null,
+        };
       }
     } catch (err) {
       console.warn("[getRealTrendingTracks] Saavn trending feed notice:", err);
@@ -599,7 +604,7 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
 
 const OldSongsInput = z.object({
   languages: z.array(z.string()).max(10).default([]),
-  count: z.number().min(1).max(50).optional(),
+  count: z.number().min(1).max(100).optional(),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   artists: z.array(z.string()).max(20).optional(),
 });
@@ -613,12 +618,17 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const count = data.count ?? 20;
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
+    const poolLimit = data.refreshNonce ? Math.max(count * 2, 70) : count;
 
     try {
       const { getSaavnOldSongs } = await import("./providers/saavn");
-      const saavnOld = await getSaavnOldSongs(langs, count);
+      const saavnOld = await getSaavnOldSongs(langs, poolLimit, data.refreshNonce);
       if (saavnOld.length > 0) {
-        return { tracks: saavnOld as Track[], error: null };
+        const pool = saavnOld as Track[];
+        return {
+          tracks: data.refreshNonce ? shuffleArray(pool).slice(0, count) : pool.slice(0, count),
+          error: null,
+        };
       }
     } catch (err) {
       console.warn("[getOldSongsTracks] Saavn old songs feed notice:", err);
@@ -1201,7 +1211,7 @@ const DailyMixInput = z.object({
   liked: z.array(z.string()).max(30).default([]),
   dateSeed: z.string().optional(),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
-  count: z.number().min(1).max(40).optional(),
+  count: z.number().min(1).max(60).optional(),
 });
 
 /**
@@ -1284,7 +1294,7 @@ export const getDailyMix = createServerFn({ method: "POST" })
 
 const NewSongsInput = z.object({
   artists: z.array(z.string()).max(50).default([]),
-  count: z.number().min(1).max(30).optional(),
+  count: z.number().min(1).max(60).optional(),
   languages: z.array(z.string()).max(30).default([]),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
 });
@@ -1327,7 +1337,7 @@ export const newSongs = createServerFn({ method: "POST" })
 
     try {
       const { getSaavnNewReleases } = await import("./providers/saavn");
-      const releases = await getSaavnNewReleases(langs, poolLimit);
+      const releases = await getSaavnNewReleases(langs, poolLimit, data.refreshNonce);
       if (releases.length > 0) {
         const pool = releases as Track[];
         return {
@@ -1746,57 +1756,109 @@ const MoodPicksInput = z.object({
   language: z.string().max(40).optional(),
 });
 
-/** Curated search per mood — YouTube-Music-style radio that needs no AI key. */
-const MOOD_QUERIES: Record<string, string> = {
-  "late night": "late night lofi songs mix",
-  "upbeat workout": "upbeat workout songs energetic",
-  focus: "focus music instrumental concentration",
-  "sad hours": "sad songs soulful hindi",
-  throwbacks: "throwback old hindi hits",
-  romantic: "romantic love songs hindi",
-  happy: "happy songs feel good bollywood",
-  party: "party songs dance hindi",
-  chill: "chill relaxing songs",
-  devotional: "devotional bhajan songs",
-};
+/** Curated search per mood — clean 2-3 word queries optimized for JioSaavn original music index. */
+export function getMoodSearchQueries(mood: string, language?: string): string[] {
+  const lang = language?.trim();
+  const hasLang = !!lang && lang.toLowerCase() !== "english";
+  const cleanMood = mood.toLowerCase().trim();
 
-/** Builds a mood radio instantly from YouTube search — no AI required. */
+  switch (cleanMood) {
+    case "romantic":
+      return hasLang
+        ? [`${lang} love songs`, `${lang} melody songs`, `${lang} romantic songs`]
+        : ["romantic love songs", "love hits", "romantic melody songs"];
+
+    case "chill":
+      return hasLang
+        ? [`${lang} slow songs`, `${lang} chill songs`, `${lang} melody songs`]
+        : ["chill relaxing songs", "calm acoustic songs", "chill melody songs"];
+
+    case "upbeat workout":
+    case "workout":
+      return hasLang
+        ? [`${lang} mass songs`, `${lang} beat songs`, `${lang} energetic songs`]
+        : ["workout motivation songs", "energetic gym songs", "high energy songs"];
+
+    case "party":
+      return hasLang
+        ? [`${lang} party songs`, `${lang} dance songs`, `${lang} dj hits`]
+        : ["party dance songs", "dance hits", "club bangers"];
+
+    case "sad hours":
+    case "sad":
+      return hasLang
+        ? [`${lang} sad songs`, `${lang} emotional songs`, `${lang} heartbreak songs`]
+        : ["sad emotional songs", "heartbreak soulful songs", "sad hits"];
+
+    case "focus":
+      return hasLang
+        ? [`${lang} peaceful songs`, `${lang} melody songs`, "focus study instrumental"]
+        : ["focus study instrumental", "ambient concentration piano", "calm focus songs"];
+
+    case "late night":
+      return hasLang
+        ? [`${lang} night songs`, `${lang} melody songs`, `${lang} soft songs`]
+        : ["late night songs", "midnight drive songs", "calm night songs"];
+
+    case "devotional":
+      return hasLang
+        ? [`${lang} devotional songs`, `${lang} bhakti songs`, `${lang} stotram songs`]
+        : ["devotional bhakti songs", "peaceful spiritual songs", "bhajan songs"];
+
+    default:
+      return hasLang
+        ? [`${lang} ${mood} songs`, `${lang} hits`]
+        : [`${mood} songs`, "top hits"];
+  }
+}
+
+/** Builds a mood radio instantly from JioSaavn catalog — no AI required. */
 export const moodPicks = createServerFn({ method: "POST" })
   .validator((input: unknown) => MoodPicksInput.parse(input))
   .handler(async ({ data }) => {
-    const lang = data.language?.trim();
-    let query: string;
+    const queries = getMoodSearchQueries(data.mood, data.language);
+    const seenIds = new Set<string>();
+    const seenKeys = new Set<string>();
+    const tracks: Track[] = [];
 
-    if (lang && lang.toLowerCase() !== "english") {
-      if (data.mood === "focus") {
-        query = "focus music instrumental concentration study";
-      } else if (data.mood === "devotional") {
-        query = `${lang} devotional bhakti songs`;
-      } else if (data.mood === "romantic") {
-        query = `${lang} romantic love melody songs`;
-      } else if (data.mood === "upbeat workout") {
-        query = `${lang} energetic workout gym songs`;
-      } else if (data.mood === "party") {
-        query = `${lang} party dance mass songs`;
-      } else if (data.mood === "sad hours") {
-        query = `${lang} sad soulful heartbreak songs`;
-      } else if (data.mood === "chill") {
-        query = `${lang} chill calm acoustic melody songs`;
-      } else if (data.mood === "late night") {
-        query = `${lang} late night melody songs`;
-      } else {
-        query = `${lang} ${data.mood} songs`;
-      }
-    } else {
-      query = MOOD_QUERIES[data.mood] ?? `${data.mood} songs`;
-    }
     try {
       const { searchSaavn } = await import("./providers/saavn");
-      const saavnHits = await searchSaavn(query, { limit: 30 });
-      return { tracks: (saavnHits as Track[]) ?? [], error: null };
-    } catch {
-      return { tracks: [], error: "Could not build that mood radio. Try again." };
-    }
+
+      for (const q of queries) {
+        if (tracks.length >= 25) break;
+        try {
+          const hits = await searchSaavn(q, { limit: 15 });
+          for (const t of hits) {
+            if (!t?.id || seenIds.has(t.id)) continue;
+            const key = getTrackDedupeKey(t.title, t.artist);
+            if (key && seenKeys.has(key)) continue;
+            if (key) seenKeys.add(key);
+            seenIds.add(t.id);
+            tracks.push(t as Track);
+          }
+        } catch {}
+      }
+
+      if (tracks.length > 0) {
+        return { tracks: tracks.slice(0, 30), error: null };
+      }
+    } catch {}
+
+    // Fallback: If regional Saavn query returned 0, try universal fallback
+    try {
+      const { searchSaavn } = await import("./providers/saavn");
+      const hits = await searchSaavn(`${data.mood} songs`, { limit: 20 });
+      for (const t of hits) {
+        if (!t?.id || seenIds.has(t.id)) continue;
+        seenIds.add(t.id);
+        tracks.push(t as Track);
+      }
+      if (tracks.length > 0) {
+        return { tracks: tracks.slice(0, 30), error: null };
+      }
+    } catch {}
+
+    return { tracks, error: tracks.length === 0 ? "Could not load mood songs right now." : null };
   });
 
 

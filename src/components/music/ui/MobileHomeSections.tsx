@@ -245,6 +245,16 @@ function VerticalSongList({
                 : "bg-card border-hair hover:border-hair-strong hover:bg-chip",
             )}
           >
+            {/* Queue index number */}
+            <span
+              className={cn(
+                "w-5 text-center text-xs font-semibold tabular-nums shrink-0",
+                active ? "text-primary font-bold" : "text-muted-foreground/80",
+              )}
+            >
+              {i + 1}
+            </span>
+
             {/* Thumbnail + Play Action */}
             <button
               type="button"
@@ -321,16 +331,23 @@ function SectionHeader({
   title,
   subtitle,
   icon: Icon,
+  count,
 }: {
   title: string;
   subtitle?: string;
   icon?: typeof Music2 | typeof Sparkles | typeof Users;
+  count?: number;
 }) {
   return (
     <div className="flex items-center justify-between mb-3 px-0.5">
       <div className="flex items-center gap-2">
         {Icon && <Icon className="h-4 w-4 text-primary" />}
         <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        {typeof count === "number" && count > 0 && (
+          <span className="text-[11px] font-semibold text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full">
+            {count} songs
+          </span>
+        )}
       </div>
       {subtitle && (
         <span className="text-[11px] font-normal text-muted-foreground">
@@ -439,6 +456,7 @@ export function MobileHomeSections({
         <section className="animate-fade-in">
           <SectionHeader
             title="Daily Mix"
+            count={visibleDailyMix.length}
             subtitle="Updated today"
             icon={Sparkles}
           />
@@ -480,6 +498,7 @@ export function MobileHomeSections({
         <section className="animate-fade-in">
           <SectionHeader
             title="Made For You"
+            count={visibleRecommended.length}
             subtitle="Based on your taste"
             icon={Music2}
           />

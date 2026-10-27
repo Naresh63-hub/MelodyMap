@@ -10,6 +10,7 @@ import {
   Moon,
   MessageSquare,
   Mic,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
@@ -20,6 +21,8 @@ type Props = {
   track: Track | null;
   isLiked: boolean;
   isDownloaded: boolean;
+  isDownloading?: boolean | undefined;
+  downloadProgress?: number | undefined;
   onClose: () => void;
   onToggleLike: (track: Track) => void;
   onAddToPlaylist: (track: Track) => void;
@@ -37,6 +40,8 @@ export function SongOptionsModal({
   track,
   isLiked,
   isDownloaded,
+  isDownloading = false,
+  downloadProgress,
   onClose,
   onToggleLike,
   onAddToPlaylist,
@@ -121,21 +126,36 @@ export function SongOptionsModal({
           {/* Download */}
           <button
             type="button"
+            disabled={isDownloading}
             onClick={() => {
+              if (isDownloading) return;
               onDownload(track);
               onClose();
             }}
-            className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-foreground hover:bg-chip active:bg-chip-strong transition-colors"
+            className={cn(
+              "flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm transition-colors",
+              isDownloading
+                ? "bg-primary/10 text-primary cursor-default"
+                : "text-foreground hover:bg-chip active:bg-chip-strong",
+            )}
           >
             <span className="font-medium">
-              {isDownloaded ? "Remove Download" : "Download"}
+              {isDownloading
+                ? `Downloading${typeof downloadProgress === "number" && downloadProgress > 0 ? ` (${Math.round(downloadProgress)}%)` : "…"}`
+                : isDownloaded
+                  ? "Remove Download"
+                  : "Download for Offline Play"}
             </span>
-            <Download
-              className={cn(
-                "h-5 w-5",
-                isDownloaded ? "text-primary" : "text-foreground/40"
-              )}
-            />
+            {isDownloading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            ) : (
+              <Download
+                className={cn(
+                  "h-5 w-5",
+                  isDownloaded ? "text-primary fill-primary/20" : "text-foreground/40",
+                )}
+              />
+            )}
           </button>
 
           {/* Add to Queue */}

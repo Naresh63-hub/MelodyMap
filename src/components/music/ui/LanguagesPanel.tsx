@@ -27,6 +27,7 @@ type Props = {
   onCreatePlaylistWith: (track: Track) => void;
   downloadedIds?: Set<string> | undefined;
   downloadingIds?: Set<string> | undefined;
+  downloadProgress?: Record<string, number> | undefined;
   onDownload?: ((track: Track) => void) | undefined;
   onRemoveDownload?: ((track: Track) => void) | undefined;
 };
@@ -49,6 +50,7 @@ export function LanguagesPanel({
   onCreatePlaylistWith,
   downloadedIds,
   downloadingIds,
+  downloadProgress,
   onDownload,
   onRemoveDownload,
 }: Props) {
@@ -195,6 +197,7 @@ export function LanguagesPanel({
           onCreatePlaylistWith={onCreatePlaylistWith}
           downloadedIds={downloadedIds}
           downloadingIds={downloadingIds}
+          downloadProgress={downloadProgress}
           onDownload={onDownload}
           onRemoveDownload={onRemoveDownload}
           emptyMessage={

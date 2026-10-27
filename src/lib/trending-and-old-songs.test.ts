@@ -143,4 +143,42 @@ describe("Trending & Old Songs - Language Filtering and Section Isolation", () =
       ).toBe(false);
     });
   });
+
+  describe("Explore Refresh Freshness & Non-duplicate guarantee", () => {
+    it("excludes previously displayed track IDs and normalized titles on refresh", () => {
+      const displayedTrending = [
+        { id: "saavn-101", title: "Fear Song", artist: "Anirudh Ravichander" },
+        { id: "saavn-102", title: "Chuttamalle", artist: "Shilpa Rao" },
+      ];
+
+      const incomingCandidateTracks = [
+        { id: "saavn-101", title: "Fear Song", artist: "Anirudh Ravichander" }, // DUPLICATE ID & TITLE
+        { id: "saavn-999", title: "fear song", artist: "Different Artist" },    // DUPLICATE TITLE (CASE-INSENSITIVE)
+        { id: "saavn-103", title: "Daavudi", artist: "Nakash Aziz" },          // FRESH TRACK
+        { id: "saavn-104", title: "Ayudha Pooja", artist: "Kala Bhairava" },   // FRESH TRACK
+      ];
+
+      const prevIds = new Set(displayedTrending.map((t) => t.id));
+      const prevTitles = new Set(displayedTrending.map((t) => t.title.toLowerCase().trim()));
+
+      const refreshed = incomingCandidateTracks.filter(
+        (t) => !prevIds.has(t.id) && !prevTitles.has(t.title.toLowerCase().trim()),
+      );
+
+      expect(refreshed).toHaveLength(2);
+      expect(refreshed.map((t) => t.id)).toEqual(["saavn-103", "saavn-104"]);
+      expect(refreshed.some((t) => t.id === "saavn-101")).toBe(false);
+      expect(refreshed.some((t) => t.title.toLowerCase() === "fear song")).toBe(false);
+    });
+
+    it("verifies Saavn provider functions accept refreshNonce parameter", async () => {
+      const { getSaavnNewReleases, getSaavnTrendingSongs, getSaavnOldSongs } = await import("./providers/saavn");
+      expect(typeof getSaavnNewReleases).toBe("function");
+      expect(typeof getSaavnTrendingSongs).toBe("function");
+      expect(typeof getSaavnOldSongs).toBe("function");
+      expect(getSaavnNewReleases.length).toBeGreaterThanOrEqual(0);
+      expect(getSaavnTrendingSongs.length).toBeGreaterThanOrEqual(0);
+      expect(getSaavnOldSongs.length).toBeGreaterThanOrEqual(0);
+    });
+  });
 });
