@@ -7,6 +7,7 @@
 import CryptoJS from "crypto-js";
 import type { UnifiedTrack, ProviderSearchOptions } from "./types";
 import { isOriginalSong } from "../track-filters";
+import { isOldEraTrack } from "../library";
 import { decodeEntities } from "../track-metadata";
 import { cleanAlbumName, cleanMovieName, cleanSongTitle } from "../track-metadata";
 
@@ -430,22 +431,24 @@ export async function getSaavnNewReleases(
   languages: string[] = [],
   limit = 45,
   refreshNonce?: string | number,
+  page = 1,
 ): Promise<UnifiedTrack[]> {
   const normLangs = languages.map((l) => l.toLowerCase().trim()).filter(Boolean);
   const userLangs = normLangs.length > 0 ? normLangs : ["telugu", "hindi", "tamil"];
   const year = new Date().getFullYear();
   const tracks: UnifiedTrack[] = [];
   const seen = new Set<string>();
-  const seed = getNonceSeed(refreshNonce);
+  const safePage = Math.max(1, Math.floor(page || 1));
 
-  // 1. Fetch launch data for new_albums
+  // 1. Fetch launch data for new_albums on early pages
   try {
     const data = await fetchSaavnLaunchData(languages);
     const newAlbums: any[] = Array.isArray(data?.new_albums) ? data.new_albums : [];
-    const rotatedAlbums = seed > 0 ? rotateArray(newAlbums, seed % Math.max(1, newAlbums.length)) : newAlbums;
+    const albumOffset = (safePage - 1) * 6;
+    const pagedAlbums = newAlbums.slice(albumOffset, albumOffset + 6);
 
-    // Fetch songs from top new albums in parallel with timeout
-    const albumTasks = rotatedAlbums.slice(0, 10).map(async (alb) => {
+    // Fetch songs from target new albums in parallel with timeout
+    const albumTasks = pagedAlbums.map(async (alb) => {
       if (!alb?.id) return [];
       try {
         const albumUrl = `https://www.jiosaavn.com/api.php?__call=content.getAlbumDetails&albumid=${encodeURIComponent(alb.id)}&_format=json&_marker=0&api_version=4&ctx=web6dot0`;
@@ -463,7 +466,7 @@ export async function getSaavnNewReleases(
         const resTracks: UnifiedTrack[] = [];
         for (const s of songs) {
           const unified = mapSaavnSongToUnified(s);
-          if (unified && unified.playbackSource && isOriginalSong(unified)) {
+          if (unified && unified.playbackSource && isOriginalSong(unified) && !isOldEraTrack(unified)) {
             resTracks.push(unified);
           }
         }
@@ -487,30 +490,32 @@ export async function getSaavnNewReleases(
     }
   } catch {}
 
-  // 2. Supplement with targeted search queries in parallel
+  // 2. Supplement with targeted release query rotation across user languages
   if (tracks.length < limit) {
     const searchQueries: string[] = [];
-    const queryTemplates = [
+    const queryBuckets = [
       (l: string) => `${l} latest new hit songs ${year}`,
       (l: string) => `${l} new release songs ${year}`,
       (l: string) => `latest ${l} movie songs ${year}`,
       (l: string) => `${l} top new songs ${year}`,
       (l: string) => `new ${l} albums ${year}`,
     ];
+
     for (const l of userLangs.slice(0, 3)) {
-      const qIndex = seed > 0 ? (seed % queryTemplates.length) : 0;
-      const fn1 = queryTemplates[qIndex];
-      const fn2 = queryTemplates[(qIndex + 1) % queryTemplates.length];
+      const qIndex = (safePage - 1) % queryBuckets.length;
+      const fn1 = queryBuckets[qIndex];
+      const fn2 = queryBuckets[(qIndex + 1) % queryBuckets.length];
       if (fn1) searchQueries.push(fn1(l));
       if (fn2) searchQueries.push(fn2(l));
     }
-    const searchTasks = searchQueries.map((q) => searchSaavn(q, { limit: 20 }));
+
+    const searchTasks = searchQueries.map((q) => searchSaavn(q, { limit: 20, page: safePage }));
     const searchResults = await Promise.allSettled(searchTasks);
     for (const r of searchResults) {
       if (r.status === "fulfilled") {
         for (const t of r.value) {
           if (tracks.length >= limit) break;
-          if (!seen.has(t.id) && isOriginalSong(t)) {
+          if (!seen.has(t.id) && isOriginalSong(t) && !isOldEraTrack(t)) {
             seen.add(t.id);
             tracks.push(t);
           }
@@ -525,94 +530,121 @@ export async function getSaavnNewReleases(
 /**
  * Fetches official Trending Songs / Top 50 Charts directly from JioSaavn.
  * Guaranteed 100% pure original hit tracks with direct CDN audio.
+ * Preserves genuine chart rankings without random shuffling or timestamp rotation.
  */
 export async function getSaavnTrendingSongs(
   languages: string[] = [],
   limit = 50,
   refreshNonce?: string | number,
+  page = 1,
 ): Promise<UnifiedTrack[]> {
-  const seed = getNonceSeed(refreshNonce);
-  const data = await fetchSaavnLaunchData(languages);
-  const charts: any[] = Array.isArray(data?.charts) ? data.charts : [];
-  const normLangs = languages.map((l) => l.toLowerCase());
+  const normLangs = languages.map((l) => l.toLowerCase().trim()).filter(Boolean);
   const tracks: UnifiedTrack[] = [];
   const seen = new Set<string>();
+  const safePage = Math.max(1, Math.floor(page || 1));
 
-  // Find candidate charts matching user languages
-  const candidateCharts: any[] = [];
-  if (normLangs.length > 0) {
-    for (const c of charts) {
-      const title = String(c.title || "").toLowerCase();
-      if (normLangs.some((lang) => title.includes(lang))) {
-        candidateCharts.push(c);
-      }
-    }
-  }
-  for (const c of charts) {
-    if (!candidateCharts.some((existing) => existing.id === c.id)) {
-      candidateCharts.push(c);
-    }
-  }
-
-  const rotatedCharts = seed > 0 ? rotateArray(candidateCharts, seed % Math.max(1, candidateCharts.length)) : candidateCharts;
-
-  // Fetch playlist details from candidate charts
-  for (const chart of rotatedCharts.slice(0, 4)) {
-    if (tracks.length >= limit) break;
-    if (!chart?.id) continue;
+  // On page 1: prioritize genuine official launch charts from JioSaavn
+  if (safePage === 1) {
     try {
-      const playlistUrl = `https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid=${encodeURIComponent(chart.id)}&_format=json&_marker=0&api_version=4&ctx=web6dot0`;
-      const res = await fetch(playlistUrl, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-          Accept: "application/json",
-          Referer: "https://www.jiosaavn.com/",
-        },
-        signal: AbortSignal.timeout(9000),
-      });
-      if (res.ok) {
-        const playlistData = await res.json();
-        const songs: any[] = Array.isArray(playlistData?.list) ? playlistData.list : [];
-        const candidateSongs = seed > 0 ? rotateArray(songs, seed % Math.max(1, songs.length)) : songs;
-        for (const s of candidateSongs) {
-          if (tracks.length >= limit) break;
-          const unified = mapSaavnSongToUnified(s);
-          if (unified && unified.playbackSource && isOriginalSong(unified)) {
-            if (!seen.has(unified.id)) {
-              seen.add(unified.id);
-              tracks.push(unified);
-            }
+      const data = await fetchSaavnLaunchData(languages);
+      const charts: any[] = Array.isArray(data?.charts) ? data.charts : [];
+
+      // Find candidate charts matching user languages
+      const candidateCharts: any[] = [];
+      if (normLangs.length > 0) {
+        for (const c of charts) {
+          const title = String(c.title || "").toLowerCase();
+          if (normLangs.some((lang) => title.includes(lang))) {
+            candidateCharts.push(c);
           }
         }
       }
-    } catch (err) {
-      console.warn("[Saavn] Failed to fetch chart playlist:", err);
-    }
+      for (const c of charts) {
+        if (!candidateCharts.some((existing) => existing.id === c.id)) {
+          candidateCharts.push(c);
+        }
+      }
+
+      // Fetch playlist details from candidate charts in official chart order
+      for (const chart of candidateCharts.slice(0, 4)) {
+        if (tracks.length >= limit) break;
+        if (!chart?.id) continue;
+        try {
+          const playlistUrl = `https://www.jiosaavn.com/api.php?__call=playlist.getDetails&listid=${encodeURIComponent(chart.id)}&_format=json&_marker=0&api_version=4&ctx=web6dot0`;
+          const res = await fetch(playlistUrl, {
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+              Accept: "application/json",
+              Referer: "https://www.jiosaavn.com/",
+            },
+            signal: AbortSignal.timeout(9000),
+          });
+          if (res.ok) {
+            const playlistData = await res.json();
+            const songs: any[] = Array.isArray(playlistData?.list) ? playlistData.list : [];
+            // Preserve genuine chart order from the playlist
+            for (const s of songs) {
+              if (tracks.length >= limit) break;
+              const unified = mapSaavnSongToUnified(s);
+              if (unified && unified.playbackSource && isOriginalSong(unified)) {
+                if (!seen.has(unified.id)) {
+                  seen.add(unified.id);
+                  tracks.push(unified);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("[Saavn] Failed to fetch chart playlist:", err);
+        }
+      }
+    } catch {}
   }
 
-  if (tracks.length >= Math.min(25, limit)) {
+  // If we already have enough official chart tracks on page 1, return them
+  if (tracks.length >= Math.min(30, limit) && safePage === 1) {
     return tracks.slice(0, limit);
   }
 
-  const qLang = languages[0] || "Telugu";
-  const trendingQueries = [
-    `${qLang} top trending hit songs`,
-    `${qLang} viral hits chart`,
-    `top 50 ${qLang} songs`,
-    `latest trending ${qLang} hits`,
-    `${qLang} most popular songs`,
+  // Supplement with language-aware chart queries with real pagination
+  const userLangs = languages.length > 0 ? languages : ["Telugu", "Hindi", "Tamil"];
+  const trendingQueryBuckets = [
+    (l: string) => `Top 50 ${l} songs`,
+    (l: string) => `${l} top trending hit songs`,
+    (l: string) => `${l} viral hits chart`,
+    (l: string) => `latest trending ${l} hits`,
+    (l: string) => `${l} most popular songs`,
   ];
-  const queryIndex = seed > 0 ? (seed % trendingQueries.length) : 0;
-  const trendingQuery = trendingQueries[queryIndex] || `${qLang} top trending hit songs`;
-  const searchResults = await searchSaavn(trendingQuery, { limit });
-  for (const t of searchResults) {
-    if (tracks.length >= limit) break;
-    if (!seen.has(t.id)) {
-      seen.add(t.id);
-      tracks.push(t);
+
+  const queriesToRun: string[] = [];
+  for (const lang of userLangs) {
+    const bucketIndex = (safePage - 1) % trendingQueryBuckets.length;
+    const bucketFn = trendingQueryBuckets[bucketIndex] || trendingQueryBuckets[0];
+    if (bucketFn) {
+      queriesToRun.push(bucketFn(lang));
+    }
+    // Also include top 50 if early page
+    if (safePage <= 2) {
+      queriesToRun.push(`Top 50 ${lang} songs`);
     }
   }
+
+  const queryTasks = queriesToRun.map((q) => searchSaavn(q, { limit: 30, page: safePage }));
+  const queryResults = await Promise.allSettled(queryTasks);
+
+  for (const r of queryResults) {
+    if (r.status === "fulfilled") {
+      for (const t of r.value) {
+        if (tracks.length >= limit) break;
+        if (!seen.has(t.id) && isOriginalSong(t)) {
+          seen.add(t.id);
+          tracks.push(t);
+        }
+      }
+    }
+  }
+
   return tracks.slice(0, limit);
 }
 
@@ -624,10 +656,11 @@ export async function getSaavnOldSongs(
   languages: string[] = [],
   limit = 45,
   refreshNonce?: string | number,
+  page = 1,
 ): Promise<UnifiedTrack[]> {
   const normLangs = languages.map((l) => l.toLowerCase().trim()).filter(Boolean);
   const userLangs = normLangs.length > 0 ? normLangs : ["telugu", "hindi"];
-  const seed = getNonceSeed(refreshNonce);
+  const safePage = Math.max(1, Math.floor(page || 1));
 
   const RETRO_ARTISTS_BY_LANG: Record<string, string[]> = {
     telugu: [
@@ -693,15 +726,20 @@ export async function getSaavnOldSongs(
   const queries: string[] = [];
   for (const lang of userLangs) {
     const rawPool = RETRO_ARTISTS_BY_LANG[lang] || [`${lang} classic old hit songs`];
-    const rotatedPool = seed > 0 ? rotateArray(rawPool, seed % rawPool.length) : rawPool;
-    queries.push(...rotatedPool.slice(0, 3));
+    const offset = ((safePage - 1) * 3) % rawPool.length;
+    const q1 = rawPool[offset] || rawPool[0];
+    const q2 = rawPool[(offset + 1) % rawPool.length];
+    const q3 = rawPool[(offset + 2) % rawPool.length];
+    if (q1) queries.push(q1);
+    if (q2) queries.push(q2);
+    if (q3) queries.push(q3);
   }
 
   const tracks: UnifiedTrack[] = [];
   const seen = new Set<string>();
 
-  // Fetch retro queries concurrently in parallel with timeout
-  const searchTasks = queries.map((q) => searchSaavn(q, { limit: 15 }));
+  // Fetch retro queries concurrently in parallel with pagination
+  const searchTasks = queries.map((q) => searchSaavn(q, { limit: 15, page: safePage }));
   const searchResults = await Promise.allSettled(searchTasks);
 
   for (const r of searchResults) {
