@@ -503,6 +503,8 @@ const TrendingInput = z.object({
   count: z.number().min(1).max(100).optional(),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   clientHour: z.number().min(0).max(23).optional(),
+  page: z.number().min(1).max(50).optional(),
+  recentSeenIds: z.array(z.string()).max(300).optional(),
 });
 
 /** Multi-category query pools for REAL-WORLD global and chart-topping trending music */
@@ -535,16 +537,46 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
   .validator((input: unknown) => TrendingInput.parse(input))
   .handler(async ({ data }) => {
     const count = data.count ?? 20;
+    const page = data.page ?? 1;
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
-    const poolLimit = data.refreshNonce ? Math.max(count * 2, 80) : count;
+    const poolLimit = Math.max(count * 2, 70);
+    const recentSeenSet = new Set((data.recentSeenIds || []).map((id) => id.toLowerCase()));
 
     try {
       const { getSaavnTrendingSongs } = await import("./providers/saavn");
-      const saavnTrending = await getSaavnTrendingSongs(langs, poolLimit, data.refreshNonce);
+      const saavnTrending = await getSaavnTrendingSongs(langs, poolLimit, data.refreshNonce, page);
       if (saavnTrending.length > 0) {
         const pool = saavnTrending as Track[];
+        // Deduplicate in pool
+        const seenIds = new Set<string>();
+        const uniquePool: Track[] = [];
+        for (const t of pool) {
+          if (!t?.id || seenIds.has(t.id)) continue;
+          seenIds.add(t.id);
+          uniquePool.push(t);
+        }
+
+        // Language consistency
+        const langFiltered = langs.length > 0
+          ? uniquePool.filter((t) => isLanguageConsistent(t, langs) && isOriginalSong(t))
+          : uniquePool.filter(isOriginalSong);
+        const candidates = langFiltered.length >= 10 ? langFiltered : uniquePool;
+
+        // When recentSeenIds are provided on page 1 (refresh):
+        // Prioritize unseen tracks while preserving relative chart ranking!
+        if (recentSeenSet.size > 0 && page === 1) {
+          const unseen = candidates.filter((t) => !recentSeenSet.has(t.id.toLowerCase()));
+          const seen = candidates.filter((t) => recentSeenSet.has(t.id.toLowerCase()));
+          const ordered = [...unseen, ...seen];
+          return {
+            tracks: ordered.slice(0, count),
+            error: null,
+          };
+        }
+
+        // Official chart ranking preserved
         return {
-          tracks: data.refreshNonce ? shuffleArray(pool).slice(0, count) : pool.slice(0, count),
+          tracks: candidates.slice(0, count),
           error: null,
         };
       }
@@ -607,6 +639,8 @@ const OldSongsInput = z.object({
   count: z.number().min(1).max(100).optional(),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   artists: z.array(z.string()).max(20).optional(),
+  page: z.number().min(1).max(50).optional(),
+  recentSeenIds: z.array(z.string()).max(300).optional(),
 });
 
 /**
@@ -617,16 +651,27 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
   .validator((input: unknown) => OldSongsInput.parse(input))
   .handler(async ({ data }) => {
     const count = data.count ?? 20;
+    const page = data.page ?? 1;
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
-    const poolLimit = data.refreshNonce ? Math.max(count * 2, 70) : count;
+    const poolLimit = Math.max(count * 2, 60);
+    const recentSeenSet = new Set((data.recentSeenIds || []).map((id) => id.toLowerCase()));
 
     try {
       const { getSaavnOldSongs } = await import("./providers/saavn");
-      const saavnOld = await getSaavnOldSongs(langs, poolLimit, data.refreshNonce);
+      const saavnOld = await getSaavnOldSongs(langs, poolLimit, data.refreshNonce, page);
       if (saavnOld.length > 0) {
-        const pool = saavnOld as Track[];
+        const pool = (saavnOld as Track[]).filter(isOldEraTrack);
+        const candidates = pool.length > 0 ? pool : (saavnOld as Track[]);
+        if (recentSeenSet.size > 0 && page === 1) {
+          const unseen = candidates.filter((t) => !recentSeenSet.has(t.id.toLowerCase()));
+          const seen = candidates.filter((t) => recentSeenSet.has(t.id.toLowerCase()));
+          return {
+            tracks: [...unseen, ...seen].slice(0, count),
+            error: null,
+          };
+        }
         return {
-          tracks: data.refreshNonce ? shuffleArray(pool).slice(0, count) : pool.slice(0, count),
+          tracks: candidates.slice(0, count),
           error: null,
         };
       }
@@ -1297,6 +1342,8 @@ const NewSongsInput = z.object({
   count: z.number().min(1).max(60).optional(),
   languages: z.array(z.string()).max(30).default([]),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
+  page: z.number().min(1).max(50).optional(),
+  recentSeenIds: z.array(z.string()).max(300).optional(),
 });
 
 /** Language names from Tune picks → search terms for YouTube queries. */
@@ -1329,19 +1376,28 @@ export const newSongs = createServerFn({ method: "POST" })
   .validator((input: unknown) => NewSongsInput.parse(input))
   .handler(async ({ data }) => {
     const count = data.count ?? 24;
+    const page = data.page ?? 1;
     const year = new Date().getFullYear();
     const langs = data.languages.map((l) => l.trim()).filter(Boolean);
-    // When a refresh nonce is supplied, pull a larger candidate pool and rotate
-    // through it so pull-to-refresh surfaces genuinely different new releases.
-    const poolLimit = data.refreshNonce ? Math.max(count, 50) : count;
+    const poolLimit = Math.max(count * 2, 60);
+    const recentSeenSet = new Set((data.recentSeenIds || []).map((id) => id.toLowerCase()));
 
     try {
       const { getSaavnNewReleases } = await import("./providers/saavn");
-      const releases = await getSaavnNewReleases(langs, poolLimit, data.refreshNonce);
+      const releases = await getSaavnNewReleases(langs, poolLimit, data.refreshNonce, page);
       if (releases.length > 0) {
-        const pool = releases as Track[];
+        const pool = (releases as Track[]).filter((t) => !isOldEraTrack(t));
+        const candidates = pool.length > 0 ? pool : (releases as Track[]);
+        if (recentSeenSet.size > 0 && page === 1) {
+          const unseen = candidates.filter((t) => !recentSeenSet.has(t.id.toLowerCase()));
+          const seen = candidates.filter((t) => recentSeenSet.has(t.id.toLowerCase()));
+          return {
+            tracks: [...unseen, ...seen].slice(0, count),
+            error: null,
+          };
+        }
         return {
-          tracks: data.refreshNonce ? shuffleArray(pool).slice(0, count) : pool.slice(0, count),
+          tracks: candidates.slice(0, count),
           error: null,
         };
       }
