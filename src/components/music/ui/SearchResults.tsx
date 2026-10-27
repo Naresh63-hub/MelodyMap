@@ -39,6 +39,9 @@ type Props = {
   onToggleLike: (track: Track) => void;
   onOpenOptions?: (track: Track) => void;
   likedIds: Set<string>;
+  downloadedIds?: Set<string> | undefined;
+  downloadingIds?: Set<string> | undefined;
+  downloadProgress?: Record<string, number> | undefined;
   currentId?: string | null;
   isPlaying: boolean;
   onClear?: () => void;
@@ -66,6 +69,9 @@ export function SearchResults(props: Props) {
     onToggleLike,
     onOpenOptions,
     likedIds,
+    downloadedIds,
+    downloadingIds,
+    downloadProgress,
     currentId,
     isPlaying,
     onSearch,
@@ -460,6 +466,9 @@ export function SearchResults(props: Props) {
                     <Equalizer active className="h-4 w-4 text-primary" />
                   </div>
                 )}
+                {downloadingIds?.has(track.id) && (
+                  <DownloadThumbnailOverlay progress={downloadProgress?.[track.id]} />
+                )}
               </button>
 
               {/* Track Info */}
@@ -483,6 +492,11 @@ export function SearchResults(props: Props) {
 
               {/* Song duration time & like button matching reference image */}
               <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                <DownloadStatusBadge
+                  isDownloading={Boolean(downloadingIds?.has(track.id))}
+                  isDownloaded={Boolean(downloadedIds?.has(track.id))}
+                  progress={downloadProgress?.[track.id]}
+                />
                 <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium">
                   {getTrackDisplayDuration(track)}
                 </span>
