@@ -37,6 +37,12 @@ export type NextTrackInfo = {
 export const SKIP_FORWARD_SECONDS = 5;
 export const SKIP_BACKWARD_SECONDS = 5;
 
+export type AudioPlayerErrorDetails = {
+  code?: "OFFLINE" | "NETWORK_ERROR" | "DECODE_ERROR" | "SRC_NOT_SUPPORTED" | "TIMEOUT" | "RECONNECT_FAILED" | "UNKNOWN_ERROR";
+  isOffline?: boolean;
+  error?: MediaError | null;
+};
+
 /**
  * HTML5-Audio + Web Audio API backed player with Spotify-like background playback,
  * screen-off & lockscreen continuous playback, 10-band hardware equalizer, sound presets,
@@ -44,7 +50,7 @@ export const SKIP_BACKWARD_SECONDS = 5;
  */
 export function useAudioPlayer(options: {
   onEnded: (autoAdvanced?: boolean) => void;
-  onError?: (message: string) => void;
+  onError?: (message: string, details?: AudioPlayerErrorDetails) => void;
   getNextTrack?: () => NextTrackInfo | undefined;
   onSponsorBlockSkipped?: (category: string) => void;
 }) {
@@ -513,7 +519,18 @@ export function useAudioPlayer(options: {
               return;
             }
             console.warn("[MelodyMap] play() error:", err);
-            onErrorRef.current?.("Tap play to start playback.");
+            const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+            if (isOffline) {
+              onErrorRef.current?.("You are offline. Reconnect to resume playback.", {
+                code: "OFFLINE",
+                isOffline: true,
+              });
+            } else {
+              onErrorRef.current?.("Tap play to start playback.", {
+                code: "UNKNOWN_ERROR",
+                isOffline: false,
+              });
+            }
           });
         }
       }
