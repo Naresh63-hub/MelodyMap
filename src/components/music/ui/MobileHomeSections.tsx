@@ -1,4 +1,4 @@
-import { MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, Users } from "lucide-react";
+import { MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, TrendingUp, Users } from "lucide-react";
 import { useRef, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
@@ -394,6 +394,7 @@ function SectionHeader({
 export function MobileHomeSections({
   dailyMix,
   recommended,
+  trending,
   userLanguages = [],
   onPlayTrack,
   onToggleLike,
@@ -414,6 +415,7 @@ export function MobileHomeSections({
   // Genre & mood quick filters narrow sections instantly
   const visibleDailyMix = filterTracksByQuickFilters(dailyMix ?? [], quickFilterIds);
   const visibleRecommended = filterTracksByQuickFilters(recommended, quickFilterIds);
+  const visibleTrending = filterTracksByQuickFilters(trending ?? [], quickFilterIds);
 
   const topArtists = useMemo(() => {
     return getTopArtistsForLanguages(userLanguages);
@@ -515,7 +517,31 @@ export function MobileHomeSections({
         </section>
       )}
 
-      {/* 3. Made For You (AI / Personalized Recommendations) */}
+      {/* 3. Trending Now (Official Charts & Hit Songs) */}
+      {visibleTrending.length > 0 && (
+        <section className="animate-fade-in">
+          <SectionHeader
+            title="Trending Now"
+            count={visibleTrending.length}
+            subtitle="Top charts in your language"
+            icon={TrendingUp}
+          />
+          <HorizontalScrollRow
+            tracks={visibleTrending}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            onOpenOptions={onOpenOptions}
+            likedIds={likedIds}
+            downloadedIds={downloadedIds}
+            downloadingIds={downloadingIds}
+            downloadProgress={downloadProgress}
+          />
+        </section>
+      )}
+
+      {/* 4. Made For You (AI / Personalized Recommendations) */}
       {visibleRecommended.length > 0 && (
         <section className="animate-fade-in">
           <SectionHeader
