@@ -1726,46 +1726,44 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     setQuickFilterLoading(false);
   }, []);
 
-  const handlePlayMood = useCallback(
-    async (moodKey: string, moodLabel: string) => {
-      if (activeMood === moodKey && current) {
-        if (player.isPlaying) {
-          pause();
-        } else {
-          play();
-        }
-        return;
-      }
+  const handleSelectMood = useCallback(
+    async (item: MoodItem, autoPlay = true) => {
+      setSelectedMood(item);
+      setMoodError(null);
+      setActiveMood(item.key);
+      setLoadingMood(item.key);
+      setMoodLoading(true);
 
-      setLoadingMood(moodKey);
       try {
         const preferredLang = settings.languages?.[0];
         const res = await runMoodPicks({
           data: {
-            mood: moodKey,
+            mood: item.key,
             language: preferredLang,
           },
         });
 
         const tracks = (res.tracks ?? []) as Track[];
+        setMoodTracks(tracks);
+
         if (tracks.length > 0) {
-          setActiveMood(moodKey);
-          startQueue(tracks, 0);
-          setMessage(`Playing ${moodLabel} vibe • ${tracks.length} songs`);
-          setTimeout(() => setMessage(null), 3500);
+          if (autoPlay) {
+            startQueue(tracks, 0);
+            setMessage(`Playing ${item.label} vibe • ${tracks.length} songs`);
+            setTimeout(() => setMessage(null), 3500);
+          }
         } else {
-          setMessage(`Could not load ${moodLabel} songs right now. Please try again.`);
-          setTimeout(() => setMessage(null), 3500);
+          setMoodError(`Could not find ${item.label} songs right now. Please try again.`);
         }
       } catch (err) {
         console.error("Failed to load mood picks:", err);
-        setMessage(`Could not load ${moodLabel} songs. Check connection.`);
-        setTimeout(() => setMessage(null), 3500);
+        setMoodError(`Could not load ${item.label} songs. Check connection.`);
       } finally {
+        setMoodLoading(false);
         setLoadingMood(null);
       }
     },
-    [activeMood, current, player.isPlaying, pause, play, settings.languages, runMoodPicks, startQueue],
+    [settings.languages, runMoodPicks, startQueue],
   );
 
   // Reload every home feed when language/artist preferences change. Previously
