@@ -44,53 +44,109 @@ describe("Trending & Old Songs - Language Filtering and Section Isolation", () =
     });
   });
 
-  describe("isOldEraTrack filter", () => {
-    it("allows authentic golden era classics", () => {
+  describe("isOldEraTrack filter (2000s Nostalgia Era)", () => {
+    it("allows authentic 2000s ('20s') nostalgia era hits", () => {
       expect(
         isOldEraTrack({
-          title: "Keeravani",
-          artist: "S.P. Balasubrahmanyam, S. Janaki",
-          year: "1985",
+          title: "Mellaga Karagani",
+          artist: "Devi Sri Prasad, Sagar",
+          year: "2004",
         }),
       ).toBe(true);
 
+      expect(
+        isOldEraTrack({
+          title: "Cheliya Cheliya",
+          artist: "Harris Jayaraj, KK",
+          year: "2001",
+        }),
+      ).toBe(true);
+
+      expect(
+        isOldEraTrack({
+          title: "Tum Se Hi",
+          artist: "Pritam, Mohit Chauhan",
+          year: "2007",
+        }),
+      ).toBe(true);
+
+      expect(
+        isOldEraTrack({
+          title: "Zara Sa",
+          artist: "KK, Pritam",
+          year: "2008",
+        }),
+      ).toBe(true);
+
+      expect(
+        isOldEraTrack({
+          title: "In the End",
+          artist: "Linkin Park",
+          year: "2000",
+        }),
+      ).toBe(true);
+
+      expect(
+        isOldEraTrack({
+          title: "Nuvvostanante Nenoddantana",
+          artist: "Devi Sri Prasad",
+          year: "2005",
+        }),
+      ).toBe(true);
+    });
+
+    it("strictly rejects ancient vintage artists and 50s-80s songs ('not too much old songs')", () => {
       expect(
         isOldEraTrack({
           title: "Roop Tera Mastana",
           artist: "Kishore Kumar",
           year: "1971",
         }),
-      ).toBe(true);
+      ).toBe(false);
 
       expect(
         isOldEraTrack({
-          title: "Bohemian Rhapsody",
-          artist: "Queen",
-          year: "1975",
-        }),
-      ).toBe(true);
-
-      expect(
-        isOldEraTrack({
-          title: "Ilaiyaraaja 80s Evergreens (2024 Remastered)",
-          artist: "Ilaiyaraaja",
-        }),
-      ).toBe(true);
-    });
-
-    it("rejects contemporary artists from modern streaming era", () => {
-      expect(
-        isOldEraTrack({
-          title: "Samajavaragamana",
-          artist: "Sid Sriram",
+          title: "Siva Sankari",
+          artist: "Ghantasala",
+          year: "1961",
         }),
       ).toBe(false);
 
       expect(
         isOldEraTrack({
-          title: "Tum Hi Ho",
-          artist: "Arijit Singh",
-          year: "2013",
+          title: "Telugu Evergreen Melody",
+          artist: "P. Susheela",
+        }),
+      ).toBe(false);
+
+      expect(
+        isOldEraTrack({
+          title: "Likhe Jo Khat Tujhe",
+          artist: "Mohammed Rafi",
+        }),
+      ).toBe(false);
+
+      expect(
+        isOldEraTrack({
+          title: "Jeena Yahan Marna Yahan",
+          artist: "Mukesh",
+        }),
+      ).toBe(false);
+
+      expect(
+        isOldEraTrack({
+          title: "80s Retro Classics",
+          artist: "Unknown Artist",
+        }),
+      ).toBe(false);
+    });
+
+    it("rejects contemporary artists and post-2015 streaming tracks", () => {
+      expect(
+        isOldEraTrack({
+          title: "Samajavaragamana",
+          artist: "Sid Sriram",
+          year: "2019",
         }),
       ).toBe(false);
 
@@ -98,6 +154,7 @@ describe("Trending & Old Songs - Language Filtering and Section Isolation", () =
         isOldEraTrack({
           title: "Arabic Kuthu",
           artist: "Anirudh Ravichander",
+          year: "2022",
         }),
       ).toBe(false);
 
@@ -105,11 +162,10 @@ describe("Trending & Old Songs - Language Filtering and Section Isolation", () =
         isOldEraTrack({
           title: "Cruel Summer",
           artist: "Taylor Swift",
+          year: "2019",
         }),
       ).toBe(false);
-    });
 
-    it("rejects tracks with modern post-2005 release years", () => {
       expect(
         isOldEraTrack({
           title: "Random Song",
@@ -122,7 +178,7 @@ describe("Trending & Old Songs - Language Filtering and Section Isolation", () =
         isOldEraTrack({
           title: "Hit Song",
           artist: "Singer",
-          year: 2018,
+          year: 2024,
         }),
       ).toBe(false);
     });

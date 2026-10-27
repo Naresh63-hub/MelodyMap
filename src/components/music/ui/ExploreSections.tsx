@@ -415,7 +415,7 @@ export function ExploreSections({
                 {loadingMoreTrending ? (
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
                 ) : null}
-                {exploreExhaustedTrending ? "All caught up" : "Load more trending songs"}
+                {exploreExhaustedTrending ? "All caught up" : "Explore more songs"}
               </Button>
               {exploreExhaustedTrending && (
                 <p className="text-[11px] text-muted-foreground">You've explored all currently available trending songs.</p>
@@ -456,7 +456,7 @@ export function ExploreSections({
             title="Old Songs"
             count={oldSongs.length}
             icon={Disc3}
-            subtitle="Golden Era & Retro hits"
+            subtitle="2000s Hits & Nostalgia"
           />
           <HorizontalScrollRow
             tracks={oldSongs}

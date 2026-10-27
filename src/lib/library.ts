@@ -358,8 +358,8 @@ function mergeById<T extends { id: string }>(a: T[], b: T[], max: number): T[] {
   return out.slice(0, max);
 }
 
-import { areSameTrack, trackExistsIn } from "@/lib/track-dedup";
-import type { TrackLike } from "@/lib/track-dedup";
+import { areSameTrack, trackExistsIn } from "./track-dedup";
+import type { TrackLike } from "./track-dedup";
 
 /**
  * Local-first library. When a listener is signed in, the same data syncs to
@@ -1124,15 +1124,14 @@ export function isLanguageConsistent(
 }
 
 /**
- * Known modern artists and producers who debuted in the modern streaming era (2005+)
- * to strictly exclude from the Old Songs / Golden Era / Retro feed.
+ * Known modern artists and producers who debuted strictly in the modern streaming era (post-2015)
+ * to strictly exclude from the 2000s ("20's") nostalgia catalog.
  */
 const MODERN_BLOCKED_ARTISTS = [
-  // South Indian Modern
+  // South Indian Modern (post-2015)
   "sid sriram",
   "anirudh",
   "anirudh ravichander",
-  "devi sri prasad",
   "thaman",
   "santhosh narayanan",
   "anurag kulkarni",
@@ -1212,6 +1211,33 @@ const MODERN_BLOCKED_ARTISTS = [
   "martin garrix",
 ];
 
+/**
+ * Ancient vintage artists (1950s-1980s) to strictly exclude so Old Songs focuses on
+ * 2000s ("20's") nostalgia hits rather than ancient/too-old classical eras.
+ */
+const ANCIENT_VINTAGE_ARTISTS = [
+  "ghantasala",
+  "p. susheela",
+  "p susheela",
+  "susheela",
+  "k.v. mahadevan",
+  "kv mahadevan",
+  "k. v. mahadevan",
+  "t.m. soundararajan",
+  "tms",
+  "p.b. sreenivas",
+  "pb sreenivas",
+  "mukesh",
+  "mohammed rafi",
+  "mohd rafi",
+  "rafi",
+  "kishore kumar",
+  "kl saigal",
+  "k.l. saigal",
+  "surinder kaur",
+  "yamla jatt",
+];
+
 const MODERN_TAGS = [
   "phonk",
   "speed up",
@@ -1231,8 +1257,9 @@ const MODERN_TAGS = [
 ];
 
 /**
- * Validates that a track strictly belongs to the Golden Era / Vintage Retro Classics catalog.
- * Guarantees that contemporary songs, modern remixes, and post-2005 hits are filtered out.
+ * Validates that a track strictly belongs to the 2000s ("20's") Era / Nostalgia Classics catalog.
+ * Guarantees that ancient vintage songs (pre-1995 50s/60s/70s/80s) and contemporary modern streaming songs (post-2015)
+ * are filtered out, displaying only authentic 2000s nostalgia classics.
  */
 export function isOldEraTrack(track: {
   title?: string | undefined;
@@ -1246,45 +1273,52 @@ export function isOldEraTrack(track: {
   const artist = (track.artist || "").toLowerCase();
   const text = `${title} ${artist}`;
 
-  // 1. Strict Year validation
+  // 1. Strict Year validation: 2000s era is bounded between 1995 and 2015
   if (track.year !== undefined && track.year !== null) {
     const parsed = parseInt(String(track.year).trim(), 10);
-    if (!isNaN(parsed) && parsed >= 2005) {
+    if (!isNaN(parsed)) {
+      if (parsed < 1995 || parsed > 2015) {
+        return false;
+      }
+    }
+  }
+
+  // 2. Block ancient vintage artists ("too much old songs": 50s/60s/70s/80s)
+  for (const vintage of ANCIENT_VINTAGE_ARTISTS) {
+    if (artist.includes(vintage) || title.includes(vintage)) {
       return false;
     }
   }
 
-  // 2. Block modern artists
+  // 3. Block ancient decade indicators in title / artist (50s, 60s, 70s, 80s, 1920-1994)
+  if (/\b(50s|60s|70s|80s)\b/.test(text) || /\b19[2-8][0-9]\b/.test(text) || /\b199[0-4]\b/.test(text)) {
+    return false;
+  }
+
+  // 4. Block modern post-2015 streaming artists
   for (const modern of MODERN_BLOCKED_ARTISTS) {
     if (artist.includes(modern) || title.includes(modern)) {
       return false;
     }
   }
 
-  // 3. Block modern electronic / viral tags
+  // 5. Block modern electronic / viral tags
   for (const tag of MODERN_TAGS) {
     if (title.includes(tag)) {
       return false;
     }
   }
 
-  // 4. Reject explicit modern 4-digit years in title (2005-2029) unless qualified by vintage indicators
-  const modernYearMatch = text.match(/\b20(0[5-9]|[12][0-9])\b/);
+  // 6. Reject explicit modern 4-digit years in title (2016-2099) unless qualified by 2000s vintage indicators
+  const modernYearMatch = text.match(/\b20(1[6-9]|[2-9][0-9])\b/);
   if (modernYearMatch) {
     const vintageIndicators = [
       "remaster",
       "remastered",
       "restored",
-      "50s",
-      "60s",
-      "70s",
-      "80s",
-      "90s",
-      "195",
-      "196",
-      "197",
-      "198",
-      "199",
+      "2000s",
+      "00s",
+      "20s",
       "golden",
       "retro",
       "classic",

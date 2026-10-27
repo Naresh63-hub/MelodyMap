@@ -1965,11 +1965,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       moreTrendingPageRef.current += 1;
       const targetPage = moreTrendingPageRef.current;
       const clientHour = new Date().getHours();
+      const currentIds = trendingList.map((t) => t.id);
       const res = await runTrending({
         data: {
           languages: settings.languages,
           count: 35,
           page: targetPage,
+          recentSeenIds: currentIds.slice(-200),
           clientHour,
         },
       });
@@ -2001,7 +2003,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setLoadingMoreExplore(false);
       isFetchingMoreTrendingRef.current = false;
     }
-  }, [loadingMoreExplore, exploreExhaustedTrending, runTrending, settings.languages]);
+  }, [loadingMoreExplore, exploreExhaustedTrending, runTrending, settings.languages, trendingList]);
 
   const extendQueue = useCallback(async (): Promise<Track[]> => {
     // Synchronous mutex guard against overlapping concurrent extensions

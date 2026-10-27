@@ -1,17 +1,21 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import type { Track } from "./library";
-import { isRecentlySeen, recordSeenTrackIdentities } from "./explore-history";
 import { sameSong } from "./feed-freshness";
+
+const makeTrack = (t: Partial<Track> & { id: string; title: string; artist: string; duration: string }): Track => ({
+  thumbnail: "",
+  ...t,
+});
 
 describe("Explore & Trending Discovery Architecture", () => {
   it("preserves genuine chart ordering and does not scramble official rank", () => {
     // Official provider Top 5 chart tracks
     const officialChart: Track[] = [
-      { id: "saavn:chart-1", title: "Chuttamalle", artist: "Shilpa Rao", duration: 220 },
-      { id: "saavn:chart-2", title: "Fear Song", artist: "Anirudh Ravichander", duration: 195 },
-      { id: "saavn:chart-3", title: "Tauba Tauba", artist: "Karan Aujla", duration: 210 },
-      { id: "saavn:chart-4", title: "Illuminati", artist: "Sushin Shyam", duration: 180 },
-      { id: "saavn:chart-5", title: "Aayi Nai", artist: "Pawan Singh", duration: 200 },
+      makeTrack({ id: "saavn:chart-1", title: "Chuttamalle", artist: "Shilpa Rao", duration: "3:40" }),
+      makeTrack({ id: "saavn:chart-2", title: "Fear Song", artist: "Anirudh Ravichander", duration: "3:15" }),
+      makeTrack({ id: "saavn:chart-3", title: "Tauba Tauba", artist: "Karan Aujla", duration: "3:30" }),
+      makeTrack({ id: "saavn:chart-4", title: "Illuminati", artist: "Sushin Shyam", duration: "3:00" }),
+      makeTrack({ id: "saavn:chart-5", title: "Aayi Nai", artist: "Pawan Singh", duration: "3:20" }),
     ];
 
     // Discovery pipeline on normal load: must return tracks in exact chart order
@@ -26,12 +30,12 @@ describe("Explore & Trending Discovery Architecture", () => {
   it("prioritizes unseen candidates on refresh while keeping popular songs eligible", () => {
     // Candidate pool of 10 tracks returned from provider
     const candidatePool: Track[] = [
-      { id: "track-1", title: "Hit 1", artist: "Artist A", duration: 200 },
-      { id: "track-2", title: "Hit 2", artist: "Artist B", duration: 210 },
-      { id: "track-3", title: "Hit 3", artist: "Artist C", duration: 190 },
-      { id: "track-4", title: "Hit 4", artist: "Artist D", duration: 205 },
-      { id: "track-5", title: "Hit 5", artist: "Artist E", duration: 185 },
-      { id: "track-6", title: "Hit 6", artist: "Artist F", duration: 220 },
+      makeTrack({ id: "track-1", title: "Hit 1", artist: "Artist A", duration: "3:20" }),
+      makeTrack({ id: "track-2", title: "Hit 2", artist: "Artist B", duration: "3:30" }),
+      makeTrack({ id: "track-3", title: "Hit 3", artist: "Artist C", duration: "3:10" }),
+      makeTrack({ id: "track-4", title: "Hit 4", artist: "Artist D", duration: "3:25" }),
+      makeTrack({ id: "track-5", title: "Hit 5", artist: "Artist E", duration: "3:05" }),
+      makeTrack({ id: "track-6", title: "Hit 6", artist: "Artist F", duration: "3:40" }),
     ];
 
     // Suppose user has already seen track-1 and track-2 in previous session
@@ -56,16 +60,16 @@ describe("Explore & Trending Discovery Architecture", () => {
 
   it("trending pagination appends only unique tracks and preserves 1..N order", () => {
     const existingList: Track[] = [
-      { id: "t-1", title: "Song 1", artist: "Singer A", duration: 200 },
-      { id: "t-2", title: "Song 2", artist: "Singer B", duration: 210 },
-      { id: "t-3", title: "Song 3", artist: "Singer C", duration: 190 },
+      makeTrack({ id: "t-1", title: "Song 1", artist: "Singer A", duration: "3:20" }),
+      makeTrack({ id: "t-2", title: "Song 2", artist: "Singer B", duration: "3:30" }),
+      makeTrack({ id: "t-3", title: "Song 3", artist: "Singer C", duration: "3:10" }),
     ];
 
     // Incoming page 2 contains one duplicate (Song 2) and two new tracks
     const incomingPage2: Track[] = [
-      { id: "t-2", title: "Song 2", artist: "Singer B", duration: 210 }, // duplicate
-      { id: "t-4", title: "Song 4", artist: "Singer D", duration: 240 },
-      { id: "t-5", title: "Song 5", artist: "Singer E", duration: 180 },
+      makeTrack({ id: "t-2", title: "Song 2", artist: "Singer B", duration: "3:30" }), // duplicate
+      makeTrack({ id: "t-4", title: "Song 4", artist: "Singer D", duration: "4:00" }),
+      makeTrack({ id: "t-5", title: "Song 5", artist: "Singer E", duration: "3:00" }),
     ];
 
     // Deduplicate incoming tracks against existing list
@@ -123,24 +127,24 @@ describe("Explore & Trending Discovery Architecture", () => {
 
   it("preserves active playback queue during discovery feed refresh", () => {
     // Current playing state
-    const currentTrack: Track = {
+    const currentTrack: Track = makeTrack({
       id: "playing-123",
       title: "Active Listening Song",
       artist: "Current Artist",
-      duration: 240,
-    };
+      duration: "4:00",
+    });
     const activeQueue: Track[] = [
       currentTrack,
-      { id: "queued-456", title: "Next Up", artist: "Artist 2", duration: 180 },
+      makeTrack({ id: "queued-456", title: "Next Up", artist: "Artist 2", duration: "3:00" }),
     ];
-    let isPlaying = true;
-    let activeQueueCopy = [...activeQueue];
+    const isPlaying = true;
+    const activeQueueCopy = [...activeQueue];
 
     // Discovery refresh runs in background:
     const simulateFeedRefresh = () => {
       const refreshedTrendingList: Track[] = [
-        { id: "new-trend-1", title: "Trending Hit 1", artist: "Pop Star", duration: 200 },
-        { id: "new-trend-2", title: "Trending Hit 2", artist: "DJ Hit", duration: 215 },
+        makeTrack({ id: "new-trend-1", title: "Trending Hit 1", artist: "Pop Star", duration: "3:20" }),
+        makeTrack({ id: "new-trend-2", title: "Trending Hit 2", artist: "DJ Hit", duration: "3:35" }),
       ];
       // Notice: Discovery refresh updates ONLY discovery state, NEVER playback state!
       return refreshedTrendingList;

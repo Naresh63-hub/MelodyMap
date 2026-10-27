@@ -414,22 +414,12 @@ async function getLocalPicks(data: {
     return [...arr.slice(normalized), ...arr.slice(0, normalized)];
   };
 
-  const pickedNew = rotateQueries(newQueries, queryOffset).slice(0, 5);
-  const pickedOld = rotateQueries(oldQueries, queryOffset).slice(0, 5);
+  const pickedNew = rotateQueries(newQueries, queryOffset).slice(0, 6);
+  const pickedOld = rotateQueries(oldQueries, queryOffset).slice(0, 6);
 
-  const [newCandidates, oldCandidates, trendingCandidates] = await Promise.all([
-    runQueryBatch(pickedNew, 12, true, bypassCache, page),
-    runQueryBatch(pickedOld, 12, true, bypassCache, page),
-    (async () => {
-      // On page > 1, do not fetch trending songs because page 1 trending songs are duplicate
-      if (page > 1) return [] as Track[];
-      try {
-        const { getSaavnTrendingSongs } = await import("./providers/saavn");
-        return (await getSaavnTrendingSongs(languages, 12)) as Track[];
-      } catch {
-        return [] as Track[];
-      }
-    })(),
+  const [newCandidates, oldCandidates] = await Promise.all([
+    runQueryBatch(pickedNew, 14, true, bypassCache, page),
+    runQueryBatch(pickedOld, 14, true, bypassCache, page),
   ]);
 
   const newQuota = Math.ceil(count / 2);
@@ -446,7 +436,7 @@ async function getLocalPicks(data: {
     return isOriginalSong(t);
   };
 
-  const filteredNew = [...newCandidates, ...trendingCandidates].filter(isCandidateValid);
+  const filteredNew = newCandidates.filter(isCandidateValid);
   const filteredOld = oldCandidates.filter(isCandidateValid);
 
   // Draw 50% new releases
@@ -562,23 +552,23 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
           : uniquePool.filter(isOriginalSong);
         const candidates = langFiltered.length >= 10 ? langFiltered : uniquePool;
 
-        // When recentSeenIds are provided on page 1 (refresh):
-        // Prioritize unseen tracks while preserving relative chart ranking!
-        if (recentSeenSet.size > 0 && page === 1) {
+        // When recentSeenIds are provided (e.g. on explicit refresh):
+        // Exclude recently seen tracks so fresh discovery is served!
+        // Never reinsert previously displayed tracks just to fill a batch.
+        if (recentSeenSet.size > 0) {
           const unseen = candidates.filter((t) => !recentSeenSet.has(t.id.toLowerCase()));
-          const seen = candidates.filter((t) => recentSeenSet.has(t.id.toLowerCase()));
-          const ordered = [...unseen, ...seen];
+          if (unseen.length > 0) {
+            return {
+              tracks: unseen.slice(0, count),
+              error: null,
+            };
+          }
+        } else {
           return {
-            tracks: ordered.slice(0, count),
+            tracks: candidates.slice(0, count),
             error: null,
           };
         }
-
-        // Official chart ranking preserved
-        return {
-          tracks: candidates.slice(0, count),
-          error: null,
-        };
       }
     } catch (err) {
       console.warn("[getRealTrendingTracks] Saavn trending feed notice:", err);
@@ -627,11 +617,15 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
       }
     }
 
-    const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache);
+    const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache, page);
     const filteredTracks = langs.length > 0
       ? tracks.filter((t) => isLanguageConsistent(t, langs) && isOriginalSong(t))
       : tracks.filter(isOriginalSong);
-    return { tracks: shuffleArray(filteredTracks).slice(0, count), error: null };
+    const unseenFallback = recentSeenSet.size > 0
+      ? filteredTracks.filter((t) => !recentSeenSet.has(t.id.toLowerCase()))
+      : filteredTracks;
+    const finalFallback = unseenFallback.length > 0 ? unseenFallback : (recentSeenSet.size > 0 ? [] : filteredTracks);
+    return { tracks: shuffleArray(finalFallback).slice(0, count), error: null };
   });
 
 const OldSongsInput = z.object({
@@ -662,18 +656,20 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
       if (saavnOld.length > 0) {
         const pool = (saavnOld as Track[]).filter(isOldEraTrack);
         const candidates = pool.length > 0 ? pool : (saavnOld as Track[]);
-        if (recentSeenSet.size > 0 && page === 1) {
+        if (recentSeenSet.size > 0) {
           const unseen = candidates.filter((t) => !recentSeenSet.has(t.id.toLowerCase()));
-          const seen = candidates.filter((t) => recentSeenSet.has(t.id.toLowerCase()));
+          if (unseen.length > 0) {
+            return {
+              tracks: unseen.slice(0, count),
+              error: null,
+            };
+          }
+        } else {
           return {
-            tracks: [...unseen, ...seen].slice(0, count),
+            tracks: candidates.slice(0, count),
             error: null,
           };
         }
-        return {
-          tracks: candidates.slice(0, count),
-          error: null,
-        };
       }
     } catch (err) {
       console.warn("[getOldSongsTracks] Saavn old songs feed notice:", err);
@@ -745,12 +741,16 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
       }
     }
 
-    const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache);
+    const tracks = await runQueryBatch(shuffleArray(queries).slice(0, 6), 8, true, bypassCache, page);
     const filteredTracks = tracks.filter((t) => {
       const langOk = langs.length > 0 ? isLanguageConsistent(t, langs) : true;
       return langOk && isOldEraTrack(t) && isOriginalSong(t);
     });
-    return { tracks: shuffleArray(filteredTracks).slice(0, count), error: null };
+    const unseenFallback = recentSeenSet.size > 0
+      ? filteredTracks.filter((t) => !recentSeenSet.has(t.id.toLowerCase()))
+      : filteredTracks;
+    const finalFallback = unseenFallback.length > 0 ? unseenFallback : (recentSeenSet.size > 0 ? [] : filteredTracks);
+    return { tracks: shuffleArray(finalFallback).slice(0, count), error: null };
   });
 
 /**
