@@ -108,6 +108,7 @@ import {
   newSongs,
   moodPicks,
 } from "@/lib/music.functions";
+import { getRecentlySeenIdentities, recordSeenTrackIdentities } from "@/lib/explore-history";
 import {
   countQuickFilterMatches,
   filterTracksByQuickFilters,
@@ -335,6 +336,7 @@ function MusicApp() {
   const [loadingMoreExplore, setLoadingMoreExplore] = useState(false);
   const [exploreExhaustedTrending, setExploreExhaustedTrending] = useState(false);
   const moreTrendingPageRef = useRef(1);
+  const isFetchingMoreTrendingRef = useRef(false);
   const [showFullScreen, setShowFullScreen] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
@@ -1465,18 +1467,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setExploreExhaustedTrending(false);
       }
 
-      // Snapshot currently displayed tracks to strictly avoid repeating the same songs on refresh
-      const prevTrendingIds = new Set(trendingRef.current.map((t) => t.id));
-      const prevTrendingTitles = new Set(trendingRef.current.map((t) => (t.title || "").toLowerCase().trim()));
-
-      const prevNewIds = new Set((mixTracksRef.current?.newrelease || []).map((t) => t.id));
-      const prevNewTitles = new Set((mixTracksRef.current?.newrelease || []).map((t) => (t.title || "").toLowerCase().trim()));
-
-      const prevOldIds = new Set(oldSongsRef.current.map((t) => t.id));
-      const prevOldTitles = new Set(oldSongsRef.current.map((t) => (t.title || "").toLowerCase().trim()));
-
       const nonce = refreshNonce ?? `${Date.now()}-${safeUUID()}`;
       const clientHour = new Date().getHours();
+      const recentSeenIds = getRecentlySeenIdentities();
 
       try {
         await Promise.allSettled([
@@ -1484,91 +1477,65 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             const res = await runTrending({
               data: {
                 languages: settings.languages,
-                count: 70,
+                count: 50,
                 refreshNonce: nonce,
                 clientHour,
+                page: 1,
+                recentSeenIds,
               },
             });
             if (res.tracks && res.tracks.length > 0) {
-              const fresh = applyExploreFilters(res.tracks as Track[]);
-              const finalTracks = fresh.length > 0 ? fresh : (res.tracks as Track[]);
-              const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
-              const diversified = diversifyTrackList(ranked, {
-                maxPerArtist: 3,
-                maxPerAlbum: 1,
-                minArtistSpacing: 2,
-                minAlbumSpacing: 3,
-              });
-              let resultTracks = diversified;
-              if (isExplicitRefresh && prevTrendingIds.size > 0) {
-                const nonDupes = diversified.filter(
-                  (t) => !prevTrendingIds.has(t.id) && !prevTrendingTitles.has((t.title || "").toLowerCase().trim()),
-                );
-                resultTracks = nonDupes.length >= 20 ? nonDupes : [...nonDupes, ...diversified.filter((t) => !nonDupes.some((nd) => nd.id === t.id))];
+              const pool = (res.tracks as Track[]).filter(isOriginalSong);
+              if (pool.length > 0) {
+                setTrendingList(pool);
+                writeHomeCache({ trendingList: pool });
+                recordSeenTrackIdentities(pool);
               }
-              setTrendingList(resultTracks);
-              writeHomeCache({ trendingList: resultTracks });
             }
           })(),
           (async () => {
             const artistList = topArtists(stats, likes);
             const res = await runNewSongs({
-              data: { artists: artistList, languages: settings.languages, count: 50, refreshNonce: nonce },
+              data: {
+                artists: artistList,
+                languages: settings.languages,
+                count: 40,
+                refreshNonce: nonce,
+                page: 1,
+                recentSeenIds,
+              },
             });
             if (res.tracks && res.tracks.length > 0) {
               const pool = (res.tracks as Track[]).filter((t) => !isOldEraTrack(t));
-              const fresh = applyExploreFilters(pool);
-              const finalTracks = fresh.length > 0 ? fresh : pool;
-              const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
-              const diversified = diversifyTrackList(ranked, {
-                maxPerArtist: 3,
-                maxPerAlbum: 1,
-                minArtistSpacing: 2,
-                minAlbumSpacing: 3,
-              });
-              let resultTracks = diversified;
-              if (isExplicitRefresh && prevNewIds.size > 0) {
-                const nonDupes = diversified.filter(
-                  (t) => !prevNewIds.has(t.id) && !prevNewTitles.has((t.title || "").toLowerCase().trim()),
-                );
-                resultTracks = nonDupes.length >= 15 ? nonDupes : [...nonDupes, ...diversified.filter((t) => !nonDupes.some((nd) => nd.id === t.id))];
+              if (pool.length > 0) {
+                setMixTracks((prev) => {
+                  const next = { ...prev, newrelease: pool };
+                  writeHomeCache({ mixTracks: next });
+                  return next;
+                });
+                recordSeenTrackIdentities(pool);
               }
-              setMixTracks((prev) => {
-                const next = { ...prev, newrelease: resultTracks };
-                writeHomeCache({ mixTracks: next });
-                return next;
-              });
             }
           })(),
           (async () => {
             const res = await runOldSongs({
               data: {
                 languages: settings.languages,
-                count: 50,
+                count: 40,
                 refreshNonce: nonce,
                 artists: topArtists(stats, likes),
+                page: 1,
+                recentSeenIds,
               },
             });
             if (res.tracks && res.tracks.length > 0) {
               const pool = (res.tracks as Track[]).filter(isOldEraTrack);
-              const fresh = applyExploreFilters(pool.length > 0 ? pool : (res.tracks as Track[]));
-              const finalTracks = fresh.length > 0 ? fresh : (res.tracks as Track[]);
-              const ranked = thompsonSamplingPolicy.rankCandidates(finalTracks, getSessionContext());
-              const diversified = diversifyTrackList(ranked, {
-                maxPerArtist: 3,
-                maxPerAlbum: 1,
-                minArtistSpacing: 2,
-                minAlbumSpacing: 3,
-              });
-              let resultTracks = diversified;
-              if (isExplicitRefresh && prevOldIds.size > 0) {
-                const nonDupes = diversified.filter(
-                  (t) => !prevOldIds.has(t.id) && !prevOldTitles.has((t.title || "").toLowerCase().trim()),
-                );
-                resultTracks = nonDupes.length >= 15 ? nonDupes : [...nonDupes, ...diversified.filter((t) => !nonDupes.some((nd) => nd.id === t.id))];
+              const finalPool = pool.length > 0 ? pool : (res.tracks as Track[]);
+              if (finalPool.length > 0) {
+                setOldSongsList(finalPool);
+                writeHomeCache({ oldSongsList: finalPool });
+                recordSeenTrackIdentities(finalPool);
               }
-              setOldSongsList(resultTracks);
-              writeHomeCache({ oldSongsList: resultTracks });
             }
           })(),
         ]);
@@ -1578,7 +1545,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setExploreLoading(false);
       }
     },
-    [runTrending, runNewSongs, runOldSongs, settings.languages, stats, likes, applyExploreFilters, getSessionContext],
+    [runTrending, runNewSongs, runOldSongs, settings.languages, stats, likes],
   );
 
   const loadHomeFeeds = useCallback(
@@ -1991,7 +1958,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   );
 
   const loadMoreExploreSongs = useCallback(async () => {
-    if (loadingMoreExplore || exploreExhaustedTrending) return;
+    if (loadingMoreExplore || exploreExhaustedTrending || isFetchingMoreTrendingRef.current) return;
+    isFetchingMoreTrendingRef.current = true;
     setLoadingMoreExplore(true);
     try {
       moreTrendingPageRef.current += 1;
@@ -2000,14 +1968,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const res = await runTrending({
         data: {
           languages: settings.languages,
-          count: 40,
-          refreshNonce: `more-trending-${Date.now()}-p${targetPage}`,
+          count: 35,
+          page: targetPage,
           clientHour,
         },
       });
       if (res.tracks && res.tracks.length > 0) {
-        const fresh = applyExploreFilters(res.tracks as Track[]);
-        const incoming = fresh.length > 0 ? fresh : (res.tracks as Track[]);
+        const incoming = (res.tracks as Track[]).filter(isOriginalSong);
         let addedCount = 0;
         setTrendingList((prev) => {
           const trulyNew = incoming.filter(
@@ -2017,6 +1984,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           addedCount = trulyNew.length;
           const combined = dedupeTracks([...prev, ...trulyNew]);
           writeHomeCache({ trendingList: combined });
+          recordSeenTrackIdentities(trulyNew);
           return combined;
         });
         if (addedCount > 0) {
@@ -2031,8 +1999,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       console.error("[loadMoreExploreSongs] error:", e);
     } finally {
       setLoadingMoreExplore(false);
+      isFetchingMoreTrendingRef.current = false;
     }
-  }, [loadingMoreExplore, exploreExhaustedTrending, runTrending, settings.languages, applyExploreFilters]);
+  }, [loadingMoreExplore, exploreExhaustedTrending, runTrending, settings.languages]);
 
   const extendQueue = useCallback(async (): Promise<Track[]> => {
     // Synchronous mutex guard against overlapping concurrent extensions
@@ -3699,6 +3668,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       <MobileHomeSections
                         dailyMix={dailyMixTracks}
                         recommended={recs}
+                        trending={trendingList}
                         userLanguages={settings.languages}
                         onArtistClick={(artist: JioSaavnArtist) => {
                           setTab("search");
@@ -3805,26 +3775,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   loading={!hydrated || (exploreLoading && trendingList.length === 0 && oldSongsList.length === 0 && (!mixTracks.newrelease || mixTracks.newrelease.length === 0))}
                   onLoadMoreTrending={loadMoreExploreSongs}
                   loadingMoreTrending={loadingMoreExplore}
+                  exploreExhaustedTrending={exploreExhaustedTrending}
                 />
-
-                {/* Explore More Songs in explore section like in home page */}
-                {trendingList.length > 0 && (
-                  <div className="flex flex-col items-center justify-center pt-2 pb-6 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void loadMoreExploreSongs()}
-                      disabled={loadingMoreExplore || exploreExhaustedTrending}
-                      className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
-                    >
-                      {loadingMoreExplore ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" /> : null}
-                      {exploreExhaustedTrending ? "All caught up" : "Explore more songs"}
-                    </Button>
-                    {exploreExhaustedTrending && (
-                      <p className="text-[11px] text-muted-foreground">You've explored all currently available trending songs.</p>
-                    )}
-                  </div>
-                )}
               </div>
             )}
 

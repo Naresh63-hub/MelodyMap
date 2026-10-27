@@ -686,47 +686,61 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
     for (const lang of userLangs) {
       const lower = lang.toLowerCase();
       if (lower === "telugu") {
-        queries.push("Telugu old hit songs 80s 90s classics");
-        queries.push("Telugu golden evergreen melodies SPB Chitra");
-        queries.push("Telugu 90s all time classic hit songs");
-        queries.push("Best of Ghantasala SP Balasubrahmanyam Telugu");
-        queries.push("Telugu 70s 80s retro classics Ilaiyaraaja Janaki");
+        queries.push("Telugu 2000s hit songs");
+        queries.push("Telugu 2000s super hit melodies");
+        queries.push("Mani Sharma 2000s Telugu hits");
+        queries.push("Devi Sri Prasad 2000s Telugu hits");
+        queries.push("Harris Jayaraj Telugu hits 2000s");
+        queries.push("RP Patnaik Chakri 2000s hits");
+        queries.push("Telugu 2000s love songs");
+        queries.push("Best of 2000 to 2010 Telugu hits");
       } else if (lower === "hindi") {
-        queries.push("Hindi retro classic hit songs 70s 80s 90s");
-        queries.push("Kishore Kumar Lata Mangeshkar evergreen hits");
-        queries.push("Bollywood 90s golden era evergreen classics");
-        queries.push("Best of Mohammed Rafi Mukesh RD Burman");
-        queries.push("Old Hindi golden melodies 60s 70s Asha Bhosle");
+        queries.push("Bollywood 2000s hit songs");
+        queries.push("Best of 2000s Hindi songs");
+        queries.push("Pritam 2000s hit songs");
+        queries.push("KK 2000s evergreen hit songs");
+        queries.push("Hindi 2000s romantic melodies");
+        queries.push("Emraan Hashmi 2000s hit songs");
+        queries.push("Mohit Chauhan 2000s hits");
+        queries.push("Sonu Nigam 2000s Bollywood hits");
       } else if (lower === "tamil") {
-        queries.push("Tamil 80s 90s classic evergreen hits Ilaiyaraaja");
-        queries.push("Tamil golden retro songs SPB Janaki");
-        queries.push("Tamil all time classic old melody songs");
-        queries.push("Best of TMS MSV old Tamil classic songs");
+        queries.push("Tamil 2000s hit songs");
+        queries.push("Harris Jayaraj 2000s Tamil hits");
+        queries.push("Yuvan Shankar Raja 2000s hits");
+        queries.push("AR Rahman 2000s Tamil hits");
+        queries.push("Vidyasagar Tamil 2000s hits");
+        queries.push("Tamil 2000 to 2010 melody hits");
       } else if (lower === "malayalam") {
-        queries.push("Malayalam old classic hit songs KJ Yesudas");
-        queries.push("Malayalam golden retro melodies 80s 90s");
-        queries.push("Johnson Master Raveendran old Malayalam classics");
+        queries.push("Malayalam 2000s hit songs");
+        queries.push("Vidyasagar Malayalam 2000s hits");
+        queries.push("Deepak Dev 2000s Malayalam hits");
+        queries.push("Malayalam 2000 to 2010 melody songs");
       } else if (lower === "kannada") {
-        queries.push("Kannada old classic evergreen hit songs Rajkumar");
-        queries.push("Kannada 80s 90s retro melodies SPB Janaki");
+        queries.push("Kannada 2000s hit songs");
+        queries.push("Mano Murthy 2000s Kannada hits");
+        queries.push("Gurukiran 2000s Kannada hits");
+        queries.push("Kannada 2000 to 2010 super hits");
       } else if (lower === "punjabi") {
-        queries.push("Punjabi old classic folk songs vintage retro");
-        queries.push("Punjabi evergreen golden oldies Kuldeep Manak Chamkila");
+        queries.push("Punjabi 2000s hit songs");
+        queries.push("Bally Sagoo Sukhbir 2000s hits");
+        queries.push("Stereo Nation 2000s Punjabi hits");
+        queries.push("Punjabi 2000 to 2010 pop hits");
       } else if (lower === "english") {
-        queries.push("70s 80s 90s classic rock pop evergreen hits");
-        queries.push("Best retro golden oldies classics Beatles Queen ABBA");
-        queries.push("Timeless classic songs 70s 80s Eagles Fleetwood Mac");
+        queries.push("2000s pop rock hits");
+        queries.push("Best 2000s songs");
+        queries.push("2000 to 2010 greatest hits");
+        queries.push("Coldplay Linkin Park 2000s hits");
       } else {
-        queries.push(`${lang} old classic songs retro 80s 90s`);
-        queries.push(`${lang} golden evergreen classic melodies`);
+        queries.push(`${lang} 2000s hit songs`);
+        queries.push(`${lang} 2000 to 2010 classic melodies`);
       }
     }
 
-    // Only query artists if they are verified vintage/retro artists (never modern contemporary artists)
+    // Only query artists if they are verified 2000s era artists (never modern contemporary or ancient vintage)
     if (data.artists && data.artists.length > 0) {
       for (const artist of data.artists.slice(0, 3)) {
         if (isOldEraTrack({ artist })) {
-          queries.push(`${artist} evergreen classic hit songs`);
+          queries.push(`${artist} 2000s hit songs`);
         }
       }
     }

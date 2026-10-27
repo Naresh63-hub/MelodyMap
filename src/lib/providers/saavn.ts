@@ -649,8 +649,8 @@ export async function getSaavnTrendingSongs(
 }
 
 /**
- * Fetches official Old Songs / Retro Classics directly from JioSaavn.
- * Guaranteed 100% pure original golden classics with direct CDN audio.
+ * Fetches official 2000s Era ("20's") Nostalgia Classics directly from JioSaavn.
+ * Focuses strictly on 2000s melody and superhit classics, avoiding ancient 50s-70s vintage tracks.
  */
 export async function getSaavnOldSongs(
   languages: string[] = [],
@@ -662,70 +662,69 @@ export async function getSaavnOldSongs(
   const userLangs = normLangs.length > 0 ? normLangs : ["telugu", "hindi"];
   const safePage = Math.max(1, Math.floor(page || 1));
 
-  const RETRO_ARTISTS_BY_LANG: Record<string, string[]> = {
+  const NOSTALGIA_2000S_BY_LANG: Record<string, string[]> = {
     telugu: [
-      "S. P. Balasubrahmanyam hits",
-      "Ghantasala Telugu hits",
-      "K. S. Chithra Telugu hits",
-      "Ilaiyaraaja Telugu hits",
-      "P. Susheela Telugu hits",
-      "S. Janaki Telugu hits",
-      "M. M. Keeravani 90s Telugu classics",
-      "K. V. Mahadevan vintage Telugu hits",
-      "Telugu 80s 90s evergreen melodies",
+      "Telugu 2000s hit songs",
+      "Telugu 2000s super hit melodies",
+      "Mani Sharma 2000s Telugu hits",
+      "Devi Sri Prasad 2000s Telugu hits",
+      "Harris Jayaraj Telugu hits 2000s",
+      "RP Patnaik Chakri 2000s hits",
+      "Telugu 2000s love songs",
+      "Best of 2000 to 2010 Telugu hits",
+      "Telugu 2000s evergreen melodies",
     ],
     hindi: [
-      "Kishore Kumar hits",
-      "Lata Mangeshkar hits",
-      "Mohammed Rafi hits",
-      "R. D. Burman hits",
-      "Asha Bhosle hits",
-      "Mukesh evergreen hits",
-      "Kumar Sanu 90s hits",
-      "Udit Narayan Alka Yagnik 90s hits",
-      "Jagjit Singh ghazals classics",
-      "Bollywood 70s 80s golden classics",
+      "Bollywood 2000s hit songs",
+      "Best of 2000s Hindi songs",
+      "Pritam 2000s hit songs",
+      "KK 2000s evergreen hit songs",
+      "Hindi 2000s romantic melodies",
+      "Emraan Hashmi 2000s hit songs",
+      "Mohit Chauhan 2000s hits",
+      "Sonu Nigam 2000s Bollywood hits",
+      "Udit Narayan Alka Yagnik 2000s hits",
+      "2000 to 2010 Bollywood super hits",
     ],
     tamil: [
-      "Ilaiyaraaja Tamil hits",
-      "S. P. Balasubrahmanyam Tamil hits",
-      "TMS MSV old Tamil classic hits",
-      "S Janaki Tamil hits",
-      "K. J. Yesudas Tamil classics",
-      "A. R. Rahman 90s Tamil golden hits",
-      "K. S. Chithra Tamil vintage hits",
+      "Tamil 2000s hit songs",
+      "Harris Jayaraj 2000s Tamil hits",
+      "Yuvan Shankar Raja 2000s hits",
+      "AR Rahman 2000s Tamil hits",
+      "Vidyasagar Tamil 2000s hits",
+      "Tamil 2000 to 2010 melody hits",
+      "Best of 2000s Tamil love songs",
     ],
     malayalam: [
-      "K. J. Yesudas Malayalam hits",
-      "Johnson Master Malayalam hits",
-      "M. G. Sreekumar 90s Malayalam hits",
-      "K. S. Chithra Malayalam evergreen hits",
+      "Malayalam 2000s hit songs",
+      "Vidyasagar Malayalam 2000s hits",
+      "Deepak Dev 2000s Malayalam hits",
+      "Malayalam 2000 to 2010 melody songs",
     ],
     kannada: [
-      "Dr Rajkumar Kannada hits",
-      "S. P. Balasubrahmanyam Kannada hits",
-      "P. B. Sreenivas Kannada hits",
-      "C. Ashwath Kannada classic songs",
+      "Kannada 2000s hit songs",
+      "Mano Murthy 2000s Kannada hits",
+      "Gurukiran 2000s Kannada hits",
+      "Kannada 2000 to 2010 super hits",
     ],
     punjabi: [
-      "Kuldeep Manak hits",
-      "Gurdas Maan hits",
-      "Surinder Kaur Punjabi classics",
-      "Yamla Jatt vintage folk hits",
+      "Punjabi 2000s hit songs",
+      "Bally Sagoo Sukhbir 2000s hits",
+      "Stereo Nation 2000s Punjabi hits",
+      "Punjabi 2000 to 2010 pop hits",
     ],
     english: [
-      "The Beatles hits",
-      "Queen classic rock hits",
-      "ABBA hits",
-      "70s 80s classic rock hits",
-      "Michael Jackson 80s 90s classics",
-      "Pink Floyd greatest hits",
+      "2000s pop rock hits",
+      "Best 2000s songs",
+      "2000 to 2010 greatest hits",
+      "Coldplay Linkin Park 2000s hits",
+      "Backstreet Boys Westlife 2000s hits",
     ],
   };
 
   const queries: string[] = [];
   for (const lang of userLangs) {
-    const rawPool = RETRO_ARTISTS_BY_LANG[lang] || [`${lang} classic old hit songs`];
+    const rawPool = NOSTALGIA_2000S_BY_LANG[lang] || [`${lang} 2000s hit songs`];
     const offset = ((safePage - 1) * 3) % rawPool.length;
     const q1 = rawPool[offset] || rawPool[0];
     const q2 = rawPool[(offset + 1) % rawPool.length];
@@ -738,7 +737,7 @@ export async function getSaavnOldSongs(
   const tracks: UnifiedTrack[] = [];
   const seen = new Set<string>();
 
-  // Fetch retro queries concurrently in parallel with pagination
+  // Fetch 2000s nostalgia queries concurrently in parallel with pagination
   const searchTasks = queries.map((q) => searchSaavn(q, { limit: 15, page: safePage }));
   const searchResults = await Promise.allSettled(searchTasks);
 
@@ -746,7 +745,7 @@ export async function getSaavnOldSongs(
     if (r.status === "fulfilled") {
       for (const t of r.value) {
         if (tracks.length >= limit) break;
-        if (!seen.has(t.id) && isOriginalSong(t)) {
+        if (!seen.has(t.id) && isOriginalSong(t) && isOldEraTrack(t)) {
           seen.add(t.id);
           tracks.push(t);
         }

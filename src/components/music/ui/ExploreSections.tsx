@@ -24,6 +24,7 @@ type Props = {
   loading?: boolean | undefined;
   onLoadMoreTrending?: () => void;
   loadingMoreTrending?: boolean;
+  exploreExhaustedTrending?: boolean;
 };
 
 /** Horizontal scrollable row of JioSaavn-styled track cards */
@@ -356,6 +357,7 @@ export function ExploreSections({
   loading = false,
   onLoadMoreTrending,
   loadingMoreTrending = false,
+  exploreExhaustedTrending = false,
 }: Props) {
   if (loading) {
     return (
@@ -402,19 +404,22 @@ export function ExploreSections({
             downloadProgress={downloadProgress}
           />
           {onLoadMoreTrending && (
-            <div className="flex justify-center pt-4 pb-2">
+            <div className="flex flex-col items-center justify-center pt-4 pb-2 gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onLoadMoreTrending}
-                disabled={loadingMoreTrending}
+                disabled={loadingMoreTrending || exploreExhaustedTrending}
                 className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
               >
                 {loadingMoreTrending ? (
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
                 ) : null}
-                Load more trending songs
+                {exploreExhaustedTrending ? "All caught up" : "Load more trending songs"}
               </Button>
+              {exploreExhaustedTrending && (
+                <p className="text-[11px] text-muted-foreground">You've explored all currently available trending songs.</p>
+              )}
             </div>
           )}
         </section>
