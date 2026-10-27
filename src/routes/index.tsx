@@ -337,6 +337,8 @@ function MusicApp() {
   const [exploreExhaustedTrending, setExploreExhaustedTrending] = useState(false);
   const moreTrendingPageRef = useRef(1);
   const isFetchingMoreTrendingRef = useRef(false);
+  const exploreRefreshPageRef = useRef(1);
+  const exploreRequestIdRef = useRef(0);
   const [showFullScreen, setShowFullScreen] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [showEqualizer, setShowEqualizer] = useState(false);
@@ -1462,14 +1464,26 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     async (refreshNonce?: number | string) => {
       setExploreLoading(true);
       const isExplicitRefresh = Boolean(refreshNonce);
+      const currentReqId = ++exploreRequestIdRef.current;
+
       if (isExplicitRefresh) {
         moreTrendingPageRef.current = 1;
         setExploreExhaustedTrending(false);
+        // Advance target page across discovery range (pages 1 to 5)
+        exploreRefreshPageRef.current = (exploreRefreshPageRef.current % 5) + 1;
+      } else {
+        exploreRefreshPageRef.current = 1;
       }
 
+      const targetPage = exploreRefreshPageRef.current;
       const nonce = refreshNonce ?? `${Date.now()}-${safeUUID()}`;
       const clientHour = new Date().getHours();
       const recentSeenIds = getRecentlySeenIdentities();
+
+      // Snapshot currently displayed tracks to ensure fresh discovery and prevent reinsertion on refresh
+      const prevTrending = [...trendingRef.current];
+      const prevNew = [...(mixTracksRef.current?.newrelease || [])];
+      const prevOld = [...oldSongsRef.current];
 
       try {
         await Promise.allSettled([
@@ -1480,16 +1494,47 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 count: 50,
                 refreshNonce: nonce,
                 clientHour,
-                page: 1,
+                page: targetPage,
                 recentSeenIds,
               },
             });
+            if (currentReqId !== exploreRequestIdRef.current) return;
             if (res.tracks && res.tracks.length > 0) {
               const pool = (res.tracks as Track[]).filter(isOriginalSong);
-              if (pool.length > 0) {
-                setTrendingList(pool);
-                writeHomeCache({ trendingList: pool });
-                recordSeenTrackIdentities(pool);
+              let fresh = pool;
+              if (isExplicitRefresh && prevTrending.length > 0) {
+                fresh = pool.filter((t) => !prevTrending.some((p) => p.id === t.id || sameSong(p, t)));
+                // If the target page returned too few fresh non-duplicate tracks (< 10), try another supported query
+                if (fresh.length < 10) {
+                  const altPage = (targetPage % 5) + 1;
+                  const altRes = await runTrending({
+                    data: {
+                      languages: settings.languages,
+                      count: 50,
+                      refreshNonce: `${nonce}-alt`,
+                      clientHour,
+                      page: altPage,
+                      recentSeenIds: [...recentSeenIds, ...prevTrending.map((p) => p.id)],
+                    },
+                  });
+                  if (currentReqId === exploreRequestIdRef.current && altRes.tracks && altRes.tracks.length > 0) {
+                    const altPool = (altRes.tracks as Track[]).filter(isOriginalSong);
+                    for (const t of altPool) {
+                      if (
+                        !prevTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
+                        !fresh.some((f) => f.id === t.id || sameSong(f, t))
+                      ) {
+                        fresh.push(t);
+                      }
+                    }
+                  }
+                }
+              }
+              // Preserve official chart ordering directly without applying Thompson Sampling
+              if (fresh.length > 0) {
+                setTrendingList(fresh);
+                writeHomeCache({ trendingList: fresh });
+                recordSeenTrackIdentities(fresh);
               }
             }
           })(),
@@ -1501,19 +1546,54 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 count: 40,
                 refreshNonce: nonce,
-                page: 1,
+                page: targetPage,
                 recentSeenIds,
               },
             });
+            if (currentReqId !== exploreRequestIdRef.current) return;
             if (res.tracks && res.tracks.length > 0) {
               const pool = (res.tracks as Track[]).filter((t) => !isOldEraTrack(t));
-              if (pool.length > 0) {
+              let fresh = pool;
+              if (isExplicitRefresh && prevNew.length > 0) {
+                fresh = pool.filter((t) => !prevNew.some((p) => p.id === t.id || sameSong(p, t)));
+                if (fresh.length < 10) {
+                  const altPage = (targetPage % 5) + 1;
+                  const altRes = await runNewSongs({
+                    data: {
+                      artists: artistList,
+                      languages: settings.languages,
+                      count: 40,
+                      refreshNonce: `${nonce}-alt`,
+                      page: altPage,
+                      recentSeenIds: [...recentSeenIds, ...prevNew.map((p) => p.id)],
+                    },
+                  });
+                  if (currentReqId === exploreRequestIdRef.current && altRes.tracks && altRes.tracks.length > 0) {
+                    const altPool = (altRes.tracks as Track[]).filter((t) => !isOldEraTrack(t));
+                    for (const t of altPool) {
+                      if (
+                        !prevNew.some((p) => p.id === t.id || sameSong(p, t)) &&
+                        !fresh.some((f) => f.id === t.id || sameSong(f, t))
+                      ) {
+                        fresh.push(t);
+                      }
+                    }
+                  }
+                }
+              }
+              if (fresh.length > 0) {
+                const diversified = diversifyTrackList(fresh, {
+                  maxPerArtist: 3,
+                  maxPerAlbum: 1,
+                  minArtistSpacing: 2,
+                  minAlbumSpacing: 3,
+                });
                 setMixTracks((prev) => {
-                  const next = { ...prev, newrelease: pool };
+                  const next = { ...prev, newrelease: diversified };
                   writeHomeCache({ mixTracks: next });
                   return next;
                 });
-                recordSeenTrackIdentities(pool);
+                recordSeenTrackIdentities(diversified);
               }
             }
           })(),
@@ -1524,17 +1604,53 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 count: 40,
                 refreshNonce: nonce,
                 artists: topArtists(stats, likes),
-                page: 1,
+                page: targetPage,
                 recentSeenIds,
               },
             });
+            if (currentReqId !== exploreRequestIdRef.current) return;
             if (res.tracks && res.tracks.length > 0) {
               const pool = (res.tracks as Track[]).filter(isOldEraTrack);
-              const finalPool = pool.length > 0 ? pool : (res.tracks as Track[]);
-              if (finalPool.length > 0) {
-                setOldSongsList(finalPool);
-                writeHomeCache({ oldSongsList: finalPool });
-                recordSeenTrackIdentities(finalPool);
+              const candidates = pool.length > 0 ? pool : (res.tracks as Track[]);
+              let fresh = candidates;
+              if (isExplicitRefresh && prevOld.length > 0) {
+                fresh = candidates.filter((t) => !prevOld.some((p) => p.id === t.id || sameSong(p, t)));
+                if (fresh.length < 10) {
+                  const altPage = (targetPage % 5) + 1;
+                  const altRes = await runOldSongs({
+                    data: {
+                      languages: settings.languages,
+                      count: 40,
+                      refreshNonce: `${nonce}-alt`,
+                      artists: topArtists(stats, likes),
+                      page: altPage,
+                      recentSeenIds: [...recentSeenIds, ...prevOld.map((p) => p.id)],
+                    },
+                  });
+                  if (currentReqId === exploreRequestIdRef.current && altRes.tracks && altRes.tracks.length > 0) {
+                    const altPool = (altRes.tracks as Track[]).filter(isOldEraTrack);
+                    const altCandidates = altPool.length > 0 ? altPool : (altRes.tracks as Track[]);
+                    for (const t of altCandidates) {
+                      if (
+                        !prevOld.some((p) => p.id === t.id || sameSong(p, t)) &&
+                        !fresh.some((f) => f.id === t.id || sameSong(f, t))
+                      ) {
+                        fresh.push(t);
+                      }
+                    }
+                  }
+                }
+              }
+              if (fresh.length > 0) {
+                const diversified = diversifyTrackList(fresh, {
+                  maxPerArtist: 3,
+                  maxPerAlbum: 1,
+                  minArtistSpacing: 2,
+                  minAlbumSpacing: 3,
+                });
+                setOldSongsList(diversified);
+                writeHomeCache({ oldSongsList: diversified });
+                recordSeenTrackIdentities(diversified);
               }
             }
           })(),
@@ -1542,7 +1658,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       } catch (e) {
         console.error("[loadExploreFeeds] Error:", e);
       } finally {
-        setExploreLoading(false);
+        if (currentReqId === exploreRequestIdRef.current) {
+          setExploreLoading(false);
+        }
       }
     },
     [runTrending, runNewSongs, runOldSongs, settings.languages, stats, likes],
@@ -1596,14 +1714,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               }
             }
 
-            // Fallback to trending catalog if deep search is still sparse
+            // Fallback to language-relevant artist essentials and radio discovery if deep search is still sparse
             if (fresh.length < 15) {
-              const fallbackRes = await runTrending({
+              const fallbackRes = await runMoodPicks({
                 data: {
+                  mood: "Melody",
                   languages: settings.languages,
-                  count: 40,
-                  refreshNonce: `${nonce}-fallback`,
-                  clientHour,
                 },
               });
               if (fallbackRes.tracks) {
@@ -1627,9 +1743,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               minArtistSpacing: 2,
               minAlbumSpacing: 3,
             });
-            setRecs(diversified);
-            markFeedDisplayed(diversified);
-            writeHomeCache({ recs: diversified });
+
+            // Cross-check Home recommendations against current Trending list and deprioritize overlapping tracks
+            const currentTrending = trendingRef.current;
+            const nonTrendingRecs = diversified.filter(
+              (t) => !currentTrending.some((tr) => tr.id === t.id || sameSong(tr, t)),
+            );
+            const overlappingRecs = diversified.filter(
+              (t) => currentTrending.some((tr) => tr.id === t.id || sameSong(tr, t)),
+            );
+
+            // Prioritize distinct personalized discovery; allow limited overlap only if available pool is too small (< 10)
+            const finalRecs = nonTrendingRecs.length >= 10
+              ? nonTrendingRecs
+              : [...nonTrendingRecs, ...overlappingRecs];
+
+            setRecs(finalRecs);
+            markFeedDisplayed(finalRecs);
+            writeHomeCache({ recs: finalRecs });
           })(),
           (async () => {
             await loadDailyMix(nonce);
@@ -1639,7 +1770,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setRecLoading(false);
       }
     },
-    [runRecommend, runTrending, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
+    [runRecommend, runMoodPicks, loadDailyMix, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
   const loadRecommendations = useCallback(
