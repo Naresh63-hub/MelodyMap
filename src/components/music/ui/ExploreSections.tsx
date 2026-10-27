@@ -380,55 +380,7 @@ export function ExploreSections({
 
   return (
     <div className="space-y-7 pt-1 animate-fade-in">
-      {/* 1. New Releases */}
-      {newReleases.length > 0 && (
-        <section>
-          <SectionHeader
-            title="New Releases"
-            count={newReleases.length}
-            icon={Flame}
-            subtitle="Fresh official drops"
-          />
-          <HorizontalScrollRow
-            tracks={newReleases}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onToggleLike={onToggleLike}
-            onOpenOptions={onOpenOptions}
-            likedIds={likedIds}
-            downloadedIds={downloadedIds}
-            downloadingIds={downloadingIds}
-            downloadProgress={downloadProgress}
-          />
-        </section>
-      )}
-
-      {/* 2. Old Songs / Golden Era */}
-      {oldSongs && oldSongs.length > 0 && (
-        <section>
-          <SectionHeader
-            title="Old Songs"
-            count={oldSongs.length}
-            icon={Disc3}
-            subtitle="Golden Era & Retro hits"
-          />
-          <HorizontalScrollRow
-            tracks={oldSongs}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onToggleLike={onToggleLike}
-            onOpenOptions={onOpenOptions}
-            likedIds={likedIds}
-            downloadedIds={downloadedIds}
-            downloadingIds={downloadingIds}
-            downloadProgress={downloadProgress}
-          />
-        </section>
-      )}
-
-      {/* 3. Trending Songs */}
+      {/* 1. Trending Songs (Promoted to Top for Instant Access) */}
       {trending.length > 0 && (
         <section>
           <SectionHeader
@@ -465,6 +417,54 @@ export function ExploreSections({
               </Button>
             </div>
           )}
+        </section>
+      )}
+
+      {/* 2. New Releases */}
+      {newReleases.length > 0 && (
+        <section>
+          <SectionHeader
+            title="New Releases"
+            count={newReleases.length}
+            icon={Flame}
+            subtitle="Fresh official drops"
+          />
+          <HorizontalScrollRow
+            tracks={newReleases}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            onOpenOptions={onOpenOptions}
+            likedIds={likedIds}
+            downloadedIds={downloadedIds}
+            downloadingIds={downloadingIds}
+            downloadProgress={downloadProgress}
+          />
+        </section>
+      )}
+
+      {/* 3. Old Songs / Golden Era */}
+      {oldSongs && oldSongs.length > 0 && (
+        <section>
+          <SectionHeader
+            title="Old Songs"
+            count={oldSongs.length}
+            icon={Disc3}
+            subtitle="Golden Era & Retro hits"
+          />
+          <HorizontalScrollRow
+            tracks={oldSongs}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+            onToggleLike={onToggleLike}
+            onOpenOptions={onOpenOptions}
+            likedIds={likedIds}
+            downloadedIds={downloadedIds}
+            downloadingIds={downloadingIds}
+            downloadProgress={downloadProgress}
+          />
         </section>
       )}
     </div>
