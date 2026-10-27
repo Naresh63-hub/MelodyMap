@@ -959,6 +959,21 @@ export function useAudioPlayer(options: {
       ) {
         console.warn("[MelodyMap] Audio element error:", audio.error.code, audio.error.message);
 
+        // Check if device is offline (either navigator.onLine is false, or network error while disconnected)
+        const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
+        if (isOffline) {
+          clearPendingTimers();
+          reconnectAttemptsRef.current = 0;
+          setIsReconnecting(false);
+          isRetryingRef.current = false;
+          onErrorRef.current?.("You are offline. Check your internet connection.", {
+            code: "OFFLINE",
+            isOffline: true,
+            error: audio.error,
+          });
+          return;
+        }
+
         // Case 1: Recoverable network error mid-stream (code 2 = MEDIA_ERR_NETWORK)
         if (wantPlayRef.current && audio.error.code === 2) {
           console.warn("[MelodyMap] Audio network error (MEDIA_ERR_NETWORK), attempting mid-song reconnect.");
@@ -987,15 +1002,35 @@ export function useAudioPlayer(options: {
         }
 
         // Case 3: Permanent failure (code 4 / code 3 / invalid source)
-        // Stop retrying the dead source. Clear retry state and report unplayable stream.
         clearPendingTimers();
         reconnectAttemptsRef.current = 0;
         setIsReconnecting(false);
 
-        const message = activeId.startsWith("podcast:")
-          ? "Couldn't play this episode. The podcast host may be temporarily unavailable."
-          : "Audio stream unavailable, skipping to next track...";
-        onErrorRef.current?.(message);
+        let specificMessage: string;
+        let errorCode: AudioPlayerErrorDetails["code"] = "UNKNOWN_ERROR";
+
+        if (audio.error.code === 3) {
+          errorCode = "DECODE_ERROR";
+          specificMessage = "Audio decode failed. The audio format may not be supported by this device.";
+        } else if (audio.error.code === 4) {
+          errorCode = "SRC_NOT_SUPPORTED";
+          if (activeId.startsWith("podcast:")) {
+            specificMessage = "Podcast episode source is unavailable or unreachable.";
+          } else {
+            specificMessage = "Audio stream unavailable for this track.";
+          }
+        } else if (audio.error.code === 2) {
+          errorCode = "NETWORK_ERROR";
+          specificMessage = "Network connection failed while streaming audio.";
+        } else {
+          specificMessage = audio.error.message || "An audio playback error occurred.";
+        }
+
+        onErrorRef.current?.(specificMessage, {
+          code: errorCode,
+          isOffline: false,
+          error: audio.error,
+        });
       }
     };
 
@@ -1011,7 +1046,14 @@ export function useAudioPlayer(options: {
     const handleOffline = () => {
       console.warn("[MelodyMap] Device disconnected from internet.");
       clearPendingTimers();
-      setIsReconnecting(true);
+      setIsReconnecting(false);
+      isRetryingRef.current = false;
+      setIsLoading(false);
+      setIsPlaying(false);
+      onErrorRef.current?.("You are offline. Playback paused.", {
+        code: "OFFLINE",
+        isOffline: true,
+      });
     };
 
     audio.addEventListener("play", onPlay);
@@ -1228,6 +1270,17 @@ export function useAudioPlayer(options: {
       if (playbackSessionRef.current !== session) return;
       if (playedOffline) return;
 
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setIsLoading(false);
+        setIsPlaying(false);
+        wantPlayRef.current = false;
+        onErrorRef.current?.("You are offline. This song is not downloaded.", {
+          code: "OFFLINE",
+          isOffline: true,
+        });
+        return;
+      }
+
       if (sanitized) {
         setStream(sanitized, startAt);
         return;
@@ -1276,6 +1329,16 @@ export function useAudioPlayer(options: {
       if (playbackSessionRef.current !== session) return;
       if (playedOffline) return;
 
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        setIsLoading(false);
+        setIsPlaying(false);
+        onErrorRef.current?.("You are offline. This song is not downloaded.", {
+          code: "OFFLINE",
+          isOffline: true,
+        });
+        return;
+      }
+
       if (sanitized) {
         setStream(sanitized, startSeconds);
         return;
@@ -1291,6 +1354,18 @@ export function useAudioPlayer(options: {
     initWebAudio();
     const audio = audioRef.current;
     if (!audio) return;
+
+    const isBlobUrl = audio.src && (audio.src.startsWith("blob:") || audio.src.startsWith("data:"));
+    if (!isBlobUrl && typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsPlaying(false);
+      setIsLoading(false);
+      wantPlayRef.current = false;
+      onErrorRef.current?.("You are offline. Reconnect to internet or play downloaded songs.", {
+        code: "OFFLINE",
+        isOffline: true,
+      });
+      return;
+    }
 
     // If audio element is in an error state or has no valid source, recover it
     if (
