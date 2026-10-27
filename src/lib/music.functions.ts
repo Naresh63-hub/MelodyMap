@@ -1402,18 +1402,20 @@ export const newSongs = createServerFn({ method: "POST" })
       if (releases.length > 0) {
         const pool = (releases as Track[]).filter((t) => !isOldEraTrack(t));
         const candidates = pool.length > 0 ? pool : (releases as Track[]);
-        if (recentSeenSet.size > 0 && page === 1) {
+        if (recentSeenSet.size > 0) {
           const unseen = candidates.filter((t) => !recentSeenSet.has(t.id.toLowerCase()));
-          const seen = candidates.filter((t) => recentSeenSet.has(t.id.toLowerCase()));
+          if (unseen.length > 0) {
+            return {
+              tracks: unseen.slice(0, count),
+              error: null,
+            };
+          }
+        } else {
           return {
-            tracks: [...unseen, ...seen].slice(0, count),
+            tracks: candidates.slice(0, count),
             error: null,
           };
         }
-        return {
-          tracks: candidates.slice(0, count),
-          error: null,
-        };
       }
     } catch (err) {
       console.warn("[newSongs] Saavn new releases feed notice:", err);
@@ -1424,16 +1426,26 @@ export const newSongs = createServerFn({ method: "POST" })
 
     try {
       const { searchSaavn } = await import("./providers/saavn");
+      const queryTemplates = [
+        (l: string) => `${l} latest new hit songs ${year}`,
+        (l: string) => `${l} new release songs ${year}`,
+        (l: string) => `latest ${l} movie songs ${year}`,
+        (l: string) => `${l} top new songs ${year}`,
+        (l: string) => `new ${l} albums ${year}`,
+      ];
+      const qIndex = (page - 1) % queryTemplates.length;
+      const fn = queryTemplates[qIndex] || queryTemplates[0]!;
       const queries = langs.length > 0
-        ? langs.map((l) => `${l} latest new hit songs ${year}`)
+        ? langs.map((l) => fn(l))
         : [`latest hit songs ${year}`];
 
       for (const q of queries) {
         if (out.length >= count) break;
-        const hits = await searchSaavn(q, { limit: 12 });
+        const hits = await searchSaavn(q, { limit: 15, page });
         for (const t of hits) {
           if (out.length >= count) break;
           if (!seen.has(t.id) && isOriginalSong(t) && !isOldEraTrack(t)) {
+            if (recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase())) continue;
             seen.add(t.id);
             out.push(t as Track);
           }
@@ -1446,10 +1458,11 @@ export const newSongs = createServerFn({ method: "POST" })
         const queryPool = langs.length > 0
           ? langs.map((l) => `${l} latest songs ${year} official audio`)
           : [`latest hit songs ${year} official audio`];
-        const ytTracks = await runQueryBatch(queryPool, 10, true, false);
+        const ytTracks = await runQueryBatch(queryPool, 10, true, false, page);
         for (const t of ytTracks) {
           if (out.length >= count) break;
           if (!seen.has(t.id) && isOriginalSong(t) && !isOldEraTrack(t)) {
+            if (recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase())) continue;
             seen.add(t.id);
             out.push(t as Track);
           }
