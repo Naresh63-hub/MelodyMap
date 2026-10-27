@@ -168,9 +168,6 @@ export function MobileQueue({
                         onClick={() => onJump(realIndex)}
                         className="flex min-w-0 flex-1 items-center gap-3"
                       >
-                        <span className="w-5 text-center text-[10px] text-muted-foreground tabular-nums shrink-0">
-                          {realIndex + 1}
-                        </span>
                         <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-md bg-card">
                           {track.thumbnail ? (
                             <img src={track.thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" />

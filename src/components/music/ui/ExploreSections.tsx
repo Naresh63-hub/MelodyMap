@@ -216,16 +216,6 @@ function VerticalSongList({
               active ? "bg-chip-strong" : "hover:bg-chip-subtle",
             )}
           >
-            {/* Queue / Chart position number */}
-            <span
-              className={cn(
-                "w-5 text-center text-xs font-semibold tabular-nums shrink-0",
-                active ? "text-primary font-bold" : "text-muted-foreground/80",
-              )}
-            >
-              {i + 1}
-            </span>
-
             {/* Thumbnail + Play Action */}
             <button
               type="button"

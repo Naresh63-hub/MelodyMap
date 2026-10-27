@@ -3801,7 +3801,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       <MobileHomeSections
                         dailyMix={dailyMixTracks}
                         recommended={recs}
-                        trending={trendingList}
                         userLanguages={settings.languages}
                         onArtistClick={(artist: JioSaavnArtist) => {
                           setTab("search");
