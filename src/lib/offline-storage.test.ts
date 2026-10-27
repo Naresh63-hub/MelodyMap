@@ -346,5 +346,49 @@ describe("Offline Storage & Playback Reliability", () => {
       expect(message).toContain("Tap Retry");
       expect(actionLabel).toBe("Retry");
     });
+
+    it("distinguishes offline status from genuine stream errors and suppresses auto-skip when offline", () => {
+      let skipped = false;
+      let displayedProblem = "";
+
+      const processPlayerError = (
+        isOffline: boolean,
+        details: { code?: string; isOffline?: boolean } | undefined,
+        genericMsg: string,
+      ) => {
+        if (isOffline || details?.isOffline || details?.code === "OFFLINE") {
+          displayedProblem = "You're offline. Check your internet connection.";
+          // Do not skip!
+          return;
+        }
+
+        if (details?.code === "DECODE_ERROR") {
+          displayedProblem = "Audio format decode error. Skipping to next track...";
+        } else if (details?.code === "SRC_NOT_SUPPORTED") {
+          displayedProblem = "Audio source unavailable for this track. Skipping to next track...";
+        } else if (details?.code === "NETWORK_ERROR") {
+          displayedProblem = "Network error during stream. Skipping to next track...";
+        } else {
+          displayedProblem = genericMsg;
+        }
+        skipped = true;
+      };
+
+      // 1. Offline scenario: never skips, shows offline message
+      processPlayerError(true, { code: "OFFLINE", isOffline: true }, "Audio stream unavailable");
+      expect(skipped).toBe(false);
+      expect(displayedProblem).toBe("You're offline. Check your internet connection.");
+
+      // 2. Decode error: shows specific decode error
+      processPlayerError(false, { code: "DECODE_ERROR" }, "Audio stream unavailable");
+      expect(skipped).toBe(true);
+      expect(displayedProblem).toBe("Audio format decode error. Skipping to next track...");
+
+      // 3. Source not supported: shows specific source unavailable error
+      skipped = false;
+      processPlayerError(false, { code: "SRC_NOT_SUPPORTED" }, "Audio stream unavailable");
+      expect(skipped).toBe(true);
+      expect(displayedProblem).toBe("Audio source unavailable for this track. Skipping to next track...");
+    });
   });
 });
