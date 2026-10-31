@@ -881,7 +881,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setTimeout(() => setMessage(null), 3000);
     },
     getNextTrack: () => {
-      if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
+      if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current || sleepTimerService.isStopAtTrackEnd()) {
         return undefined;
       }
 
@@ -902,6 +902,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       return undefined;
     },
     onEnded: (autoAdvanced = false) => {
+      if (sleepTimerService.isStopAtTrackEnd()) {
+        sleepTimerHaltedRef.current = true;
+        sleepTimerService.triggerExpire();
+        player.pause();
+        return;
+      }
       if (sleepTimerService.isExpired() || sleepTimerHaltedRef.current) {
         player.pause();
         return;
