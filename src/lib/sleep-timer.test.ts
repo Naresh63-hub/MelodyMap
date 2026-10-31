@@ -297,4 +297,31 @@ describe("MelodyMap Sleep Timer Specification & Invariants", () => {
       expect(sleepTimerService.isExpired()).toBe(true);
     });
   });
+
+  describe("6. Finish Current Song (Stop at Track End)", () => {
+    it("activates and reports stopAtTrackEnd state", () => {
+      sleepTimerService.setStopAtTrackEnd(true);
+      expect(sleepTimerService.isStopAtTrackEnd()).toBe(true);
+      const state = sleepTimerService.getState();
+      expect(state.active).toBe(true);
+      expect(state.stopAtTrackEnd).toBe(true);
+      expect(sleepTimerService.formatRemaining(state.remainingSeconds)).toBe("End of song");
+    });
+
+    it("cancels stopAtTrackEnd when cancel() is called", () => {
+      sleepTimerService.setStopAtTrackEnd(true);
+      expect(sleepTimerService.isStopAtTrackEnd()).toBe(true);
+      sleepTimerService.cancel();
+      expect(sleepTimerService.isStopAtTrackEnd()).toBe(false);
+      expect(sleepTimerService.getState().stopAtTrackEnd).toBe(false);
+    });
+
+    it("cancels stopAtTrackEnd when a normal minute duration timer is started", () => {
+      sleepTimerService.setStopAtTrackEnd(true);
+      expect(sleepTimerService.isStopAtTrackEnd()).toBe(true);
+      sleepTimerService.start(20);
+      expect(sleepTimerService.isStopAtTrackEnd()).toBe(false);
+      expect(sleepTimerService.getState().durationMinutes).toBe(20);
+    });
+  });
 });
