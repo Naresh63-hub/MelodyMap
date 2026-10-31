@@ -255,11 +255,11 @@ function getDynamicQueries(
   const langQualifier = primaryLang ? ` ${primaryLang}` : "";
   if (priorityArtists.length > 0) {
     for (const art of priorityArtists.slice(0, 6)) {
-      userNewQ.push(art);
+      userNewQ.push(`${art}${langQualifier} movie songs`);
       userNewQ.push(`${art}${langQualifier} songs`);
-      userNewQ.push(`${art} album songs`);
-      userOldQ.push(art);
-      userOldQ.push(`${art} melodies`);
+      userNewQ.push(`${art}${langQualifier} album songs`);
+      userOldQ.push(`${art}${langQualifier} movie songs`);
+      userOldQ.push(`${art}${langQualifier} melodies`);
     }
   }
 
@@ -267,10 +267,10 @@ function getDynamicQueries(
   const discovery = options?.discovery ?? 40;
   if (discovery > 30 && filteredRelatedArtists.length > 0) {
     for (const art of filteredRelatedArtists.slice(0, 4)) {
-      generalNewQ.push(art);
-      generalNewQ.push(`${art} songs`);
-      generalOldQ.push(art);
-      generalOldQ.push(`${art} album songs`);
+      generalNewQ.push(`${art}${langQualifier} movie songs`);
+      generalNewQ.push(`${art}${langQualifier} songs`);
+      generalOldQ.push(`${art}${langQualifier} movie songs`);
+      generalOldQ.push(`${art}${langQualifier} melodies`);
     }
   }
 
@@ -298,10 +298,10 @@ function getDynamicQueries(
   for (const lang of langs.slice(0, 3)) {
     const langPrefix = `${lang} `;
     for (const art of otherArtists.slice(0, 3)) {
-      generalNewQ.push(art);
+      generalNewQ.push(`${langPrefix}${art} movie songs`);
       generalNewQ.push(`${art} ${langPrefix}songs`);
-      generalOldQ.push(art);
-      generalOldQ.push(`${art} melodies`);
+      generalOldQ.push(`${langPrefix}${art} movie songs`);
+      generalOldQ.push(`${art} ${langPrefix}melodies`);
     }
 
     for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 2)) {

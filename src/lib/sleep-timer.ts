@@ -18,6 +18,7 @@ export type SleepTimerState = {
   targetEpochMs: number | null;
   remainingSeconds: number;
   expired: boolean;
+  stopAtTrackEnd: boolean;
 };
 
 export type SleepTimerPreset = {
@@ -37,6 +38,7 @@ export const SLEEP_TIMER_PRESETS: SleepTimerPreset[] = [
 const STORAGE_KEY_ACTIVE = "melodymap.sleeptimer.v2.active";
 const STORAGE_KEY_DURATION = "melodymap.sleeptimer.v2.duration";
 const STORAGE_KEY_TARGET = "melodymap.sleeptimer.v2.target";
+const STORAGE_KEY_TRACK_END = "melodymap.sleeptimer.v2.trackEnd";
 
 type Listener = (state: SleepTimerState) => void;
 type ExpireCallback = () => void;
@@ -47,6 +49,7 @@ class SleepTimerService {
   private targetEpochMs: number | null = null;
   private remainingSeconds = 0;
   private expired = false;
+  private stopAtTrackEnd = false;
 
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private listeners: Set<Listener> = new Set();
@@ -62,10 +65,18 @@ class SleepTimerService {
     try {
       if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
         const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE) === "true";
+        const savedTrackEnd = localStorage.getItem(STORAGE_KEY_TRACK_END) === "true";
         const savedDuration = localStorage.getItem(STORAGE_KEY_DURATION);
         const savedTarget = localStorage.getItem(STORAGE_KEY_TARGET);
 
-        if (savedActive && savedTarget) {
+        if (savedTrackEnd && savedActive) {
+          this.active = true;
+          this.expired = false;
+          this.stopAtTrackEnd = true;
+          this.durationMinutes = null;
+          this.targetEpochMs = null;
+          this.remainingSeconds = 0;
+        } else if (savedActive && savedTarget) {
           const targetMs = parseInt(savedTarget, 10);
           const durationMin = savedDuration ? parseInt(savedDuration, 10) : 30;
           const now = Date.now();
@@ -124,7 +135,34 @@ class SleepTimerService {
       targetEpochMs: this.targetEpochMs,
       remainingSeconds: this.remainingSeconds,
       expired: this.expired,
+      stopAtTrackEnd: this.stopAtTrackEnd,
     };
+  }
+
+  public setStopAtTrackEnd(enabled: boolean): void {
+    if (enabled) {
+      this.cancel();
+      this.stopAtTrackEnd = true;
+      this.active = true;
+      this.expired = false;
+      this.durationMinutes = null;
+      this.targetEpochMs = null;
+      this.remainingSeconds = 0;
+      if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+        try {
+          localStorage.setItem(STORAGE_KEY_ACTIVE, "true");
+          localStorage.setItem(STORAGE_KEY_TRACK_END, "true");
+        } catch {}
+      }
+    } else {
+      this.stopAtTrackEnd = false;
+      this.cancel();
+    }
+    this.notify();
+  }
+
+  public isStopAtTrackEnd(): boolean {
+    return this.stopAtTrackEnd && this.active;
   }
 
   public isExpired(): boolean {
@@ -139,6 +177,13 @@ class SleepTimerService {
   }
 
   public start(minutes: number): void {
+    this.stopAtTrackEnd = false;
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+      try {
+        localStorage.removeItem(STORAGE_KEY_TRACK_END);
+      } catch {}
+    }
+
     if (minutes <= 0) {
       this.cancel();
       return;
@@ -163,6 +208,7 @@ class SleepTimerService {
   public cancel(): void {
     this.active = false;
     this.expired = false;
+    this.stopAtTrackEnd = false;
     this.targetEpochMs = null;
     this.remainingSeconds = 0;
 
@@ -191,6 +237,7 @@ class SleepTimerService {
 
     this.active = false;
     this.expired = true;
+    this.stopAtTrackEnd = false;
     this.targetEpochMs = null;
     this.remainingSeconds = 0;
 
@@ -278,6 +325,7 @@ class SleepTimerService {
     try {
       localStorage.removeItem(STORAGE_KEY_ACTIVE);
       localStorage.removeItem(STORAGE_KEY_TARGET);
+      localStorage.removeItem(STORAGE_KEY_TRACK_END);
     } catch {}
   }
 
@@ -306,6 +354,7 @@ class SleepTimerService {
   }
 
   public formatRemaining(seconds: number): string {
+    if (this.stopAtTrackEnd && this.active) return "End of song";
     if (seconds <= 0) return "00:00";
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);

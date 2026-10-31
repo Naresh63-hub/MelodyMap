@@ -44,6 +44,9 @@ const SleepTimerModal = lazy(() =>
 const ShareModal = lazy(() =>
   import("@/components/music/ui/ShareModal").then((m) => ({ default: m.ShareModal }))
 );
+const ConfirmDeleteModal = lazy(() =>
+  import("@/components/music/ui/ConfirmDeleteModal").then((m) => ({ default: m.ConfirmDeleteModal }))
+);
 const LyricsPanel = lazy(() =>
   import("@/components/music/ui/LyricsPanel").then((m) => ({ default: m.LyricsPanel }))
 );
@@ -352,6 +355,7 @@ function MusicApp() {
   const [downloadedTracks, setDownloadedTracks] = useState<Track[]>([]);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
+  const [deleteConfirmTrack, setDeleteConfirmTrack] = useState<Track | null>(null);
   const [activeDownloadTrack, setActiveDownloadTrack] = useState<{ track: Track; isDone?: boolean } | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(80);
@@ -1331,7 +1335,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           data: { artists: artistList, languages: settings.languages, count: 24 },
         });
         if (res.tracks && res.tracks.length > 0) {
-          const pool = (res.tracks as Track[]).filter((t) => !isOldEraTrack(t));
+          const pool = (res.tracks as Track[]).filter(
+            (t) =>
+              !isOldEraTrack(t) &&
+              (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)),
+          );
           let fresh = applyExploreFilters(pool);
           if (fresh.length === 0) fresh = pool;
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
@@ -1371,7 +1379,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks) {
-          const pureMusic = res.tracks as Track[];
+          const pureMusic = (res.tracks as Track[]).filter(
+            (t) => settings.languages.length === 0 || isLanguageConsistent(t, settings.languages),
+          );
           // Freshness: exclude displayed/liked/recent/overlong tracks; fetch MORE rather than reuse.
           let fresh = applyFeedFilters(pureMusic);
           if (fresh.length < 6) {
@@ -1391,6 +1401,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (res2.tracks) {
               for (const t of res2.tracks as Track[]) {
+                if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
                 if (!pureMusic.some((existing) => sameSong(existing, t))) {
                   pureMusic.push(t);
                 }
@@ -1425,7 +1436,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks) {
-          const pureMusic = (res.tracks as Track[]).filter((t) => (isNewUser ? !isOldEraTrack(t) : true));
+          const pureMusic = (res.tracks as Track[]).filter(
+            (t) =>
+              (isNewUser ? !isOldEraTrack(t) : true) &&
+              (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)),
+          );
           // Freshness: fetch MORE candidates instead of re-serving displayed songs.
           let fresh = applyFeedFilters(pureMusic);
           if (fresh.length < 15) {
@@ -1442,6 +1457,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             if (res2.tracks) {
               for (const t of res2.tracks as Track[]) {
                 if (isNewUser && isOldEraTrack(t)) continue;
+                if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
                 if (!pureMusic.some((existing) => sameSong(existing, t))) {
                   pureMusic.push(t);
                 }
@@ -1713,6 +1729,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               if (res.tracks) {
                 for (const t of res.tracks as Track[]) {
                   if (isNewUser && isOldEraTrack(t)) continue;
+                  if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
                   if (!pureMusic.some((existing) => sameSong(existing, t))) {
                     pureMusic.push(t);
                   }
@@ -1734,6 +1751,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 if (fallbackRes.tracks) {
                   for (const t of fallbackRes.tracks as Track[]) {
                     if (!isOldEraTrack(t) && !pureMusic.some((existing) => sameSong(existing, t))) {
+                      if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
                       pureMusic.push(t);
                     }
                   }
@@ -1748,6 +1766,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 });
                 if (fallbackRes.tracks) {
                   for (const t of fallbackRes.tracks as Track[]) {
+                    if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
                     if (!pureMusic.some((existing) => sameSong(existing, t))) {
                       pureMusic.push(t);
                     }
@@ -1990,6 +2009,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 isOriginalSong(t) &&
                 (!isNewUser || !isOldEraTrack(t)) &&
                 hasPlayableDuration(t) &&
+                (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
                 !moreCandidates.some((existing) => sameSong(existing, t))
               ) {
                 moreCandidates.push(t);
@@ -2028,6 +2048,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     t &&
                     isOriginalSong(t) &&
                     hasPlayableDuration(t) &&
+                    (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
                     !moreCandidates.some((existing) => sameSong(existing, t))
                   ) {
                     moreCandidates.push(t);
@@ -2041,6 +2062,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           }
         }
+
+        // Prioritize tracks with legitimate movie metadata
+        moreCandidates.sort((a, b) => {
+          const aMovie = Boolean(extractTrackMovieOrAlbum(a));
+          const bMovie = Boolean(extractTrackMovieOrAlbum(b));
+          if (aMovie && !bMovie) return -1;
+          if (!aMovie && bMovie) return 1;
+          return 0;
+        });
 
         // 3. Relaxed Session Freshness Fallback:
         // If fresh is still sparse (< 6) due to session-level displayed sets,
@@ -2136,7 +2166,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         },
       });
       if (res.tracks && res.tracks.length > 0) {
-        const incoming = (res.tracks as Track[]).filter(isOriginalSong);
+        const incoming = (res.tracks as Track[]).filter(
+          (t) => isOriginalSong(t) && (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)),
+        );
         let addedCount = 0;
         setTrendingList((prev) => {
           const trulyNew = incoming.filter(
@@ -2203,6 +2235,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (dislikedIdsRef.current.has(t.id)) return false;
         const art = (t.artist || "").toLowerCase().trim();
         if (penalizedArtistSet.has(art)) return false;
+        if (settings.languages && settings.languages.length > 0) {
+          if (!isLanguageConsistent(t as Track, settings.languages)) return false;
+        }
         return true;
       };
 
@@ -2307,6 +2342,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         autoDjPageRef.current = (curPage % 5) + 1;
 
         const deduped = dedupeTracks(candidateTracks);
+        // Prioritize tracks that belong to movies/soundtrack albums so proper movie holder is displayed
+        deduped.sort((a, b) => {
+          const aMovie = Boolean(extractTrackMovieOrAlbum(a));
+          const bMovie = Boolean(extractTrackMovieOrAlbum(b));
+          if (aMovie && !bMovie) return -1;
+          if (!aMovie && bMovie) return 1;
+          return 0;
+        });
         // Diversify to guarantee no more than 2 tracks per artist, 1 per movie, and spaced out
         const diversifiedBatch = diversifyTrackList(deduped, {
           maxPerArtist: 2,
@@ -3786,7 +3829,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       onCreatePlaylistWith={(track) => setCreatePlaylistTrack(track)}
                       onAddToQueue={(track) => enqueue([track])}
                       onDownload={(track) => void handleDownload(track)}
-                      onRemoveDownload={(track) => void handleRemoveDownload(track)}
+                      onRemoveDownload={(track) => setDeleteConfirmTrack(track)}
                       onRetry={() => {
                         if (selectedMood) void handleSelectMood(selectedMood, false);
                       }}
@@ -4105,7 +4148,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 downloadingIds={downloadingIds}
                 downloadProgress={downloadProgress}
                 onDownload={(track) => void handleDownload(track)}
-                onRemoveDownload={(track) => void handleRemoveDownload(track)}
+                onRemoveDownload={(track) => setDeleteConfirmTrack(track)}
               />
               </div>
             )}
@@ -4218,7 +4261,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   downloadingIds={downloadingIds}
                   downloadProgress={downloadProgress}
                   onDownload={(track) => void handleDownload(track)}
-                  onRemoveDownload={(track) => void handleRemoveDownload(track)}
+                  onRemoveDownload={(track) => setDeleteConfirmTrack(track)}
                   onOpenOptions={(t) => setOptionsTrack(t)}
                   onPlay={(track, i) => {
                     if (current?.id === track.id) {
@@ -4395,7 +4438,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onToggleLike={(t) => handleToggleLike(t)}
           onAddToPlaylist={(t) => setCreatePlaylistTrack(t)}
           onDownload={(t) =>
-            downloadedIds.has(t.id) ? void handleRemoveDownload(t) : void handleDownload(t)
+            downloadedIds.has(t.id) ? setDeleteConfirmTrack(t) : void handleDownload(t)
           }
           onAddToQueue={(t) => enqueue([t])}
           onOpenLyrics={(t) => {
@@ -4442,6 +4485,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           open={!!shareTrack}
           track={shareTrack}
           onClose={() => setShareTrack(null)}
+        />
+
+        {/* CONFIRM DELETE DOWNLOAD MODAL (2-STEP CONFIRMATION) */}
+        <ConfirmDeleteModal
+          open={!!deleteConfirmTrack}
+          track={deleteConfirmTrack}
+          onClose={() => setDeleteConfirmTrack(null)}
+          onConfirm={(track) => {
+            void handleRemoveDownload(track);
+            setDeleteConfirmTrack(null);
+          }}
         />
 
         {/* ADD TO PLAYLIST MODAL */}

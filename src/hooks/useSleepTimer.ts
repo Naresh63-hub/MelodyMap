@@ -41,16 +41,22 @@ export function useSleepTimer(onSleep?: () => void) {
     sleepTimerService.resetExpired();
   }, []);
 
+  const setStopAtTrackEnd = useCallback((enable: boolean) => {
+    sleepTimerService.setStopAtTrackEnd(enable);
+  }, []);
+
   return {
     state,
     isActive: state.active,
     isExpired: state.expired,
+    isStopAtTrackEnd: state.stopAtTrackEnd,
     durationMinutes: state.durationMinutes,
     remaining: state.remainingSeconds,
     remainingSeconds: state.remainingSeconds,
     formattedRemaining: sleepTimerService.formatRemaining(state.remainingSeconds),
     presets: SLEEP_TIMER_PRESETS,
     startTimer,
+    setStopAtTrackEnd,
     cancelTimer,
     restartTimer,
     setDuration,

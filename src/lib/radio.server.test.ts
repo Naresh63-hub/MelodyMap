@@ -139,4 +139,68 @@ describe("radio.server getRadioTracks", () => {
       }
     }
   });
+
+  it("strictly filters out tracks in other languages and prioritizes movie soundtrack albums", async () => {
+    const mockSearch = vi.mocked(saavnProvider.searchSaavn);
+
+    mockSearch.mockImplementation(async (query: string): Promise<any> => {
+      return [
+        {
+          id: "tel-movie-1",
+          title: "Chuttamalle",
+          artist: "Anirudh Ravichander, Shilpa Rao",
+          album: "Devara Part 1",
+          languageCode: "telugu",
+          duration: 215,
+        },
+        {
+          id: "tam-movie-1",
+          title: "Hukum (Tamil)",
+          artist: "Anirudh Ravichander",
+          album: "Jailer",
+          languageCode: "tamil",
+          duration: 200,
+        },
+        {
+          id: "hin-movie-1",
+          title: "Chaleya (Hindi)",
+          artist: "Anirudh Ravichander, Arijit Singh",
+          album: "Jawan",
+          languageCode: "hindi",
+          duration: 210,
+        },
+        {
+          id: "tel-nonmovie-1",
+          title: "Independent Beat Track",
+          artist: "Anirudh Ravichander",
+          album: "Indie Single",
+          languageCode: "telugu",
+          duration: 180,
+        },
+      ];
+    });
+
+    const result = await getRadioTracks("seed-1", 10, undefined, {
+      title: "Fear Song",
+      artist: "Anirudh Ravichander",
+      album: "Devara Part 1",
+      languages: ["Telugu"],
+    });
+
+    const ids = result.tracks.map((t) => t.id);
+
+    // Telugu tracks must be included
+    expect(ids).toContain("tel-movie-1");
+
+    // Other language tracks must be strictly excluded
+    expect(ids).not.toContain("tam-movie-1");
+    expect(ids).not.toContain("hin-movie-1");
+
+    // Movie song must appear before non-movie single
+    const movieIdx = result.tracks.findIndex((t) => t.id === "tel-movie-1");
+    const nonMovieIdx = result.tracks.findIndex((t) => t.id === "tel-nonmovie-1");
+    if (nonMovieIdx !== -1) {
+      expect(movieIdx).toBeLessThan(nonMovieIdx);
+    }
+  });
 });

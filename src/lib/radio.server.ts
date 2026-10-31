@@ -8,6 +8,8 @@ import { searchSaavn } from "./providers/saavn";
 import { LANGUAGE_ARTISTS } from "./language-artists";
 import { norm, diversifyTrackList } from "./track-dedup";
 import { isOriginalSong } from "./track-filters";
+import { isLanguageConsistent } from "./library";
+import { cleanMovieName } from "./track-metadata";
 
 export interface RadioOptions {
   title?: string | undefined;
@@ -57,13 +59,15 @@ export async function getRadioTracks(
     }
 
     const primaryLang = languages[0] || "";
+    const langSuffix = primaryLang ? ` ${primaryLang}` : "";
 
-    // Build deep, taste-weighted catalog queries across albums, discography & co-artists:
-    // (Notice: no shallow "top songs" or "hit songs" bias that traps recommendations in 3 viral singles)
+    // Build deep, taste-weighted catalog queries across movie albums, discography & co-artists:
+    // Focus strictly on original movie soundtracks in user's selected language(s)
     const queries: { query: string; limit: number; page?: number }[] = [];
 
     if (artist) {
-      // 1. Primary artist natural discography at current pagination depth
+      // 1. Primary artist movie songs and discography
+      queries.push({ query: `${artist}${langSuffix} movie songs`, limit: 8, page });
       queries.push({ query: `${artist} songs`, limit: 8, page });
 
       // 2. Specific album/deep cut exploration for the artist
@@ -77,7 +81,8 @@ export async function getRadioTracks(
     }
 
     if (album && album.length > 2 && norm(album) !== normalizedSeedTitle) {
-      queries.push({ query: `${album} album`, limit: 5, page: Math.min(page, 2) });
+      queries.push({ query: `${album} album`, limit: 6, page: Math.min(page, 2) });
+      queries.push({ query: `${album}${langSuffix} movie songs`, limit: 6, page: Math.min(page, 2) });
     }
 
     // Co-artists for sonic variety in listener's language(s)
@@ -92,16 +97,16 @@ export async function getRadioTracks(
       const pickedCoArtists = shuffled.slice(0, 3);
       pickedCoArtists.forEach((ca, idx) => {
         const coArtistPage = page > 1 && idx % 2 === 1 ? 2 : 1;
-        queries.push({ query: `${ca} songs`, limit: 6, page: coArtistPage });
+        queries.push({ query: `${ca}${langSuffix} movie songs`, limit: 6, page: coArtistPage });
       });
     }
 
     // Fallback if no queries were formed
     if (queries.length === 0) {
       if (cleanTitle) {
-        queries.push({ query: `${cleanTitle} songs`, limit: 10, page });
+        queries.push({ query: `${cleanTitle}${langSuffix} movie songs`, limit: 10, page });
       } else {
-        queries.push({ query: `${primaryLang || "trending"} melodies`, limit: 12, page });
+        queries.push({ query: `${primaryLang || "trending"} movie songs`, limit: 12, page });
       }
     }
 
@@ -140,7 +145,10 @@ export async function getRadioTracks(
 
         if (seenTitles.has(tTitleNorm)) continue;
 
-        // Non-film devotional/festival folk song filter
+        // 1. Strict language check: ensure every track belongs to user's selected languages
+        if (languages.length > 0 && !isLanguageConsistent(t, languages)) continue;
+
+        // 2. Non-film devotional/festival folk song filter
         if (!isOriginalSong(t)) continue;
 
         seenIds.add(t.id);
@@ -154,9 +162,17 @@ export async function getRadioTracks(
           thumbnail: t.thumbnail,
           album: t.album,
           previewUrl: t.previewUrl,
+          languageCode: t.languageCode,
         });
       }
     }
+
+    // Prioritize tracks with legitimate movie metadata so the movie album title is always displayed
+    interleavedCandidates.sort((a, b) => {
+      const aMovie = cleanMovieName(a.album, a.title) ? 1 : 0;
+      const bMovie = cleanMovieName(b.album, b.title) ? 1 : 0;
+      return bMovie - aMovie;
+    });
 
     // Apply strict anti-clustering diversification:
     // max 2 tracks per artist, max 1 track per movie, minimum artist spacing of 2
