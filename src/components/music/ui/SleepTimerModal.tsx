@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Moon, RotateCcw, X, Clock, Sliders } from "lucide-react";
+import { Moon, RotateCcw, X, Clock, Sliders, Disc } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSleepTimer } from "@/hooks/useSleepTimer";
 import { SLEEP_TIMER_PRESETS } from "@/lib/sleep-timer";
@@ -22,10 +22,12 @@ export function SleepTimerModal({
   const {
     isActive,
     isExpired,
+    isStopAtTrackEnd,
     durationMinutes,
     remainingSeconds,
     formattedRemaining,
     startTimer,
+    setStopAtTrackEnd,
     cancelTimer,
     restartTimer,
     resetExpired,
@@ -80,6 +82,9 @@ export function SleepTimerModal({
   };
 
   const formatDisplayMinutes = () => {
+    if (isStopAtTrackEnd) {
+      return "End of song";
+    }
     if (isActive) {
       return formattedRemaining;
     }
@@ -164,6 +169,36 @@ export function SleepTimerModal({
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Finish Current Song Option */}
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => {
+              if (isStopAtTrackEnd) {
+                cancelTimer();
+              } else {
+                resetExpired();
+                setStopAtTrackEnd(true);
+                onClose();
+              }
+            }}
+            className={cn(
+              "w-full flex items-center justify-between rounded-xl border p-2.5 text-xs font-semibold transition-all",
+              isStopAtTrackEnd
+                ? "border-primary bg-primary/15 text-primary shadow-xs"
+                : "border-hair bg-card text-foreground hover:bg-chip",
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <Disc className="h-4 w-4 text-primary" />
+              <span>Finish Current Song</span>
+            </div>
+            <span className="text-[11px] font-normal text-muted-foreground">
+              {isStopAtTrackEnd ? "Active (Stops at end)" : "Stop at track end"}
+            </span>
+          </button>
         </div>
 
         {/* Preset Chips */}
