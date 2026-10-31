@@ -189,6 +189,7 @@ const RecommendInput = z.object({
   penalizedArtists: z.array(z.string()).max(20).default([]),
   clientHour: z.number().min(0).max(23).optional(),
   temporalContext: z.string().max(300).optional(),
+  isNewUser: z.boolean().optional(),
 });
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -376,6 +377,7 @@ async function getLocalPicks(data: {
   affinityArtists?: string[] | undefined;
   penalizedArtists?: string[] | undefined;
   clientHour?: number | undefined;
+  isNewUser?: boolean | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
   const page = Math.max(1, data.page ?? 1);
@@ -384,6 +386,99 @@ async function getLocalPicks(data: {
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
   const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
   const penalizedSet = new Set((data.penalizedArtists ?? []).map((s) => norm(s)));
+  const isNewUser = Boolean(
+    data.isNewUser ?? (artists.length === 0 && (data.affinityArtists?.length ?? 0) === 0 && (data.exclude?.length ?? 0) === 0),
+  );
+
+  // Filter out any excluded / recently played / penalized / cross-language tracks
+  const isCandidateValid = (t: Track) => {
+    const key = norm(`${t.artist} - ${t.title}`);
+    const titleKey = norm(t.title);
+    const artKey = norm(t.artist);
+    if (excludeSet.has(key) || excludeSet.has(titleKey)) return false;
+    if (penalizedSet.has(artKey)) return false;
+    if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
+    if (isNewUser && isOldEraTrack(t)) return false;
+    return isOriginalSong(t);
+  };
+
+  // For a brand new user on first login: strictly deliver ONLY new released songs and recently popular hits
+  if (isNewUser) {
+    const { newQueries } = getDynamicQueries(languages, artists, {
+      discovery: data.discovery,
+      clientHour: data.clientHour,
+    });
+
+    const popularQueries: string[] = [];
+    const activeLangs = languages.length > 0 ? languages : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
+    for (const lang of activeLangs) {
+      popularQueries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
+      popularQueries.push(`${lang} Most Popular Viral Songs`);
+      popularQueries.push(`Top 50 ${lang} songs`);
+      popularQueries.push(`${lang} latest hit songs ${CURRENT_YEAR}`);
+      popularQueries.push(`${lang} new releases ${CURRENT_YEAR}`);
+    }
+
+    const queryOffset = (page - 1) * 3;
+    const rotateQueries = (arr: string[], offset: number) => {
+      if (arr.length === 0) return [];
+      const normalized = offset % arr.length;
+      return [...arr.slice(normalized), ...arr.slice(0, normalized)];
+    };
+
+    const pickedNew = rotateQueries(newQueries, queryOffset).slice(0, 4);
+    const pickedPopular = rotateQueries(popularQueries, queryOffset).slice(0, 4);
+
+    const [queryCandidates, trendingCandidates, newReleasesCandidates] = await Promise.all([
+      runQueryBatch([...pickedNew, ...pickedPopular], 14, true, bypassCache, page),
+      (async () => {
+        try {
+          const { getSaavnTrendingSongs } = await import("./providers/saavn");
+          return await getSaavnTrendingSongs(languages, 15);
+        } catch {
+          return [];
+        }
+      })(),
+      (async () => {
+        try {
+          const { getSaavnNewReleases } = await import("./providers/saavn");
+          return await getSaavnNewReleases(languages, 15);
+        } catch {
+          return [];
+        }
+      })(),
+    ]);
+
+    const combined = [
+      ...queryCandidates,
+      ...(trendingCandidates as Track[]),
+      ...(newReleasesCandidates as Track[]),
+    ];
+
+    const seenIds = new Set<string>();
+    const seenKeys = new Set<string>();
+    const validCandidates: Track[] = [];
+
+    for (const t of combined) {
+      if (!t || !t.id || seenIds.has(t.id)) continue;
+      if (!isCandidateValid(t)) continue;
+      const key = getTrackDedupeKey(t.title, t.artist);
+      if (key && seenKeys.has(key)) continue;
+      if (key) seenKeys.add(key);
+      seenIds.add(t.id);
+      validCandidates.push(t);
+    }
+
+    const shuffled = shuffleArray(validCandidates);
+    const diversified = diversifyTrackList(shuffled, {
+      maxPerArtist: 2,
+      maxPerAlbum: 1,
+      minArtistSpacing: 2,
+      minAlbumSpacing: 3,
+    });
+
+    return diversified.slice(0, count);
+  }
 
   // Expand with related artists via Deezer
   const relatedArtists: string[] = [];
@@ -424,17 +519,6 @@ async function getLocalPicks(data: {
 
   const newQuota = Math.ceil(count / 2);
   const oldQuota = count - newQuota;
-
-  // Filter out any excluded / recently played / penalized / cross-language tracks
-  const isCandidateValid = (t: Track) => {
-    const key = norm(`${t.artist} - ${t.title}`);
-    const titleKey = norm(t.title);
-    const artKey = norm(t.artist);
-    if (excludeSet.has(key) || excludeSet.has(titleKey)) return false;
-    if (penalizedSet.has(artKey)) return false;
-    if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
-    return isOriginalSong(t);
-  };
 
   const filteredNew = newCandidates.filter(isCandidateValid);
   const filteredOld = oldCandidates.filter(isCandidateValid);
@@ -759,6 +843,12 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
 export const recommendTracks = createServerFn({ method: "POST" })
   .validator((input: unknown) => RecommendInput.parse(input))
   .handler(async ({ data }) => {
+    const count = data.count ?? 30;
+    const hasTaste = data.liked.length > 0 || data.recent.length > 0;
+    const isNewUser = Boolean(
+      data.isNewUser ?? (!hasTaste && (data.artists?.length ?? 0) === 0 && (data.affinityArtists?.length ?? 0) === 0),
+    );
+
     const key = process.env["AI_API_KEY"];
     if (!key) {
       // No AI key — fall back to local YouTube-based picks with dynamic New & Old mix
@@ -781,15 +871,13 @@ export const recommendTracks = createServerFn({ method: "POST" })
         affinityArtists: data.affinityArtists,
         penalizedArtists: data.penalizedArtists,
         clientHour: data.clientHour,
+        isNewUser,
       });
       return { tracks, error: null };
     }
 
     const { generateText } = await import("ai");
     const { createAiGatewayProvider } = await import("./ai-gateway.server");
-
-    const count = data.count ?? 30;
-    const hasTaste = data.liked.length > 0 || data.recent.length > 0;
     const sanitizedLiked = data.liked.slice(0, 20).map(sanitizePromptInput).filter(Boolean);
     const sanitizedRecent = data.recent.slice(0, 20).map(sanitizePromptInput).filter(Boolean);
     const sanitizedSequence = (data.sequence ?? []).slice(0, 20).map(sanitizePromptInput).filter(Boolean);
@@ -813,7 +901,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
       "You map the sonic DNA of a listener's taste — tempo, pitch, instrumentation, vocal texture and energy — and read their behaviour sequentially: the order they play, replay and skip tracks.",
       hasTaste
         ? `Songs this listener loved:\n${sanitizedLiked.join("\n") || "(none yet)"}\n\nRecently played:\n${sanitizedRecent.join("\n") || "(none yet)"}`
-        : "The listener is brand new. Suggest widely loved, high-quality songs across popular genres.",
+        : "The listener is brand new on their first session. Strictly recommend widely loved current hits and fresh popular songs in their selected languages.",
       sanitizedSequence.length
         ? `Their last sessions in order, with what they did with each track:\n${sanitizedSequence.join("\n")}`
         : "",
@@ -837,7 +925,9 @@ export const recommendTracks = createServerFn({ method: "POST" })
         ? `CRITICAL LANGUAGE RESTRICTION: The user strictly wants songs in: ${sanitizedLangs.join(", ")}. EVERY single recommended track MUST be in one of these languages: ${sanitizedLangs.join(", ")}. Do NOT suggest tracks in any other language.`
         : "",
       "",
-      `Recommend ${count} songs with a dynamic 50/50 balance: exactly 50% brand new songs (released in ${PREV_YEAR}-${CURRENT_YEAR} or current trending hits) and 50% classic evergreen songs (90s, 2000s, iconic timeless tracks). Respect tuning preferences above.`,
+      isNewUser
+        ? `The listener is brand new. Recommend ${count} songs composed ONLY of brand new releases (released in ${PREV_YEAR}-${CURRENT_YEAR}) and the most popular songs that are currently trending and viral hits in their selected languages (${sanitizedLangs.join(", ")}). Absolutely DO NOT include any old, retro, vintage, 90s, or 2000s classics.`
+        : `Recommend ${count} songs with a dynamic 50/50 balance: exactly 50% brand new songs (released in ${PREV_YEAR}-${CURRENT_YEAR} or current trending hits) and 50% classic evergreen songs (90s, 2000s, iconic timeless tracks). Respect tuning preferences above.`,
       "CRITICAL: Do NOT suggest songs that are already in recently played list above. Every suggestion MUST be a different, unplayed song that the listener has not heard recently.",
       `CRITICAL DIVERSITY INSTRUCTION: Refresh session entropy token: [${seedNonce}]. On every refresh you MUST explore completely different tracks, unexpected classics, and fresh popular hits. Do not repeat songs.`,
       'Reply with ONLY a JSON array like: [{"title":"Song name","artist":"Artist name","reason":"why, max 8 words"}]',
@@ -865,6 +955,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         affinityArtists: data.affinityArtists,
         penalizedArtists: data.penalizedArtists,
         clientHour: data.clientHour,
+        isNewUser,
       });
       return { tracks, error: null };
     };
@@ -1223,6 +1314,7 @@ const LocalPicksInput = z.object({
   currentArtist: z.string().max(120).optional(),
   mode: z.enum(["feed", "discover", "nextup"]).default("feed"),
   count: z.number().min(1).max(40).optional(),
+  isNewUser: z.boolean().optional(),
 });
 
 /**
@@ -1271,6 +1363,7 @@ const DailyMixInput = z.object({
   dateSeed: z.string().optional(),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   count: z.number().min(1).max(60).optional(),
+  isNewUser: z.boolean().optional(),
 });
 
 /**
@@ -1288,18 +1381,34 @@ export const getDailyMix = createServerFn({ method: "POST" })
       : (data.dateSeed || new Date().toISOString().slice(0, 10));
     const artists = data.artists.map((a) => a.trim()).filter(Boolean);
     const languages = data.languages.map((l) => l.trim()).filter(Boolean);
+    const isNewUser = Boolean(data.isNewUser ?? (artists.length === 0 && (data.liked?.length ?? 0) === 0));
     const { newQueries, oldQueries } = getDynamicQueries(languages, artists);
 
     // Pick 4 dynamic new queries and 4 dynamic old queries (randomized on refresh, seeded on daily view)
     const pickedNew = data.refreshNonce
       ? shuffleArray(newQueries).slice(0, 4)
       : seededShuffleArray(newQueries, `${dateSeed}-new`).slice(0, 4);
-    const pickedOld = data.refreshNonce
-      ? shuffleArray(oldQueries).slice(0, 4)
-      : seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
+
+    let pickedQueries: string[];
+    if (isNewUser) {
+      const popularQueries: string[] = [];
+      const activeLangs = languages.length > 0 ? languages : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
+      for (const lang of activeLangs) {
+        popularQueries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
+        popularQueries.push(`${lang} Most Popular Viral Songs`);
+        popularQueries.push(`Top 50 ${lang} songs`);
+      }
+      const pickedPopular = shuffleArray(popularQueries).slice(0, 4);
+      pickedQueries = [...pickedNew, ...pickedPopular];
+    } else {
+      const pickedOld = data.refreshNonce
+        ? shuffleArray(oldQueries).slice(0, 4)
+        : seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
+      pickedQueries = [...pickedNew, ...pickedOld];
+    }
 
     const [queryCandidates, trendingCandidates, newReleasesCandidates] = await Promise.all([
-      runQueryBatch([...pickedNew, ...pickedOld], 10, true, bypassCache),
+      runQueryBatch(pickedQueries, 10, true, bypassCache),
       (async () => {
         try {
           const { getSaavnTrendingSongs } = await import("./providers/saavn");
@@ -1332,11 +1441,12 @@ export const getDailyMix = createServerFn({ method: "POST" })
       deduplicatedCandidates.push(t);
     }
 
-    // Rigorous language consistency: drop any track that conflicts with the
-    // listener's selected languages before the daily mix is assembled.
-    const consistent = languages.length > 0
-      ? deduplicatedCandidates.filter((t) => isLanguageConsistent(t, languages) && isOriginalSong(t))
-      : deduplicatedCandidates.filter(isOriginalSong);
+    // Rigorous language consistency and zero old songs for new users:
+    const consistent = deduplicatedCandidates.filter((t) => {
+      if (isNewUser && isOldEraTrack(t)) return false;
+      const langOk = languages.length > 0 ? isLanguageConsistent(t, languages) : true;
+      return langOk && isOriginalSong(t);
+    });
     const shuffled = data.refreshNonce
       ? shuffleArray(consistent)
       : seededShuffleArray(consistent, `${dateSeed}-final`);

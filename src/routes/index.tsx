@@ -1411,9 +1411,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const loadDailyMix = useCallback(
     async (refreshNonce?: number | string) => {
       const nonce = refreshNonce ?? Date.now();
+      const isNewUser = likes.length === 0 && history.length === 0;
       try {
         const res = await runDailyMix({
           data: {
+            isNewUser,
             languages: settings.languages,
             artists: topArtists(stats, likes),
             liked: likes.slice(0, 15).map(trackLabel),
@@ -1422,12 +1424,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks) {
-          const pureMusic = res.tracks as Track[];
+          const pureMusic = (res.tracks as Track[]).filter((t) => (isNewUser ? !isOldEraTrack(t) : true));
           // Freshness: fetch MORE candidates instead of re-serving displayed songs.
           let fresh = applyFeedFilters(pureMusic);
           if (fresh.length < 15) {
             const res2 = await runDailyMix({
               data: {
+                isNewUser,
                 languages: settings.languages,
                 artists: topArtists(stats, likes),
                 liked: likes.slice(0, 15).map(trackLabel),
@@ -1437,6 +1440,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (res2.tracks) {
               for (const t of res2.tracks as Track[]) {
+                if (isNewUser && isOldEraTrack(t)) continue;
                 if (!pureMusic.some((existing) => sameSong(existing, t))) {
                   pureMusic.push(t);
                 }
@@ -1457,7 +1461,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       } catch {}
     },
-    [runDailyMix, settings.languages, stats, likes, getSessionContext, applyFeedFilters, markFeedDisplayed],
+    [runDailyMix, settings.languages, stats, likes, history, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
 
   const loadExploreFeeds = useCallback(
@@ -1675,6 +1679,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const nonce = refreshNonce ?? `${Date.now()}-${safeUUID()}`;
       const clientHour = new Date().getHours();
       const affinity = contextEngine.getAffinityWeights(stats);
+      const isNewUser = likes.length === 0 && history.length === 0;
 
       try {
         await Promise.allSettled([
@@ -1686,6 +1691,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             for (let depth = 1; depth <= maxDepth; depth++) {
               const res = await runRecommend({
                 data: {
+                  isNewUser,
                   liked: likes.slice(0, 15).map(trackLabel),
                   recent: history.slice(0, 15).map(trackLabel),
                   disliked: dislikes.slice(0, 15).map(trackLabel),
@@ -1705,6 +1711,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               });
               if (res.tracks) {
                 for (const t of res.tracks as Track[]) {
+                  if (isNewUser && isOldEraTrack(t)) continue;
                   if (!pureMusic.some((existing) => sameSong(existing, t))) {
                     pureMusic.push(t);
                   }
@@ -1714,21 +1721,38 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               }
             }
 
-            // Fallback to language-relevant artist essentials and radio discovery if deep search is still sparse
+            // Fallback: for new users, fall back to new drops and trending hits; for returning users, language essentials
             if (fresh.length < 15) {
-              const fallbackRes = await runMoodPicks({
-                data: {
-                  mood: "Melody",
-                  languages: settings.languages,
-                },
-              });
-              if (fallbackRes.tracks) {
-                for (const t of fallbackRes.tracks as Track[]) {
-                  if (!pureMusic.some((existing) => sameSong(existing, t))) {
-                    pureMusic.push(t);
+              if (isNewUser) {
+                const fallbackRes = await runNewSongs({
+                  data: {
+                    languages: settings.languages,
+                    count: 20,
+                  },
+                });
+                if (fallbackRes.tracks) {
+                  for (const t of fallbackRes.tracks as Track[]) {
+                    if (!isOldEraTrack(t) && !pureMusic.some((existing) => sameSong(existing, t))) {
+                      pureMusic.push(t);
+                    }
                   }
+                  fresh = applyFeedFilters(pureMusic);
                 }
-                fresh = applyFeedFilters(pureMusic);
+              } else {
+                const fallbackRes = await runMoodPicks({
+                  data: {
+                    mood: "Melody",
+                    languages: settings.languages,
+                  },
+                });
+                if (fallbackRes.tracks) {
+                  for (const t of fallbackRes.tracks as Track[]) {
+                    if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                      pureMusic.push(t);
+                    }
+                  }
+                  fresh = applyFeedFilters(pureMusic);
+                }
               }
             }
 
@@ -1933,10 +1957,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         let fresh: Track[] = [];
         const baseNonce = Date.now();
 
+        const isNewUser = likes.length === 0 && history.length === 0;
+
         // 1. Primary AI / Deep Local Recommendation with deep ocean pagination
         for (let depth = 1; depth <= 3; depth++) {
           const res = await runRecommend({
             data: {
+              isNewUser,
               liked: likes.slice(0, 15).map(trackLabel),
               recent: history.slice(0, 15).map(trackLabel),
               disliked: dislikes.slice(0, 15).map(trackLabel),
@@ -1960,6 +1987,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               if (
                 t &&
                 isOriginalSong(t) &&
+                (!isNewUser || !isOldEraTrack(t)) &&
                 hasPlayableDuration(t) &&
                 !moreCandidates.some((existing) => sameSong(existing, t))
               ) {
@@ -3309,10 +3337,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         });
     };
 
-    const cleanRecs = filterCached(cachedFeed.recs);
+    const isNewUser = likes.length === 0 && history.length === 0;
+    const cleanRecs = filterCached(isNewUser ? cachedFeed.recs?.filter((t) => !isOldEraTrack(t)) : cachedFeed.recs);
     const cleanTrending = filterCached(cachedFeed.trendingList);
     const cleanOldSongs = filterCached(cachedFeed.oldSongsList?.filter(isOldEraTrack));
-    const cleanDailyMix = filterCached(cachedFeed.dailyMixTracks);
+    const cleanDailyMix = filterCached(isNewUser ? cachedFeed.dailyMixTracks?.filter((t) => !isOldEraTrack(t)) : cachedFeed.dailyMixTracks);
     const cleanMixTracks = cachedFeed.mixTracks
       ? {
           discover: filterCached(cachedFeed.mixTracks.discover),
@@ -3772,7 +3801,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                           <h1 suppressHydrationWarning className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
                             Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, <span className="text-animated-gradient">{auth.profile?.display_name?.split(" ")[0] || "Listener"}</span>
                           </h1>
-                          <p className="text-xs text-muted-foreground font-normal mt-0.5">Recommended based on your recent listening</p>
+                          <p className="text-xs text-muted-foreground font-normal mt-0.5">
+                            {likes.length === 0 && history.length === 0
+                              ? "Fresh new releases & recently popular hits"
+                              : "Recommended based on your recent listening"}
+                          </p>
                         </div>
 
                         <div className="flex items-center gap-2">
