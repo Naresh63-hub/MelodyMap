@@ -38,4 +38,45 @@ describe("scoreAudiusCandidate", () => {
     expect(scoreAudiusCandidate({}, { title: "", artist: "", durationSeconds: null })).toBe(0);
     expect(scoreAudiusCandidate({ title: "X" }, { title: "X", artist: "Y", durationSeconds: 0 })).toBeGreaterThan(0);
   });
+
+  it("penalizes extraneous words in candidate title (prevents false matches on common words)", () => {
+    const singleWordTarget = { title: "Fear", artist: "Anirudh", durationSeconds: 195 };
+    const unrelatedLongTitle = {
+      title: "Fear The Walking Dead Soundtrack Theme",
+      artist: "AMC Composer",
+      durationSeconds: 195,
+    };
+    // 1 token overlap out of 6 candidate tokens gives low title ratio
+    // Score should be well below the threshold of 2.6
+    expect(scoreAudiusCandidate(unrelatedLongTitle, singleWordTarget)).toBeLessThan(1.5);
+  });
+});
+
+describe("resolveStreamUrlWithMeta saavn safety", () => {
+  it("never falls back to audius or jamendo for saavn track IDs", async () => {
+    const { resolveStreamUrlWithMeta } = await import("./stream.server");
+    // Mock fetch for saavn API to return empty object immediately (no network delay)
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url: any, ...args: any[]) => {
+      const u = typeof url === "string" ? url : url?.url || "";
+      if (u.includes("jiosaavn.com")) {
+        return new Response(JSON.stringify({ status: "SUCCESS", songs: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return originalFetch(url, ...args);
+    };
+
+    try {
+      const res = await resolveStreamUrlWithMeta("saavn:non_existent_id_999999", "high", {
+        title: "NonExistentSongTitleXYZ123",
+        artist: "NonExistentArtistABC456",
+      });
+      // Must return null, never resolve to an unrelated Audius or Jamendo stream!
+      expect(res).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

@@ -2,7 +2,9 @@ import type { TrackLike } from "./track-dedup";
 import {
   detectTrackEnergy,
   calculateEnergyCompatibility,
+  calculateMoodCompatibility,
   getTemporalContext,
+  contextEngine,
   type TrackEnergy,
 } from "./context-engine";
 import {
@@ -19,6 +21,8 @@ export interface SessionContext {
   sessionCompletions?: number | undefined;
   sessionSkips?: number | undefined;
   familiarArtists?: Set<string> | undefined;
+  activeMood?: string | null | undefined;
+  transitionAffinity?: number | ((from?: string, to?: string) => number) | undefined;
 }
 
 export interface BanditModelState {
@@ -199,26 +203,47 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     // x0: Intercept
     x[0] = 1.0;
 
-    // x1: Circadian alignment
-    const hour = context.hourOfDay ?? new Date().getHours();
-    const tempCtx = getTemporalContext(hour);
+    // x1: Circadian & Mood Anchor Alignment
     const candidateEnergy = detectTrackEnergy(candidate);
-    let circadianScore: number;
-    if (tempCtx.energy === "gentle" || tempCtx.energy === "low") {
-      circadianScore = candidateEnergy === "chill" ? 1.0 : candidateEnergy === "medium" ? 0.6 : 0.2;
-    } else if (tempCtx.energy === "high") {
-      circadianScore = candidateEnergy === "high" ? 1.0 : candidateEnergy === "medium" ? 0.7 : 0.3;
-    } else {
-      circadianScore = candidateEnergy === "medium" ? 0.9 : 0.6;
-    }
-    x[1] = Math.max(0.0, Math.min(1.0, circadianScore));
+    let alignmentScore: number;
 
-    // x2: Energy continuity flow from current playing track
+    if (context.activeMood) {
+      // Anchored Mood Locking: evaluate candidate against chosen mood envelope
+      const candidateText = `${candidate.title || ""} ${candidate.artist || ""}`;
+      alignmentScore = calculateMoodCompatibility(context.activeMood, candidateEnergy, candidateText);
+    } else {
+      // Circadian alignment fallback
+      const hour = context.hourOfDay ?? new Date().getHours();
+      const tempCtx = getTemporalContext(hour);
+      if (tempCtx.energy === "gentle" || tempCtx.energy === "low") {
+        alignmentScore = candidateEnergy === "chill" ? 1.0 : candidateEnergy === "medium" ? 0.6 : 0.2;
+      } else if (tempCtx.energy === "high") {
+        alignmentScore = candidateEnergy === "high" ? 1.0 : candidateEnergy === "medium" ? 0.7 : 0.3;
+      } else {
+        alignmentScore = candidateEnergy === "medium" ? 0.9 : 0.6;
+      }
+    }
+    x[1] = Math.max(0.0, Math.min(1.0, alignmentScore));
+
+    // x2: Energy continuity flow & Markov sequence transition affinity
     if (context.currentTrack) {
       const currentEnergy = detectTrackEnergy(context.currentTrack);
       const compat = calculateEnergyCompatibility(currentEnergy, candidateEnergy); // range: -0.30 to +0.30
       // Map [-0.30, 0.30] -> [0.0, 1.0]
-      x[2] = Math.max(0.0, Math.min(1.0, (compat + 0.3) / 0.6));
+      const energyScore = Math.max(0.0, Math.min(1.0, (compat + 0.3) / 0.6));
+
+      // Markov sequence transition affinity
+      let transScore = 0.5;
+      if (typeof context.transitionAffinity === "function") {
+        transScore = context.transitionAffinity(context.currentTrack.artist, candidate.artist);
+      } else if (typeof context.transitionAffinity === "number") {
+        transScore = context.transitionAffinity;
+      } else if (contextEngine) {
+        transScore = contextEngine.getTransitionAffinity(context.currentTrack.artist, candidate.artist);
+      }
+
+      // Blend energy continuity (60%) and Markov transition (40%)
+      x[2] = Math.max(0.0, Math.min(1.0, 0.6 * energyScore + 0.4 * transScore));
     } else {
       x[2] = 0.5; // neutral when no current track
     }

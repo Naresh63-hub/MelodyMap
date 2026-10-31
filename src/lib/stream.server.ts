@@ -31,7 +31,7 @@ export type StreamMeta = {
 
 // ─── Audius match scoring ────────────────────────────────────────────
 
-const AUDIUS_MIN_SCORE = 2.0;
+const AUDIUS_MIN_SCORE = 2.6;
 
 /** Lowers case, strips bracketed tags/punctuation, returns word tokens. */
 function titleTokens(text: string | null | undefined): string[] {
@@ -59,13 +59,13 @@ export function scoreAudiusCandidate(
 ): number {
   let score = 0;
 
-  const candTitle = new Set(titleTokens(candidate.title));
-  const targetTitle = titleTokens(target.title);
+  const candTitleTokens = titleTokens(candidate.title);
+  const targetTitleTokens = titleTokens(target.title);
+  if (targetTitleTokens.length === 0 || candTitleTokens.length === 0) return 0;
+  const candTitle = new Set(candTitleTokens);
   let overlap = 0;
-  if (targetTitle.length > 0 && candTitle.size > 0) {
-    for (const tok of targetTitle) if (candTitle.has(tok)) overlap++;
-    score += (overlap / targetTitle.length) * 2;
-  }
+  for (const tok of targetTitleTokens) if (candTitle.has(tok)) overlap++;
+  score += (overlap / Math.max(targetTitleTokens.length, candTitleTokens.length)) * 2;
 
   // Strict check: if there is no title word overlap at all, it's a completely different track
   if (overlap === 0) return 0;
@@ -220,8 +220,8 @@ export async function resolveWithInnerTubePlayer(
   _quality: StreamQuality = "high",
   options?: { title?: string | null | undefined; artist?: string | null | undefined },
 ): Promise<StreamMeta | null> {
-  // If the ID is an explicit JioSaavn track ID, resolve directly from Saavn
-  if (videoId.startsWith("saavn:")) {
+  // If the ID is an explicit JioSaavn track ID or numeric ID, resolve strictly via Saavn
+  if (videoId.startsWith("saavn:") || /^\d{6,12}$/.test(videoId)) {
     const saavnDirect = await resolveSaavnById(videoId, _quality);
     if (saavnDirect?.url) {
       return {
@@ -253,20 +253,13 @@ export async function resolveWithInnerTubePlayer(
         }
       }
     }
+    // Saavn tracks are licensed regional music. Never fall through to Audius or Jamendo!
+    return null;
   }
 
-  // Handle purely numeric IDs as potential JioSaavn song IDs
-  if (/^\d{6,12}$/.test(videoId)) {
-    const saavnDirect = await resolveSaavnById(videoId, _quality);
-    if (saavnDirect?.url) {
-      return {
-        url: saavnDirect.url,
-        mimeType: saavnDirect.mimeType || "audio/mp4",
-        contentLength: null,
-        audioBitrate: _quality === "saver" ? 96000 : _quality === "standard" ? 160000 : 320000,
-        source: "saavn",
-      };
-    }
+  // Explicit Audius or Jamendo tracks should not cross-match across unrelated providers
+  if (videoId.startsWith("audius:") || videoId.startsWith("jamendo:")) {
+    return null;
   }
 
   // Test hook / legacy InnerTube fallback compatibility
@@ -384,7 +377,13 @@ export async function resolveWithInnerTubePlayer(
             bestScore = s;
           }
         }
-        if (best && bestScore >= AUDIUS_MIN_SCORE && best.playbackSource?.url) {
+        const hasArtistMatch =
+          !rawAuthor ||
+          !best?.artist ||
+          titleTokens(rawAuthor).some((t) =>
+            titleTokens(best?.artist).join(" ").includes(t),
+          );
+        if (best && bestScore >= AUDIUS_MIN_SCORE && hasArtistMatch && best.playbackSource?.url) {
           return {
             url: best.playbackSource.url,
             mimeType: "audio/mpeg",
@@ -412,7 +411,13 @@ export async function resolveWithInnerTubePlayer(
             bestScore = s;
           }
         }
-        if (best && bestScore >= AUDIUS_MIN_SCORE && best.playbackSource?.url) {
+        const hasArtistMatch =
+          !rawAuthor ||
+          !best?.artist ||
+          titleTokens(rawAuthor).some((t) =>
+            titleTokens(best?.artist).join(" ").includes(t),
+          );
+        if (best && bestScore >= AUDIUS_MIN_SCORE && hasArtistMatch && best.playbackSource?.url) {
           if (await probeStream(best.playbackSource.url)) {
             return {
               url: best.playbackSource.url,

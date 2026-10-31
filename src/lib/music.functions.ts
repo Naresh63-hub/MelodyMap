@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Track } from "./types";
 import { norm, areSameTrack, diversifyTrackList } from "./track-dedup";
 import { resolveAiModelId } from "./ai-gateway.server";
-import { getTemporalContext } from "./context-engine";
+import { getTemporalContext, MOOD_ENVELOPES } from "./context-engine";
 import { isLanguageConsistent, isOldEraTrack } from "./library";
 import { isOriginalSong } from "./track-filters";
 
@@ -215,6 +215,7 @@ function getDynamicQueries(
     relatedArtists?: string[] | undefined;
     discovery?: number | undefined;
     clientHour?: number | undefined;
+    mood?: string | undefined;
   },
 ): { newQueries: string[]; oldQueries: string[] } {
   let langs = languages.map((l) => l.trim()).filter(Boolean);
@@ -273,11 +274,22 @@ function getDynamicQueries(
     }
   }
 
-  // 3. Circadian temporal queries (clean studio hits)
-  const temporalCtx = getTemporalContext(options?.clientHour);
-  for (const theme of temporalCtx.queryThemes) {
-    for (const lang of langs.slice(0, 2)) {
-      generalNewQ.push(`${lang} ${theme}`);
+  // 3. Circadian & Mood Anchor queries (clean studio hits)
+  const normMood = (options?.mood || "").toLowerCase().trim();
+  const moodEnvelope = normMood ? MOOD_ENVELOPES[normMood] : undefined;
+
+  if (moodEnvelope && moodEnvelope.queryThemes.length > 0) {
+    for (const theme of moodEnvelope.queryThemes) {
+      for (const lang of langs.slice(0, 3)) {
+        generalNewQ.push(`${lang} ${theme}`);
+      }
+    }
+  } else {
+    const temporalCtx = getTemporalContext(options?.clientHour);
+    for (const theme of temporalCtx.queryThemes) {
+      for (const lang of langs.slice(0, 2)) {
+        generalNewQ.push(`${lang} ${theme}`);
+      }
     }
   }
 
@@ -378,6 +390,7 @@ async function getLocalPicks(data: {
   penalizedArtists?: string[] | undefined;
   clientHour?: number | undefined;
   isNewUser?: boolean | undefined;
+  mood?: string | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
   const page = Math.max(1, data.page ?? 1);
@@ -407,6 +420,7 @@ async function getLocalPicks(data: {
     const { newQueries } = getDynamicQueries(languages, artists, {
       discovery: data.discovery,
       clientHour: data.clientHour,
+      mood: data.mood,
     });
 
     const popularQueries: string[] = [];
@@ -499,6 +513,7 @@ async function getLocalPicks(data: {
     relatedArtists,
     discovery: data.discovery,
     clientHour: data.clientHour,
+    mood: data.mood,
   });
 
   // Sample queries with offset rotation based on page depth so deeper pages explore different facets/discographies
@@ -872,6 +887,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         penalizedArtists: data.penalizedArtists,
         clientHour: data.clientHour,
         isNewUser,
+        mood: data.mood,
       });
       return { tracks, error: null };
     }
@@ -956,6 +972,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         penalizedArtists: data.penalizedArtists,
         clientHour: data.clientHour,
         isNewUser,
+        mood: data.mood,
       });
       return { tracks, error: null };
     };

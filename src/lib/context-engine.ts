@@ -122,6 +122,103 @@ export function calculateEnergyCompatibility(
   return -0.30;
 }
 
+// ─── Mood Envelope Anchoring ──────────────────────────────────────
+
+export interface MoodEnvelope {
+  targetEnergy: TrackEnergy[];
+  keywords: string[];
+  queryThemes: string[];
+}
+
+export const MOOD_ENVELOPES: Record<string, MoodEnvelope> = {
+  chill: {
+    targetEnergy: ["chill"],
+    keywords: ["chill", "lo-fi", "lofi", "acoustic", "relax", "calm", "soft", "peaceful", "unplugged", "ambient", "mellow"],
+    queryThemes: ["acoustic chill melodies", "peaceful lofi songs", "soft acoustic unplugged hits"],
+  },
+  romantic: {
+    targetEnergy: ["chill", "medium"],
+    keywords: ["love", "romantic", "heart", "melody", "soul", "duet", "kadhal", "prema", "pyaar", "ishq", "priya"],
+    queryThemes: ["romantic love melodies", "heart touching duet songs", "sweet romantic chartbusters"],
+  },
+  workout: {
+    targetEnergy: ["high"],
+    keywords: ["workout", "gym", "energetic", "motivation", "hype", "banger", "fast", "drill", "trap", "bass", "power"],
+    queryThemes: ["high energy workout gym beats", "powerful motivation tracks", "fast pace hype songs"],
+  },
+  "upbeat workout": {
+    targetEnergy: ["high"],
+    keywords: ["workout", "gym", "energetic", "motivation", "hype", "banger", "fast", "drill", "trap", "bass", "power"],
+    queryThemes: ["high energy workout gym beats", "powerful motivation tracks", "fast pace hype songs"],
+  },
+  party: {
+    targetEnergy: ["high"],
+    keywords: ["party", "dance", "remix", "club", "dj", "edm", "banger", "celebration", "electronic", "mass", "bhangra"],
+    queryThemes: ["club dance party hits", "trending edm dance remixes", "mass banger party tracks"],
+  },
+  "sad hours": {
+    targetEnergy: ["chill"],
+    keywords: ["sad", "broken", "pain", "melancholy", "tears", "alone", "slow", "cry", "heartbreak", "dard"],
+    queryThemes: ["sad emotional heartbreak songs", "deep soulful pain melodies", "slow melancholy songs"],
+  },
+  sad: {
+    targetEnergy: ["chill"],
+    keywords: ["sad", "broken", "pain", "melancholy", "tears", "alone", "slow", "cry", "heartbreak", "dard"],
+    queryThemes: ["sad emotional heartbreak songs", "deep soulful pain melodies", "slow melancholy songs"],
+  },
+  focus: {
+    targetEnergy: ["chill", "medium"],
+    keywords: ["focus", "study", "instrumental", "ambient", "piano", "lo-fi", "lofi", "meditation", "calm", "peace"],
+    queryThemes: ["deep focus instrumental study beats", "ambient piano melodies", "peaceful calm background music"],
+  },
+  "late night": {
+    targetEnergy: ["chill"],
+    keywords: ["night", "midnight", "slowed", "reverb", "moon", "drive", "dark", "deep", "sleep", "soothing"],
+    queryThemes: ["late night slowed reverb hits", "midnight drive calm songs", "peaceful sleep ambient music"],
+  },
+  devotional: {
+    targetEnergy: ["chill", "medium"],
+    keywords: ["bhakti", "bhajan", "devotional", "prayer", "spiritual", "peace", "temple", "divine", "god", "aarti", "mantra", "shloka"],
+    queryThemes: ["peaceful bhakti bhajans", "soulful spiritual prayers", "divine temple devotional songs"],
+  },
+};
+
+/**
+ * Computes compatibility score in [0.0, 1.0] between an active mood anchor and a candidate track.
+ */
+export function calculateMoodCompatibility(
+  activeMood: string,
+  candidateEnergy: TrackEnergy,
+  candidateText = "",
+): number {
+  const normMood = activeMood.toLowerCase().trim();
+  const envelope = MOOD_ENVELOPES[normMood];
+  if (!envelope) return 0.5;
+
+  let energyScore = 0.5;
+  if (envelope.targetEnergy.includes(candidateEnergy)) {
+    energyScore = 0.85;
+  } else if (
+    (envelope.targetEnergy.includes("chill") && candidateEnergy === "high") ||
+    (envelope.targetEnergy.includes("high") && candidateEnergy === "chill")
+  ) {
+    energyScore = 0.15; // Severe energy mismatch with mood anchor
+  } else {
+    energyScore = 0.55; // Adjacent / medium energy
+  }
+
+  const text = candidateText.toLowerCase();
+  let keywordBonus = 0;
+  for (const kw of envelope.keywords) {
+    if (text.includes(kw)) {
+      keywordBonus += 0.15;
+      break;
+    }
+  }
+
+  return Math.max(0.0, Math.min(1.0, energyScore + keywordBonus));
+}
+
 // ─── Session Feedback & Penalty Learner ────────────────────────────
 
 interface SkipRecord {
@@ -148,6 +245,7 @@ export class ContextEngineSession {
   private skips: SkipRecord[] = [];
   private completions: CompletionRecord[] = [];
   private transitionMatrix = new Map<string, Map<string, number>>();
+  private sessionPenalizedArtists = new Set<string>();
 
   constructor() {
     this.loadFromStorage();
@@ -196,16 +294,98 @@ export class ContextEngineSession {
     } catch {}
   }
 
-  /** Record when a user skips a track early (< 25s) */
-  recordSkip(track: TrackLike) {
+  /**
+   * Record when a user skips a track early (< 25s).
+   * If skipped within 10 seconds, immediately dampens the artist for the active session.
+   */
+  recordSkip(track: TrackLike, positionSeconds?: number) {
     if (!track.artist) return;
+    const rawArtist = track.artist.trim();
+    const normArtist = rawArtist.toLowerCase();
+
+    // Fast-skip (< 10s): immediate intra-session negative dampening
+    if (positionSeconds !== undefined && positionSeconds >= 0 && positionSeconds < 10) {
+      if (normArtist) {
+        this.sessionPenalizedArtists.add(normArtist);
+      }
+    }
+
     this.skips.push({
-      artist: track.artist.trim(),
+      artist: rawArtist,
       title: (track.title || "").trim(),
       timestamp: Date.now(),
     });
     if (this.skips.length > 50) this.skips.shift();
     this.saveToStorage();
+  }
+
+  /**
+   * Immediately dampens an artist for this active session (user skipped within 8-10 seconds).
+   */
+  recordFastSkip(track: TrackLike) {
+    if (!track.artist) return;
+    const norm = track.artist.toLowerCase().trim();
+    if (norm) {
+      this.sessionPenalizedArtists.add(norm);
+    }
+    this.recordSkip(track, 5);
+  }
+
+  /**
+   * Returns list of artists penalized in the current in-memory listening session.
+   */
+  getSessionPenalizedArtists(): string[] {
+    return Array.from(this.sessionPenalizedArtists);
+  }
+
+  /**
+   * Clear in-memory session-only penalties (e.g. on new session or manual reset).
+   */
+  clearSessionPenalties(): void {
+    this.sessionPenalizedArtists.clear();
+  }
+
+  /**
+   * Returns the Markov sequence transition affinity between two artists in [0.0, 1.0].
+   * If fromArtist and toArtist frequently transition after each other in completions,
+   * returns a boosted score (> 0.5). If no data, returns a neutral prior (0.5).
+   */
+  getTransitionAffinity(fromArtist?: string | null, toArtist?: string | null): number {
+    if (!fromArtist || !toArtist) return 0.5;
+    const from = fromArtist.toLowerCase().trim();
+    const to = toArtist.toLowerCase().trim();
+    if (!from || !to) return 0.5;
+
+    const row = this.transitionMatrix.get(from);
+    if (!row || row.size === 0) return 0.5;
+
+    let totalTransitions = 0;
+    for (const count of row.values()) {
+      totalTransitions += count;
+    }
+    if (totalTransitions === 0) return 0.5;
+
+    const count = row.get(to) || 0;
+    if (count > 0) {
+      const prob = count / totalTransitions;
+      // High transition likelihood maps to [0.65, 1.0]
+      return Math.min(1.0, 0.65 + prob * 0.35);
+    }
+
+    // Has recorded transitions from `from`, but none to `to`
+    return 0.4;
+  }
+
+  /**
+   * Get top artists that frequently follow a given artist based on Markov transitions.
+   */
+  getTopTransitions(fromArtist: string, limit = 5): string[] {
+    const from = fromArtist.toLowerCase().trim();
+    const row = this.transitionMatrix.get(from);
+    if (!row) return [];
+
+    const sorted = Array.from(row.entries()).sort((a, b) => b[1] - a[1]);
+    return sorted.slice(0, limit).map(([artist]) => artist);
   }
 
   /** Record when a user completes a track (> 85% played) */
@@ -236,7 +416,7 @@ export class ContextEngineSession {
 
   /**
    * Calculate top positive affinity artists and heavily penalized artists from
-   * session history and accumulated player stats.
+   * session history, accumulated player stats, and fast-skips.
    */
   getAffinityWeights(
     stats?: Record<string, { plays?: number; skips?: number; completions?: number; track?: any }>,
@@ -308,6 +488,18 @@ export class ContextEngineSession {
       }
     }
 
+    // 3. Fast-Skip Intra-Session Dampening: inject session-penalized artists immediately
+    for (const fastSkipped of this.sessionPenalizedArtists) {
+      const displayName = artistDisplayMap.get(fastSkipped) || fastSkipped;
+      if (!penalizedArtists.some((a) => a.toLowerCase().trim() === fastSkipped)) {
+        penalizedArtists.unshift(displayName);
+      }
+      const affIdx = affinityArtists.findIndex((a) => a.toLowerCase().trim() === fastSkipped);
+      if (affIdx !== -1) {
+        affinityArtists.splice(affIdx, 1);
+      }
+    }
+
     // Sort affinity artists descending by net score
     affinityArtists.sort((a, b) => (artistScores[b] ?? 0) - (artistScores[a] ?? 0));
 
@@ -320,6 +512,7 @@ export class ContextEngineSession {
 
   /**
    * Calculate dynamic affinity score for a track (higher is better).
+   * - Fast-skip dampening drops score immediately to 0.05.
    * - Recent skips within 30 min penalize score by up to -0.7.
    * - Hard skip filter: 2+ recent skips drops score to 0.05 (near zero).
    * - Recent completions boost score by +0.35.
@@ -327,9 +520,15 @@ export class ContextEngineSession {
    * - AutoDJ energy compatibility with current playing track adds/penalizes score.
    */
   calculateAffinityScore(track: TrackLike, currentTrack?: TrackLike | null): number {
-    let score = 1.0;
     const normArtist = (track.artist || "").toLowerCase().trim();
     const normTitle = (track.title || "").toLowerCase().trim();
+
+    // Intra-session fast-skip penalty: immediately suppress artists skipped < 10s ago in this session
+    if (this.sessionPenalizedArtists.has(normArtist)) {
+      return 0.05;
+    }
+
+    let score = 1.0;
     const now = Date.now();
     const HALF_HOUR_MS = 30 * 60 * 1000;
 
@@ -354,15 +553,11 @@ export class ContextEngineSession {
       score += Math.min(0.45, recentCompletions.length * 0.15);
     }
 
-    // 3. Sequence transition probability from current playing track
+    // 3. Sequence transition probability & energy continuity from current playing track
     if (currentTrack && currentTrack.artist) {
-      const prevArtist = currentTrack.artist.toLowerCase().trim();
-      const row = this.transitionMatrix.get(prevArtist);
-      if (row) {
-        const transCount = row.get(normArtist) || 0;
-        if (transCount > 0) {
-          score += Math.min(0.45, transCount * 0.12);
-        }
+      const transAffinity = this.getTransitionAffinity(currentTrack.artist, track.artist);
+      if (transAffinity > 0.5) {
+        score += (transAffinity - 0.5) * 0.9;
       }
 
       // AutoDJ energy continuity flow
@@ -375,12 +570,14 @@ export class ContextEngineSession {
   }
 
   /**
-   * Re-rank a list of candidate tracks based on context, temporal relevance, AutoDJ energy flow, and learned affinity.
+   * Re-rank a list of candidate tracks based on context, temporal relevance, mood anchor,
+   * AutoDJ energy flow, and learned affinity.
    */
   rankTracks<T extends TrackLike>(
     tracks: T[],
     currentTrack?: TrackLike | null,
     temporalCtx?: TemporalContext,
+    activeMood?: string | null,
   ): T[] {
     if (tracks.length <= 1) return tracks;
     const ctx = temporalCtx || getTemporalContext();
@@ -388,16 +585,25 @@ export class ContextEngineSession {
     const scored = tracks.map((track, originalIndex) => {
       let score = this.calculateAffinityScore(track, currentTrack);
 
-      // Temporal genre/mood boost
       const titleLower = (track.title || "").toLowerCase();
       const artistLower = (track.artist || "").toLowerCase();
+      const candidateText = `${titleLower} ${artistLower}`;
 
-      for (const mood of ctx.suggestedMoods) {
-        if (titleLower.includes(mood.toLowerCase())) score += 0.15;
-      }
-      for (const genre of ctx.suggestedGenres) {
-        if (titleLower.includes(genre.toLowerCase()) || artistLower.includes(genre.toLowerCase())) {
-          score += 0.2;
+      // Mood Anchor Locking (if active mood is selected)
+      if (activeMood) {
+        const candidateEnergy = detectTrackEnergy(track);
+        const moodComp = calculateMoodCompatibility(activeMood, candidateEnergy, candidateText);
+        // Map compatibility to [-0.35, +0.45] adjustment
+        score += (moodComp - 0.5) * 0.8;
+      } else {
+        // Temporal circadian genre/mood boost
+        for (const mood of ctx.suggestedMoods) {
+          if (titleLower.includes(mood.toLowerCase())) score += 0.15;
+        }
+        for (const genre of ctx.suggestedGenres) {
+          if (titleLower.includes(genre.toLowerCase()) || artistLower.includes(genre.toLowerCase())) {
+            score += 0.2;
+          }
         }
       }
 

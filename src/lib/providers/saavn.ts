@@ -10,6 +10,7 @@ import { isOriginalSong } from "../track-filters";
 import { isOldEraTrack } from "../library";
 import { decodeEntities } from "../track-metadata";
 import { cleanAlbumName, cleanMovieName, cleanSongTitle } from "../track-metadata";
+import { stringSimilarity, norm } from "../track-dedup";
 
 const DES_KEY = "38346591";
 
@@ -222,19 +223,31 @@ export async function resolveSaavnById(
       const data = (await res.json().catch(() => null)) as any;
       if (!data || typeof data !== "object") continue;
 
-      // Extract raw song: directly by cleanId, via songs array, or first valid song entry
-      let raw = data[cleanId];
-      if (!raw && Array.isArray(data.songs) && data.songs[0]) {
-        raw = data.songs[0];
-      }
-      if (!raw) {
+      // Extract raw song: strictly matching cleanId
+      let raw: any = null;
+      if (data[cleanId] && typeof data[cleanId] === "object") {
+        raw = data[cleanId];
+      } else if (Array.isArray(data.songs)) {
+        raw = data.songs.find(
+          (s: any) =>
+            s &&
+            typeof s === "object" &&
+            (String(s.id) === String(cleanId) ||
+              (typeof s.perma_url === "string" && s.perma_url.includes(cleanId))),
+        );
+        // Only if songs array has exactly 1 item and cleanId was the requested pid
+        if (!raw && data.songs.length === 1 && data.songs[0] && typeof data.songs[0] === "object") {
+          const s = data.songs[0];
+          if (!s.id || String(s.id) === String(cleanId)) {
+            raw = s;
+          }
+        }
+      } else {
         raw = Object.values(data).find(
           (v: any) =>
             v &&
             typeof v === "object" &&
-            (v.id === cleanId ||
-              Boolean(v.encrypted_media_url) ||
-              Boolean(v.more_info?.encrypted_media_url)),
+            String(v.id) === String(cleanId),
         );
       }
       if (!raw) continue;
@@ -265,8 +278,6 @@ export async function resolveSaavnById(
   console.warn(`[Saavn] Failed to resolve song ID "${cleanId}" across endpoints`);
   return null;
 }
-
-import { stringSimilarity, norm } from "../track-dedup";
 
 /**
  * Resolves a full-length 320kbps JioSaavn stream URL for an existing track
@@ -309,19 +320,30 @@ export async function resolveSaavnByMeta(
   let bestScore = 0;
 
   for (const cand of validCandidates) {
+    const cleanCandTitle = cleanSongTitle(cand.title) || cand.title;
     const normCandTitle = norm(cand.title);
-    const titleSim = stringSimilarity(cleanTitle, cand.title);
+
+    // Compute title similarity against both candidate title variants
+    const titleSim = Math.max(
+      stringSimilarity(cleanTitle, cand.title),
+      stringSimilarity(cleanTitle, cleanCandTitle),
+    );
 
     // Check if key words from target title appear in candidate title (e.g. "Kesariya")
     const wordOverlap =
       targetWords.length > 0
         ? targetWords.filter((w) => normCandTitle.includes(w)).length / targetWords.length
-        : 0;
+        : 1;
 
-    // Strict safety guard: candidate title MUST match target title
-    // Either high fuzzy similarity OR strong keyword overlap
-    if (titleSim < 0.55 && wordOverlap < 0.5) {
-      continue; // Completely different song, ignore!
+    // Strict safety guard 1: candidate title MUST match target title with high confidence
+    // Never allow a completely different song title through even if artist matches!
+    if (titleSim < 0.65) {
+      continue;
+    }
+
+    // Strict safety guard 2: key words from target title must be present
+    if (targetWords.length > 0 && wordOverlap < 0.6) {
+      continue;
     }
 
     let score = titleSim * 0.5 + wordOverlap * 0.3;
@@ -345,7 +367,7 @@ export async function resolveSaavnByMeta(
   }
 
   // Only accept if bestScore meets confidence threshold and has direct playback source
-  if (best && bestScore >= 0.55 && best.playbackSource?.url) {
+  if (best && bestScore >= 0.70 && best.playbackSource?.url) {
     const targetSuffix =
       quality === "saver" ? "_96.mp4" : quality === "standard" ? "_160.mp4" : "_320.mp4";
     const mediaUrl = best.playbackSource.url.replace(/_(?:96|160|320)\.mp4/, targetSuffix);

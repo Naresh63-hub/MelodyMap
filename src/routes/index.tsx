@@ -856,8 +856,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       sessionCompletions: sessionCompletionsRef.current,
       sessionSkips: sessionSkipsRef.current,
       familiarArtists: new Set(likes.map((t) => (t.artist || "").toLowerCase().trim()).filter(Boolean)),
+      activeMood: activeMood || selectedMood?.key || null,
     };
-  }, [settings.discovery, history, stats, likes]);
+  }, [settings.discovery, history, stats, likes, activeMood, selectedMood]);
 
   const sleepTimerHaltedRef = useRef<boolean>(false);
   const extendQueueRef = useRef<(() => Promise<Track[]>) | null>(null);
@@ -2186,6 +2187,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
 
       const curPage = autoDjPageRef.current;
+      const affinity = contextEngine.getAffinityWeights(stats);
+      const sessionPenalizedSet = new Set(
+        contextEngine.getSessionPenalizedArtists().map((a) => a.toLowerCase().trim()),
+      );
+      const penalizedArtistSet = new Set([
+        ...affinity.penalizedArtists.map((a) => a.toLowerCase().trim()),
+        ...sessionPenalizedSet,
+      ]);
+
+      const isCandidateAcceptable = (t: TrackLike, existing: TrackLike[] = []) => {
+        if (trackExistsIn(currentQueue, t)) return false;
+        if (trackExistsIn(existing, t)) return false;
+        if (trackExistsIn(history.slice(0, 50), t)) return false;
+        if (dislikedIdsRef.current.has(t.id)) return false;
+        const art = (t.artist || "").toLowerCase().trim();
+        if (penalizedArtistSet.has(art)) return false;
+        return true;
+      };
 
       // 1. Try Song Radio across recent seeds with deep pagination (delving into discographies)
       for (const seed of seedTracks) {
@@ -2209,13 +2228,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
             if (radioRes.tracks && radioRes.tracks.length > 0) {
               const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(radioRes.tracks as Track[]), getSessionContext());
-              const fresh = ranked.filter(
-                (t) =>
-                  !trackExistsIn(currentQueue, t as TrackLike) &&
-                  !trackExistsIn(candidateTracks, t as TrackLike) &&
-                  !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
-                  !dislikedIdsRef.current.has(t.id),
-              );
+              const fresh = ranked.filter((t) => isCandidateAcceptable(t as TrackLike, candidateTracks));
               candidateTracks.push(...fresh);
               if (candidateTracks.length >= 12) break;
             }
@@ -2231,11 +2244,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         return [];
       }
 
-      // 2. Fallback to recommendation engine with circadian, affinity, and discovery context
+      // 2. Fallback to recommendation engine with circadian, affinity, mood anchor, and discovery context
       if (candidateTracks.length === 0) {
         const nonce = `${Date.now()}-${safeUUID()}`;
         const clientHour = new Date().getHours();
-        const affinity = contextEngine.getAffinityWeights(stats);
         const res = await runRecommend({
           data: {
             liked: likes.slice(0, 20).map(trackLabel),
@@ -2252,16 +2264,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             affinityArtists: affinity.affinityArtists,
             penalizedArtists: affinity.penalizedArtists,
             clientHour,
+            mood: activeMood || selectedMood?.key || undefined,
           },
         });
         if (res.tracks && res.tracks.length > 0) {
           const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(res.tracks as Track[]), getSessionContext());
-          candidateTracks = ranked.filter(
-            (t) =>
-              !trackExistsIn(currentQueue, t as TrackLike) &&
-              !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
-              !dislikedIdsRef.current.has(t.id),
-          );
+          candidateTracks = ranked.filter((t) => isCandidateAcceptable(t as TrackLike));
         }
       }
 
@@ -2281,12 +2289,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           ...(mixTracksRef.current?.newrelease || []),
         ]);
         const rankedPool = thompsonSamplingPolicy.rankCandidates(pool, getSessionContext());
-        candidateTracks = rankedPool.filter(
-          (t) =>
-            !trackExistsIn(currentQueue, t as TrackLike) &&
-            !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
-            !dislikedIdsRef.current.has(t.id),
-        );
+        candidateTracks = rankedPool.filter((t) => isCandidateAcceptable(t as TrackLike));
       }
 
       // Secondary fallback: allow unplayed tracks from cached pool, still strictly enforcing history exclusion
@@ -2296,12 +2299,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           ...trendingRef.current,
           ...oldSongsRef.current,
         ]);
-        candidateTracks = fallbackPool.filter(
-          (t) =>
-            !trackExistsIn(currentQueue, t as TrackLike) &&
-            !trackExistsIn(history.slice(0, 50), t as TrackLike) &&
-            !dislikedIdsRef.current.has(t.id),
-        );
+        candidateTracks = fallbackPool.filter((t) => isCandidateAcceptable(t as TrackLike));
       }
 
       if (candidateTracks.length > 0) {
@@ -2355,7 +2353,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       isExtendingRef.current = false;
       setExtending(false);
     }
-  }, [runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed]);
+  }, [runRecommend, likes, history, dislikes, stats, settings, getSessionContext, applyFeedFilters, markFeedDisplayed, activeMood, selectedMood]);
   extendQueueRef.current = extendQueue;
 
   const searchFor = useCallback(
@@ -2547,7 +2545,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (currentTrack && !isPodcastTrack(currentTrack)) {
       if (player.position > 0 && player.position < 25) {
         logSkip(currentTrack);
-        contextEngine.recordSkip(currentTrack);
+        contextEngine.recordSkip(currentTrack, player.position);
       }
       sessionSkipsRef.current += 1;
       const frac = player.duration > 0 ? player.position / player.duration : 0;
