@@ -35,7 +35,8 @@ import { useDragToDismiss, useDoubleTapSeek, useSwipeGestures } from "@/hooks/us
 import type { Track } from "@/lib/library";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import AudioVisualizer from "./AudioVisualizer";
-import { useTrackLyrics } from "@/lib/use-track-lyrics";
+import { useTrackLyrics, findActiveLyricIndex } from "@/lib/use-track-lyrics";
+import { extractArtworkColor, estimateArtworkColor, type ArtworkColorTheme } from "@/lib/artwork-color";
 import { isPodcastTrack } from "@/lib/track-filters";
 
 type Props = {
@@ -141,6 +142,20 @@ export function FullScreenPlayer({
   const userScrollingLyricsRef = useRef(false);
   const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [artworkTheme, setArtworkTheme] = useState<ArtworkColorTheme>(() =>
+    estimateArtworkColor(track?.id || track?.title || "melodymap"),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void extractArtworkColor(track?.thumbnail, track?.id || track?.title).then((theme) => {
+      if (!cancelled) setArtworkTheme(theme);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [track?.thumbnail, track?.id, track?.title]);
+
   const lyricsState = useTrackLyrics({
     title: track?.title,
     artist: track?.artist,
@@ -152,14 +167,7 @@ export function FullScreenPlayer({
 
   useEffect(() => {
     if (!lyricsState.isSynced || lyricsState.syncedLyrics.length === 0) return;
-    let idx = -1;
-    for (let i = lyricsState.syncedLyrics.length - 1; i >= 0; i--) {
-      const line = lyricsState.syncedLyrics[i];
-      if (line && position >= line.time) {
-        idx = i;
-        break;
-      }
-    }
+    const idx = findActiveLyricIndex(lyricsState.syncedLyrics, position);
     if (idx !== -1 && idx !== currentLyricIndex) {
       setCurrentLyricIndex(idx);
     }
@@ -279,14 +287,24 @@ export function FullScreenPlayer({
         {/* Center Area: Artwork OR Live Lyrics */}
         <div className="flex flex-col items-center justify-center my-auto w-full py-4 relative">
           {/* Reference Image Atmospheric Ambient Violet Aura */}
-          <div className="absolute w-72 sm:w-88 h-72 sm:h-88 rounded-full bg-gradient-to-tr from-[#9333EA]/35 via-[#8B5CF6]/30 to-[#6D28D9]/20 blur-3xl pointer-events-none -z-0 animate-pulse" />
+          <div
+            className="absolute w-72 sm:w-88 h-72 sm:h-88 rounded-full blur-3xl pointer-events-none -z-0 animate-pulse transition-all duration-700"
+            style={{
+              background: artworkTheme.ambientGlow,
+              opacity: 0.7,
+            }}
+          />
 
           {!showLiveLyrics ? (
             <div
               {...doubleTapProps}
               onTouchStart={swipeStart}
               onTouchEnd={swipeEnd}
-              className="relative z-10 aspect-square w-64 sm:w-72 overflow-hidden rounded-3xl p-1.5 bg-gradient-to-b from-primary/30 via-primary/10 to-transparent border border-primary/30 ring-4 ring-primary/15 shadow-[0_0_50px_rgba(139,92,246,0.35)] touch-manipulation select-none"
+              style={{
+                boxShadow: `0 0 50px ${artworkTheme.borderAccent}`,
+                borderColor: artworkTheme.borderAccent,
+              }}
+              className="relative z-10 aspect-square w-64 sm:w-72 overflow-hidden rounded-3xl p-1.5 bg-gradient-to-b from-primary/30 via-primary/10 to-transparent border ring-4 ring-primary/15 touch-manipulation select-none"
             >
               <div className="w-full h-full rounded-[20px] overflow-hidden">
                 <img

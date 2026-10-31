@@ -4,6 +4,7 @@ import {
   ListMusic,
   Download,
   ListPlus,
+  Radio,
   User,
   Share2,
   Trash2,
@@ -29,6 +30,7 @@ type Props = {
   onAddToPlaylist: (track: Track) => void;
   onDownload: (track: Track) => void;
   onAddToQueue: (track: Track) => void;
+  onStartRadio?: (track: Track) => void;
   onOpenLyrics?: (track: Track) => void;
   onOpenSleepTimer?: () => void;
   onGoToArtist?: (artist: string, track?: Track) => void;
@@ -48,6 +50,7 @@ export function SongOptionsModal({
   onAddToPlaylist,
   onDownload,
   onAddToQueue,
+  onStartRadio,
   onOpenLyrics,
   onOpenSleepTimer,
   onGoToArtist,
@@ -185,6 +188,21 @@ export function SongOptionsModal({
             <span className="font-medium">Add to Queue</span>
             <ListPlus className="h-5 w-5 text-foreground/40" />
           </button>
+
+          {/* Start Song Radio */}
+          {onStartRadio && (
+            <button
+              type="button"
+              onClick={() => {
+                onStartRadio(track);
+                onClose();
+              }}
+              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm text-foreground hover:bg-chip active:bg-chip-strong transition-colors"
+            >
+              <span className="font-medium">Start Song Radio</span>
+              <Radio className="h-5 w-5 text-primary" />
+            </button>
+          )}
 
           {/* View Lyrics */}
           {onOpenLyrics && (

@@ -149,6 +149,8 @@ export type RecSettings = {
   moods: Record<string, number>; // 0-100 weighting per mood
   genres: string[];
   languages: string[];
+  primaryLanguage?: string | undefined;
+  languageWeights?: Record<string, number> | undefined;
   /** Favorite artists/singers — drives language-based song picks. */
   artists: string[];
   podcastTopics: string[]; // topics the podcast mix should chase
@@ -172,10 +174,37 @@ export const MOODS = [
   "devotional",
 ] as const;
 
+
+/**
+ * Computes proportional weights for user languages, allocating prioritized weight to primary language.
+ */
+export function calculateLanguageWeights(
+  languages: string[],
+  primaryLanguage?: string,
+  primaryWeight = 70,
+): Record<string, number> {
+  if (!languages || languages.length === 0) return {};
+  if (languages.length === 1) return { [languages[0]!]: 100 };
+  const effectivePrimary =
+    primaryLanguage && languages.includes(primaryLanguage)
+      ? primaryLanguage
+      : languages[0]!;
+  const secondaryLangs = languages.filter((l) => l !== effectivePrimary);
+  const remainingWeight = Math.max(10, 100 - primaryWeight);
+  const secondaryWeightPerLang = Math.round(remainingWeight / secondaryLangs.length);
+  const weights: Record<string, number> = { [effectivePrimary]: primaryWeight };
+  for (const lang of secondaryLangs) {
+    weights[lang] = secondaryWeightPerLang;
+  }
+  return weights;
+}
+
 export const DEFAULT_SETTINGS: RecSettings = {
   moods: Object.fromEntries(MOODS.map((m) => [m, 50])),
   genres: [],
   languages: [],
+  primaryLanguage: undefined,
+  languageWeights: undefined,
   artists: [],
   podcastTopics: [],
   injectInterval: 5,

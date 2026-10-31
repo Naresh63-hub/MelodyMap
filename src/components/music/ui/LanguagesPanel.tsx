@@ -163,6 +163,8 @@ export function LanguagesPanel({
       <div className="mb-6 rounded-2xl border border-hair-strong bg-chip-subtle p-4 sm:p-5">
         <LanguageArtistPicker
           languages={settings.languages}
+          primaryLanguage={settings.primaryLanguage}
+          languageWeights={settings.languageWeights}
           artists={settings.artists}
           onChange={(patch) => onChangeSettings(patch)}
         />

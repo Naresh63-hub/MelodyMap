@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Music2, Plus, X, Loader2 } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
-import { LANGUAGES, SUGGESTED_ARTISTS, type Track } from "@/lib/library";
+import { LANGUAGES, SUGGESTED_ARTISTS, calculateLanguageWeights, type RecSettings, type Track } from "@/lib/library";
 import { languagePicks } from "@/lib/music.functions";
 import { HorizontalScroll } from "./HorizontalScroll";
 import { MediaCard } from "./MediaCard";
@@ -10,8 +10,10 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   languages: string[];
+  primaryLanguage?: string | undefined;
+  languageWeights?: Record<string, number> | undefined;
   artists: string[];
-  onChange: (patch: { languages?: string[]; artists?: string[] }) => void;
+  onChange: (patch: Partial<RecSettings>) => void;
   /** Optional action (e.g. "Open Languages tab") shown beside the header. */
   actionLabel?: string;
   onAction?: () => void;
@@ -20,6 +22,8 @@ type Props = {
 /** Reusable language + artist/singer picker used on login and in settings. */
 export function LanguageArtistPicker({
   languages,
+  primaryLanguage,
+  languageWeights,
   artists,
   onChange,
   actionLabel,
@@ -48,12 +52,24 @@ export function LanguageArtistPicker({
     return () => clearTimeout(timer);
   }, [languages, artists, runLanguagePicks]);
 
-  const toggleLanguage = (lang: string) =>
-    onChange({
-      languages: languages.includes(lang)
-        ? languages.filter((l) => l !== lang)
-        : [...languages, lang],
-    });
+  const toggleLanguage = (lang: string) => {
+    const nextLanguages = languages.includes(lang)
+      ? languages.filter((l) => l !== lang)
+      : [...languages, lang];
+    const nextPrimary =
+      primaryLanguage && nextLanguages.includes(primaryLanguage)
+        ? primaryLanguage
+        : nextLanguages[0];
+    const nextWeights = calculateLanguageWeights(nextLanguages, nextPrimary, 70);
+    const patch: Partial<RecSettings> = {
+      languages: nextLanguages,
+      languageWeights: nextWeights,
+    };
+    if (nextPrimary) {
+      patch.primaryLanguage = nextPrimary;
+    }
+    onChange(patch);
+  };
 
   const addArtist = (name: string) => {
     const clean = name.trim();
@@ -115,6 +131,44 @@ export function LanguageArtistPicker({
             );
           })}
         </div>
+
+        {languages.length > 1 && (
+          <div className="mt-2.5 rounded-xl border border-hair bg-card/60 p-2.5 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="font-medium text-foreground/80">Primary Language:</span>
+              <span className="text-[10px] text-primary/80">Prioritized (70% weight)</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {languages.map((lang) => {
+                const isPrimary = primaryLanguage ? primaryLanguage === lang : languages[0] === lang;
+                return (
+                  <button
+                    key={`primary-${lang}`}
+                    type="button"
+                    onClick={() => {
+                      const weights = calculateLanguageWeights(languages, lang, 70);
+                      const patch: Partial<RecSettings> = {
+                        primaryLanguage: lang,
+                        languageWeights: weights,
+                      };
+                      onChange(patch);
+                    }}
+                    className={cn(
+                      "rounded-lg px-2.5 py-1 text-xs transition-all flex items-center gap-1",
+                      isPrimary
+                        ? "bg-primary text-primary-foreground font-semibold shadow-xs ring-1 ring-primary/40"
+                        : "bg-chip text-muted-foreground hover:text-foreground border border-hair",
+                    )}
+                  >
+                    <span>★</span>
+                    <span>{lang}</span>
+                    {isPrimary && <span className="text-[10px] opacity-80">(Primary)</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div>

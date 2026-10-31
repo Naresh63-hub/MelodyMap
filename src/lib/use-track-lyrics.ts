@@ -18,6 +18,19 @@ export type TrackLyricsState = {
 const clientLyricsCache = new Map<string, TrackLyricsState>();
 const MAX_CLIENT_CACHE = 100;
 
+export function findActiveLyricIndex(syncedLyrics: LyricLine[], currentTime: number): number {
+  if (!syncedLyrics || syncedLyrics.length === 0) return -1;
+  let activeIndex = -1;
+  for (let i = syncedLyrics.length - 1; i >= 0; i--) {
+    const line = syncedLyrics[i];
+    if (line && currentTime >= line.time) {
+      activeIndex = i;
+      break;
+    }
+  }
+  return activeIndex;
+}
+
 function getCacheKey(title: string, artist: string, trackId?: string): string {
   return `${trackId || ""}:${title.trim().toLowerCase()}:${artist.trim().toLowerCase()}`;
 }

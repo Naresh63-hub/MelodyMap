@@ -12,7 +12,7 @@ import {
   Sparkles,
   Sun,
 } from "lucide-react";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { triggerHaptic } from "@/lib/haptics";
 
@@ -92,17 +92,63 @@ export const MOOD_ITEMS: MoodItem[] = [
   },
 ];
 
+export type TimeOfDayPeriod = "morning" | "afternoon" | "evening" | "night";
+
+export interface TimeOfDayMoodContext {
+  period: TimeOfDayPeriod;
+  badgeLabel: string;
+  recommendedKeys: string[];
+}
+
+/**
+ * Returns dynamic mood recommendations tailored to the local time of day:
+ * - Morning (5:00 - 11:59): Devotional, Chill, Focus
+ * - Afternoon (12:00 - 16:59): Focus, Workout, Chill
+ * - Evening (17:00 - 21:59): Romantic, Party, Chill
+ * - Late Night (22:00 - 4:59): Late Night, Sad & Soulful, Chill
+ */
+export function getTimeOfDayMoodContext(date: Date = new Date()): TimeOfDayMoodContext {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) {
+    return {
+      period: "morning",
+      badgeLabel: "Morning",
+      recommendedKeys: ["devotional", "chill", "focus"],
+    };
+  }
+  if (hour >= 12 && hour < 17) {
+    return {
+      period: "afternoon",
+      badgeLabel: "Afternoon",
+      recommendedKeys: ["focus", "upbeat workout", "chill"],
+    };
+  }
+  if (hour >= 17 && hour < 22) {
+    return {
+      period: "evening",
+      badgeLabel: "Evening",
+      recommendedKeys: ["romantic", "party", "chill"],
+    };
+  }
+  return {
+    period: "night",
+    badgeLabel: "Late Night",
+    recommendedKeys: ["late night", "sad hours", "chill"],
+  };
+}
+
 type Props = {
   activeMood?: string | null | undefined;
   loadingMood?: string | null | undefined;
   isPlaying?: boolean | undefined;
   onSelectMood: (item: MoodItem) => void;
   className?: string | undefined;
+  currentDate?: Date | undefined;
 };
 
 /**
  * Clean & Simple One-Tap Mood & Vibe Selector (Spotify / YouTube Music style).
- * Replaces convoluted multi-slider settings and tiny chips with prominent visual vibe cards.
+ * Dynamically highlights time-of-day relevant moods while preserving manual user selection.
  */
 export function MoodCardsSection({
   activeMood,
@@ -110,8 +156,21 @@ export function MoodCardsSection({
   isPlaying = false,
   onSelectMood,
   className,
+  currentDate,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const timeContext = useMemo(() => getTimeOfDayMoodContext(currentDate), [currentDate]);
+
+  // Order cards: prioritize time-of-day moods first while preserving full collection
+  const orderedItems = useMemo(() => {
+    return [...MOOD_ITEMS].sort((a, b) => {
+      const aRec = timeContext.recommendedKeys.includes(a.key);
+      const bRec = timeContext.recommendedKeys.includes(b.key);
+      if (aRec && !bRec) return -1;
+      if (!aRec && bRec) return 1;
+      return 0;
+    });
+  }, [timeContext]);
 
   const handleClick = (item: MoodItem) => {
     triggerHaptic("selection");
@@ -126,6 +185,9 @@ export function MoodCardsSection({
           <h2 className="text-base font-semibold tracking-tight text-foreground">
             Moods & Vibes
           </h2>
+          <span className="inline-flex items-center rounded-full bg-primary/15 border border-primary/30 px-2 py-0.5 text-[10px] font-medium text-primary">
+            {timeContext.badgeLabel}
+          </span>
         </div>
         <span className="text-[11px] font-normal text-muted-foreground">
           Tap to Explore
@@ -136,10 +198,11 @@ export function MoodCardsSection({
         ref={scrollRef}
         className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x snap-mandatory"
       >
-        {MOOD_ITEMS.map((item) => {
+        {orderedItems.map((item) => {
           const isActive = activeMood === item.key;
           const isLoading = loadingMood === item.key;
           const isCurrentPlaying = isActive && isPlaying;
+          const isSuggested = timeContext.recommendedKeys.includes(item.key);
           const Icon = item.icon;
 
           return (
@@ -160,9 +223,16 @@ export function MoodCardsSection({
             >
               {/* Header: Label & Icon */}
               <div className="flex items-start justify-between gap-1 z-10">
-                <span className="text-sm sm:text-base font-semibold text-white tracking-tight leading-tight line-clamp-1">
-                  {item.label}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm sm:text-base font-semibold text-white tracking-tight leading-tight line-clamp-1">
+                    {item.label}
+                  </span>
+                  {isSuggested && !isActive && (
+                    <span className="shrink-0 rounded-full bg-white/20 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider text-white">
+                      Now
+                    </span>
+                  )}
+                </div>
                 <span
                   className={cn(
                     "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform duration-200 group-hover/mood:scale-110",

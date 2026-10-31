@@ -128,3 +128,40 @@ describe("lyrics.server: formatSaavnLyrics", () => {
     expect(formatSaavnLyrics("")).toBe("");
   });
 });
+
+import { findActiveLyricIndex } from "./use-track-lyrics";
+
+describe("Real-Time Synced Lyrics (findActiveLyricIndex)", () => {
+  const sampleLyrics = [
+    { time: 10.0, text: "First line starts here" },
+    { time: 25.5, text: "Second line verse hook" },
+    { time: 42.0, text: "Chorus explodes now" },
+    { time: 60.0, text: "Outro fade away" },
+  ];
+
+  it("returns -1 for empty lyrics", () => {
+    expect(findActiveLyricIndex([], 15)).toBe(-1);
+  });
+
+  it("returns -1 when audio position is before the first timestamp", () => {
+    expect(findActiveLyricIndex(sampleLyrics, 5.0)).toBe(-1);
+  });
+
+  it("returns correct line index when exactly on a timestamp", () => {
+    expect(findActiveLyricIndex(sampleLyrics, 10.0)).toBe(0);
+    expect(findActiveLyricIndex(sampleLyrics, 25.5)).toBe(1);
+    expect(findActiveLyricIndex(sampleLyrics, 42.0)).toBe(2);
+  });
+
+  it("maintains current line index during audio playback between timestamps", () => {
+    expect(findActiveLyricIndex(sampleLyrics, 15.0)).toBe(0);
+    expect(findActiveLyricIndex(sampleLyrics, 25.4)).toBe(0);
+    expect(findActiveLyricIndex(sampleLyrics, 30.0)).toBe(1);
+    expect(findActiveLyricIndex(sampleLyrics, 55.0)).toBe(2);
+  });
+
+  it("retains the last line index after the final lyric timestamp", () => {
+    expect(findActiveLyricIndex(sampleLyrics, 65.0)).toBe(3);
+    expect(findActiveLyricIndex(sampleLyrics, 120.0)).toBe(3);
+  });
+});

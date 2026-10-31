@@ -3,7 +3,7 @@ import { MessageSquare, X, Search, Loader2, Copy, Check, Music2, Sparkles } from
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useTrackLyrics } from "@/lib/use-track-lyrics";
+import { useTrackLyrics, findActiveLyricIndex } from "@/lib/use-track-lyrics";
 
 type Props = {
   trackId: string;
@@ -53,14 +53,7 @@ export function LyricsPanel({
   // Find active line in synced lyrics based on audio currentTime
   useEffect(() => {
     if (!isSynced || syncedLyrics.length === 0) return;
-    let newIndex = -1;
-    for (let i = syncedLyrics.length - 1; i >= 0; i--) {
-      const line = syncedLyrics[i];
-      if (line && currentTime >= line.time) {
-        newIndex = i;
-        break;
-      }
-    }
+    const newIndex = findActiveLyricIndex(syncedLyrics, currentTime);
     if (newIndex !== -1 && newIndex !== currentLineIndex) {
       setCurrentLineIndex(newIndex);
     }

@@ -8,6 +8,9 @@ import {
   getBlob,
   saveDownload,
   removeDownload,
+  getStorageDashboard,
+  cleanupDownloadsOlderThan,
+  formatBytes,
 } from "./offline";
 import { hasFullLengthDirectSource } from "./track-stream-policy";
 import type { Track } from "./library";
@@ -389,6 +392,28 @@ describe("Offline Storage & Playback Reliability", () => {
       processPlayerError(false, { code: "SRC_NOT_SUPPORTED" }, "Audio stream unavailable");
       expect(skipped).toBe(true);
       expect(displayedProblem).toBe("Audio source unavailable for this track. Skipping to next track...");
+    });
+  });
+
+  describe("6. Storage Dashboard & 30-Day Cleanup", () => {
+    it("formats bytes accurately across B, KB, MB", () => {
+      expect(formatBytes(500)).toBe("500 B");
+      expect(formatBytes(1024 * 50)).toBe("50 KB");
+      expect(formatBytes(1024 * 1024 * 15)).toBe("15.0 MB");
+    });
+
+    it("reports storage dashboard summary and calculates 30-day cleanup", async () => {
+      const summary = await getStorageDashboard();
+      expect(summary).toHaveProperty("itemCount");
+      expect(summary).toHaveProperty("totalBytes");
+      expect(summary).toHaveProperty("formattedTotalSize");
+      expect(summary).toHaveProperty("itemsOlderThan30Days");
+      expect(summary).toHaveProperty("bytesOlderThan30Days");
+      expect(summary).toHaveProperty("formattedOlderSize");
+
+      const result = await cleanupDownloadsOlderThan(30);
+      expect(result).toHaveProperty("removedCount");
+      expect(result).toHaveProperty("reclaimedBytes");
     });
   });
 });

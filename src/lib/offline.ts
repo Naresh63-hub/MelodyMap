@@ -358,6 +358,75 @@ export async function totalDownloadSize(): Promise<number> {
   return list.reduce((acc, d) => acc + d.size, 0);
 }
 
+export type StorageDashboardSummary = {
+  itemCount: number;
+  totalBytes: number;
+  formattedTotalSize: string;
+  itemsOlderThan30Days: number;
+  bytesOlderThan30Days: number;
+  formattedOlderSize: string;
+  quotaBytes?: number | undefined;
+  usedBytes?: number | undefined;
+};
+
+export async function getStorageDashboard(): Promise<StorageDashboardSummary> {
+  const downloads = await listDownloads();
+  const now = Date.now();
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+  let totalBytes = 0;
+  let itemsOlderThan30Days = 0;
+  let bytesOlderThan30Days = 0;
+
+  for (const item of downloads) {
+    totalBytes += item.size;
+    if (now - item.savedAt > THIRTY_DAYS_MS) {
+      itemsOlderThan30Days++;
+      bytesOlderThan30Days += item.size;
+    }
+  }
+
+  let quotaBytes: number | undefined;
+  let usedBytes: number | undefined;
+
+  if (typeof navigator !== "undefined" && navigator.storage && typeof navigator.storage.estimate === "function") {
+    try {
+      const estimate = await navigator.storage.estimate();
+      quotaBytes = estimate.quota;
+      usedBytes = estimate.usage;
+    } catch {}
+  }
+
+  return {
+    itemCount: downloads.length,
+    totalBytes,
+    formattedTotalSize: formatBytes(totalBytes),
+    itemsOlderThan30Days,
+    bytesOlderThan30Days,
+    formattedOlderSize: formatBytes(bytesOlderThan30Days),
+    quotaBytes,
+    usedBytes,
+  };
+}
+
+export async function cleanupDownloadsOlderThan(days = 30): Promise<{ removedCount: number; reclaimedBytes: number }> {
+  const downloads = await listDownloads();
+  const now = Date.now();
+  const cutoffMs = days * 24 * 60 * 60 * 1000;
+  let removedCount = 0;
+  let reclaimedBytes = 0;
+
+  for (const item of downloads) {
+    if (now - item.savedAt > cutoffMs) {
+      await removeDownload(item.track.id);
+      removedCount++;
+      reclaimedBytes += item.size;
+    }
+  }
+
+  return { removedCount, reclaimedBytes };
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;

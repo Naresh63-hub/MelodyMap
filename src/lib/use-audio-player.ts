@@ -506,6 +506,22 @@ export function useAudioPlayer(options: {
             mainGainRef.current.gain.cancelScheduledValues(audioCtxRef.current.currentTime);
             mainGainRef.current.gain.setValueAtTime(1, audioCtxRef.current.currentTime);
           } catch {}
+        } else if (fadeDur > 0) {
+          // Safe fallback: HTML5 volume ramp-in when Web Audio is unavailable
+          try {
+            const targetVol = audio.volume;
+            audio.volume = 0;
+            const stepMs = 100;
+            const steps = Math.max(1, Math.floor((Math.min(fadeDur, 4) * 1000) / stepMs));
+            let step = 0;
+            const timer = setInterval(() => {
+              step++;
+              audio.volume = Math.min(targetVol, targetVol * (step / steps));
+              if (step >= steps || audio.paused) {
+                clearInterval(timer);
+              }
+            }, stepMs);
+          } catch {}
         }
 
         const playPromise = audio.play();
@@ -846,20 +862,35 @@ export function useAudioPlayer(options: {
         fadeDur > 0 &&
         dur > 0 &&
         dur - cur <= fadeDur &&
-        dur > fadeDur + 2 &&
-        audioCtxRef.current &&
-        mainGainRef.current
+        dur > fadeDur + 2
       ) {
         if (!isFadingOutRef.current) {
           isFadingOutRef.current = true;
-          const ctx = audioCtxRef.current;
-          const mainGain = mainGainRef.current;
           const remaining = Math.max(0.1, dur - cur);
-          const curve = createEqualPowerCurve("out", 32);
-          try {
-            mainGain.gain.cancelScheduledValues(ctx.currentTime);
-            mainGain.gain.setValueCurveAtTime(curve, ctx.currentTime, remaining);
-          } catch {}
+          if (audioCtxRef.current && mainGainRef.current) {
+            const ctx = audioCtxRef.current;
+            const mainGain = mainGainRef.current;
+            const curve = createEqualPowerCurve("out", 32);
+            try {
+              mainGain.gain.cancelScheduledValues(ctx.currentTime);
+              mainGain.gain.setValueCurveAtTime(curve, ctx.currentTime, remaining);
+            } catch {}
+          } else {
+            // Safe fallback: HTML5 volume ramp if Web Audio is unavailable
+            try {
+              const startVol = audio.volume;
+              const stepMs = 100;
+              const steps = Math.max(1, Math.floor((remaining * 1000) / stepMs));
+              let step = 0;
+              const timer = setInterval(() => {
+                step++;
+                audio.volume = Math.max(0, startVol * (1 - step / steps));
+                if (step >= steps || audio.paused) {
+                  clearInterval(timer);
+                }
+              }, stepMs);
+            } catch {}
+          }
         }
       }
     };

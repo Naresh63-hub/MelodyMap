@@ -190,6 +190,8 @@ const RecommendInput = z.object({
   clientHour: z.number().min(0).max(23).optional(),
   temporalContext: z.string().max(300).optional(),
   isNewUser: z.boolean().optional(),
+  primaryLanguage: z.string().max(40).optional(),
+  languageWeights: z.record(z.string(), z.number()).optional(),
 });
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -216,6 +218,8 @@ function getDynamicQueries(
     discovery?: number | undefined;
     clientHour?: number | undefined;
     mood?: string | undefined;
+    primaryLanguage?: string | undefined;
+    languageWeights?: Record<string, number> | undefined;
   },
 ): { newQueries: string[]; oldQueries: string[] } {
   let langs = languages.map((l) => l.trim()).filter(Boolean);
@@ -236,7 +240,22 @@ function getDynamicQueries(
     langs = matchedLangs.length > 0 ? matchedLangs : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
   }
 
-  const primaryLang = langs[0] || "";
+  const weights = options?.languageWeights;
+  if (weights && Object.keys(weights).length > 0) {
+    langs.sort((a, b) => (weights[b] ?? 0) - (weights[a] ?? 0));
+  } else if (options?.primaryLanguage) {
+    const p = options.primaryLanguage.trim().toLowerCase();
+    const idx = langs.findIndex((l) => l.toLowerCase() === p);
+    if (idx > 0) {
+      const [item] = langs.splice(idx, 1);
+      if (item) langs.unshift(item);
+    }
+  }
+
+  const primaryLang =
+    options?.primaryLanguage && langs.some((l) => l.toLowerCase() === options.primaryLanguage?.toLowerCase())
+      ? options.primaryLanguage
+      : langs[0] || "";
   const langArtistPool = (primaryLang && LANGUAGE_ARTISTS[primaryLang] ? LANGUAGE_ARTISTS[primaryLang] : Object.values(LANGUAGE_ARTISTS).flat())
     .filter((a) => !penalizedSet.has(a.toLowerCase().trim()));
 
@@ -391,6 +410,8 @@ async function getLocalPicks(data: {
   clientHour?: number | undefined;
   isNewUser?: boolean | undefined;
   mood?: string | undefined;
+  primaryLanguage?: string | undefined;
+  languageWeights?: Record<string, number> | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
   const page = Math.max(1, data.page ?? 1);
@@ -514,6 +535,8 @@ async function getLocalPicks(data: {
     discovery: data.discovery,
     clientHour: data.clientHour,
     mood: data.mood,
+    primaryLanguage: data.primaryLanguage,
+    languageWeights: data.languageWeights,
   });
 
   // Sample queries with offset rotation based on page depth so deeper pages explore different facets/discographies
@@ -537,6 +560,28 @@ async function getLocalPicks(data: {
 
   const filteredNew = newCandidates.filter(isCandidateValid);
   const filteredOld = oldCandidates.filter(isCandidateValid);
+
+  // Prioritize primary language candidates in recommendations
+  const primaryLangPref = (data.primaryLanguage || languages[0] || "").toLowerCase().trim();
+  if (primaryLangPref && languages.length > 1) {
+    const isPrimaryTrack = (t: Track) => {
+      const lang = ((t as { language?: string }).language || t.languageCode || "").toLowerCase().trim();
+      if (lang === primaryLangPref) return true;
+      const titleLower = t.title.toLowerCase();
+      if (
+        titleLower.includes(`(${primaryLangPref})`) ||
+        titleLower.includes(`[${primaryLangPref}]`) ||
+        titleLower.includes(` - ${primaryLangPref}`)
+      ) {
+        return true;
+      }
+      const primaryArtists = LANGUAGE_ARTISTS[data.primaryLanguage || languages[0] || ""] || [];
+      return primaryArtists.some((a) => a.toLowerCase() === t.artist.toLowerCase());
+    };
+
+    filteredNew.sort((a, b) => (isPrimaryTrack(b) ? 1 : 0) - (isPrimaryTrack(a) ? 1 : 0));
+    filteredOld.sort((a, b) => (isPrimaryTrack(b) ? 1 : 0) - (isPrimaryTrack(a) ? 1 : 0));
+  }
 
   // Draw 50% new releases
   const selectedNew = shuffleArray(filteredNew).slice(0, newQuota);

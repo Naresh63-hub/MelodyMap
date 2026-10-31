@@ -13,6 +13,28 @@ import { triggerHaptic } from "@/lib/haptics";
  * so we use raw touch events + a dblclick fallback for desktop.
  */
 
+export type SwipeDirection = "left" | "right" | "up" | "down" | null;
+
+export function calculateSwipeGesture(
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+  threshold = 56,
+): SwipeDirection {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+
+  const isHorizontal = Math.abs(dx) >= Math.abs(dy) * 1.25;
+  const isVertical = Math.abs(dy) >= Math.abs(dx) * 1.25;
+
+  if (isHorizontal && Math.abs(dx) >= threshold) {
+    return dx < 0 ? "left" : "right";
+  }
+  if (isVertical && Math.abs(dy) >= threshold) {
+    return dy < 0 ? "up" : "down";
+  }
+  return null;
+}
+
 type SwipeOptions = {
   onSwipeUp?: () => void;
   onSwipeDown?: () => void;
@@ -37,21 +59,14 @@ export function useSwipeGestures({ onSwipeUp, onSwipeDown, onSwipeLeft, onSwipeR
       if (!start) return;
       const t = e.changedTouches[0];
       if (!t) return;
-      const dx = t.clientX - start.x;
-      const dy = t.clientY - start.y;
-
-      // Determine dominant direction
-      const isHorizontal = Math.abs(dx) > Math.abs(dy);
-      const isVertical = Math.abs(dy) > Math.abs(dx);
-
-      if (isHorizontal && Math.abs(dx) >= threshold) {
+      const dir = calculateSwipeGesture(start, { x: t.clientX, y: t.clientY }, threshold);
+      if (dir) {
         triggerHaptic('light');
-        if (dx < 0) onSwipeLeft?.();
-        else onSwipeRight?.();
-      } else if (isVertical && Math.abs(dy) >= threshold) {
-        triggerHaptic('light');
-        if (dy < 0) onSwipeUp?.();
-        else onSwipeDown?.();
+        if (dir === "left") onSwipeLeft?.();
+        else if (dir === "right") onSwipeRight?.();
+        else if (dir === "up") onSwipeUp?.();
+        else if (dir === "down") onSwipeDown?.();
+        return;
       }
     },
     [threshold, onSwipeUp, onSwipeDown, onSwipeLeft, onSwipeRight],
