@@ -3,6 +3,8 @@ import {
   Plus,
   ThumbsDown,
   Music2,
+  Trash2,
+  MoreVertical,
 } from "lucide-react";
 import type { Playlist, Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
@@ -40,6 +42,7 @@ type Props = {
   downloadProgress?: Record<string, number> | undefined;
   onDownload?: ((track: Track) => void) | undefined;
   onRemoveDownload?: ((track: Track) => void) | undefined;
+  onOpenOptions?: ((track: Track) => void) | undefined;
 };
 
 export function TrackList({
@@ -62,6 +65,7 @@ export function TrackList({
   downloadProgress,
   onDownload,
   onRemoveDownload,
+  onOpenOptions,
 }: Props) {
 
 
@@ -180,6 +184,22 @@ export function TrackList({
                 />
               </div>
 
+              {/* Direct Delete Download Button when track is downloaded */}
+              {isDownloaded && onRemoveDownload && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveDownload(track);
+                  }}
+                  title="Delete downloaded song"
+                  aria-label={`Delete downloaded song ${track.title}`}
+                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-red-400 hover:bg-red-500/10 active:scale-95"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+
               {onToggleDislike && (
                 <button
                   type="button"
@@ -196,7 +216,20 @@ export function TrackList({
                 </button>
               )}
 
-              {onAddToPlaylist && (
+              {onOpenOptions ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenOptions(track);
+                  }}
+                  title="Track options"
+                  aria-label="Track options"
+                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-foreground hover:bg-chip-strong active:scale-95"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+              ) : onAddToPlaylist && (
                 <DropdownMenu>
                   <DropdownMenuTrigger
                     aria-label="Add to playlist"

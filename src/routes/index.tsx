@@ -4221,6 +4221,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   downloadProgress={downloadProgress}
                   onDownload={(track) => void handleDownload(track)}
                   onRemoveDownload={(track) => void handleRemoveDownload(track)}
+                  onOpenOptions={(t) => setOptionsTrack(t)}
                   onPlay={(track, i) => {
                     if (current?.id === track.id) {
                       if (player.isPlaying) {

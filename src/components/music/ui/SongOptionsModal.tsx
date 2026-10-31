@@ -147,23 +147,27 @@ export function SongOptionsModal({
               "flex w-full items-center justify-between rounded-xl px-3 py-3 text-sm transition-all duration-200",
               (isDownloading || justTriggered)
                 ? "bg-primary/15 text-primary border border-primary/30 shadow-xs"
-                : "text-foreground hover:bg-chip active:bg-chip-strong",
+                : isDownloaded
+                  ? "text-red-400 hover:bg-red-500/10 active:bg-red-500/20"
+                  : "text-foreground hover:bg-chip active:bg-chip-strong",
             )}
           >
             <span className="font-medium">
               {isDownloading || justTriggered
                 ? `Downloading${typeof downloadProgress === "number" && downloadProgress > 0 ? ` (${Math.round(downloadProgress)}%)` : "…"}`
                 : isDownloaded
-                  ? "Remove Download"
+                  ? "Delete Download"
                   : "Download for Offline Play"}
             </span>
             {isDownloading || justTriggered ? (
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            ) : isDownloaded ? (
+              <Trash2 className="h-5 w-5 text-red-400 transition-colors" />
             ) : (
               <Download
                 className={cn(
                   "h-5 w-5 transition-colors",
-                  isDownloaded ? "text-primary fill-primary/20" : "text-foreground/40",
+                  "text-foreground/40",
                 )}
               />
             )}
