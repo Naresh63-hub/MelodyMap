@@ -65,7 +65,13 @@ export function MiniPlayer({
   }
 
   // Swipe up anywhere on the dock expands the full-screen player
-  const swipeProps = useSwipeGestures({ onSwipeUp: onOpenPlayer });
+  // Swipe gestures: swipe left for next, right for previous, up to expand
+  const swipeProps = useSwipeGestures({
+    onSwipeUp: onOpenPlayer,
+    onSwipeLeft: onNext,
+    onSwipeRight: onPrevious,
+    threshold: 48,
+  });
 
   const progressPct =
     duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;

@@ -36,12 +36,11 @@ export function calculateSwipeGesture(
 }
 
 type SwipeOptions = {
-  onSwipeUp?: () => void;
-  onSwipeDown?: () => void;
-  onSwipeLeft?: () => void;
-  onSwipeRight?: () => void;
-  /** Minimum travel (px) to count as a swipe. */
-  threshold?: number;
+  onSwipeUp?: (() => void) | undefined;
+  onSwipeDown?: (() => void) | undefined;
+  onSwipeLeft?: (() => void) | undefined;
+  onSwipeRight?: (() => void) | undefined;
+  threshold?: number | undefined;
 };
 
 export function useSwipeGestures({ onSwipeUp, onSwipeDown, onSwipeLeft, onSwipeRight, threshold = 56 }: SwipeOptions) {

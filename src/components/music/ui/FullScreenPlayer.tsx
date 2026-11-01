@@ -132,7 +132,8 @@ export function FullScreenPlayer({
   const { onTouchStart: swipeStart, onTouchEnd: swipeEnd } = useSwipeGestures({
     onSwipeLeft: onNext,
     onSwipeRight: onPrevious,
-    threshold: 80,
+    onSwipeDown: onClose,
+    threshold: 64,
   });
 
   const [showLiveLyrics, setShowLiveLyrics] = useState(false);
