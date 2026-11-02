@@ -159,6 +159,8 @@ import {
 } from "@/lib/context-engine";
 import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { runStartupMigrations } from "@/lib/startup-migration";
+import { safeStorage } from "@/lib/safe-storage";
+import { GuestSignInPromptModal } from "@/components/music/ui/GuestSignInPromptModal";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -187,7 +189,7 @@ const HOME_CACHE_KEY = "melodymap.home_cache.v2";
 function readHomeCache(): Partial<HomeCacheData> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem(HOME_CACHE_KEY);
+    const raw = safeStorage.getItem(HOME_CACHE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : {};
@@ -201,7 +203,7 @@ function writeHomeCache(patch: Partial<HomeCacheData>) {
   try {
     const current = readHomeCache();
     const updated = { ...current, ...patch, timestamp: Date.now() };
-    localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(updated));
+    safeStorage.setItem(HOME_CACHE_KEY, JSON.stringify(updated));
   } catch {
     // quota exceeded — ignore
   }
@@ -235,11 +237,11 @@ function MusicApp() {
     if (typeof window !== "undefined") {
       const hash = window.location.hash;
       const search = window.location.search;
-      if (hash.includes("access_token") || search.includes("code=")) {
+      if (hash.includes("access_token") || search.includes("code=") || search.includes("token_hash=") || search.includes("error=") || hash.includes("error=")) {
         // OAuth tokens present in URL, let auth listener process them
         return;
       }
-      const isGuest = localStorage.getItem("melodymap.guest_mode") === "true";
+      const isGuest = safeStorage.getItem("melodymap.guest_mode") === "true";
       if (!auth.userId && !isGuest) {
         void navigate({ to: "/auth", replace: true });
       }
@@ -404,6 +406,8 @@ function MusicApp() {
   const [prevVolume, setPrevVolume] = useState(80);
   // Playlist creation dialog state
   const [createPlaylistTrack, setCreatePlaylistTrack] = useState<Track | null>(null);
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+  const [guestPromptDetails, setGuestPromptDetails] = useState<{ title?: string; description?: string }>({});
   const [podcastTargetShow, setPodcastTargetShow] = useState<{ id?: string | undefined; title?: string | undefined } | null>(null);
   // Undo support for playlist track removal
   const undoRef = useRef<{ timeout: ReturnType<typeof setTimeout>; restore: () => void } | null>(null);
@@ -466,7 +470,7 @@ function MusicApp() {
   // Show language & artist onboarding for new users / accounts without song language preferences
   useEffect(() => {
     if (!hydrated) return;
-    const onboarded = typeof window !== "undefined" ? localStorage.getItem("melodymap.onboarded.v1") : null;
+    const onboarded = safeStorage.getItem("melodymap.onboarded.v1");
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (!onboarded && settings.languages.length === 0) {
       timer = setTimeout(() => {
@@ -481,7 +485,7 @@ function MusicApp() {
 function getPodcastResumePosition(trackId: string): number {
   if (typeof window === "undefined" || !trackId) return 0;
   try {
-    const raw = localStorage.getItem("melodymap.podcast_positions.v1");
+    const raw = safeStorage.getItem("melodymap.podcast_positions.v1");
     if (!raw) return 0;
     const map = JSON.parse(raw);
     return typeof map[trackId] === "number" ? map[trackId] : 0;
@@ -493,10 +497,10 @@ function getPodcastResumePosition(trackId: string): number {
 function savePodcastResumePosition(trackId: string, pos: number) {
   if (typeof window === "undefined" || !trackId || pos < 5) return;
   try {
-    const raw = localStorage.getItem("melodymap.podcast_positions.v1");
+    const raw = safeStorage.getItem("melodymap.podcast_positions.v1");
     const map = raw ? JSON.parse(raw) : {};
     map[trackId] = Math.floor(pos);
-    localStorage.setItem("melodymap.podcast_positions.v1", JSON.stringify(map));
+    safeStorage.setItem("melodymap.podcast_positions.v1", JSON.stringify(map));
   } catch {}
 }
 
@@ -2857,6 +2861,18 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         notifyLikedState(!wasLiked);
       }
       if (!wasLiked && !isPodcastTrack(track)) {
+        if (!auth.isCloudAuth) {
+          const prompted = safeStorage.getItem("melodymap.guest_like_prompted");
+          if (!prompted) {
+            safeStorage.setItem("melodymap.guest_like_prompted", "true");
+            setGuestPromptDetails({
+              title: "Liked! Save your music everywhere",
+              description:
+                "Your like is saved locally. Sign in with Google to sync your favorites across devices and keep them safe forever.",
+            });
+            setGuestPromptOpen(true);
+          }
+        }
         const ctx = getSessionContext();
         const event = telemetry.logEvent({
           trackId: track.id,
@@ -3454,14 +3470,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   // Persist volume to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem("melodymap.volume.v1", String(volume));
+      safeStorage.setItem("melodymap.volume.v1", String(volume));
     } catch { /* quota exceeded — ignore */ }
   }, [volume]);
 
   // Persist continuous mode to localStorage
   useEffect(() => {
     try {
-      localStorage.setItem("melodymap.continuous.v1", String(continuous));
+      safeStorage.setItem("melodymap.continuous.v1", String(continuous));
     } catch { /* quota exceeded — ignore */ }
   }, [continuous]);
 
@@ -4686,6 +4702,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           }}
         />
 
+        {/* GUEST SIGN-IN PROMPT MODAL */}
+        <GuestSignInPromptModal
+          open={guestPromptOpen}
+          onClose={() => setGuestPromptOpen(false)}
+          actionTitle={guestPromptDetails.title}
+          actionDescription={guestPromptDetails.description}
+        />
+
         {/* LYRICS PANEL */}
         {showLyrics && current && (
           <LyricsPanel
@@ -4724,7 +4748,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           continuous={continuous}
           onContinuousChange={(v) => {
             setContinuous(v);
-            localStorage.setItem("melodymap.continuous.v1", String(v));
+            safeStorage.setItem("melodymap.continuous.v1", String(v));
           }}
           onOpenEqualizer={() => setShowEqualizer(true)}
           onOpenSleepTimer={() => setShowSleepTimer(true)}
@@ -4781,9 +4805,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           currentArtists={settings.artists}
           onSave={(data) => {
             updateSettings({ languages: data.languages, artists: data.artists });
-            if (typeof window !== "undefined") {
-              localStorage.setItem("melodymap.onboarded.v1", "true");
-            }
+            safeStorage.setItem("melodymap.onboarded.v1", "true");
             setShowOnboarding(false);
             setMessage("Preferences saved! Loading your personalized music...");
             setTimeout(() => setMessage(null), 3500);

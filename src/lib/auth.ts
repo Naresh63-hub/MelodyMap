@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { safeStorage } from "@/lib/safe-storage";
 import { getOAuthRedirectUrl } from "@/lib/auth-deep-link";
 import {
   isNativeGoogleAuthSupported,
@@ -89,8 +90,15 @@ export function useAuth() {
     let mounted = true;
 
     // Listen to Supabase auth events
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
+
+      if (event === "PASSWORD_RECOVERY") {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("melodymap:password-recovery"));
+        }
+      }
+
       if (session?.user) {
         setUserId(session.user.id);
         setIsCloudAuth(!session.user.is_anonymous);
@@ -98,26 +106,24 @@ export function useAuth() {
         await fetchProfile(session.user);
       } else {
         // Fallback to local guest profile if saved
-        if (typeof window !== "undefined") {
-          const raw = localStorage.getItem("melodymap.local_user");
-          if (raw) {
-            try {
-              const parsed = JSON.parse(raw);
-              if (parsed && typeof parsed === "object") {
-                const localId = parsed.id || "local-listener";
-                setUserId(localId);
-                setIsCloudAuth(false);
-                setEmail(parsed.email || null);
-                setProfile({
-                  id: localId,
-                  display_name: parsed.name || parsed.display_name || "Listener",
-                  avatar_url: parsed.avatar_url || null,
-                });
-                setReady(true);
-                return;
-              }
-            } catch {}
-          }
+        const raw = safeStorage.getItem("melodymap.local_user");
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              const localId = parsed.id || "local-listener";
+              setUserId(localId);
+              setIsCloudAuth(false);
+              setEmail(parsed.email || null);
+              setProfile({
+                id: localId,
+                display_name: parsed.name || parsed.display_name || "Listener",
+                avatar_url: parsed.avatar_url || null,
+              });
+              setReady(true);
+              return;
+            }
+          } catch {}
         }
         setUserId(null);
         setIsCloudAuth(false);
@@ -160,9 +166,7 @@ export function useAuth() {
           avatar_url: patch.avatar_url ?? profile?.avatar_url ?? null,
         };
         setProfile(updated);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("melodymap.local_user", JSON.stringify(updated));
-        }
+        safeStorage.setItem("melodymap.local_user", JSON.stringify(updated));
         return { success: true };
       }
 
@@ -211,10 +215,8 @@ export function useAuth() {
     } catch (err) {
       console.warn("[Auth] signOut error:", err);
     } finally {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("melodymap.guest_mode");
-        localStorage.removeItem("melodymap.local_user");
-      }
+      safeStorage.removeItem("melodymap.guest_mode");
+      safeStorage.removeItem("melodymap.local_user");
       setUserId(null);
       setIsCloudAuth(false);
       setEmail(null);
@@ -277,25 +279,47 @@ export function useAuth() {
 
   const signUpWithEmail = useCallback(async (emailInput: string, passwordInput: string, name?: string) => {
     try {
+      const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/auth` : undefined;
       const { data, error } = await supabase.auth.signUp({
         email: emailInput.trim(),
         password: passwordInput,
         options: {
           data: {
-            display_name: name?.trim(),
-            full_name: name?.trim(),
+            display_name: name?.trim() || "",
+            full_name: name?.trim() || "",
           },
+          ...(redirectUrl ? { emailRedirectTo: redirectUrl } : {}),
         },
       });
       if (error) throw error;
       if (data.user) {
         await fetchProfile(data.user);
       }
-      return { success: true, user: data.user };
+      return {
+        success: true,
+        user: data.user,
+        session: data.session,
+        requiresVerification: Boolean(data.user && !data.session),
+      };
     } catch (err: any) {
       return { success: false, error: err?.message || "Sign up failed" };
     }
   }, [fetchProfile]);
+
+  const resendVerificationEmail = useCallback(async (emailInput: string) => {
+    try {
+      const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/auth` : undefined;
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: emailInput.trim(),
+        options: redirectUrl ? { emailRedirectTo: redirectUrl } : {},
+      });
+      if (error) throw error;
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || "Failed to resend verification email" };
+    }
+  }, []);
 
   const resetPassword = useCallback(async (emailInput: string) => {
     try {
@@ -323,6 +347,7 @@ export function useAuth() {
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
+    resendVerificationEmail,
     resetPassword,
   };
 }
@@ -333,14 +358,13 @@ export function saveLocalUser(user: {
   email?: string | null | undefined;
   avatar_url?: string | null | undefined;
 }) {
-  if (typeof window === "undefined") return;
   const id =
     user.id ||
     "user-" +
       (typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : Date.now());
-  localStorage.setItem(
+  safeStorage.setItem(
     "melodymap.local_user",
     JSON.stringify({
       id,
@@ -349,5 +373,7 @@ export function saveLocalUser(user: {
       avatar_url: user.avatar_url,
     }),
   );
-  window.dispatchEvent(new CustomEvent("melodymap:auth-changed"));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("melodymap:auth-changed"));
+  }
 }

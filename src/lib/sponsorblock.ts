@@ -3,6 +3,8 @@
  * and non-music portions in YouTube tracks and music videos.
  */
 
+import { safeStorage } from "./safe-storage";
+
 export interface SponsorBlockSegment {
   category: "sponsor" | "intro" | "outro" | "selfpromo" | "music_offtopic" | string;
   start: number;
@@ -17,7 +19,7 @@ const SPONSORBLOCK_STORAGE_KEY = "melodymap:sponsorblock_enabled";
 export function getSponsorBlockEnabled(): boolean {
   if (typeof window === "undefined") return true;
   try {
-    const val = localStorage.getItem(SPONSORBLOCK_STORAGE_KEY);
+    const val = safeStorage.getItem(SPONSORBLOCK_STORAGE_KEY);
     return val === null ? true : val === "true";
   } catch {
     return true;
@@ -27,7 +29,7 @@ export function getSponsorBlockEnabled(): boolean {
 export function setSponsorBlockEnabled(enabled: boolean): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(SPONSORBLOCK_STORAGE_KEY, String(enabled));
+    safeStorage.setItem(SPONSORBLOCK_STORAGE_KEY, String(enabled));
   } catch {}
 }
 

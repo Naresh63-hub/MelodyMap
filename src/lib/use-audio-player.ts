@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { safeStorage } from "@/lib/safe-storage";
 import {
   EQUALIZER_PRESETS,
   loadEqualizerSettings,
@@ -193,7 +194,7 @@ export function useAudioPlayer(options: {
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(() => {
     if (typeof window === "undefined") return 1;
     try {
-      const saved = localStorage.getItem("melodymap.playback_speed.v1");
+      const saved = safeStorage.getItem("melodymap.playback_speed.v1");
       if (!saved) return 1;
       const parsed = Number(saved);
       return Number.isFinite(parsed) && parsed >= 0.25 && parsed <= 3 ? parsed : 1;
@@ -1506,7 +1507,7 @@ export function useAudioPlayer(options: {
     setPlaybackSpeed(clamped);
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem("melodymap.playback_speed.v1", String(clamped));
+        safeStorage.setItem("melodymap.playback_speed.v1", String(clamped));
       } catch {}
     }
     const audio = audioRef.current;

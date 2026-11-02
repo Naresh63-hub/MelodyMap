@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { safeStorage } from "./safe-storage";
 import type { PlaybackSource } from "@/lib/providers/types";
 import { inferLanguageFromArtists } from "./language-artists";
 
@@ -262,7 +263,7 @@ export type Stats = Record<string, PlayStat>;
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = safeStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
   } catch (err) {
     console.warn(`[MelodyMap] Failed to read "${key}" from localStorage:`, err);
@@ -273,7 +274,7 @@ function read<T>(key: string, fallback: T): T {
 function write(key: string, value: unknown) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    safeStorage.setItem(key, JSON.stringify(value));
   } catch (err) {
     console.warn(`[MelodyMap] Failed to write "${key}" to localStorage (quota?):`, err);
   }

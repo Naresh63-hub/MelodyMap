@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "./supabase";
+import { safeStorage } from "./safe-storage";
 import { jamService } from "./jam-service";
 import {
   calculatePlaybackSync,
@@ -61,16 +62,12 @@ export function useJamSession(options: UseJamSessionOptions) {
   // Stable persistent guest ID for presence key and identity continuity
   const guestIdRef = useRef<string>("");
   if (!guestIdRef.current) {
-    if (typeof window !== "undefined") {
-      let stored = localStorage.getItem("melodymap.jam_guest_id");
-      if (!stored) {
-        stored = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-        localStorage.setItem("melodymap.jam_guest_id", stored);
-      }
-      guestIdRef.current = stored;
-    } else {
-      guestIdRef.current = `guest-${Date.now()}`;
+    let stored = safeStorage.getItem("melodymap.jam_guest_id");
+    if (!stored) {
+      stored = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      safeStorage.setItem("melodymap.jam_guest_id", stored);
     }
+    guestIdRef.current = stored;
   }
 
   const effectiveUserId = options.userId || guestIdRef.current;

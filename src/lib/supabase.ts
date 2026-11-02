@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { safeStorage } from "./safe-storage";
 
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
@@ -25,8 +26,8 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 export function getSupabaseEnv() {
-  const localUrl = typeof window !== "undefined" ? localStorage.getItem("melodymap.supabase_url") || "" : "";
-  const localKey = typeof window !== "undefined" ? localStorage.getItem("melodymap.supabase_key") || "" : "";
+  const localUrl = safeStorage.getItem("melodymap.supabase_url") || "";
+  const localKey = safeStorage.getItem("melodymap.supabase_key") || "";
 
   const metaUrl = (import.meta as any).env?.["VITE_SUPABASE_URL"];
   const metaKey = (import.meta as any).env?.["VITE_SUPABASE_PUBLISHABLE_KEY"] || (import.meta as any).env?.["VITE_SUPABASE_ANON_KEY"];
@@ -52,16 +53,14 @@ export function getSupabaseEnv() {
 }
 
 export function setLocalSupabaseCredentials(url: string, key: string) {
-  if (typeof window !== "undefined") {
-    if (url && key) {
-      localStorage.setItem("melodymap.supabase_url", url.trim());
-      localStorage.setItem("melodymap.supabase_key", key.trim());
-    } else {
-      localStorage.removeItem("melodymap.supabase_url");
-      localStorage.removeItem("melodymap.supabase_key");
-    }
-    _supabase = undefined;
+  if (url && key) {
+    safeStorage.setItem("melodymap.supabase_url", url.trim());
+    safeStorage.setItem("melodymap.supabase_key", key.trim());
+  } else {
+    safeStorage.removeItem("melodymap.supabase_url");
+    safeStorage.removeItem("melodymap.supabase_key");
   }
+  _supabase = undefined;
 }
 
 function createSupabaseClient() {
@@ -75,7 +74,7 @@ function createSupabaseClient() {
       fetch: createSupabaseFetch(effectiveKey),
     },
     auth: {
-      storage: typeof window !== "undefined" ? localStorage : undefined,
+      storage: safeStorage,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,

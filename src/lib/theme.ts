@@ -1,3 +1,5 @@
+import { safeStorage } from "./safe-storage";
+
 export type Theme = 'dark' | 'light' | 'auto';
 
 const THEME_KEY = 'melodymap-theme';
@@ -11,9 +13,7 @@ export function resolveTheme(_mode?: string): 'dark' {
 
 export function getStoredTheme(): 'dark' {
   try {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(THEME_KEY);
-    }
+    safeStorage.removeItem(THEME_KEY);
   } catch {}
   return 'dark';
 }

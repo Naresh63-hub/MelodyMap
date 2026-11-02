@@ -1,4 +1,5 @@
 import type { TrackLike } from "./track-dedup";
+import { safeStorage } from "./safe-storage";
 
 export type TimeOfDay = "morning" | "afternoon" | "evening" | "night";
 export type TrackEnergy = "chill" | "medium" | "high";
@@ -255,7 +256,7 @@ export class ContextEngineSession {
   loadFromStorage(): void {
     if (typeof window === "undefined") return;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = safeStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const data = JSON.parse(raw);
       if (Array.isArray(data.skips)) this.skips = data.skips.slice(-50);
@@ -290,7 +291,7 @@ export class ContextEngineSession {
         completions: this.completions.slice(-50),
         transitions: transitionsObj,
       };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {}
   }
 

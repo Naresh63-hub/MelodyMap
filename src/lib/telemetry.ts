@@ -1,4 +1,5 @@
 import type { Track } from "./library";
+import { safeStorage } from "./safe-storage";
 
 export type TelemetryEventType =
   | "PLAY_START"
@@ -188,7 +189,7 @@ export class TelemetryManager {
   private loadFromStorage() {
     if (typeof window === "undefined") return;
     try {
-      const raw = localStorage.getItem(TELEMETRY_STORAGE_KEY);
+      const raw = safeStorage.getItem(TELEMETRY_STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
@@ -204,7 +205,7 @@ export class TelemetryManager {
       if (this.buffer.length > MAX_LOCAL_EVENTS) {
         this.buffer = this.buffer.slice(-MAX_LOCAL_EVENTS);
       }
-      localStorage.setItem(TELEMETRY_STORAGE_KEY, JSON.stringify(this.buffer));
+      safeStorage.setItem(TELEMETRY_STORAGE_KEY, JSON.stringify(this.buffer));
     } catch {}
   }
 

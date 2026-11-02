@@ -12,6 +12,8 @@
  * 5. Notification & headset play commands cannot bypass an expired sleep timer until explicit in-app reset.
  */
 
+import { safeStorage } from "./safe-storage";
+
 export type SleepTimerState = {
   active: boolean;
   durationMinutes: number | null;
@@ -63,11 +65,11 @@ class SleepTimerService {
   public init() {
     // 1. Restore state from localStorage
     try {
-      if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
-        const savedActive = localStorage.getItem(STORAGE_KEY_ACTIVE) === "true";
-        const savedTrackEnd = localStorage.getItem(STORAGE_KEY_TRACK_END) === "true";
-        const savedDuration = localStorage.getItem(STORAGE_KEY_DURATION);
-        const savedTarget = localStorage.getItem(STORAGE_KEY_TARGET);
+      if (typeof window !== "undefined") {
+        const savedActive = safeStorage.getItem(STORAGE_KEY_ACTIVE) === "true";
+        const savedTrackEnd = safeStorage.getItem(STORAGE_KEY_TRACK_END) === "true";
+        const savedDuration = safeStorage.getItem(STORAGE_KEY_DURATION);
+        const savedTarget = safeStorage.getItem(STORAGE_KEY_TARGET);
 
         if (savedTrackEnd && savedActive) {
           this.active = true;
@@ -148,10 +150,10 @@ class SleepTimerService {
       this.durationMinutes = null;
       this.targetEpochMs = null;
       this.remainingSeconds = 0;
-      if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+      if (typeof window !== "undefined") {
         try {
-          localStorage.setItem(STORAGE_KEY_ACTIVE, "true");
-          localStorage.setItem(STORAGE_KEY_TRACK_END, "true");
+          safeStorage.setItem(STORAGE_KEY_ACTIVE, "true");
+          safeStorage.setItem(STORAGE_KEY_TRACK_END, "true");
         } catch {}
       }
     } else {
@@ -178,9 +180,9 @@ class SleepTimerService {
 
   public start(minutes: number): void {
     this.stopAtTrackEnd = false;
-    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+    if (typeof window !== "undefined") {
       try {
-        localStorage.removeItem(STORAGE_KEY_TRACK_END);
+        safeStorage.removeItem(STORAGE_KEY_TRACK_END);
       } catch {}
     }
 
@@ -312,20 +314,20 @@ class SleepTimerService {
   }
 
   private saveStorage(minutes: number, targetMs: number) {
-    if (typeof window === "undefined" || typeof localStorage === "undefined") return;
+    if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(STORAGE_KEY_ACTIVE, "true");
-      localStorage.setItem(STORAGE_KEY_DURATION, String(minutes));
-      localStorage.setItem(STORAGE_KEY_TARGET, String(targetMs));
+      safeStorage.setItem(STORAGE_KEY_ACTIVE, "true");
+      safeStorage.setItem(STORAGE_KEY_DURATION, String(minutes));
+      safeStorage.setItem(STORAGE_KEY_TARGET, String(targetMs));
     } catch {}
   }
 
   private clearStorage() {
-    if (typeof window === "undefined" || typeof localStorage === "undefined") return;
+    if (typeof window === "undefined") return;
     try {
-      localStorage.removeItem(STORAGE_KEY_ACTIVE);
-      localStorage.removeItem(STORAGE_KEY_TARGET);
-      localStorage.removeItem(STORAGE_KEY_TRACK_END);
+      safeStorage.removeItem(STORAGE_KEY_ACTIVE);
+      safeStorage.removeItem(STORAGE_KEY_TARGET);
+      safeStorage.removeItem(STORAGE_KEY_TRACK_END);
     } catch {}
   }
 

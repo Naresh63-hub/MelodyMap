@@ -1,4 +1,6 @@
-﻿export type EqualizerBand = {
+import { safeStorage } from "./safe-storage";
+
+export type EqualizerBand = {
   frequency: number;
   label: string;
   gain: number; // -12dB to +12dB
@@ -105,7 +107,7 @@ const STORAGE_KEY = "melodymap.equalizer.v2";
 export function loadEqualizerSettings(): EqualizerSettings {
   if (typeof window === "undefined") return DEFAULT_EQUALIZER_SETTINGS;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_EQUALIZER_SETTINGS;
     const parsed = JSON.parse(raw);
     return {
@@ -121,7 +123,7 @@ export function loadEqualizerSettings(): EqualizerSettings {
 export function saveEqualizerSettings(settings: EqualizerSettings): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    safeStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   } catch {
     // ignore quota error
   }

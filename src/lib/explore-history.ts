@@ -8,6 +8,8 @@
  * can resurface in future sessions, without permanently hiding popular tracks.
  */
 
+import { safeStorage, type SafeStorageProvider } from "./safe-storage";
+
 export const EXPLORE_RECENT_SEEN_KEY = "melodymap.explore_recent_seen.v1";
 export const MAX_RECENT_SEEN_CAPACITY = 250;
 
@@ -51,16 +53,8 @@ export function normalizeTrackIdentity(track: TrackIdentityInput | null | undefi
   return null;
 }
 
-function getStorage(): Storage | null {
-  try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      return window.localStorage;
-    }
-    if (typeof localStorage !== "undefined") {
-      return localStorage;
-    }
-  } catch {}
-  return null;
+function getStorage(): SafeStorageProvider {
+  return safeStorage;
 }
 
 /**

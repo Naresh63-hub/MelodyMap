@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { App } from "@capacitor/app";
 import { supabase } from "./supabase";
+import { safeStorage } from "./safe-storage";
 
 /**
  * Dedicated callback URI for Android deep linking.
@@ -38,9 +39,11 @@ export function getOAuthRedirectUrl(): string {
 
 export interface ParsedAuthCallback {
   code?: string | undefined;
+  tokenHash?: string | undefined;
   accessToken?: string | undefined;
   refreshToken?: string | undefined;
   error?: string | undefined;
+  errorCode?: string | undefined;
   errorDescription?: string | undefined;
   type?: string | undefined;
   rawUrl: string;
@@ -48,12 +51,15 @@ export interface ParsedAuthCallback {
 
 /**
  * Validates whether a given URL string is an intent directed to MelodyMap's auth callback.
+ * Supports both custom scheme (Android) and web callback URLs with tokens/codes/errors.
  */
 export function isAuthCallbackUrl(url: string): boolean {
   if (!url || typeof url !== "string") return false;
   try {
     const normalized = url.replace(/^com\.melodymap\.music:\/?\/?/i, "com.melodymap.music://");
     const parsed = new URL(normalized);
+
+    // 1. Android custom scheme
     if (parsed.protocol.toLowerCase() === "com.melodymap.music:") {
       const host = parsed.host.toLowerCase();
       const pathname = parsed.pathname.toLowerCase();
@@ -62,6 +68,39 @@ export function isAuthCallbackUrl(url: string): boolean {
         (host === "auth" && (pathname === "" || pathname === "/" || pathname.startsWith("/callback"))) ||
         pathname.includes("callback")
       );
+    }
+
+    // 2. Query search parameters
+    const sp = parsed.searchParams;
+    if (
+      sp.has("code") ||
+      sp.has("token_hash") ||
+      sp.has("error") ||
+      sp.has("error_code") ||
+      sp.has("error_description")
+    ) {
+      return true;
+    }
+
+    // 3. Hash fragment parameters
+    if (parsed.hash && parsed.hash.length > 1) {
+      const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ""));
+      if (
+        hashParams.has("access_token") ||
+        hashParams.has("code") ||
+        hashParams.has("error") ||
+        hashParams.has("error_code") ||
+        hashParams.has("error_description") ||
+        hashParams.has("token_hash")
+      ) {
+        return true;
+      }
+    }
+
+    // 4. Explicit callback path
+    const pathname = parsed.pathname.toLowerCase();
+    if (pathname === "/auth/callback" || pathname.endsWith("/auth/callback")) {
+      return true;
     }
   } catch {
     return false;
@@ -84,18 +123,22 @@ export function parseAuthCallbackUrl(url: string): ParsedAuthCallback | null {
     const hashParams = new URLSearchParams(hash);
 
     const code = searchParams.get("code") || hashParams.get("code") || undefined;
+    const tokenHash = searchParams.get("token_hash") || hashParams.get("token_hash") || undefined;
     const accessToken = hashParams.get("access_token") || searchParams.get("access_token") || undefined;
     const refreshToken = hashParams.get("refresh_token") || searchParams.get("refresh_token") || undefined;
     const error = searchParams.get("error") || hashParams.get("error") || undefined;
+    const errorCode = searchParams.get("error_code") || hashParams.get("error_code") || undefined;
     const errorDescription =
       searchParams.get("error_description") || hashParams.get("error_description") || undefined;
     const type = searchParams.get("type") || hashParams.get("type") || undefined;
 
     return {
       code,
+      tokenHash,
       accessToken,
       refreshToken,
       error,
+      errorCode,
       errorDescription,
       type,
       rawUrl: url,
@@ -115,8 +158,44 @@ export function resetProcessedAuthCodesForTest(): void {
 }
 
 /**
+ * Formats auth errors into user-friendly messages avoiding raw internal exceptions.
+ */
+export function formatCallbackError(error?: string, errorCode?: string, description?: string): string {
+  const code = (errorCode || "").toLowerCase();
+  const desc = (description || error || "").toLowerCase();
+
+  if (
+    code === "otp_expired" ||
+    desc.includes("expired") ||
+    desc.includes("invalid or has expired") ||
+    desc.includes("token has expired")
+  ) {
+    return "Your verification link has expired. Request a new one.";
+  }
+
+  if (description) {
+    return description;
+  }
+
+  if (
+    code === "access_denied" ||
+    desc.includes("access_denied") ||
+    desc.includes("cancelled") ||
+    desc.includes("user cancelled")
+  ) {
+    return "We couldn't complete sign-in. Please try again.";
+  }
+
+  if (desc.includes("storage") || desc.includes("localstorage") || desc.includes("access is denied")) {
+    return "Your browser is restricting storage. Open MelodyMap in your regular browser to continue.";
+  }
+
+  return error || "We couldn't complete sign-in. Please try again.";
+}
+
+/**
  * Processes an incoming auth callback URL, restores session state,
- * and dismisses any active in-app browser.
+ * cleans URL parameters, and dismisses any active in-app browser.
  */
 export async function handleAuthCallback(
   url: string,
@@ -132,18 +211,20 @@ export async function handleAuthCallback(
   }
 
   // Handle provider cancellation or OAuth errors
-  if (parsed.error) {
-    const msg = parsed.errorDescription || parsed.error || "Authentication was cancelled or failed.";
+  if (parsed.error || parsed.errorCode) {
+    const msg = formatCallbackError(parsed.error, parsed.errorCode, parsed.errorDescription);
     const err = new Error(msg);
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("melodymap:auth-error", { detail: { error: msg } }));
+      window.dispatchEvent(
+        new CustomEvent("melodymap:auth-error", { detail: { error: msg, code: parsed.errorCode } }),
+      );
     }
     options?.onError?.(err);
     return { success: false, error: msg };
   }
 
   // Check for duplicate callback
-  const uniqueKey = parsed.code || parsed.accessToken || url;
+  const uniqueKey = parsed.code || parsed.tokenHash || parsed.accessToken || url;
   if (processedCodes.has(uniqueKey)) {
     console.info("[AuthDeepLink] Callback already processed:", uniqueKey);
     return { success: true };
@@ -158,12 +239,32 @@ export async function handleAuthCallback(
     try {
       const client = _authClient || supabase;
       if (client?.auth) {
-        if (parsed.code) {
+        if (parsed.tokenHash) {
+          // Supabase email verifyOtp flow
+          const verifyType = (parsed.type as any) || "signup";
+          const { error } = await client.auth.verifyOtp({
+            token_hash: parsed.tokenHash,
+            type: verifyType,
+          });
+
+          if (error) {
+            console.warn("[AuthDeepLink] verifyOtp error:", error.message);
+            const friendly = formatCallbackError(error.message, undefined, error.message);
+            const errObj = new Error(friendly);
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new CustomEvent("melodymap:auth-error", { detail: { error: friendly } }));
+            }
+            options?.onError?.(errObj);
+            return { success: false, error: friendly };
+          }
+        } else if (parsed.code) {
+          // PKCE code exchange
           const { error } = await client.auth.exchangeCodeForSession(parsed.code);
           if (error) {
             console.warn("[AuthDeepLink] exchangeCodeForSession notice:", error.message);
           }
         } else if (parsed.accessToken && parsed.refreshToken) {
+          // Direct token session setup
           const { error } = await client.auth.setSession({
             access_token: parsed.accessToken,
             refresh_token: parsed.refreshToken,
@@ -176,8 +277,27 @@ export async function handleAuthCallback(
 
       processedCodes.add(uniqueKey);
 
+      safeStorage.removeItem("melodymap.guest_mode");
       if (typeof window !== "undefined") {
-        localStorage.removeItem("melodymap.guest_mode");
+        // Clean query/hash parameters from URL without reloading
+        try {
+          const currentUrl = new URL(window.location.href);
+          let cleaned = false;
+          ["code", "token_hash", "error", "error_code", "error_description", "type"].forEach((k) => {
+            if (currentUrl.searchParams.has(k)) {
+              currentUrl.searchParams.delete(k);
+              cleaned = true;
+            }
+          });
+          if (currentUrl.hash && (currentUrl.hash.includes("access_token") || currentUrl.hash.includes("error"))) {
+            currentUrl.hash = "";
+            cleaned = true;
+          }
+          if (cleaned) {
+            window.history.replaceState(null, "", currentUrl.toString());
+          }
+        } catch {}
+
         window.dispatchEvent(new CustomEvent("melodymap:auth-success"));
       }
 
@@ -185,12 +305,13 @@ export async function handleAuthCallback(
       return { success: true };
     } catch (err: any) {
       console.warn("[AuthDeepLink] Session exchange failed:", err);
-      const errorObj = err instanceof Error ? err : new Error(err?.message || "Failed to exchange session");
+      const friendly = formatCallbackError(err?.message);
+      const errorObj = new Error(friendly);
       if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("melodymap:auth-error", { detail: { error: errorObj.message } }));
+        window.dispatchEvent(new CustomEvent("melodymap:auth-error", { detail: { error: friendly } }));
       }
       options?.onError?.(errorObj);
-      return { success: false, error: errorObj.message };
+      return { success: false, error: friendly };
     } finally {
       activeExchangePromise = null;
     }

@@ -2,20 +2,26 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import {
   AlertCircle,
   ArrowLeft,
+  Check,
   CheckCircle2,
+  Compass,
   Eye,
   EyeOff,
+  HelpCircle,
   Loader2,
   Lock,
   Mail,
+  RefreshCw,
+  Sparkles,
   User,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { safeStorage } from "@/lib/safe-storage";
 
 export function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -33,6 +39,14 @@ export function formatAuthError(msg: string): string {
   }
   if (lower.includes("email not confirmed")) {
     return "Please confirm your email before signing in. Check your inbox or spam folder.";
+  }
+  if (
+    lower.includes("otp_expired") ||
+    lower.includes("email link is invalid") ||
+    lower.includes("token has expired") ||
+    lower.includes("expired token")
+  ) {
+    return "Your verification link has expired or is invalid. Please request a new verification link.";
   }
   if (
     lower.includes("email-already-in-use") ||
@@ -69,6 +83,13 @@ export function formatAuthError(msg: string): string {
   ) {
     return "Authentication service is currently not configured or unavailable. Please try again later or continue as a guest.";
   }
+  if (
+    lower.includes("localstorage") ||
+    lower.includes("access is denied") ||
+    lower.includes("quotaexceeded")
+  ) {
+    return "Browser storage is restricted in this window. You can still explore as a guest or open in a standard browser.";
+  }
   if (lower.includes("popup-closed-by-user") || lower.includes("cancelled")) {
     return "Sign in was cancelled.";
   }
@@ -89,10 +110,36 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+type AuthMode = "signin" | "signup" | "forgot" | "reset_password" | "verify_email";
+
+function getPasswordStrength(pwd: string): { score: number; label: string; color: string } {
+  if (!pwd) return { score: 0, label: "", color: "#E9DDFD" };
+  let score = 0;
+  if (pwd.length >= 6) score += 1;
+  if (pwd.length >= 9) score += 1;
+  if (/[0-9]/.test(pwd) && /[a-zA-Z]/.test(pwd)) score += 1;
+  if (/[^a-zA-Z0-9]/.test(pwd)) score += 1;
+
+  switch (score) {
+    case 1:
+      return { score: 1, label: "Weak", color: "#C4B5FD" };
+    case 2:
+      return { score: 2, label: "Fair", color: "#A78BFA" };
+    case 3:
+      return { score: 3, label: "Good", color: "#9333EA" };
+    case 4:
+      return { score: 4, label: "Strong", color: "#7C3AED" };
+    default:
+      return { score: 0, label: "Too short", color: "#E9DDFD" };
+  }
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const auth = useAuth();
-  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "reset_password">("signin");
+  const formId = useId();
+
+  const [mode, setMode] = useState<AuthMode>("signin");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -100,17 +147,49 @@ function AuthPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [errorNote, setErrorNote] = useState<string | null>(null);
   const [successNote, setSuccessNote] = useState<string | null>(null);
 
+  // Parse initial recovery or callback intent from URL or global events
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const hash = window.location.hash || "";
+    const search = window.location.search || "";
+    const fullParams = new URLSearchParams(search + (hash.startsWith("#") ? "?" + hash.slice(1) : ""));
+
+    if (fullParams.get("type") === "recovery" || hash.includes("type=recovery")) {
+      setMode("reset_password");
+    }
+
+    const err = fullParams.get("error_description") || fullParams.get("error");
+    if (err) {
+      setErrorNote(formatAuthError(decodeURIComponent(err.replace(/\+/g, " "))));
+    }
+
+    const onRecovery = () => setMode("reset_password");
+    window.addEventListener("melodymap:password-recovery", onRecovery);
+    return () => window.removeEventListener("melodymap:password-recovery", onRecovery);
+  }, []);
+
+  // Redirect to home if user is signed in (unless resetting password)
   useEffect(() => {
     if (auth.userId && mode !== "reset_password") {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("melodymap.guest_mode");
-      }
+      safeStorage.removeItem("melodymap.guest_mode");
       void navigate({ to: "/", replace: true });
     }
   }, [navigate, mode, auth.userId]);
+
+  // Resend cooldown timer countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const handleGoogleSignIn = async () => {
     setGoogleBusy(true);
@@ -119,7 +198,7 @@ function AuthPage() {
     try {
       const res = await auth.signInWithGoogle();
       if (res.success) {
-        setSuccessNote("Redirecting to Google Sign-in...");
+        setSuccessNote("Connecting with Google...");
       } else {
         setErrorNote(formatAuthError(res.error || "Google Sign-in failed"));
       }
@@ -127,6 +206,29 @@ function AuthPage() {
       setErrorNote(formatAuthError(err?.message || "Google Sign-in failed"));
     } finally {
       setGoogleBusy(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setErrorNote("Please enter your email address.");
+      return;
+    }
+    setResending(true);
+    setErrorNote(null);
+    try {
+      const res = await auth.resendVerificationEmail(trimmedEmail);
+      if (res.success) {
+        setSuccessNote("Verification email resent! Please check your inbox or spam.");
+        setResendCooldown(45);
+      } else {
+        setErrorNote(formatAuthError(res.error || "Failed to resend verification email"));
+      }
+    } catch (err: any) {
+      setErrorNote(formatAuthError(err?.message || "Failed to resend verification email"));
+    } finally {
+      setResending(false);
     }
   };
 
@@ -175,7 +277,7 @@ function AuthPage() {
       try {
         const res = await auth.resetPassword(trimmedEmail);
         if (res.success) {
-          setSuccessNote("Password reset instructions sent to your email! Check your inbox.");
+          setSuccessNote("Password reset instructions sent! Check your inbox.");
           setTimeout(() => setMode("signin"), 3000);
         } else {
           setErrorNote(formatAuthError(res.error || "Failed to send reset email"));
@@ -215,10 +317,16 @@ function AuthPage() {
       try {
         const res = await auth.signUpWithEmail(trimmedEmail, password, trimmedName);
         if (res.success) {
-          setSuccessNote(`Welcome, ${trimmedName}! Account created.`);
-          setTimeout(() => {
-            void navigate({ to: "/", replace: true });
-          }, 800);
+          if (res.requiresVerification) {
+            setMode("verify_email");
+            setSuccessNote(`Verification email sent to ${trimmedEmail}!`);
+            setResendCooldown(30);
+          } else {
+            setSuccessNote(`Welcome, ${trimmedName}! Account created.`);
+            setTimeout(() => {
+              void navigate({ to: "/", replace: true });
+            }, 800);
+          }
         } else {
           setErrorNote(formatAuthError(res.error || "Sign-up failed"));
         }
@@ -271,90 +379,111 @@ function AuthPage() {
         });
       }
     } catch {}
-    if (typeof window !== "undefined") {
-      localStorage.setItem("melodymap.guest_mode", "true");
-    }
+    safeStorage.setItem("melodymap.guest_mode", "true");
     void navigate({ to: "/", replace: true });
   };
 
+  const passwordStrength = getPasswordStrength(password);
+  const passwordsMatch = confirmPassword.length > 0 && password === confirmPassword;
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-background px-4 py-8 sm:px-6 lg:px-8 text-foreground">
+    <div
+      className="flex min-h-screen flex-col justify-center px-4 py-8 sm:px-6 lg:px-8 selection:bg-[#F3EEFF] selection:text-[#7C3AED]"
+      style={{
+        backgroundColor: "#FAF9FF",
+        color: "#191329",
+      }}
+    >
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        {/* Navigation Escape Back to Music */}
         <div className="flex justify-center mb-2">
           <Link
             to="/"
-            className="flex items-center gap-2 text-xs text-foreground/75 hover:text-foreground transition-colors py-2 px-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary min-h-[44px]"
+            className="flex items-center gap-2 text-xs text-[#716A80] hover:text-[#191329] transition-colors py-2 px-3 rounded-full hover:bg-[#F3EEFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] min-h-[44px]"
           >
             <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-            <span>Back to music</span>
+            <span className="font-medium">Back to music</span>
           </Link>
         </div>
 
-        <div className="flex flex-col items-center">
-          <picture>
-            <source srcSet="/brand/app-icon.webp" type="image/webp" />
-            <img
-              src="/brand/app-icon.png"
-              alt="MelodyMap"
-              loading="eager"
-              fetchPriority="high"
-              width={56}
-              height={56}
-              className="h-14 w-14 rounded-2xl object-contain ring-1 ring-primary/30 shadow-lg mb-3"
-            />
-          </picture>
-          <h2 className="text-center text-2xl font-semibold tracking-tight text-foreground font-display">
-            {mode === "signin" && "Sign in to MelodyMap"}
-            {mode === "signup" && "Create an account"}
+        {/* Brand Header */}
+        <div className="flex flex-col items-center text-center">
+          <div className="relative mb-3 group">
+            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-[#7C3AED]/20 to-[#9333EA]/20 blur-md opacity-70 group-hover:opacity-100 transition duration-300" />
+            <picture>
+              <source srcSet="/brand/app-icon.webp" type="image/webp" />
+              <img
+                src="/brand/app-icon.png"
+                alt="MelodyMap"
+                loading="eager"
+                fetchPriority="high"
+                width={56}
+                height={56}
+                className="relative h-14 w-14 rounded-2xl object-contain shadow-sm border border-[#E9DDFD] bg-white p-1"
+              />
+            </picture>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#191329] font-display">
+            {mode === "signin" && "Your music. Your mood. Your Melody."}
+            {mode === "signup" && "Join MelodyMap"}
+            {mode === "verify_email" && "Check your inbox"}
             {mode === "forgot" && "Reset your password"}
             {mode === "reset_password" && "Set new password"}
-          </h2>
-          <p className="mt-1.5 text-center text-xs text-foreground/75">
-            {mode === "signin" && "Sign in with Google or email to sync across all your devices"}
-            {mode === "signup" && "Create an account to keep your listening history and favourites safe"}
-            {mode === "forgot" && "Enter your email to receive password reset instructions"}
-            {mode === "reset_password" && "Enter a secure new password for your account"}
+          </h1>
+
+          <p className="mt-1.5 text-xs sm:text-sm text-[#716A80] max-w-sm leading-relaxed">
+            {mode === "signin" && "Sign in to keep your music, playlists and discoveries in sync."}
+            {mode === "signup" && "Create your free account to save favorites and listen across devices."}
+            {mode === "verify_email" && `We've sent a verification link to ${email || "your email"}.`}
+            {mode === "forgot" && "Enter your email to receive password reset instructions."}
+            {mode === "reset_password" && "Enter a secure new password for your account."}
           </p>
         </div>
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="rounded-2xl bg-card border border-hair-strong p-6 sm:p-8 shadow-2xl space-y-4">
-          {/* Notification alerts */}
+        <div
+          className="rounded-3xl bg-white border border-[#E9DDFD] p-6 sm:p-8 shadow-[0_12px_40px_rgba(124,58,237,0.08)] space-y-4"
+          style={{ backgroundColor: "#FFFFFF" }}
+        >
+          {/* Notifications & Status Banners */}
           {errorNote && (
             <div
               id="auth-error-note"
               role="alert"
               aria-live="assertive"
-              className="flex items-center gap-2.5 rounded-xl bg-destructive/20 border border-destructive/40 p-3 text-xs text-red-200"
+              className="flex items-start gap-2.5 rounded-2xl bg-[#FFF5F5] border border-[#FED7D7] p-3.5 text-xs text-[#C53030]"
             >
-              <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
-              <p className="flex-1">{errorNote}</p>
+              <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
+              <p className="flex-1 font-medium leading-relaxed">{errorNote}</p>
             </div>
           )}
+
           {successNote && (
             <div
               role="status"
               aria-live="polite"
-              className="flex items-center gap-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 p-3 text-xs text-emerald-200"
+              className="flex items-start gap-2.5 rounded-2xl bg-[#F3EEFF] border border-[#E9DDFD] p-3.5 text-xs text-[#7C3AED]"
             >
-              <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0" />
-              <p className="flex-1">{successNote}</p>
+              <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
+              <p className="flex-1 font-medium leading-relaxed">{successNote}</p>
             </div>
           )}
 
-          {/* Primary Hero: Google Sign-in */}
-          {mode !== "reset_password" && (
+          {/* Primary Social Hero: Continue with Google */}
+          {mode !== "reset_password" && mode !== "verify_email" && (
             <div className="space-y-2.5 pt-1">
               <Button
                 type="button"
                 variant="outline"
                 disabled={googleBusy || submitting}
                 onClick={handleGoogleSignIn}
-                className="w-full h-11 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 border-none font-semibold flex items-center justify-center gap-2.5 shadow-md active:scale-95 transition-all text-xs"
+                className="w-full h-11 rounded-2xl bg-white hover:bg-[#FAF9FF] text-[#191329] border border-[#E9DDFD] font-semibold flex items-center justify-center gap-2.5 shadow-sm active:scale-[0.99] transition-all text-xs"
               >
                 {googleBusy ? (
-                  <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-neutral-900" />
+                  <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[#7C3AED]" />
                 ) : (
                   <svg aria-hidden="true" focusable="false" className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                     <path
@@ -377,25 +506,22 @@ function AuthPage() {
                 )}
                 <span>Continue with Google</span>
               </Button>
-              <p className="text-center text-[11px] text-muted-foreground font-medium">
-                Instant 1-tap sign-in & account creation
-              </p>
 
-              <div className="relative flex items-center justify-center my-3">
-                <div className="border-t border-hair w-full" />
-                <span className="bg-card px-2.5 text-[10px] text-foreground/70 uppercase tracking-widest font-mono">
-                  or with email
+              <div className="relative flex items-center justify-center my-3.5">
+                <div className="border-t border-[#E9DDFD] w-full" />
+                <span className="bg-white px-3 text-[10px] text-[#716A80] uppercase tracking-wider font-medium">
+                  or continue with email
                 </span>
               </div>
             </div>
           )}
 
-          {/* Mode Switcher for Email */}
-          {mode !== "reset_password" && mode !== "forgot" && (
+          {/* Mode Switcher Tabs */}
+          {mode !== "reset_password" && mode !== "forgot" && mode !== "verify_email" && (
             <div
               role="tablist"
               aria-label="Authentication mode"
-              className="flex rounded-xl bg-chip-subtle p-1 border border-hair"
+              className="flex rounded-2xl bg-[#FAF9FF] p-1 border border-[#E9DDFD]"
             >
               <button
                 type="button"
@@ -407,10 +533,10 @@ function AuthPage() {
                   setErrorNote(null);
                   setSuccessNote(null);
                 }}
-                className={`flex-1 rounded-lg py-2.5 min-h-[44px] flex items-center justify-center text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                className={`flex-1 rounded-xl py-2 min-h-[44px] flex items-center justify-center text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] ${
                   mode === "signin"
-                    ? "bg-primary-strong text-primary-foreground shadow-md"
-                    : "text-foreground/75 hover:text-foreground"
+                    ? "bg-[#7C3AED] text-white shadow-sm"
+                    : "text-[#716A80] hover:text-[#191329]"
                 }`}
               >
                 Sign In
@@ -425,10 +551,10 @@ function AuthPage() {
                   setErrorNote(null);
                   setSuccessNote(null);
                 }}
-                className={`flex-1 rounded-lg py-2.5 min-h-[44px] flex items-center justify-center text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                className={`flex-1 rounded-xl py-2 min-h-[44px] flex items-center justify-center text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] ${
                   mode === "signup"
-                    ? "bg-primary-strong text-primary-foreground shadow-md"
-                    : "text-foreground/75 hover:text-foreground"
+                    ? "bg-[#7C3AED] text-white shadow-sm"
+                    : "text-[#716A80] hover:text-[#191329]"
                 }`}
               >
                 Create Account
@@ -436,172 +562,274 @@ function AuthPage() {
             </div>
           )}
 
-          <form id="auth-form" onSubmit={handleSubmit} className="space-y-3.5">
-            {mode === "signup" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="auth-name" className="text-xs text-foreground/90 font-medium">
-                  Full Name
-                </Label>
-                <div className="relative">
-                  <User aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/70 pointer-events-none" />
-                  <Input
-                    id="auth-name"
-                    name="name"
-                    type="text"
-                    autoComplete="name"
-                    placeholder="Your Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    disabled={submitting}
-                    aria-invalid={Boolean(errorNote)}
-                    aria-describedby={errorNote ? "auth-error-note" : undefined}
-                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/65 h-10 rounded-xl focus:border-primary"
-                    required
-                  />
+          {/* Dedicated Verify Email Screen */}
+          {mode === "verify_email" && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-2xl bg-[#FAF9FF] border border-[#E9DDFD] p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-[#F3EEFF] text-[#7C3AED] flex items-center justify-center shrink-0">
+                    <Mail aria-hidden="true" className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-[#191329]">Verification link sent</p>
+                    <p className="text-[11px] text-[#716A80] break-all">{email}</p>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-[#716A80] space-y-1.5 border-t border-[#E9DDFD] pt-2.5">
+                  <p>1. Open your email app and click the confirmation link.</p>
+                  <p>2. Check your spam/junk folder if not received in 1 minute.</p>
+                  <p className="text-[#7C3AED] font-medium">
+                    Tip: If opened in Gmail/Outlook webview, tap (⋮) &gt; "Open in Chrome / Browser" to keep your session saved.
+                  </p>
                 </div>
               </div>
-            )}
 
-            {mode !== "reset_password" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="auth-email" className="text-xs text-foreground/90 font-medium">
-                  Email Address
-                </Label>
-                <div className="relative">
-                  <Mail aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/70 pointer-events-none" />
-                  <Input
-                    id="auth-email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={submitting}
-                    aria-invalid={Boolean(errorNote)}
-                    aria-describedby={errorNote ? "auth-error-note" : undefined}
-                    className="pl-9 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/65 h-10 rounded-xl focus:border-primary"
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={resending || resendCooldown > 0}
+                  onClick={handleResendVerification}
+                  className="w-full h-11 rounded-2xl border-[#E9DDFD] text-[#191329] hover:bg-[#FAF9FF] text-xs font-semibold flex items-center justify-center gap-2"
+                >
+                  {resending ? (
+                    <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[#7C3AED]" />
+                  ) : (
+                    <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 text-[#7C3AED]" />
+                  )}
+                  <span>
+                    {resendCooldown > 0
+                      ? `Resend available in ${resendCooldown}s`
+                      : "Resend verification link"}
+                  </span>
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setMode("signin");
+                    setErrorNote(null);
+                    setSuccessNote(null);
+                  }}
+                  className="w-full h-11 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold shadow-md shadow-[#7C3AED]/20"
+                >
+                  I've confirmed my email · Sign In
+                </Button>
               </div>
-            )}
+            </div>
+          )}
 
-            {mode !== "forgot" && (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="auth-password" className="text-xs text-foreground/90 font-medium">
-                    {mode === "reset_password" ? "New Password" : "Password"}
+          {/* Form Content */}
+          {mode !== "verify_email" && (
+            <form id="auth-form" onSubmit={handleSubmit} className="space-y-3.5">
+              {mode === "signup" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="auth-name" className="text-xs font-semibold text-[#191329]">
+                    Full Name
                   </Label>
-                  {mode === "signin" && (
+                  <div className="relative">
+                    <User aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#716A80] pointer-events-none" />
+                    <Input
+                      id="auth-name"
+                      name="name"
+                      type="text"
+                      autoComplete="name"
+                      placeholder="Jane Doe"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      disabled={submitting}
+                      aria-invalid={Boolean(errorNote)}
+                      aria-describedby={errorNote ? "auth-error-note" : undefined}
+                      className="pl-10 bg-[#FAF9FF] border-[#E9DDFD] text-[#191329] placeholder:text-[#716A80]/70 h-11 rounded-2xl focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mode !== "reset_password" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="auth-email" className="text-xs font-semibold text-[#191329]">
+                    Email Address
+                  </Label>
+                  <div className="relative">
+                    <Mail aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#716A80] pointer-events-none" />
+                    <Input
+                      id="auth-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={submitting}
+                      aria-invalid={Boolean(errorNote)}
+                      aria-describedby={errorNote ? "auth-error-note" : undefined}
+                      className="pl-10 bg-[#FAF9FF] border-[#E9DDFD] text-[#191329] placeholder:text-[#716A80]/70 h-11 rounded-2xl focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mode !== "forgot" && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="auth-password" className="text-xs font-semibold text-[#191329]">
+                      {mode === "reset_password" ? "New Password" : "Password"}
+                    </Label>
+                    {mode === "signin" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode("forgot");
+                          setErrorNote(null);
+                          setSuccessNote(null);
+                        }}
+                        className="text-xs text-[#7C3AED] hover:text-[#6D28D9] font-medium min-h-[44px] inline-flex items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <Lock aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#716A80] pointer-events-none" />
+                    <Input
+                      id="auth-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                      placeholder="At least 6 characters"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={submitting}
+                      aria-invalid={Boolean(errorNote)}
+                      aria-describedby={errorNote ? "auth-error-note" : undefined}
+                      className="pl-10 pr-12 bg-[#FAF9FF] border-[#E9DDFD] text-[#191329] placeholder:text-[#716A80]/70 h-11 rounded-2xl focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                      required
+                    />
                     <button
                       type="button"
-                      onClick={() => {
-                        setMode("forgot");
-                        setErrorNote(null);
-                        setSuccessNote(null);
-                      }}
-                      className="text-xs text-primary-soft hover:underline font-medium min-h-[44px] inline-flex items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                      onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-pressed={showPassword}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#716A80] hover:text-[#191329] transition-colors rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED]"
                     >
-                      Forgot password?
+                      {showPassword ? (
+                        <EyeOff aria-hidden="true" className="h-4 w-4" />
+                      ) : (
+                        <Eye aria-hidden="true" className="h-4 w-4" />
+                      )}
                     </button>
+                  </div>
+
+                  {/* Password Strength Meter (for Sign Up and Password Reset) */}
+                  {(mode === "signup" || mode === "reset_password") && password.length > 0 && (
+                    <div className="pt-1 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-[#716A80]">Password strength:</span>
+                        <span className="font-semibold text-[#7C3AED]">{passwordStrength.label}</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5 h-1.5">
+                        {[1, 2, 3, 4].map((bar) => (
+                          <div
+                            key={bar}
+                            className="rounded-full transition-all duration-300"
+                            style={{
+                              backgroundColor:
+                                bar <= passwordStrength.score ? passwordStrength.color : "#E9DDFD",
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div className="relative">
-                  <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/70 pointer-events-none" />
-                  <Input
-                    id="auth-password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                    placeholder="At least 6 characters"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={submitting}
-                    aria-invalid={Boolean(errorNote)}
-                    aria-describedby={errorNote ? "auth-error-note" : undefined}
-                    className="pl-9 pr-12 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/65 h-10 rounded-xl focus:border-primary"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
-                    aria-pressed={showPassword}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                  >
-                    {showPassword ? (
-                      <EyeOff aria-hidden="true" className="h-4 w-4" />
-                    ) : (
-                      <Eye aria-hidden="true" className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {(mode === "signup" || mode === "reset_password") && (
-              <div className="space-y-1.5">
-                <Label htmlFor="auth-confirm-password" className="text-xs text-foreground/90 font-medium">
-                  Confirm Password
-                </Label>
-                <div className="relative">
-                  <Lock aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/70 pointer-events-none" />
-                  <Input
-                    id="auth-confirm-password"
-                    name="confirmPassword"
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="new-password"
-                    placeholder="Re-enter password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    disabled={submitting}
-                    aria-invalid={Boolean(errorNote)}
-                    aria-describedby={errorNote ? "auth-error-note" : undefined}
-                    className="pl-9 pr-12 bg-chip-subtle border-hair text-foreground placeholder:text-foreground/65 h-10 rounded-xl focus:border-primary"
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              disabled={submitting || googleBusy}
-              aria-busy={submitting}
-              className="w-full h-11 rounded-xl bg-primary-strong hover:bg-primary-strong/90 text-primary-foreground font-semibold shadow-lg shadow-primary/20 transition-all text-xs"
-            >
-              {submitting ? (
-                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin mr-2" />
-              ) : mode === "signin" ? (
-                "Sign In"
-              ) : mode === "signup" ? (
-                "Create Account"
-              ) : mode === "forgot" ? (
-                "Send Reset Link"
-              ) : (
-                "Update Password"
               )}
-            </Button>
-          </form>
+
+              {(mode === "signup" || mode === "reset_password") && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="auth-confirm-password" className="text-xs font-semibold text-[#191329]">
+                      Confirm Password
+                    </Label>
+                    {passwordsMatch && (
+                      <span className="text-[11px] text-[#7C3AED] font-medium flex items-center gap-1">
+                        <Check className="h-3 w-3" /> Passwords match
+                      </span>
+                    )}
+                    {passwordsMismatch && (
+                      <span className="text-[11px] text-[#C53030] font-medium">
+                        Passwords do not match
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#716A80] pointer-events-none" />
+                    <Input
+                      id="auth-confirm-password"
+                      name="confirmPassword"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={submitting}
+                      aria-invalid={Boolean(errorNote)}
+                      aria-describedby={errorNote ? "auth-error-note" : undefined}
+                      className="pl-10 pr-12 bg-[#FAF9FF] border-[#E9DDFD] text-[#191329] placeholder:text-[#716A80]/70 h-11 rounded-2xl focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={submitting || googleBusy}
+                aria-busy={submitting}
+                className="w-full h-11 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold shadow-md shadow-[#7C3AED]/20 active:scale-[0.99] transition-all text-xs"
+              >
+                {submitting ? (
+                  <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin mr-2" />
+                ) : mode === "signin" ? (
+                  "Sign In"
+                ) : mode === "signup" ? (
+                  "Create Account"
+                ) : mode === "forgot" ? (
+                  "Send Reset Link"
+                ) : (
+                  "Update Password"
+                )}
+              </Button>
+            </form>
+          )}
 
           {mode === "forgot" && (
             <button
               type="button"
-              onClick={() => setMode("signin")}
-              className="w-full py-2.5 min-h-[44px] flex items-center justify-center text-xs text-foreground/75 hover:text-foreground transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+              onClick={() => {
+                setMode("signin");
+                setErrorNote(null);
+                setSuccessNote(null);
+              }}
+              className="w-full py-2 min-h-[44px] flex items-center justify-center text-xs text-[#716A80] hover:text-[#191329] font-medium transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-xl"
             >
               Back to Sign In
             </button>
           )}
 
-          <div className="pt-2 border-t border-hair text-center">
+          {/* Guest Exploration Escape */}
+          <div className="pt-3 border-t border-[#E9DDFD] text-center">
             <button
               type="button"
               onClick={continueAsGuest}
-              className="min-h-[44px] py-2.5 px-4 inline-flex items-center justify-center text-xs text-foreground/75 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
+              className="min-h-[44px] py-2 px-4 inline-flex items-center justify-center gap-1.5 text-xs text-[#716A80] hover:text-[#7C3AED] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-full hover:bg-[#F3EEFF]"
             >
-              Skip for now · Continue as Guest
+              <Compass aria-hidden="true" className="h-3.5 w-3.5 text-[#7C3AED]" />
+              <span>Explore as Guest &rarr;</span>
             </button>
           </div>
         </div>

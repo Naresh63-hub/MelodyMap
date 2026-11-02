@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { safeStorage } from "./safe-storage";
 
 export interface RecentSearchItem {
   query: string;
@@ -24,9 +25,9 @@ function dispatchSearchHistoryUpdate() {
  * Handles SSR safety, corrupt JSON, and legacy format normalization.
  */
 export function getRecentSearches(): RecentSearchItem[] {
-  if (typeof window === "undefined" || !window.localStorage) return [];
+  if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY);
+    const raw = safeStorage.getItem(SEARCH_HISTORY_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -66,7 +67,7 @@ export function saveRecentSearch(rawQuery: string): RecentSearchItem[] {
   const query = rawQuery.trim();
   if (!query) return getRecentSearches();
 
-  if (typeof window === "undefined" || !window.localStorage) {
+  if (typeof window === "undefined") {
     return [{ query, timestamp: Date.now() }];
   }
 
@@ -82,7 +83,7 @@ export function saveRecentSearch(rawQuery: string): RecentSearchItem[] {
       ...filtered,
     ].slice(0, MAX_RECENT_SEARCHES);
 
-    window.localStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(updated));
+    safeStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(updated));
     dispatchSearchHistoryUpdate();
     return updated;
   } catch {
@@ -95,12 +96,12 @@ export function saveRecentSearch(rawQuery: string): RecentSearchItem[] {
  */
 export function removeRecentSearch(rawQuery: string): RecentSearchItem[] {
   const query = rawQuery.trim().toLowerCase();
-  if (typeof window === "undefined" || !window.localStorage) return [];
+  if (typeof window === "undefined") return [];
 
   try {
     const existing = getRecentSearches();
     const updated = existing.filter((item) => item.query.toLowerCase() !== query);
-    window.localStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(updated));
+    safeStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(updated));
     dispatchSearchHistoryUpdate();
     return updated;
   } catch {
@@ -112,9 +113,9 @@ export function removeRecentSearch(rawQuery: string): RecentSearchItem[] {
  * Clears all recent searches from localStorage.
  */
 export function clearRecentSearches(): void {
-  if (typeof window === "undefined" || !window.localStorage) return;
+  if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(SEARCH_HISTORY_STORAGE_KEY);
+    safeStorage.removeItem(SEARCH_HISTORY_STORAGE_KEY);
     dispatchSearchHistoryUpdate();
   } catch {}
 }

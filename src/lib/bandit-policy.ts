@@ -1,4 +1,5 @@
 import type { TrackLike } from "./track-dedup";
+import { safeStorage } from "./safe-storage";
 import {
   detectTrackEnergy,
   calculateEnergyCompatibility,
@@ -453,7 +454,7 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
   private loadFromStorage(): void {
     if (typeof window === "undefined") return;
     try {
-      const raw = localStorage.getItem(BANDIT_STORAGE_KEY);
+      const raw = safeStorage.getItem(BANDIT_STORAGE_KEY);
       if (!raw) return;
       const state = JSON.parse(raw) as BanditModelState;
       if (state && state.dimension === this.dimension && Array.isArray(state.B)) {
@@ -466,7 +467,7 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     if (typeof window === "undefined") return;
     try {
       const state = this.getModelState();
-      localStorage.setItem(BANDIT_STORAGE_KEY, JSON.stringify(state));
+      safeStorage.setItem(BANDIT_STORAGE_KEY, JSON.stringify(state));
     } catch {}
   }
 }

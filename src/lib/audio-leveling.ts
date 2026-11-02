@@ -13,6 +13,8 @@
  * into the upstream master.
  */
 
+import { safeStorage } from "./safe-storage";
+
 const LEVELING_STORAGE_KEY = "melodymap.loudness_leveling.v1";
 
 /**
@@ -21,7 +23,7 @@ const LEVELING_STORAGE_KEY = "melodymap.loudness_leveling.v1";
 export function isVolumeLevelingEnabled(): boolean {
   if (typeof window === "undefined") return true;
   try {
-    const saved = localStorage.getItem(LEVELING_STORAGE_KEY);
+    const saved = safeStorage.getItem(LEVELING_STORAGE_KEY);
     if (saved !== null) {
       return saved === "true";
     }
@@ -37,7 +39,7 @@ export function isVolumeLevelingEnabled(): boolean {
 export function setVolumeLevelingEnabled(enabled: boolean): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LEVELING_STORAGE_KEY, enabled ? "true" : "false");
+    safeStorage.setItem(LEVELING_STORAGE_KEY, enabled ? "true" : "false");
     window.dispatchEvent(new CustomEvent("melodymap:leveling-change", { detail: { enabled } }));
   } catch {}
 }

@@ -1,4 +1,5 @@
 import { isNativeApp } from "./auth-deep-link";
+import { safeStorage } from "./safe-storage";
 
 declare global {
   interface Window {
@@ -19,7 +20,7 @@ const LOCAL_STORAGE_GOOGLE_CLIENT_ID_KEY = "melodymap.google_client_id";
  */
 export function getGoogleWebClientId(): string {
   if (typeof window !== "undefined") {
-    const local = localStorage.getItem(LOCAL_STORAGE_GOOGLE_CLIENT_ID_KEY);
+    const local = safeStorage.getItem(LOCAL_STORAGE_GOOGLE_CLIENT_ID_KEY);
     if (local && local.trim()) return local.trim();
   }
 
@@ -41,9 +42,9 @@ export function setGoogleWebClientId(clientId: string): void {
   if (typeof window === "undefined") return;
   const clean = clientId.trim();
   if (clean) {
-    localStorage.setItem(LOCAL_STORAGE_GOOGLE_CLIENT_ID_KEY, clean);
+    safeStorage.setItem(LOCAL_STORAGE_GOOGLE_CLIENT_ID_KEY, clean);
   } else {
-    localStorage.removeItem(LOCAL_STORAGE_GOOGLE_CLIENT_ID_KEY);
+    safeStorage.removeItem(LOCAL_STORAGE_GOOGLE_CLIENT_ID_KEY);
   }
 }
 
@@ -145,7 +146,7 @@ export async function signInWithNativeGoogle(
 
     if (typeof window !== "undefined") {
       try {
-        localStorage.removeItem("melodymap.guest_mode");
+        safeStorage.removeItem("melodymap.guest_mode");
         if (typeof CustomEvent !== "undefined" && typeof window.dispatchEvent === "function") {
           window.dispatchEvent(new CustomEvent("melodymap:auth-success"));
         }

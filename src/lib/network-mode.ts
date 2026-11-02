@@ -4,13 +4,15 @@
  * device connection detection (e.g. navigator.connection.saveData / 2G / 3G).
  */
 
+import { safeStorage } from "./safe-storage";
+
 const LOW_NETWORK_KEY = "melodymap.low_network_mode.v1";
 
 /** Checks if the user explicitly enabled Low Network Mode or if the device reports low bandwidth/saveData */
 export function isLowNetworkModeEnabled(): boolean {
   if (typeof window === "undefined") return false;
   try {
-    const saved = localStorage.getItem(LOW_NETWORK_KEY);
+    const saved = safeStorage.getItem(LOW_NETWORK_KEY);
     if (saved !== null) {
       return saved === "true";
     }
@@ -31,7 +33,7 @@ export function isLowNetworkModeEnabled(): boolean {
 export function setLowNetworkMode(enabled: boolean): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(LOW_NETWORK_KEY, enabled ? "true" : "false");
+    safeStorage.setItem(LOW_NETWORK_KEY, enabled ? "true" : "false");
     window.dispatchEvent(new CustomEvent("melodymap:network-mode-change", { detail: { enabled } }));
   } catch {
     // ignore quota/security errors

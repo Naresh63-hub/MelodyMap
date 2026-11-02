@@ -13,7 +13,8 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
-import { setupNativeAuthListeners } from "@/lib/auth-deep-link";
+import { setupNativeAuthListeners, isAuthCallbackUrl, handleAuthCallback } from "@/lib/auth-deep-link";
+import { safeSessionStorage } from "@/lib/safe-storage";
 
 function NotFoundComponent() {
   return (
@@ -181,10 +182,10 @@ function RootComponent() {
     if (typeof window === "undefined") return;
     const handlePreloadError = () => {
       try {
-        const lastAttempt = sessionStorage.getItem("melodymap.chunk_recovery");
+        const lastAttempt = safeSessionStorage.getItem("melodymap.chunk_recovery");
         const now = Date.now();
         if (!lastAttempt || now - Number(lastAttempt) > 8000) {
-          sessionStorage.setItem("melodymap.chunk_recovery", String(now));
+          safeSessionStorage.setItem("melodymap.chunk_recovery", String(now));
           window.location.reload();
         }
       } catch {}
@@ -201,6 +202,21 @@ function RootComponent() {
       void router.navigate({ to: "/", replace: true });
     });
     return cleanup;
+  }, [router]);
+
+  // Handle incoming web auth callbacks (email confirmations, PKCE, OAuth)
+  useEffect(() => {
+    if (typeof window !== "undefined" && isAuthCallbackUrl(window.location.href)) {
+      void handleAuthCallback(window.location.href, undefined, {
+        onSuccess: () => {
+          void router.navigate({ to: "/", replace: true });
+        },
+        onError: (err) => {
+          console.warn("[Root] Web auth callback notice:", err.message);
+          void router.navigate({ to: "/auth", replace: true });
+        },
+      });
+    }
   }, [router]);
 
   // Register the service worker for PWA / offline support, purge stale caches, and auto-update
