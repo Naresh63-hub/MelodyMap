@@ -431,13 +431,6 @@ function AuthPage() {
       {/* Sweeping Wave Ribbons at Top and Bottom matching UI Reference Images */}
       <MusicWaveBanner variant="header" className="opacity-60 dark:opacity-40" />
       <MusicWaveBanner variant="bottom" className="opacity-90 dark:opacity-50" />
-      <div className="absolute bottom-0 left-0 right-0 h-28 sm:h-36 pointer-events-none z-0 overflow-hidden">
-        <img
-          src="/brand/auth-bottom-waves.png"
-          alt=""
-          className="w-full h-full object-cover object-bottom opacity-80 dark:opacity-35"
-        />
-      </div>
 
       {/* TOP NAVIGATION BAR: Brand Logo + Wave Equalizer Tagline */}
       <header className="w-full flex items-center justify-between px-6 sm:px-12 py-5 lg:py-6 relative z-20 max-w-7xl mx-auto">
@@ -511,14 +504,12 @@ function AuthPage() {
             </div>
 
             {/* Centerpiece 3D Headphones on Glowing Stage Artwork */}
-            <div className="relative w-full max-w-[480px] my-3 sm:my-4 flex justify-center lg:justify-start">
-              <div className="relative w-full aspect-[520/330] max-h-[290px] sm:max-h-[330px]">
-                <img
-                  src="/brand/auth-headphones-stage.png"
-                  alt="MelodyMap 3D Hi-Fi Sound Experience"
-                  className="w-full h-full object-contain drop-shadow-[0_20px_35px_rgba(124,58,237,0.22)]"
-                />
-              </div>
+            <div className="relative w-full max-w-[460px] my-2 sm:my-3 flex justify-center lg:justify-start">
+              <img
+                src="/brand/auth-headphones-3d.png"
+                alt="MelodyMap 3D Hi-Fi Sound Experience"
+                className="w-full h-auto max-h-[280px] sm:max-h-[320px] object-contain drop-shadow-[0_16px_35px_rgba(124,58,237,0.20)] select-none pointer-events-none"
+              />
             </div>
 
             {/* Bottom Capsule Pill: 3 Highlights */}
