@@ -104,41 +104,46 @@ export function MoodDetailView({
       {/* Mood Hero Card */}
       <div
         className={cn(
-          "relative overflow-hidden rounded-3xl border p-5 sm:p-7 text-white shadow-lg",
+          "relative overflow-hidden rounded-3xl border p-5 sm:p-7 shadow-lg",
           "bg-gradient-to-br",
           mood.gradient,
         )}
+        style={
+          mood.gradientColors
+            ? { background: `linear-gradient(135deg, ${mood.gradientColors.join(", ")})` }
+            : undefined
+        }
       >
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full shadow-inner",
+                  "flex h-8 w-8 items-center justify-center rounded-full shadow-xs",
                   mood.accentColor,
                 )}
               >
                 <Icon className="h-4 w-4" />
               </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/10 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-medium text-white/90">
-                <Sparkles className="h-3 w-3 text-white/70" />
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/70 border border-white/80 px-2.5 py-0.5 text-[11px] font-semibold text-[#17112B] shadow-2xs">
+                <Sparkles className="h-3 w-3 text-[#17112B]/70" />
                 {userLanguage ? `${userLanguage} Vibe` : "Curated Vibe"}
               </span>
             </div>
 
             <div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-xs">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#17112B]">
                 {mood.label}
               </h1>
-              <p className="mt-1 text-xs sm:text-sm text-white/80 max-w-md leading-relaxed font-normal">
+              <p className="mt-1 text-xs sm:text-sm text-[#51476B] max-w-md leading-relaxed font-medium">
                 {mood.subtitle} • Only related music handpicked for this mood.
               </p>
             </div>
 
-            <div className="text-xs text-white/60 font-medium pt-1">
+            <div className="text-xs text-[#51476B] font-medium pt-1">
               {loading && (
                 <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-white/80" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#17112B]" />
                   Curating {mood.label} songs...
                 </span>
               )}
@@ -152,7 +157,7 @@ export function MoodDetailView({
                 type="button"
                 onClick={onPlayAll}
                 size="default"
-                className="rounded-full bg-white text-zinc-950 hover:bg-white/90 font-semibold shadow-md gap-2 px-5 transition-transform active:scale-95"
+                className="rounded-full bg-[#17112B] text-white hover:bg-[#17112B]/90 font-semibold shadow-md gap-2 px-5 transition-transform active:scale-95"
               >
                 {isCurrentMoodPlaying ? (
                   <>
@@ -172,7 +177,7 @@ export function MoodDetailView({
                 variant="outline"
                 size="icon"
                 onClick={onShuffle}
-                className="h-10 w-10 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-xs transition-transform active:scale-95"
+                className="h-10 w-10 rounded-full border-white/80 bg-white/80 text-[#17112B] hover:bg-white backdrop-blur-xs transition-transform active:scale-95 shadow-xs"
                 title="Shuffle mood songs"
                 aria-label="Shuffle mood songs"
               >
@@ -184,7 +189,7 @@ export function MoodDetailView({
 
         {/* Ambient radial lighting */}
         <div
-          className="pointer-events-none absolute -right-10 -bottom-10 h-44 w-44 rounded-full bg-white/10 blur-3xl"
+          className="pointer-events-none absolute -right-10 -bottom-10 h-44 w-44 rounded-full bg-white/40 blur-3xl"
           aria-hidden="true"
         />
       </div>
