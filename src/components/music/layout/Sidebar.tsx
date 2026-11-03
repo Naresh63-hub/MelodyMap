@@ -32,7 +32,8 @@ export type NavTab =
   | "playlists"
   | "history"
   | "downloads"
-  | "library";
+  | "library"
+  | "profile";
 
 type NavSection = {
   label: string;

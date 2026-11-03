@@ -1,6 +1,8 @@
-import { Clock, X, Trash2, ArrowUpRight } from "lucide-react";
+import { Clock, ChevronRight, X } from "lucide-react";
 import { useSearchHistory } from "@/lib/search-history";
 import { cn } from "@/lib/utils";
+
+const POPULAR_SEARCHES = ["Trending", "lofi", "party", "love", "sad", "focus"];
 
 interface Props {
   onSelectQuery: (query: string) => void;
@@ -9,8 +11,8 @@ interface Props {
 }
 
 /**
- * 'Recent Searches' component displaying the last 5 searched artist or song terms
- * stored locally in localStorage, allowing users to quickly jump back to previous queries.
+ * Screen 14: Recent Searches & Popular Searches
+ * Matches the uploaded reference design for Midnight Music (Dark) & Purple Dream (Light).
  */
 export function RecentSearchesSection({
   onSelectQuery,
@@ -20,62 +22,82 @@ export function RecentSearchesSection({
   const { recentSearches, removeSearch, clearHistory } = useSearchHistory();
   const last5 = recentSearches.slice(0, maxItems);
 
-  if (last5.length === 0) return null;
-
   return (
-    <section className={cn("space-y-2.5 animate-fade-in", className)}>
-      <div className="flex items-center justify-between px-0.5">
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-foreground/50" />
-          <h2 className="text-sm font-semibold tracking-normal text-foreground/90">
-            Recent Searches
-          </h2>
-        </div>
-
-        <button
-          type="button"
-          onClick={clearHistory}
-          className="flex items-center gap-1 text-[11px] text-foreground/50 hover:text-red-400 transition-colors py-1 px-1.5 rounded active:scale-95"
-          title="Clear recent searches"
-        >
-          <Trash2 className="h-3 w-3" />
-          <span>Clear</span>
-        </button>
-      </div>
-
-      {/* Horizontal pill list for quick jump-back */}
-      <div className="flex flex-wrap gap-2">
-        {last5.map((item) => (
-          <div
-            key={`${item.query}-${item.timestamp}`}
-            className="group inline-flex items-center gap-1.5 rounded-full border border-hair bg-chip-subtle pl-3 pr-1.5 py-1 text-xs text-neutral-300 hover:text-foreground hover:bg-chip-strong hover:border-hair-strong transition-all"
-          >
-            <button
-              type="button"
-              onClick={() => onSelectQuery(item.query)}
-              className="flex items-center gap-1.5 text-left focus:outline-none"
-              title={`Search again for "${item.query}"`}
-            >
-              <span className="font-normal truncate max-w-[140px] sm:max-w-[200px]">
-                {item.query}
-              </span>
-              <ArrowUpRight className="h-3 w-3 text-foreground/30 group-hover:text-foreground/70 transition-colors" />
-            </button>
+    <div className={cn("space-y-6 animate-fade-in", className)}>
+      {/* Recent Searches section (Screen 14) */}
+      {last5.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="text-sm font-bold text-foreground tracking-tight">
+              Recent Searches
+            </h2>
 
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeSearch(item.query);
-              }}
-              aria-label={`Remove ${item.query} from recent searches`}
-              className="flex h-4 w-4 items-center justify-center rounded-full text-foreground/30 hover:text-foreground hover:bg-chip-strong transition-all ml-0.5"
+              onClick={clearHistory}
+              className="text-xs font-semibold text-primary hover:underline cursor-pointer py-1 px-1 transition-colors"
+              title="Clear all recent searches"
             >
-              <X className="h-2.5 w-2.5" />
+              Clear all
             </button>
           </div>
-        ))}
-      </div>
-    </section>
+
+          <div className="divide-y divide-border rounded-2xl border border-border bg-card overflow-hidden">
+            {last5.map((item) => (
+              <div
+                key={`${item.query}-${item.timestamp}`}
+                className="group flex items-center justify-between p-3.5 hover:bg-surface-hover transition-colors"
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelectQuery(item.query)}
+                  className="flex items-center gap-3 text-left flex-1 min-w-0 cursor-pointer"
+                >
+                  <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium text-foreground truncate">
+                    {item.query}
+                  </span>
+                </button>
+
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeSearch(item.query);
+                    }}
+                    aria-label={`Remove ${item.query} from recent searches`}
+                    className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-active transition-all"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Popular Searches section (Screen 14) */}
+      <section className="space-y-2.5">
+        <h2 className="text-sm font-bold text-foreground tracking-tight">
+          Popular Searches
+        </h2>
+
+        <div className="flex flex-wrap gap-2">
+          {POPULAR_SEARCHES.map((term) => (
+            <button
+              key={term}
+              type="button"
+              onClick={() => onSelectQuery(term)}
+              className="rounded-full border border-border bg-card hover:bg-surface-hover hover:border-primary/40 px-3.5 py-1.5 text-xs font-medium text-foreground transition-all active:scale-95 cursor-pointer shadow-xs"
+            >
+              {term}
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
   );
 }

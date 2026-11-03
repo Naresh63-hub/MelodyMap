@@ -1,5 +1,5 @@
-import { Disc3, Flame, Loader2, MoreHorizontal, MoreVertical, Music2, Pause, Play, TrendingUp } from "lucide-react";
-import { useRef } from "react";
+import { Disc3, Flame, Heart, Loader2, MoreHorizontal, MoreVertical, Music2, Pause, Play, TrendingUp } from "lucide-react";
+import { useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/library";
@@ -364,8 +364,72 @@ export function ExploreSections({
     );
   }
 
+  const [activeFilter, setActiveFilter] = useState<"all" | "trending" | "releases" | "popular">("all");
+
+  const genres = [
+    { id: "pop", label: "Pop", icon: Heart, bg: "from-[#EC4899] to-[#F43F5E]" },
+    { id: "rock", label: "Rock", icon: Music2, bg: "from-[#2563EB] to-[#38BDF8]" },
+    { id: "hiphop", label: "Hip-Hop", icon: Flame, bg: "from-[#FF8A35] to-[#EA580C]" },
+    { id: "edm", label: "EDM", icon: Disc3, bg: "from-[#7C3AED] to-[#A855F7]" },
+  ];
+
   return (
-    <div className="space-y-7 pt-1 animate-fade-in">
+    <div className="space-y-6 pt-1 animate-fade-in pb-12">
+      {/* Filter Pills matching Screen 5 in reference images */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide pt-1">
+        {[
+          { id: "all" as const, label: "All" },
+          { id: "trending" as const, label: "Trending" },
+          { id: "releases" as const, label: "New Releases" },
+          { id: "popular" as const, label: "Popular" },
+        ].map((pill) => (
+          <button
+            key={pill.id}
+            type="button"
+            onClick={() => setActiveFilter(pill.id)}
+            className={cn(
+              "rounded-full px-4 py-1.5 text-xs font-semibold shrink-0 transition-all cursor-pointer",
+              activeFilter === pill.id
+                ? "mm-chip-active"
+                : "bg-card border border-border text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {pill.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Genres Grid matching Screen 5 in reference images */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between px-0.5">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">Genres</h2>
+          <span className="text-xs text-primary font-medium hover:underline cursor-pointer">See all &gt;</span>
+        </div>
+
+        <div className="grid grid-cols-4 gap-3">
+          {genres.map((g) => {
+            const Icon = g.icon;
+            return (
+              <button
+                key={g.id}
+                type="button"
+                className="flex flex-col items-center gap-2 group cursor-pointer"
+              >
+                <div
+                  className={cn(
+                    "h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br flex items-center justify-center text-white shadow-md shadow-purple-900/15 group-hover:scale-105 active:scale-95 transition-transform",
+                    g.bg
+                  )}
+                >
+                  <Icon className="h-6 w-6 stroke-[2.2]" />
+                </div>
+                <span className="text-xs font-medium text-foreground">{g.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       {/* 1. Trending Songs (Promoted to Top for Instant Access) */}
       {trending.length > 0 && (
         <section>

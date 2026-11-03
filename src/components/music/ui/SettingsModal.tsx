@@ -21,6 +21,10 @@ import {
   HardDrive,
   Activity,
   Disc,
+  Palette,
+  Sun,
+  Moon,
+  Laptop,
 } from "lucide-react";
 import { loadEqualizerSettings, saveEqualizerSettings } from "@/lib/equalizer";
 import { useNavigate } from "@tanstack/react-router";
@@ -48,6 +52,7 @@ import {
 } from "@/lib/audio-leveling";
 import type { Profile } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/lib/theme";
 import { isSafeAvatarUrl, getSafeAvatarUrl } from "@/lib/avatar-url";
 
 const PRESET_AVATARS = [
@@ -109,6 +114,7 @@ export function SettingsModal({
   onLibraryRestored,
 }: Props) {
   const navigate = useNavigate();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [activeSection, setActiveSection] = useState<"account" | "languages" | "picks" | "playback" | "insights">("account");
   const [sponsorBlockOn, setSponsorBlockOn] = useState<boolean>(getSponsorBlockEnabled);
   const [lowNetworkOn, setLowNetworkOn] = useState<boolean>(isLowNetworkModeEnabled);
@@ -523,6 +529,136 @@ export function SettingsModal({
                     <span>{profileFeedback.msg}</span>
                   </div>
                 )}
+              </div>
+
+              {/* App Theme & Appearance Card */}
+              <div className="rounded-3xl border border-hair-strong bg-chip-subtle p-5 sm:p-6 space-y-4 shadow-lg backdrop-blur-md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-300">
+                      <Palette className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Theme & Appearance</h4>
+                      <p className="text-xs text-muted-foreground">Switch between Midnight Music (Dark) and Purple Dream (Light)</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-primary border border-primary/20 capitalize">
+                    {theme === "auto" ? `Auto (${resolvedTheme})` : theme === "dark" ? "Midnight Music" : "Purple Dream"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  {/* Option 1: Dark (Midnight Music) */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme("dark")}
+                    className={cn(
+                      "flex flex-col items-start gap-2.5 rounded-2xl p-3.5 border transition-all text-left cursor-pointer group relative overflow-hidden",
+                      theme === "dark"
+                        ? "border-primary bg-primary/15 ring-2 ring-primary/40 shadow-lg shadow-purple-950/40"
+                        : "border-border bg-card hover:border-primary/40 hover:bg-surface-hover"
+                    )}
+                  >
+                    {/* Visual Preview Swatch */}
+                    <div className="w-full h-16 rounded-xl bg-[#0b0813] border border-purple-500/30 p-2 flex flex-col justify-between overflow-hidden relative shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2 w-2 rounded-full bg-[#ff2e7e]" />
+                          <div className="h-2 w-2 rounded-full bg-[#a855f7]" />
+                          <div className="h-2 w-2 rounded-full bg-[#00d4ff]" />
+                        </div>
+                        <Moon className="h-3 w-3 text-purple-400" />
+                      </div>
+                      <div className="h-2.5 w-16 rounded-full bg-gradient-to-r from-[#ff2e7e] via-[#a855f7] to-[#00d4ff]" />
+                    </div>
+
+                    <div className="min-w-0 w-full">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">Midnight Music (Dark)</span>
+                        {theme === "dark" && (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+                        Near-black midnight navy, dark glass surfaces & electric violet accents
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Option 2: Light (Purple Dream) */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme("light")}
+                    className={cn(
+                      "flex flex-col items-start gap-2.5 rounded-2xl p-3.5 border transition-all text-left cursor-pointer group relative overflow-hidden",
+                      theme === "light"
+                        ? "border-primary bg-primary/15 ring-2 ring-primary/40 shadow-lg shadow-purple-950/20"
+                        : "border-border bg-card hover:border-primary/40 hover:bg-surface-hover"
+                    )}
+                  >
+                    {/* Visual Preview Swatch */}
+                    <div className="w-full h-16 rounded-xl bg-[#FAF9FF] border border-[#E9DDFD] p-2 flex flex-col justify-between overflow-hidden relative shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2 w-2 rounded-full bg-[#ff8a35]" />
+                          <div className="h-2 w-2 rounded-full bg-[#9333ea]" />
+                          <div className="h-2 w-2 rounded-full bg-[#7c3aed]" />
+                        </div>
+                        <Sun className="h-3 w-3 text-amber-500" />
+                      </div>
+                      <div className="h-2.5 w-16 rounded-full bg-gradient-to-r from-[#7c3aed] via-[#9333ea] to-[#ff8a35]" />
+                    </div>
+
+                    <div className="min-w-0 w-full">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">Purple Dream (Light)</span>
+                        {theme === "light" && (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+                        Clean premium white with lavender tint, gentle violet borders & soft gradients
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Option 3: Auto (System Schedule) */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme("auto")}
+                    className={cn(
+                      "flex flex-col items-start gap-2.5 rounded-2xl p-3.5 border transition-all text-left cursor-pointer group relative overflow-hidden",
+                      theme === "auto"
+                        ? "border-primary bg-primary/15 ring-2 ring-primary/40 shadow-lg shadow-purple-950/20"
+                        : "border-border bg-card hover:border-primary/40 hover:bg-surface-hover"
+                    )}
+                  >
+                    {/* Visual Preview Swatch */}
+                    <div className="w-full h-16 rounded-xl border border-hair flex overflow-hidden relative shadow-inner">
+                      <div className="w-1/2 h-full bg-[#0b0813] p-2 flex flex-col justify-between">
+                        <Moon className="h-3 w-3 text-purple-400" />
+                        <div className="h-1.5 w-6 rounded-full bg-purple-500" />
+                      </div>
+                      <div className="w-1/2 h-full bg-[#FAF9FF] p-2 flex flex-col justify-between items-end">
+                        <Sun className="h-3 w-3 text-amber-500" />
+                        <div className="h-1.5 w-6 rounded-full bg-purple-400" />
+                      </div>
+                    </div>
+
+                    <div className="min-w-0 w-full">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">Match System</span>
+                        {theme === "auto" && (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">
+                        Automatically follows your OS dark/light schedule
+                      </p>
+                    </div>
+                  </button>
+                </div>
               </div>
 
               {/* Password & Security Card (For Logged-in Users) */}
@@ -983,6 +1119,12 @@ export function SettingsModal({
           {activeSection === "insights" && (
             <ListeningInsightsPanel />
           )}
+
+          {/* Screen 11: Version 1.0.9 Footer Badge */}
+          <div className="flex items-center justify-center gap-2 pt-6 pb-2 text-xs text-muted-foreground border-t border-border">
+            <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4 w-4 rounded-md object-contain" />
+            <span className="font-medium">Version 1.0.9</span>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

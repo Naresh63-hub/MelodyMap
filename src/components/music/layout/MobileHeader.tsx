@@ -1,5 +1,6 @@
 import { Menu, Radio, User } from "lucide-react";
 import { StreakBadge } from "@/components/music/ui/StreakBadge";
+import { MusicWaveBanner } from "@/components/music/ui/MusicWaveBanner";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -27,14 +28,14 @@ export function MobileHeader({
 }: Props) {
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
+    if (hour < 12) return "Good morning! ☀️";
+    if (hour < 17) return "Good afternoon! ☀️";
+    return "Good Evening! ☀️";
   };
 
   const getTitle = () => {
     if (tab === "foryou") return getGreeting();
-    if (tab === "languages") return "Languages & Artists";
+    if (tab === "languages") return "Languages";
     if (tab === "podcasts") return "Podcasts";
     if (tab === "playlists") return "Playlists";
     if (tab === "library") return "Your Library";
@@ -46,16 +47,18 @@ export function MobileHeader({
   };
 
   const getSubtitle = () => {
-    if (tab === "foryou") return "Music picked for you";
-    if (tab === "podcasts") return "Shows and episodes";
-    if (tab === "languages") return "Explore music across languages";
+    if (tab === "foryou") return "Let's find your perfect vibe";
+    if (tab === "podcasts") return "Learn · Feel · Be Inspired";
+    if (tab === "languages") return "Explore Music in Your Language";
+    if (tab === "mixes") return "Curated for your vibe";
     if (tab === "downloads") return "Available offline";
     return "";
   };
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between px-4 pb-3 header-safe-top bg-surface border-b border-hair-strong">
-      <div className="flex items-center gap-2.5 min-w-0">
+    <header className="sticky top-0 z-20 relative flex items-center justify-between px-4 pb-3 header-safe-top bg-background/70 dark:bg-background/60 backdrop-blur-md border-b border-hair-strong overflow-hidden">
+      <MusicWaveBanner />
+      <div className="flex items-center gap-2.5 min-w-0 z-10">
         {onOpenMenu && (
           <button
             type="button"

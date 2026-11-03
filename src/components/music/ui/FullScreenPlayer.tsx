@@ -235,7 +235,7 @@ export function FullScreenPlayer({
   return (
     <div
       {...dragProps}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-hidden animate-sheet-up"
+      className="dark fixed inset-0 z-50 flex items-center justify-center bg-[#0b0813] text-white overflow-hidden animate-sheet-up"
       style={{
         transform: dragY ? `translateY(${dragY}px)` : undefined,
         opacity: dragY ? 1 - dismissProgress * 0.85 : undefined,
@@ -305,7 +305,7 @@ export function FullScreenPlayer({
                 boxShadow: `0 0 50px ${artworkTheme.borderAccent}`,
                 borderColor: artworkTheme.borderAccent,
               }}
-              className="relative z-10 aspect-square w-64 sm:w-72 overflow-hidden rounded-3xl p-1.5 bg-gradient-to-b from-primary/30 via-primary/10 to-transparent border ring-4 ring-primary/15 touch-manipulation select-none"
+              className="relative z-10 aspect-square w-64 sm:w-72 overflow-hidden rounded-3xl p-1.5 bg-gradient-to-b from-primary/30 via-primary/10 to-transparent border ring-4 ring-primary/15 touch-manipulation select-none mm-artwork-glow"
             >
               <div className="w-full h-full rounded-[20px] overflow-hidden">
                 <img
@@ -621,6 +621,24 @@ export function FullScreenPlayer({
               ) : (
                 <Repeat className="h-5 w-5" />
               )}
+            </button>
+          </div>
+
+          {/* Screen 9: Centered Signature Lyrics Pill Button */}
+          <div className="flex justify-center pt-2 pb-0.5">
+            <button
+              type="button"
+              onClick={() => setShowLiveLyrics((prev) => !prev)}
+              aria-label={showLiveLyrics ? "Hide lyrics" : "Show lyrics"}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs border",
+                showLiveLyrics
+                  ? "bg-primary text-primary-foreground border-primary shadow-purple-500/30"
+                  : "bg-primary/15 text-primary border-primary/30 hover:bg-primary/25"
+              )}
+            >
+              <Music2 className="h-3.5 w-3.5" />
+              <span>Lyrics</span>
             </button>
           </div>
 

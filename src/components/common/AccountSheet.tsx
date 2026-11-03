@@ -13,6 +13,8 @@ import {
   Sliders,
   Radio,
   Moon,
+  Sun,
+  Laptop,
   Globe2,
   LogOut,
   ChevronRight,
@@ -21,6 +23,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 interface AccountSheetProps {
@@ -51,6 +54,7 @@ export function AccountSheet({
   jamParticipantsCount = 1,
 }: AccountSheetProps) {
   const auth = useAuth();
+  const { theme, setTheme } = useTheme();
 
   const isGuest = !auth.isCloudAuth;
   const displayName = auth.profile?.display_name || auth.email?.split("@")[0] || "Listener";
@@ -133,6 +137,65 @@ export function AccountSheet({
 
         {/* Quick Menu Options */}
         <div className="p-3 space-y-1">
+          {/* Quick Theme Switcher */}
+          <div className="px-3.5 py-2 rounded-xl bg-chip/60 border border-hair flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2.5">
+              <div className="h-7 w-7 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center">
+                {theme === "light" ? (
+                  <Sun className="h-3.5 w-3.5 text-primary" />
+                ) : theme === "auto" ? (
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                ) : (
+                  <Moon className="h-3.5 w-3.5 text-primary" />
+                )}
+              </div>
+              <span className="text-xs font-semibold text-foreground">Theme</span>
+            </div>
+            <div className="flex items-center gap-1 bg-surface rounded-lg p-0.5 border border-hair">
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                  theme === "dark"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Midnight Cyber-Violet"
+              >
+                <Moon className="h-3 w-3" />
+                <span>Dark</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                  theme === "light"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Lilac Sunrise"
+              >
+                <Sun className="h-3 w-3" />
+                <span>Light</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("auto")}
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer",
+                  theme === "auto"
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+                title="Auto (System Default)"
+              >
+                <Laptop className="h-3 w-3" />
+                <span>Auto</span>
+              </button>
+            </div>
+          </div>
           {/* Settings & Preferences */}
           <button
             type="button"

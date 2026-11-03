@@ -97,8 +97,31 @@ export function MixesPanel({
   const mix = MIXES.find((m) => m.id === active) ?? MIXES[0]!;
 
   return (
-    <div>
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-6 pb-12">
+      {/* Hero Banner matching Screen 6 in reference images */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#7C3AED] via-[#A855F7] to-[#FF8A35] p-6 text-white shadow-lg shadow-purple-900/25">
+        <div className="absolute -right-8 -bottom-10 w-48 h-48 rounded-full bg-white/10 blur-xl pointer-events-none" />
+        <div className="relative z-10 flex items-center justify-between">
+          <div className="space-y-1">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm">
+              <Sparkles className="h-3 w-3" />
+              Featured Mix
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight font-display">Mood Mixes</h2>
+            <p className="text-xs sm:text-sm text-white/85">Curated for your vibe & daily soundtrack</p>
+          </div>
+          <button
+            type="button"
+            onClick={onPlayAll}
+            aria-label="Play Mood Mixes"
+            className="flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-full bg-white text-[#7C3AED] shadow-xl hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+          >
+            <Play className="ml-1 h-6 w-6 fill-current" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {MIXES.map(({ id, name, blurb, icon: Icon }) => (
           <button
             key={id}

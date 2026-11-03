@@ -98,8 +98,28 @@ export function LanguagesPanel({
   }, [load]);
 
   return (
-    <div className="animate-page-in">
-      <div className="mb-5 flex items-center gap-3">
+    <div className="animate-page-in space-y-5">
+      {/* Screen 13: Hero Banner */}
+      <div className="relative overflow-hidden rounded-3xl p-6 text-white bg-gradient-to-r from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] border border-purple-400/20 shadow-xl">
+        <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-pink-500/30 blur-2xl pointer-events-none" />
+        <div className="absolute -left-8 -bottom-8 h-36 w-36 rounded-full bg-cyan-500/20 blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display">
+              Explore Music in Your Language
+            </h2>
+            <p className="text-xs sm:text-sm text-purple-100/90 font-medium">
+              Select your preferred regional languages to personalize feeds and daily mixes.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Globe2 className="h-10 w-10 text-pink-300 opacity-90" />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-pink-500/20 via-purple-500/20 to-cyan-500/20 ring-1 ring-chip-strong">
           <Globe2 className="h-5 w-5 text-pink-400 icon-glow" />
         </div>

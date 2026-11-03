@@ -15,6 +15,7 @@ import appCss from "../styles.css?url";
 import { ErrorBoundary } from "@/components/music/ErrorBoundary";
 import { setupNativeAuthListeners, isAuthCallbackUrl, handleAuthCallback } from "@/lib/auth-deep-link";
 import { safeSessionStorage } from "@/lib/safe-storage";
+import { applyTheme } from "@/lib/theme";
 
 function NotFoundComponent() {
   return (
@@ -150,17 +151,27 @@ function RootShell({ children }: { children: ReactNode }) {
             href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap"
           />
         </noscript>
-        {/* Enforce permanent Deep Violet theme before first paint */}
+        {/* Synchronize theme mode (Dark / Light / Auto) before first paint to prevent FOUC */}
         <script
           dangerouslySetInnerHTML={{
             __html:
               '(function(){try{' +
-              'localStorage.removeItem("melodymap-theme");' +
+              'var t=localStorage.getItem("melodymap-theme")||"dark";' +
+              'var r=t;' +
+              'if(t==="auto"){r=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}' +
+              'if(r==="light"){' +
+              'document.documentElement.classList.remove("dark");' +
+              'document.documentElement.classList.add("light");' +
+              'document.documentElement.style.colorScheme="light";' +
+              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#FAF9FF";' +
+              'if(window.AndroidTheme&&window.AndroidTheme.setStatusBarTheme){window.AndroidTheme.setStatusBarTheme(true);}' +
+              '}else{' +
               'document.documentElement.classList.remove("light");' +
               'document.documentElement.classList.add("dark");' +
               'document.documentElement.style.colorScheme="dark";' +
-              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#10091f";' +
+              'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#0b0813";' +
               'if(window.AndroidTheme&&window.AndroidTheme.setStatusBarTheme){window.AndroidTheme.setStatusBarTheme(false);}' +
+              '}' +
               '}catch(e){}})();',
           }}
         />
@@ -176,6 +187,11 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+
+  // Initialize and synchronize runtime theme state (media listeners, Android status bar)
+  useEffect(() => {
+    applyTheme();
+  }, []);
 
   // Listen for Vite preload errors (e.g. dynamically imported chunk updates) and reload safely
   useEffect(() => {

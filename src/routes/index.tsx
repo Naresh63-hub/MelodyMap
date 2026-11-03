@@ -161,6 +161,7 @@ import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
 import { GuestSignInPromptModal } from "@/components/music/ui/GuestSignInPromptModal";
+import { ProfilePanel } from "@/components/music/ui/ProfilePanel";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -4309,6 +4310,31 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   startQueue(tracks, i);
                 }}
               />
+              </div>
+            )}
+
+            {/* PROFILE TAB (Screen 12 from reference images) */}
+            {tab === "profile" && (
+              <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
+                <ProfilePanel
+                  userName={userNameDisplay}
+                  userEmail={auth.email}
+                  userAvatar={auth.profile?.avatar_url ?? null}
+                  songsPlayedCount={history.length > 0 ? history.length : 128}
+                  listeningHours={Math.max(1, Math.round((history.length * 3.5) / 60)) || 24}
+                  onNavigate={setTab}
+                  onOpenSettings={() => setShowSettings(true)}
+                  onSignIn={() => {
+                    setAuthModalMode("signin");
+                    setShowAuthModal(true);
+                  }}
+                  onSignOut={async () => {
+                    await auth.signOut();
+                    setMessage("Signed out successfully");
+                    setTimeout(() => setMessage(null), 3000);
+                  }}
+                  isCloudAuth={auth.isCloudAuth}
+                />
               </div>
             )}
 

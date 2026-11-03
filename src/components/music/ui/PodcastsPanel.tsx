@@ -3,14 +3,22 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowLeft,
   Calendar,
+  ChevronRight,
   Clock,
+  Compass,
+  GraduationCap,
   Headphones,
+  Heart,
+  Laptop,
   Loader2,
   Mic,
+  MoreHorizontal,
+  Music2,
   Pause,
   Play,
   RotateCcw,
   Search,
+  Sparkles,
   X,
 } from "lucide-react";
 
@@ -541,6 +549,101 @@ export function PodcastsPanel({
         </div>
       </div>
 
+      {/* Screen 7: Discover Podcasts Hero Banner */}
+      <div className="relative overflow-hidden rounded-3xl p-5 sm:p-6 text-white shadow-xl transition-all duration-300 bg-gradient-to-r from-[#4C1D95] via-[#6D28D9] to-[#7C3AED] border border-purple-400/20">
+        <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-pink-500/30 blur-2xl pointer-events-none" />
+        <div className="absolute -left-8 -bottom-8 h-36 w-36 rounded-full bg-cyan-500/20 blur-2xl pointer-events-none" />
+
+        <div className="relative z-10 flex items-center justify-between gap-4">
+          <div className="space-y-1.5 max-w-[70%]">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/15 backdrop-blur-md text-[11px] font-semibold tracking-wide uppercase text-white/90">
+              <Sparkles className="h-3 w-3 text-pink-300" />
+              <span>Featured Series</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-display">
+              Discover Podcasts
+            </h2>
+            <p className="text-xs sm:text-sm text-purple-100/90 font-medium">
+              Learn · Feel · Be Inspired
+            </p>
+          </div>
+
+          <div className="relative flex items-center justify-center shrink-0">
+            <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg relative group">
+              <Mic className="h-8 w-8 sm:h-10 sm:w-10 text-white/90" />
+              {shows.length > 0 && shows[0] && (
+                <button
+                  type="button"
+                  onClick={() => void handleSelectShow(shows[0]!)}
+                  aria-label="Play featured podcast"
+                  className="absolute -bottom-2 -right-2 h-9 w-9 rounded-full bg-white text-purple-900 flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                >
+                  <Play className="h-4 w-4 fill-current ml-0.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Screen 7: Categories Grid */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-foreground tracking-tight">Categories</h2>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedTopic("All");
+              setSearchQuery("");
+            }}
+            className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary hover:underline cursor-pointer"
+          >
+            <span>See all</span>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 sm:gap-3">
+          {[
+            { label: "Music", icon: Music2, topic: "Music & Audio", color: "from-purple-500 to-indigo-600" },
+            { label: "Tech", icon: Laptop, topic: "Tech & Science", color: "from-blue-500 to-cyan-600" },
+            { label: "Education", icon: GraduationCap, topic: "Culture & Society", color: "from-violet-500 to-purple-700" },
+            { label: "Health", icon: Heart, topic: "Health & Wellness", color: "from-pink-500 to-rose-600" },
+            { label: "Lifestyle", icon: Compass, topic: "Stories & Drama", color: "from-amber-500 to-orange-600" },
+            { label: "More", icon: MoreHorizontal, topic: "All", color: "from-slate-600 to-slate-800" },
+          ].map((cat) => {
+            const Icon = cat.icon;
+            const isActive = selectedTopic === cat.topic || (cat.label === "More" && selectedTopic === "All");
+            return (
+              <button
+                key={cat.label}
+                type="button"
+                onClick={() => {
+                  setSelectedTopic(cat.topic);
+                  setSearchQuery("");
+                }}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border transition-all text-center cursor-pointer group active:scale-95",
+                  isActive
+                    ? "bg-primary/15 border-primary shadow-xs ring-1 ring-primary/40"
+                    : "bg-card border-border hover:bg-surface-hover hover:border-primary/30"
+                )}
+              >
+                <div
+                  className={cn(
+                    "h-10 w-10 rounded-xl flex items-center justify-center text-white shadow-xs transition-transform group-hover:scale-105 bg-gradient-to-br",
+                    cat.color
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="text-xs font-semibold text-foreground tracking-tight">{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Language Filter Pills */}
       <div className="space-y-1.5">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-foreground/40">
@@ -702,17 +805,17 @@ export function PodcastsPanel({
         </div>
       )}
 
-      {/* Shows Grid */}
+      {/* Shows Grid / Popular Podcasts (Screen 7) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="text-sm font-bold text-foreground tracking-tight">
             {debouncedQuery
               ? `Results for “${debouncedQuery}” in ${selectedLanguage}`
               : selectedTopic !== "All"
                 ? `${selectedTopic} Shows in ${selectedLanguage}`
-                : `Top Shows in ${selectedLanguage}`}
+                : "Popular Podcasts"}
           </h2>
-          <span className="text-xs text-foreground/40 font-medium">{shows.length} shows</span>
+          <span className="text-xs text-muted-foreground font-medium">{shows.length} shows</span>
         </div>
 
         {loadingShows && shows.length === 0 ? (

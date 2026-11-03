@@ -143,7 +143,7 @@ export function LyricsPanel({
 
   return (
     <div
-      className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-surface/95 backdrop-blur-xl border-l border-hair shadow-2xl animate-slide-up sm:max-w-sm md:max-w-md flex flex-col"
+      className="dark fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#130d22]/95 text-white backdrop-blur-xl border-l border-hair shadow-2xl animate-slide-up sm:max-w-sm md:max-w-md flex flex-col"
       role="dialog"
       aria-label="Lyrics panel"
     >

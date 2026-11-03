@@ -1,15 +1,14 @@
-import { Compass, Home, Mic, Library as LibraryIcon, Search } from "lucide-react";
+import { Compass, Home, Library as LibraryIcon, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavTab } from "./Sidebar";
 import { triggerHaptic } from "@/lib/haptics";
 
-/** Mobile bottom navigation tabs. */
+/** Mobile bottom navigation tabs matching the reference images */
 export const MOBILE_TABS: Array<{ id: NavTab; label: string; icon: typeof Home }> = [
   { id: "foryou", label: "Home", icon: Home },
   { id: "explore", label: "Explore", icon: Compass },
-  { id: "search", label: "Search", icon: Search },
-  { id: "podcasts", label: "Podcasts", icon: Mic },
   { id: "library", label: "Library", icon: LibraryIcon },
+  { id: "profile", label: "Profile", icon: User },
 ];
 
 type Props = {

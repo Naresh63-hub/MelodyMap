@@ -54,63 +54,60 @@
   --shadow-overlay: 0 12px 40px -12px rgba(0, 0, 0, 0.55);
 }
 
-:root,
-html,
-html.dark,
-html.light {
-  color-scheme: dark;
+:root {
   --radius: 0.625rem;
   --mobile-nav-height: 56px;
 
-  /*
-   * Safe-area insets. iOS and modern Android WebViews report these through
-   * `env(safe-area-inset-*)`. On Android the app runs edge-to-edge (enforced
-   * for targetSdk 35+), so Capacitor's SystemBars plugin additionally injects
-   * `--safe-area-inset-*` custom properties onto <html> — taking the larger of
-   * the two means the chrome clears the status/navigation bars whichever
-   * mechanism the device actually reports.
-   */
+  /* Safe-area insets */
   --mm-inset-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
   --mm-inset-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
   --mm-inset-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
   --mm-inset-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+}
 
-  /*
-   * Permanent Deep Violet Colour Palette
-   * Background: #10091F | Main surface: #170D35 | Sidebar: #170D35
-   * Music cards: #21133F | Elevated surface: #2E1065
-   * Primary violet: #8B5CF6 | Bright violet: #A855F7 | Soft violet: #A78BFA
-   * Primary text: #FFFFFF | Secondary text: #D4CBEA | Muted text: #A69ABD
-   * Borders: rgba(167, 139, 250, 0.20)
-   */
-  --bg-main: #10091f;
-  --bg-sidebar: #170d35;
-  --bg-secondary: #170d35;
-  --bg-card: #21133f;
-  --bg-elevated: #2e1065;
-  --bg-elevated-2: #3b1780;
+/*
+ * 1. Theme A: Midnight Music (Dark)
+ * Reference: First uploaded image
+ * Background: near-black midnight navy (#0B0813 / #080511)
+ * Surfaces: dark navy and charcoal with subtle violet undertones (#130E24, #171128, #1E1738)
+ * Cards: dark glass-like surfaces with thin violet borders (#18122B, border: rgba(168, 85, 247, 0.18))
+ * Primary accent: electric violet (#7C3AED / #8B5CF6)
+ * Secondary accents: neon blue (#2563EB), magenta (#E040FB), pink (#EC4899), warm orange (#FF8A35)
+ * Text: white headings (#FFFFFF) and soft lavender secondary text (#D4CBEA / #A69ABD)
+ * Music artwork: vibrant blue, purple, pink and orange
+ * Subtle neon glow effects, not excessive shadows
+ */
+:root,
+html.dark,
+.dark {
+  color-scheme: dark;
+
+  --bg-main: #0b0813;
+  --bg-sidebar: #130d22;
+  --bg-secondary: #171128;
+  --bg-card: #18122b;
+  --bg-elevated: #24183d;
+  --bg-elevated-2: #2e1065;
 
   --text-primary: #ffffff;
   --text-secondary: #d4cbea;
   --text-muted: #a69abd;
 
-  --background: #10091f;
+  --background: #0b0813;
   --foreground: #ffffff;
 
   /* Surfaces */
-  --card: #21133f;
+  --card: #18122b;
   --card-foreground: #ffffff;
-  --surface: #170d35;
+  --surface: #140d24;
   --surface-foreground: #ffffff;
-  --surface-elevated: #2e1065;
-  --popover: #21133f;
+  --surface-elevated: #22183c;
+  --popover: #18122b;
   --popover-foreground: #ffffff;
 
-  /* Primary Accent: Deep Violet #8B5CF6 */
+  /* Primary Accent: Electric Violet #8B5CF6 / #7C3AED */
   --primary: #8b5cf6;
-  /* Slightly darkened Deep Violet for surfaces carrying small white text
-     (WCAG AA 4.5:1 at 12px — #8b5cf6 only reaches 4.23:1). */
-  --primary-strong: #8250f2;
+  --primary-strong: #7c3aed;
   --primary-hover: #a855f7;
   --primary-pressed: #6d28d9;
   --primary-foreground: #ffffff;
@@ -119,12 +116,12 @@ html.light {
   --color-bright-violet: #a855f7;
   --color-soft-violet: #a78bfa;
 
-  /* Secondary: Soft violet atmospheric surfaces */
-  --secondary: #2e1065;
+  /* Secondary: Smoked deep atmospheric surfaces */
+  --secondary: #22183d;
   --secondary-foreground: #d4cbea;
 
   /* Muted */
-  --muted: #1e123a;
+  --muted: #171128;
   --muted-foreground: #a69abd;
 
   /* Functional */
@@ -133,36 +130,131 @@ html.light {
   --success: #22c55e;
   --warning: #f59e0b;
 
-  /* Borders: rgba(167, 139, 250, 0.20) */
-  --border: rgba(167, 139, 250, 0.20);
-  --input: rgba(139, 92, 246, 0.15);
+  /* Borders: Hairline violet */
+  --border: rgba(168, 85, 247, 0.18);
+  --input: rgba(168, 85, 247, 0.16);
   --ring: #8b5cf6;
-  --ring-soft: rgba(139, 92, 246, 0.35);
+  --ring-soft: rgba(168, 85, 247, 0.35);
 
   /* Interactive surface steps */
-  --surface-hover: rgba(139, 92, 246, 0.12);
-  --surface-hover-strong: rgba(139, 92, 246, 0.22);
+  --surface-hover: rgba(168, 85, 247, 0.12);
+  --surface-hover-strong: rgba(168, 85, 247, 0.22);
 
   /* Chip / hairline scales */
-  --chip-subtle: rgba(139, 92, 246, 0.08);
-  --chip: #21133f;
-  --chip-strong: #2e1065;
-  --hair: rgba(167, 139, 250, 0.12);
-  --hair-strong: rgba(167, 139, 250, 0.20);
+  --chip-subtle: rgba(168, 85, 247, 0.08);
+  --chip: #1c1530;
+  --chip-strong: #24183d;
+  --hair: rgba(168, 85, 247, 0.14);
+  --hair-strong: rgba(168, 85, 247, 0.24);
 
   /* Glass system surfaces */
-  --glass-panel-bg: rgba(23, 13, 53, 0.90);
-  --glass-bg: rgba(23, 13, 53, 0.85);
-  --glass-bg-md: rgba(23, 13, 53, 0.90);
-  --glass-bg-soft: rgba(139, 92, 246, 0.12);
-  --glass-bg-heavy: rgba(16, 9, 31, 0.95);
-  --glass-border: rgba(167, 139, 250, 0.20);
-  --glass-border-strong: rgba(167, 139, 250, 0.30);
+  --glass-panel-bg: rgba(20, 14, 34, 0.92);
+  --glass-bg: rgba(23, 17, 38, 0.85);
+  --glass-bg-md: rgba(23, 17, 38, 0.90);
+  --glass-bg-soft: rgba(168, 85, 247, 0.12);
+  --glass-bg-heavy: rgba(11, 8, 19, 0.96);
+  --glass-border: rgba(168, 85, 247, 0.18);
+  --glass-border-strong: rgba(168, 85, 247, 0.28);
   --glass-hi: rgba(255, 255, 255, 0.12);
 
   --selection-bg: #2e1065;
   --scrollbar-thumb: rgba(139, 92, 246, 0.35);
   --scrollbar-thumb-hover: rgba(168, 85, 247, 0.6);
+}
+
+/*
+ * 2. Theme B: Purple Dream (Light)
+ * Reference: Second uploaded image
+ * Background: clean premium white with a very subtle lavender tint (#FAF9FF)
+ * Surfaces: white (#FFFFFF) and soft lavender (#F4F0FB / #EDE8F8)
+ * Cards: white (#FFFFFF) with gentle violet borders (#E9DDFD) and elegant soft shadows
+ * Primary accent: royal violet (#7C3AED)
+ * Secondary accents: purple, pink, blue and orange
+ * Text: deep navy/purple (#150F28 / #191329), secondary text (#6E6582 / #716A80)
+ * Music artwork: vibrant and colorful
+ * Soft gradients and elegant shadows
+ */
+html.light {
+  color-scheme: light;
+
+  --bg-main: #faf9ff;
+  --bg-sidebar: #ffffff;
+  --bg-secondary: #f4f0fb;
+  --bg-card: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-elevated-2: #ede8f8;
+
+  --text-primary: #150f28;
+  --text-secondary: #6e6582;
+  --text-muted: #8e86a3;
+
+  --background: #faf9ff;
+  --foreground: #150f28;
+
+  /* Surfaces */
+  --card: #ffffff;
+  --card-foreground: #150f28;
+  --surface: #f8f6fe;
+  --surface-foreground: #150f28;
+  --surface-elevated: #ffffff;
+  --popover: #ffffff;
+  --popover-foreground: #150f28;
+
+  /* Primary Accent: Vibrant Royal Violet #7C3AED */
+  --primary: #7c3aed;
+  --primary-strong: #6d28d9;
+  --primary-hover: #8b5cf6;
+  --primary-pressed: #5b21b6;
+  --primary-foreground: #ffffff;
+  --accent: #7c3aed;
+  --accent-foreground: #ffffff;
+  --color-bright-violet: #8b5cf6;
+  --color-soft-violet: #6d28d9;
+
+  /* Secondary: Soft lavender tint */
+  --secondary: #ede8f8;
+  --secondary-foreground: #4c1d95;
+
+  /* Muted */
+  --muted: #f3effc;
+  --muted-foreground: #6e6582;
+
+  /* Functional */
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;
+  --warning: #d97706;
+
+  /* Borders: Gentle violet hairline */
+  --border: #e9ddfd;
+  --input: #e9ddfd;
+  --ring: #7c3aed;
+  --ring-soft: rgba(124, 58, 237, 0.30);
+
+  /* Interactive surface steps */
+  --surface-hover: rgba(124, 58, 237, 0.08);
+  --surface-hover-strong: rgba(124, 58, 237, 0.14);
+
+  /* Chip / hairline scales */
+  --chip-subtle: rgba(124, 58, 237, 0.06);
+  --chip: #f3effc;
+  --chip-strong: #ede8f8;
+  --hair: rgba(124, 58, 237, 0.12);
+  --hair-strong: rgba(124, 58, 237, 0.20);
+
+  /* Glass system surfaces */
+  --glass-panel-bg: rgba(255, 255, 255, 0.95);
+  --glass-bg: rgba(255, 255, 255, 0.90);
+  --glass-bg-md: rgba(255, 255, 255, 0.94);
+  --glass-bg-soft: rgba(124, 58, 237, 0.06);
+  --glass-bg-heavy: rgba(250, 249, 255, 0.98);
+  --glass-border: #e9ddfd;
+  --glass-border-strong: rgba(139, 92, 246, 0.26);
+  --glass-hi: rgba(255, 255, 255, 0.95);
+
+  --selection-bg: #ddd6fe;
+  --scrollbar-thumb: rgba(124, 58, 237, 0.25);
+  --scrollbar-thumb-hover: rgba(124, 58, 237, 0.45);
 }
 
 
@@ -175,16 +267,16 @@ html.light {
   body {
     background-color: var(--color-background);
     background-image: 
-      /* Deep edge vignette keeping the outer edges and corners in darkest purple */
-      radial-gradient(ellipse 110% 90% at 50% 50%, transparent 45%, rgba(12, 6, 23, 0.92) 100%),
+      /* Deep edge vignette keeping the outer edges and corners in darkest obsidian */
+      radial-gradient(ellipse 110% 90% at 50% 50%, transparent 45%, rgba(8, 5, 14, 0.94) 100%),
       /* Controlled violet atmospheric lighting centered behind the main content */
       radial-gradient(ellipse 75% 45% at 50% 20%, rgba(139, 92, 246, 0.16) 0%, transparent 60%),
-      /* Soft top-right ambient bloom */
-      radial-gradient(ellipse 55% 40% at 85% 10%, rgba(168, 85, 247, 0.09) 0%, transparent 50%),
+      /* Soft top-right neon magenta/violet bloom */
+      radial-gradient(ellipse 55% 40% at 85% 10%, rgba(255, 46, 126, 0.10) 0%, transparent 50%),
       /* Center-left subtle deep purple depth */
-      radial-gradient(ellipse 60% 45% at 10% 45%, rgba(46, 16, 101, 0.28) 0%, transparent 60%),
-      /* Layered deep-purple base gradient blending #170D35, #130926, #10091F */
-      linear-gradient(180deg, #170d35 0%, #130926 40%, #10091f 100%);
+      radial-gradient(ellipse 60% 45% at 10% 45%, rgba(36, 24, 61, 0.40) 0%, transparent 60%),
+      /* Layered deep-purple base gradient */
+      linear-gradient(180deg, #130d22 0%, #0e091a 40%, #0b0813 100%);
     background-attachment: fixed;
     background-repeat: no-repeat;
     background-size: cover;
@@ -194,6 +286,20 @@ html.light {
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
+  }
+
+  html.light body {
+    background-color: #f8f7ff;
+    background-image:
+      /* Top header lavender morning bloom */
+      radial-gradient(ellipse 90% 55% at 50% 0%, rgba(216, 180, 254, 0.32) 0%, transparent 65%),
+      /* Top-right warm sunrise peach accent */
+      radial-gradient(ellipse 70% 45% at 88% 12%, rgba(254, 215, 170, 0.25) 0%, transparent 55%),
+      /* Center-left soft violet aura */
+      radial-gradient(ellipse 60% 45% at 10% 35%, rgba(196, 181, 253, 0.25) 0%, transparent 60%),
+      /* Clean crisp Lilac Sunrise base */
+      linear-gradient(180deg, #f8f7ff 0%, #f4f0fb 45%, #ede8f8 100%);
+    color: var(--color-foreground);
   }
 
 
@@ -1003,3 +1109,56 @@ html.light {
     inset 0 1px 0 var(--glass-hi);
 }
 
+
+/* Signature Tricolor & Sunrise gradients from mockups */
+@utility gradient-cta {
+  background: linear-gradient(135deg, #ff2e7e 0%, #a855f7 50%, #00d4ff 100%);
+  color: #ffffff;
+}
+
+@utility gradient-sunrise {
+  background: linear-gradient(135deg, #ff7a00 0%, #ff2e7e 50%, #8b5cf6 100%);
+  color: #ffffff;
+}
+
+@utility gradient-banner {
+  background: linear-gradient(135deg, rgba(255, 46, 126, 0.16) 0%, rgba(168, 85, 247, 0.22) 50%, rgba(0, 212, 255, 0.16) 100%);
+}
+
+/* Signature MelodyMap Master Brand Utilities matching UI Reference Images */
+@utility mm-btn-gradient {
+  background: linear-gradient(135deg, #7c3aed 0%, #9333ea 42%, #c026d3 75%, #ec4899 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.35);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility mm-gradient-text {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 45%, #e040fb 70%, #ff8a35 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility mm-artwork-glow {
+  box-shadow: 0 0 35px rgba(124, 58, 237, 0.35), 0 0 70px rgba(236, 72, 153, 0.15);
+}
+
+@utility mm-chip-active {
+  background: #7c3aed;
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 9999px;
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.35);
+}
+
+@utility mm-wave-gradient {
+  background: linear-gradient(135deg, #2563eb 0%, #4c1d95 22%, #7c3aed 46%, #a855f7 70%, #e040fb 85%, #ff8a35 100%);
+}
+
+@utility mm-bg-wave {
+  background: radial-gradient(120% 80% at 50% -20%, rgba(124, 58, 237, 0.22) 0%, rgba(168, 85, 247, 0.12) 35%, rgba(255, 138, 53, 0.08) 65%, transparent 100%);
+}
+
+@utility mm-bg-wave-bottom {
+  background: radial-gradient(120% 80% at 50% 120%, rgba(124, 58, 237, 0.25) 0%, rgba(224, 64, 251, 0.15) 35%, rgba(255, 138, 53, 0.08) 70%, transparent 100%);
+}

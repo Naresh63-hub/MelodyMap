@@ -7,13 +7,19 @@ import {
   Compass,
   Eye,
   EyeOff,
-  HelpCircle,
+  Headphones,
+  Heart,
   Loader2,
   Lock,
   Mail,
+  Mic,
+  Music,
+  Radio,
   RefreshCw,
+  ShieldCheck,
   Sparkles,
   User,
+  Volume2,
 } from "lucide-react";
 import { useEffect, useState, useId } from "react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +28,8 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { safeStorage } from "@/lib/safe-storage";
+import { cn } from "@/lib/utils";
+import { MusicWaveBanner } from "@/components/music/ui/MusicWaveBanner";
 
 export function formatAuthError(msg: string): string {
   const lower = msg.toLowerCase();
@@ -133,6 +141,12 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
       return { score: 0, label: "Too short", color: "#E9DDFD" };
   }
 }
+
+// Decorative visual waveform heights for music aesthetic
+const WAVEFORM_HEIGHTS = [
+  "h-3", "h-6", "h-9", "h-5", "h-11", "h-7", "h-12", "h-6", "h-10", "h-8",
+  "h-12", "h-5", "h-11", "h-7", "h-9", "h-4", "h-8", "h-3"
+];
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -388,452 +402,587 @@ function AuthPage() {
   const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   return (
-    <div
-      className="flex min-h-screen flex-col justify-center px-4 py-8 sm:px-6 lg:px-8 selection:bg-[#F3EEFF] selection:text-[#7C3AED]"
-      style={{
-        backgroundColor: "#FAF9FF",
-        color: "#191329",
-      }}
-    >
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Navigation Escape Back to Music */}
-        <div className="flex justify-center mb-2">
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-xs text-[#716A80] hover:text-[#191329] transition-colors py-2 px-3 rounded-full hover:bg-[#F3EEFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] min-h-[44px]"
-          >
-            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-            <span className="font-medium">Back to music</span>
-          </Link>
-        </div>
+    <div className="min-h-screen bg-[#F8F5FF] dark:bg-[#0D0819] text-[#1A1033] dark:text-[#FFFFFF] selection:bg-[#F3EEFF] dark:selection:bg-[#2E1065] selection:text-[#7C3AED] dark:selection:text-[#C084FC] transition-colors duration-300 relative overflow-x-hidden flex flex-col justify-between">
+      {/* Ambient Decorative Background Lights & Floating Elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-0">
+        {/* Soft violet radial glows */}
+        <div className="absolute top-0 left-1/4 w-[36rem] h-[36rem] rounded-full bg-gradient-to-br from-[#8B5CF6]/15 via-[#C084FC]/10 to-transparent blur-3xl" />
+        <div className="absolute top-12 right-12 w-40 h-40 rounded-full bg-gradient-to-br from-[#A855F7]/20 to-[#EC4899]/15 blur-2xl" />
+        <div className="absolute bottom-10 left-10 w-96 h-96 rounded-full bg-gradient-to-tr from-[#7C3AED]/15 via-[#FF7A00]/10 to-transparent blur-3xl" />
 
-        {/* Brand Header */}
-        <div className="flex flex-col items-center text-center">
-          <div className="relative mb-3 group">
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-[#7C3AED]/20 to-[#9333EA]/20 blur-md opacity-70 group-hover:opacity-100 transition duration-300" />
+        {/* Floating 3D Musical Notes echoing the mockup */}
+        <div className="absolute top-28 right-[12%] text-2xl sm:text-3xl font-serif text-[#A855F7]/40 select-none animate-pulse rotate-12 [animation-duration:4s]">
+          ♪
+        </div>
+        <div className="absolute top-44 left-[8%] text-3xl sm:text-4xl font-serif text-[#C084FC]/35 select-none animate-pulse -rotate-12 [animation-duration:5s] [animation-delay:1s]">
+          ♫
+        </div>
+        <div className="absolute top-1/3 left-[46%] text-xl font-serif text-[#EC4899]/40 select-none animate-pulse rotate-45 [animation-duration:3.5s] [animation-delay:2s]">
+          ♪
+        </div>
+        <div className="absolute bottom-40 right-[8%] text-3xl font-serif text-[#8B5CF6]/40 select-none animate-pulse -rotate-6 [animation-duration:4.5s] [animation-delay:1.5s]">
+          ♫
+        </div>
+        <div className="absolute bottom-28 left-[18%] text-2xl font-serif text-[#FF7A00]/30 select-none animate-pulse rotate-12 [animation-duration:6s] [animation-delay:0.5s]">
+          ♪
+        </div>
+      </div>
+
+      {/* Sweeping Wave Ribbons at Top and Bottom matching UI Reference Images */}
+      <MusicWaveBanner variant="header" className="opacity-60 dark:opacity-40" />
+      <MusicWaveBanner variant="bottom" className="opacity-90 dark:opacity-50" />
+      <div className="absolute bottom-0 left-0 right-0 h-28 sm:h-36 pointer-events-none z-0 overflow-hidden">
+        <img
+          src="/brand/auth-bottom-waves.png"
+          alt=""
+          className="w-full h-full object-cover object-bottom opacity-80 dark:opacity-35"
+        />
+      </div>
+
+      {/* TOP NAVIGATION BAR: Brand Logo + Wave Equalizer Tagline */}
+      <header className="w-full flex items-center justify-between px-6 sm:px-12 py-5 lg:py-6 relative z-20 max-w-7xl mx-auto">
+        {/* Left: Official MelodyMap Logo + Wordmark */}
+        <Link
+          to="/"
+          aria-label="Back to MelodyMap Home"
+          className="group flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-2xl cursor-pointer"
+        >
+          <div className="relative">
+            <div className="absolute inset-0 bg-[#7C3AED]/30 rounded-2xl blur-md group-hover:blur-lg transition-all" />
             <picture>
               <source srcSet="/brand/app-icon.webp" type="image/webp" />
               <img
                 src="/brand/app-icon.png"
                 alt="MelodyMap"
-                loading="eager"
-                fetchPriority="high"
-                width={56}
-                height={56}
-                className="relative h-14 w-14 rounded-2xl object-contain shadow-sm border border-[#E9DDFD] bg-white p-1"
+                className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-contain shadow-md"
               />
             </picture>
           </div>
+          <span className="text-xl sm:text-2xl font-black tracking-tight text-[#1A1033] dark:text-white font-display">
+            MelodyMap
+          </span>
+        </Link>
 
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#191329] font-display">
-            {mode === "signin" && "Your music. Your mood. Your Melody."}
-            {mode === "signup" && "Join MelodyMap"}
-            {mode === "verify_email" && "Check your inbox"}
-            {mode === "forgot" && "Reset your password"}
-            {mode === "reset_password" && "Set new password"}
-          </h1>
+        {/* Right: Tagline with Live Equalizer & Back Shortcut */}
+        <div className="flex items-center gap-4 sm:gap-6">
+          <div className="hidden sm:flex items-center gap-2.5 text-xs lg:text-sm font-medium text-[#1A1033] dark:text-[#D4CBEA]">
+            {/* Equalizer sound bars */}
+            <div className="flex items-center gap-0.5 h-4 text-[#8B5CF6]" aria-hidden="true">
+              <span className="w-1 h-2 bg-[#8B5CF6] rounded-full animate-pulse" />
+              <span className="w-1 h-3.5 bg-[#A855F7] rounded-full animate-pulse [animation-delay:150ms]" />
+              <span className="w-1 h-2.5 bg-[#EC4899] rounded-full animate-pulse [animation-delay:300ms]" />
+              <span className="w-1 h-4 bg-[#8B5CF6] rounded-full animate-pulse [animation-delay:75ms]" />
+              <span className="w-1 h-2 bg-[#A855F7] rounded-full animate-pulse [animation-delay:225ms]" />
+            </div>
+            <span className="tracking-wide">Your music. Your mood. Your Melody.</span>
+          </div>
 
-          <p className="mt-1.5 text-xs sm:text-sm text-[#716A80] max-w-sm leading-relaxed">
-            {mode === "signin" && "Sign in to keep your music, playlists and discoveries in sync."}
-            {mode === "signup" && "Create your free account to save favorites and listen across devices."}
-            {mode === "verify_email" && `We've sent a verification link to ${email || "your email"}.`}
-            {mode === "forgot" && "Enter your email to receive password reset instructions."}
-            {mode === "reset_password" && "Enter a secure new password for your account."}
-          </p>
+          <Link
+            to="/"
+            aria-label="Back to App"
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#716A80] dark:text-[#A69ABD] hover:text-[#7C3AED] dark:hover:text-[#C084FC] transition-colors py-2 px-3.5 rounded-full hover:bg-white/60 dark:hover:bg-white/5 border border-transparent hover:border-purple-200 dark:hover:border-purple-800/40 min-h-[44px] cursor-pointer"
+          >
+            <ArrowLeft aria-hidden="true" className="w-4 h-4" />
+            <span className="hidden sm:inline">Back</span>
+          </Link>
         </div>
-      </div>
+      </header>
 
-      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
-        <div
-          className="rounded-3xl bg-white border border-[#E9DDFD] p-6 sm:p-8 shadow-[0_12px_40px_rgba(124,58,237,0.08)] space-y-4"
-          style={{ backgroundColor: "#FFFFFF" }}
-        >
-          {/* Notifications & Status Banners */}
-          {errorNote && (
-            <div
-              id="auth-error-note"
-              role="alert"
-              aria-live="assertive"
-              className="flex items-start gap-2.5 rounded-2xl bg-[#FFF5F5] border border-[#FED7D7] p-3.5 text-xs text-[#C53030]"
-            >
-              <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
-              <p className="flex-1 font-medium leading-relaxed">{errorNote}</p>
+      {/* MAIN CONTAINER: Two-Column Composition */}
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-12 flex-1 flex flex-col justify-center py-4 sm:py-6 lg:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          {/* LEFT COLUMN: Hero Artwork Showcase */}
+          <div className="lg:col-span-7 xl:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
+            {/* Big Headline */}
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#1A1033] dark:text-white tracking-tight leading-[1.12]">
+              Your Music<br className="hidden sm:inline" />{" "}
+              Journey{" "}
+              <span className="bg-gradient-to-r from-[#8B5CF6] via-[#EC4899] to-[#FF7A00] bg-clip-text text-transparent">
+                Awaits
+              </span>
+            </h1>
+
+            {/* Subtitle & Gradient Accent Underline */}
+            <div className="mt-3 inline-block">
+              <p className="text-base sm:text-lg font-bold text-[#1A1033] dark:text-[#E2D9F3] tracking-wide">
+                Discover. Feel. Play.
+              </p>
+              <div className="mt-1 h-1 w-24 rounded-full bg-gradient-to-r from-[#FF7A00] via-[#EC4899] to-[#8B5CF6]" />
             </div>
-          )}
 
-          {successNote && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="flex items-start gap-2.5 rounded-2xl bg-[#F3EEFF] border border-[#E9DDFD] p-3.5 text-xs text-[#7C3AED]"
-            >
-              <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
-              <p className="flex-1 font-medium leading-relaxed">{successNote}</p>
-            </div>
-          )}
-
-          {/* Primary Social Hero: Continue with Google */}
-          {mode !== "reset_password" && mode !== "verify_email" && (
-            <div className="space-y-2.5 pt-1">
-              <Button
-                type="button"
-                variant="outline"
-                disabled={googleBusy || submitting}
-                onClick={handleGoogleSignIn}
-                className="w-full h-11 rounded-2xl bg-white hover:bg-[#FAF9FF] text-[#191329] border border-[#E9DDFD] font-semibold flex items-center justify-center gap-2.5 shadow-sm active:scale-[0.99] transition-all text-xs"
-              >
-                {googleBusy ? (
-                  <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[#7C3AED]" />
-                ) : (
-                  <svg aria-hidden="true" focusable="false" className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                )}
-                <span>Continue with Google</span>
-              </Button>
-
-              <div className="relative flex items-center justify-center my-3.5">
-                <div className="border-t border-[#E9DDFD] w-full" />
-                <span className="bg-white px-3 text-[10px] text-[#716A80] uppercase tracking-wider font-medium">
-                  or continue with email
-                </span>
+            {/* Centerpiece 3D Headphones on Glowing Stage Artwork */}
+            <div className="relative w-full max-w-[480px] my-3 sm:my-4 flex justify-center lg:justify-start">
+              <div className="relative w-full aspect-[520/330] max-h-[290px] sm:max-h-[330px]">
+                <img
+                  src="/brand/auth-headphones-stage.png"
+                  alt="MelodyMap 3D Hi-Fi Sound Experience"
+                  className="w-full h-full object-contain drop-shadow-[0_20px_35px_rgba(124,58,237,0.22)]"
+                />
               </div>
             </div>
-          )}
 
-          {/* Mode Switcher Tabs */}
-          {mode !== "reset_password" && mode !== "forgot" && mode !== "verify_email" && (
-            <div
-              role="tablist"
-              aria-label="Authentication mode"
-              className="flex rounded-2xl bg-[#FAF9FF] p-1 border border-[#E9DDFD]"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "signin"}
-                aria-controls="auth-form"
-                onClick={() => {
-                  setMode("signin");
-                  setErrorNote(null);
-                  setSuccessNote(null);
-                }}
-                className={`flex-1 rounded-xl py-2 min-h-[44px] flex items-center justify-center text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] ${
-                  mode === "signin"
-                    ? "bg-[#7C3AED] text-white shadow-sm"
-                    : "text-[#716A80] hover:text-[#191329]"
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "signup"}
-                aria-controls="auth-form"
-                onClick={() => {
-                  setMode("signup");
-                  setErrorNote(null);
-                  setSuccessNote(null);
-                }}
-                className={`flex-1 rounded-xl py-2 min-h-[44px] flex items-center justify-center text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] ${
-                  mode === "signup"
-                    ? "bg-[#7C3AED] text-white shadow-sm"
-                    : "text-[#716A80] hover:text-[#191329]"
-                }`}
-              >
-                Create Account
-              </button>
+            {/* Bottom Capsule Pill: 3 Highlights */}
+            <div className="inline-flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-4 px-5 py-2.5 rounded-full bg-white/70 dark:bg-[#1E1435]/80 backdrop-blur-md border border-[#E9DDFD] dark:border-purple-700/30 shadow-sm text-xs font-semibold text-[#1A1033] dark:text-white">
+              <div className="flex items-center gap-1.5">
+                <Music className="w-3.5 h-3.5 text-[#7C3AED]" />
+                <span>Personalized Recommendations</span>
+              </div>
+              <div className="hidden sm:block h-3.5 w-px bg-purple-200 dark:bg-purple-700/50" />
+              <div className="flex items-center gap-1.5">
+                <Heart className="w-3.5 h-3.5 text-[#EC4899]" />
+                <span>Create Your Mixes</span>
+              </div>
+              <div className="hidden sm:block h-3.5 w-px bg-purple-200 dark:bg-purple-700/50" />
+              <div className="flex items-center gap-1.5">
+                <Mic className="w-3.5 h-3.5 text-[#7C3AED]" />
+                <span>Listen to Podcasts</span>
+              </div>
             </div>
-          )}
+          </div>
 
-          {/* Dedicated Verify Email Screen */}
-          {mode === "verify_email" && (
-            <div className="space-y-4 py-2">
-              <div className="rounded-2xl bg-[#FAF9FF] border border-[#E9DDFD] p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-[#F3EEFF] text-[#7C3AED] flex items-center justify-center shrink-0">
-                    <Mail aria-hidden="true" className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-[#191329]">Verification link sent</p>
-                    <p className="text-[11px] text-[#716A80] break-all">{email}</p>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-[#716A80] space-y-1.5 border-t border-[#E9DDFD] pt-2.5">
-                  <p>1. Open your email app and click the confirmation link.</p>
-                  <p>2. Check your spam/junk folder if not received in 1 minute.</p>
-                  <p className="text-[#7C3AED] font-medium">
-                    Tip: If opened in Gmail/Outlook webview, tap (⋮) &gt; "Open in Chrome / Browser" to keep your session saved.
-                  </p>
+          {/* RIGHT COLUMN: Premium Floating Authentication Card */}
+          <div className="lg:col-span-5 xl:col-span-5 flex justify-center w-full">
+            <div className="w-full max-w-md rounded-[32px] bg-white dark:bg-[#1B132E] border border-[#E9DDFD] dark:border-purple-800/40 p-6 sm:p-8 shadow-[0_24px_60px_-12px_rgba(124,58,237,0.18)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl space-y-4 relative">
+              {/* Card Top Logo with Glowing Halo */}
+              <div className="flex justify-center -mt-1">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-[#7C3AED]/30 rounded-2xl blur-lg transform scale-110" />
+                  <picture>
+                    <source srcSet="/brand/app-icon.webp" type="image/webp" />
+                    <img
+                      src="/brand/app-icon.png"
+                      alt="MelodyMap"
+                      className="relative w-12 h-12 rounded-2xl shadow-md object-contain"
+                    />
+                  </picture>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={resending || resendCooldown > 0}
-                  onClick={handleResendVerification}
-                  className="w-full h-11 rounded-2xl border-[#E9DDFD] text-[#191329] hover:bg-[#FAF9FF] text-xs font-semibold flex items-center justify-center gap-2"
+              {/* Form Title & Context */}
+              <div className="text-center space-y-1">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-[#1A1033] dark:text-white font-display">
+                  {mode === "signin" && "Welcome to MelodyMap"}
+                  {mode === "signup" && "Join MelodyMap"}
+                  {mode === "verify_email" && "Check Your Inbox"}
+                  {mode === "forgot" && "Reset Password"}
+                  {mode === "reset_password" && "Set New Password"}
+                </h2>
+                <p className="text-xs sm:text-sm text-[#716A80] dark:text-[#A69ABD]">
+                  {mode === "signin" && "Sign in to continue your musical journey"}
+                  {mode === "signup" && "Start your musical journey"}
+                  {mode === "verify_email" && `We've sent a verification link to ${email || "your email"}.`}
+                  {mode === "forgot" && "Enter your email to receive password reset instructions."}
+                  {mode === "reset_password" && "Enter a secure new password for your account."}
+                </p>
+              </div>
+
+              {/* Status / Error Alerts */}
+              {errorNote && (
+                <div
+                  id="auth-error-note"
+                  role="alert"
+                  aria-live="assertive"
+                  className="flex items-start gap-2.5 rounded-2xl bg-[#FFF5F5] dark:bg-rose-950/30 border border-[#FED7D7] dark:border-rose-800/40 p-3 text-xs text-[#C53030] dark:text-rose-300 animate-fade-in"
                 >
-                  {resending ? (
-                    <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[#7C3AED]" />
-                  ) : (
-                    <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 text-[#7C3AED]" />
-                  )}
-                  <span>
-                    {resendCooldown > 0
-                      ? `Resend available in ${resendCooldown}s`
-                      : "Resend verification link"}
-                  </span>
-                </Button>
+                  <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
+                  <p className="flex-1 font-medium leading-relaxed">{errorNote}</p>
+                </div>
+              )}
 
-                <Button
+              {successNote && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-start gap-2.5 rounded-2xl bg-[#F3EEFF] dark:bg-purple-950/40 border border-[#E9DDFD] dark:border-purple-800/40 p-3 text-xs text-[#7C3AED] dark:text-purple-300 animate-fade-in"
+                >
+                  <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
+                  <p className="flex-1 font-medium leading-relaxed">{successNote}</p>
+                </div>
+              )}
+
+              {/* Primary Social Hero: Continue with Google */}
+              {mode !== "reset_password" && mode !== "verify_email" && (
+                <div className="space-y-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={googleBusy || submitting}
+                    onClick={handleGoogleSignIn}
+                    className="w-full h-11 sm:h-12 rounded-full bg-white dark:bg-[#23183D] hover:bg-[#FAF9FF] dark:hover:bg-[#2B1D4A] text-[#1A1033] dark:text-white border border-[#E9DDFD] dark:border-purple-800/40 font-semibold flex items-center justify-center gap-3 shadow-xs active:scale-[0.99] transition-all text-xs sm:text-sm cursor-pointer"
+                  >
+                    {googleBusy ? (
+                      <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[#7C3AED]" />
+                    ) : (
+                      <svg aria-hidden="true" focusable="false" className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                        />
+                      </svg>
+                    )}
+                    <span>Continue with Google</span>
+                  </Button>
+
+                  <div className="relative flex items-center justify-center my-2">
+                    <div className="border-t border-[#E9DDFD] dark:border-purple-900/50 w-full" />
+                    <span className="bg-white dark:bg-[#1B132E] px-3 text-[11px] font-bold text-[#716A80] dark:text-[#A69ABD] uppercase tracking-wider">
+                      OR
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Mode Switcher Tabs */}
+              {mode !== "reset_password" && mode !== "forgot" && mode !== "verify_email" && (
+                <div
+                  role="tablist"
+                  aria-label="Authentication mode"
+                  className="flex rounded-full bg-[#F3EEFC] dark:bg-[#130D22] p-1 border border-[#E9DDFD] dark:border-purple-900/40 shadow-inner"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === "signin"}
+                    aria-controls="auth-form"
+                    onClick={() => {
+                      setMode("signin");
+                      setErrorNote(null);
+                      setSuccessNote(null);
+                    }}
+                    className={`flex-1 rounded-full py-2 min-h-[44px] flex items-center justify-center text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] cursor-pointer ${
+                      mode === "signin"
+                        ? "bg-[#7C3AED] text-white shadow-md shadow-[#7C3AED]/30"
+                        : "text-[#716A80] dark:text-[#A69ABD] hover:text-[#1A1033] dark:hover:text-white"
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === "signup"}
+                    aria-controls="auth-form"
+                    onClick={() => {
+                      setMode("signup");
+                      setErrorNote(null);
+                      setSuccessNote(null);
+                    }}
+                    className={`flex-1 rounded-full py-2 min-h-[44px] flex items-center justify-center text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] cursor-pointer ${
+                      mode === "signup"
+                        ? "bg-[#7C3AED] text-white shadow-md shadow-[#7C3AED]/30"
+                        : "text-[#716A80] dark:text-[#A69ABD] hover:text-[#1A1033] dark:hover:text-white"
+                    }`}
+                  >
+                    Create Account
+                  </button>
+                </div>
+              )}
+
+              {/* Dedicated Verify Email Screen */}
+              {mode === "verify_email" && (
+                <div className="space-y-4 py-2">
+                  <div className="rounded-2xl bg-[#FAF9FF] dark:bg-[#160F25] border border-[#E9DDFD] dark:border-[rgba(168,85,247,0.22)] p-4 sm:p-5 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-11 w-11 rounded-2xl bg-[#F3EEFF] dark:bg-[#24183D] text-[#7C3AED] dark:text-[#C084FC] flex items-center justify-center shrink-0 border border-[#E9DDFD] dark:border-[rgba(168,85,247,0.25)]">
+                        <Mail aria-hidden="true" className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs sm:text-sm font-semibold text-[#1A1033] dark:text-white">Verification Link Sent</p>
+                        <p className="text-[11px] text-[#716A80] dark:text-[#D4CBEA] break-all font-mono mt-0.5">{email}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-[#716A80] dark:text-[#D4CBEA] space-y-1.5 border-t border-[#E9DDFD] dark:border-[rgba(168,85,247,0.18)] pt-3">
+                      <p>1. Open your inbox and tap the confirmation link.</p>
+                      <p>2. Check your spam or promotions folder if not received in 1 minute.</p>
+                      <p className="text-[#7C3AED] dark:text-[#C084FC] font-medium pt-1">
+                        Tip: In Gmail/Outlook in-app browsers, tap (⋮) &gt; "Open in Chrome / Browser" to ensure your session persists.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={resending || resendCooldown > 0}
+                      onClick={handleResendVerification}
+                      className="w-full h-11 sm:h-12 rounded-full border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white bg-white dark:bg-[#171126] hover:bg-[#FAF9FF] dark:hover:bg-[#24183D] text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {resending ? (
+                        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[#7C3AED]" />
+                      ) : (
+                        <RefreshCw aria-hidden="true" className="h-3.5 w-3.5 text-[#7C3AED] dark:text-[#A855F7]" />
+                      )}
+                      <span>
+                        {resendCooldown > 0
+                          ? `Resend available in ${resendCooldown}s`
+                          : "Resend verification link"}
+                      </span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setMode("signin");
+                        setErrorNote(null);
+                        setSuccessNote(null);
+                      }}
+                      className="w-full h-11 sm:h-12 rounded-full bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#A855F7] hover:brightness-110 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-[#7C3AED]/25 cursor-pointer"
+                    >
+                      I've confirmed my email · Sign In
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Form Content */}
+              {mode !== "verify_email" && (
+                <form id="auth-form" onSubmit={handleSubmit} className="space-y-3.5">
+                  {mode === "signup" && (
+                    <div className="space-y-1">
+                      <Label htmlFor="auth-name" className="text-xs font-semibold text-[#1A1033] dark:text-purple-100 flex items-center gap-1.5">
+                        <User aria-hidden="true" className="w-3.5 h-3.5 text-[#7C3AED]" />
+                        <span>Full Name</span>
+                      </Label>
+                      <div className="relative">
+                        <User aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
+                        <Input
+                          id="auth-name"
+                          name="name"
+                          type="text"
+                          autoComplete="name"
+                          placeholder="Enter your full name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          disabled={submitting}
+                          aria-invalid={Boolean(errorNote)}
+                          aria-describedby={errorNote ? "auth-error-note" : undefined}
+                          className="pl-11 pr-4 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {mode !== "reset_password" && (
+                    <div className="space-y-1">
+                      <Label htmlFor="auth-email" className="text-xs font-semibold text-[#1A1033] dark:text-purple-100 flex items-center gap-1.5">
+                        <Mail aria-hidden="true" className="w-3.5 h-3.5 text-[#7C3AED]" />
+                        <span>Email Address</span>
+                      </Label>
+                      <div className="relative">
+                        <Mail aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
+                        <Input
+                          id="auth-email"
+                          name="email"
+                          type="email"
+                          autoComplete="email"
+                          placeholder="Enter your email address"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          disabled={submitting}
+                          aria-invalid={Boolean(errorNote)}
+                          aria-describedby={errorNote ? "auth-error-note" : undefined}
+                          className="pl-11 pr-4 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {mode !== "forgot" && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="auth-password" className="text-xs font-semibold text-[#1A1033] dark:text-purple-100 flex items-center gap-1.5">
+                          <Lock aria-hidden="true" className="w-3.5 h-3.5 text-[#7C3AED]" />
+                          <span>{mode === "reset_password" ? "New Password" : "Password"}</span>
+                        </Label>
+                        {mode === "signin" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMode("forgot");
+                              setErrorNote(null);
+                              setSuccessNote(null);
+                            }}
+                            className="text-xs text-[#7C3AED] dark:text-[#C084FC] hover:underline font-semibold min-h-[44px] inline-flex items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded cursor-pointer"
+                          >
+                            Forgot password?
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="relative">
+                        <Lock aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
+                        <Input
+                          id="auth-password"
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                          placeholder="Enter your password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          disabled={submitting}
+                          aria-invalid={Boolean(errorNote)}
+                          aria-describedby={errorNote ? "auth-error-note" : undefined}
+                          className="pl-11 pr-12 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          aria-pressed={showPassword}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#716A80] dark:text-[#948BA8] hover:text-[#1A1033] dark:hover:text-white transition-colors rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] cursor-pointer"
+                        >
+                          {showPassword ? (
+                            <EyeOff aria-hidden="true" className="h-4 w-4" />
+                          ) : (
+                            <Eye aria-hidden="true" className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Password Strength Meter */}
+                      {(mode === "signup" || mode === "reset_password") && password.length > 0 && (
+                        <div className="pt-1 space-y-1.5 animate-fade-in">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-[#716A80] dark:text-[#D4CBEA]">Password strength:</span>
+                            <span className="font-semibold text-[#7C3AED] dark:text-[#C084FC]">
+                              {passwordStrength.label}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5 h-1.5">
+                            {[1, 2, 3, 4].map((bar) => (
+                              <div
+                                key={bar}
+                                className="rounded-full transition-all duration-300"
+                                style={{
+                                  backgroundColor:
+                                    bar <= passwordStrength.score ? passwordStrength.color : "#E9DDFD",
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(mode === "signup" || mode === "reset_password") && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="auth-confirm-password" className="text-xs font-semibold text-[#1A1033] dark:text-purple-100 flex items-center gap-1.5">
+                          <Lock aria-hidden="true" className="w-3.5 h-3.5 text-[#7C3AED]" />
+                          <span>Confirm Password</span>
+                        </Label>
+                        {passwordsMatch && (
+                          <span className="text-[11px] text-[#7C3AED] dark:text-[#C084FC] font-medium flex items-center gap-1 animate-fade-in">
+                            <Check className="h-3 w-3" /> Passwords match
+                          </span>
+                        )}
+                        {passwordsMismatch && (
+                          <span className="text-[11px] text-[#C53030] dark:text-rose-400 font-medium animate-fade-in">
+                            Passwords do not match
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <Lock aria-hidden="true" className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
+                        <Input
+                          id="auth-confirm-password"
+                          name="confirmPassword"
+                          type={showPassword ? "text" : "password"}
+                          autoComplete="new-password"
+                          placeholder="Confirm your password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          disabled={submitting}
+                          aria-invalid={Boolean(errorNote)}
+                          aria-describedby={errorNote ? "auth-error-note" : undefined}
+                          className="pl-11 pr-12 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={submitting || googleBusy}
+                    aria-busy={submitting}
+                    className="w-full h-11 sm:h-12 rounded-full bg-gradient-to-r from-[#6D28D9] via-[#8B5CF6] to-[#EC4899] hover:brightness-105 text-white font-bold shadow-lg shadow-[#7C3AED]/30 active:scale-[0.99] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {submitting ? (
+                      <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                    ) : mode === "signin" ? (
+                      <>
+                        <span className="font-mono text-base">&rarr;|</span>
+                        <span>Sign In</span>
+                      </>
+                    ) : mode === "signup" ? (
+                      <>
+                        <span>Create Account</span>
+                        <span className="font-mono text-base">&rarr;</span>
+                      </>
+                    ) : mode === "forgot" ? (
+                      "Send Reset Link"
+                    ) : (
+                      "Update Password"
+                    )}
+                  </Button>
+                </form>
+              )}
+
+              {mode === "forgot" && (
+                <button
                   type="button"
                   onClick={() => {
                     setMode("signin");
                     setErrorNote(null);
                     setSuccessNote(null);
                   }}
-                  className="w-full h-11 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold shadow-md shadow-[#7C3AED]/20"
+                  className="w-full py-2 min-h-[44px] flex items-center justify-center text-xs text-[#716A80] dark:text-[#D4CBEA] hover:text-[#1A1033] dark:hover:text-white font-medium transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-full cursor-pointer"
                 >
-                  I've confirmed my email · Sign In
-                </Button>
+                  Back to Sign In
+                </button>
+              )}
+
+              {/* Guest Exploration Escape */}
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={continueAsGuest}
+                  className="min-h-[44px] py-2 px-4 inline-flex items-center justify-center gap-1.5 text-xs text-[#716A80] dark:text-[#D4CBEA] hover:text-[#7C3AED] dark:hover:text-[#C084FC] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-full hover:bg-[#F3EEFF] dark:hover:bg-[#24183D] cursor-pointer"
+                >
+                  <User aria-hidden="true" className="h-3.5 w-3.5 text-[#7C3AED] dark:text-[#A855F7]" />
+                  <span>Explore as Guest &rarr;</span>
+                </button>
               </div>
             </div>
-          )}
-
-          {/* Form Content */}
-          {mode !== "verify_email" && (
-            <form id="auth-form" onSubmit={handleSubmit} className="space-y-3.5">
-              {mode === "signup" && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="auth-name" className="text-xs font-semibold text-[#191329]">
-                    Full Name
-                  </Label>
-                  <div className="relative">
-                    <User aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#716A80] pointer-events-none" />
-                    <Input
-                      id="auth-name"
-                      name="name"
-                      type="text"
-                      autoComplete="name"
-                      placeholder="Jane Doe"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      disabled={submitting}
-                      aria-invalid={Boolean(errorNote)}
-                      aria-describedby={errorNote ? "auth-error-note" : undefined}
-                      className="pl-10 bg-[#FAF9FF] border-[#E9DDFD] text-[#191329] placeholder:text-[#716A80]/70 h-11 rounded-2xl focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
-                      required
-                    />
-                  </div>
-                </div>
-              )}
-
-              {mode !== "reset_password" && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="auth-email" className="text-xs font-semibold text-[#191329]">
-                    Email Address
-                  </Label>
-                  <div className="relative">
-                    <Mail aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#716A80] pointer-events-none" />
-                    <Input
-                      id="auth-email"
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={submitting}
-                      aria-invalid={Boolean(errorNote)}
-                      aria-describedby={errorNote ? "auth-error-note" : undefined}
-                      className="pl-10 bg-[#FAF9FF] border-[#E9DDFD] text-[#191329] placeholder:text-[#716A80]/70 h-11 rounded-2xl focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
-                      required
-                    />
-                  </div>
-                </div>
-              )}
-
-              {mode !== "forgot" && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="auth-password" className="text-xs font-semibold text-[#191329]">
-                      {mode === "reset_password" ? "New Password" : "Password"}
-                    </Label>
-                    {mode === "signin" && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMode("forgot");
-                          setErrorNote(null);
-                          setSuccessNote(null);
-                        }}
-                        className="text-xs text-[#7C3AED] hover:text-[#6D28D9] font-medium min-h-[44px] inline-flex items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded"
-                      >
-                        Forgot password?
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="relative">
-                    <Lock aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#716A80] pointer-events-none" />
-                    <Input
-                      id="auth-password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                      placeholder="At least 6 characters"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={submitting}
-                      aria-invalid={Boolean(errorNote)}
-                      aria-describedby={errorNote ? "auth-error-note" : undefined}
-                      className="pl-10 pr-12 bg-[#FAF9FF] border-[#E9DDFD] text-[#191329] placeholder:text-[#716A80]/70 h-11 rounded-2xl focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      aria-pressed={showPassword}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#716A80] hover:text-[#191329] transition-colors rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED]"
-                    >
-                      {showPassword ? (
-                        <EyeOff aria-hidden="true" className="h-4 w-4" />
-                      ) : (
-                        <Eye aria-hidden="true" className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Password Strength Meter (for Sign Up and Password Reset) */}
-                  {(mode === "signup" || mode === "reset_password") && password.length > 0 && (
-                    <div className="pt-1 space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-[#716A80]">Password strength:</span>
-                        <span className="font-semibold text-[#7C3AED]">{passwordStrength.label}</span>
-                      </div>
-                      <div className="grid grid-cols-4 gap-1.5 h-1.5">
-                        {[1, 2, 3, 4].map((bar) => (
-                          <div
-                            key={bar}
-                            className="rounded-full transition-all duration-300"
-                            style={{
-                              backgroundColor:
-                                bar <= passwordStrength.score ? passwordStrength.color : "#E9DDFD",
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {(mode === "signup" || mode === "reset_password") && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="auth-confirm-password" className="text-xs font-semibold text-[#191329]">
-                      Confirm Password
-                    </Label>
-                    {passwordsMatch && (
-                      <span className="text-[11px] text-[#7C3AED] font-medium flex items-center gap-1">
-                        <Check className="h-3 w-3" /> Passwords match
-                      </span>
-                    )}
-                    {passwordsMismatch && (
-                      <span className="text-[11px] text-[#C53030] font-medium">
-                        Passwords do not match
-                      </span>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <Lock aria-hidden="true" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#716A80] pointer-events-none" />
-                    <Input
-                      id="auth-confirm-password"
-                      name="confirmPassword"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="new-password"
-                      placeholder="Re-enter password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      disabled={submitting}
-                      aria-invalid={Boolean(errorNote)}
-                      aria-describedby={errorNote ? "auth-error-note" : undefined}
-                      className="pl-10 pr-12 bg-[#FAF9FF] border-[#E9DDFD] text-[#191329] placeholder:text-[#716A80]/70 h-11 rounded-2xl focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
-                      required
-                    />
-                  </div>
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                disabled={submitting || googleBusy}
-                aria-busy={submitting}
-                className="w-full h-11 rounded-2xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-semibold shadow-md shadow-[#7C3AED]/20 active:scale-[0.99] transition-all text-xs"
-              >
-                {submitting ? (
-                  <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin mr-2" />
-                ) : mode === "signin" ? (
-                  "Sign In"
-                ) : mode === "signup" ? (
-                  "Create Account"
-                ) : mode === "forgot" ? (
-                  "Send Reset Link"
-                ) : (
-                  "Update Password"
-                )}
-              </Button>
-            </form>
-          )}
-
-          {mode === "forgot" && (
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signin");
-                setErrorNote(null);
-                setSuccessNote(null);
-              }}
-              className="w-full py-2 min-h-[44px] flex items-center justify-center text-xs text-[#716A80] hover:text-[#191329] font-medium transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-xl"
-            >
-              Back to Sign In
-            </button>
-          )}
-
-          {/* Guest Exploration Escape */}
-          <div className="pt-3 border-t border-[#E9DDFD] text-center">
-            <button
-              type="button"
-              onClick={continueAsGuest}
-              className="min-h-[44px] py-2 px-4 inline-flex items-center justify-center gap-1.5 text-xs text-[#716A80] hover:text-[#7C3AED] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-full hover:bg-[#F3EEFF]"
-            >
-              <Compass aria-hidden="true" className="h-3.5 w-3.5 text-[#7C3AED]" />
-              <span>Explore as Guest &rarr;</span>
-            </button>
           </div>
         </div>
-      </div>
+      </main>
+
+      {/* FOOTER: Minimal copyright & compliance info */}
+      <footer className="w-full px-6 py-3 relative z-10 text-center">
+        <p className="text-[11px] text-[#716A80]/70 dark:text-[#948BA8]/70">
+          MelodyMap &bull; Stream everywhere with zero interruptions
+        </p>
+      </footer>
     </div>
   );
 }

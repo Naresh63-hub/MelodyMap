@@ -166,14 +166,34 @@ export function JamSessionModal({
         {/* VIEW A: NO ACTIVE SESSION (START OR JOIN)                            */}
         {/* ==================================================================== */}
         {!session ? (
-          <div className="mt-3 space-y-4">
+          <div className="mt-2 space-y-4">
+            {/* Screen 15: Signature Circular Pulsing Soundwave Hero */}
+            <div className="flex flex-col items-center justify-center text-center py-3 space-y-2.5">
+              <div className="relative flex items-center justify-center my-2">
+                <div className="h-28 w-28 rounded-full bg-primary/10 animate-ping opacity-25" />
+                <div className="absolute h-24 w-24 rounded-full bg-primary/15 flex items-center justify-center" />
+                <div className="absolute h-18 w-18 rounded-full bg-gradient-to-tr from-[#7C3AED] via-[#9333EA] to-[#E040FB] flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <Music className="h-8 w-8 text-white" />
+                </div>
+              </div>
+
+              <div className="space-y-0.5">
+                <h3 className="text-base font-bold text-foreground tracking-tight font-display">
+                  Jam with your friends in real-time
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                  Create or join a jam session and listen together!
+                </p>
+              </div>
+            </div>
+
             {/* Tab selector */}
             <div className="flex gap-2 p-1 bg-chip rounded-xl border border-hair">
               <button
                 type="button"
                 onClick={() => setEntryTab("create")}
                 className={cn(
-                  "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                  "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
                   entryTab === "create"
                     ? "bg-[#8B5CF6] text-white font-semibold shadow-xs"
                     : "text-secondary-foreground hover:text-foreground",
@@ -186,7 +206,7 @@ export function JamSessionModal({
                 type="button"
                 onClick={() => setEntryTab("join")}
                 className={cn(
-                  "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                  "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
                   entryTab === "join"
                     ? "bg-[#8B5CF6] text-white font-semibold shadow-xs"
                     : "text-secondary-foreground hover:text-foreground",
@@ -266,14 +286,15 @@ export function JamSessionModal({
                   />
                 </div>
 
-                <Button
+                <button
+                  type="button"
                   onClick={() => void handleCreate()}
                   disabled={isConnecting}
-                  className="w-full rounded-xl bg-[#8B5CF6] hover:bg-[#7C3AED] text-white py-2.5 text-xs font-semibold shadow-md active:scale-98 transition-all"
+                  className="mm-btn-gradient flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-sm font-semibold shadow-lg active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  {isConnecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Radio className="h-4 w-4 mr-2" />}
-                  Start Jam Session
-                </Button>
+                  {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Radio className="h-4 w-4" />}
+                  <span>Start Jam Session</span>
+                </button>
               </div>
             ) : (
               <div className="space-y-3.5 pt-1">
@@ -291,14 +312,15 @@ export function JamSessionModal({
                   </p>
                 </div>
 
-                <Button
+                <button
+                  type="button"
                   onClick={() => void handleJoin()}
                   disabled={isConnecting || !joinCode.trim()}
-                  className="w-full rounded-xl bg-[#8B5CF6] hover:bg-[#7C3AED] text-white py-2.5 text-xs font-semibold shadow-md active:scale-98 transition-all"
+                  className="mm-btn-gradient flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-sm font-semibold shadow-lg active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                 >
-                  {isConnecting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Users className="h-4 w-4 mr-2" />}
-                  Join Jam
-                </Button>
+                  {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
+                  <span>Join Jam</span>
+                </button>
               </div>
             )}
           </div>
