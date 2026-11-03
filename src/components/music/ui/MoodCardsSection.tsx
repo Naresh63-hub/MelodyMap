@@ -220,24 +220,29 @@ export function MoodCardsSection({
               type="button"
               onClick={() => handleClick(item)}
               aria-label={`Play ${item.label} vibe`}
+              style={
+                item.gradientColors
+                  ? { background: `linear-gradient(135deg, ${item.gradientColors.join(", ")})` }
+                  : undefined
+              }
               className={cn(
                 "group/mood relative shrink-0 snap-start rounded-2xl border p-3.5 text-left transition-all duration-200 active:scale-[0.97]",
                 "w-[144px] sm:w-[164px] h-[96px] sm:h-[104px] flex flex-col justify-between overflow-hidden",
-                "bg-gradient-to-br shadow-sm",
+                "bg-gradient-to-br",
                 item.gradient,
                 isActive
-                  ? "ring-2 ring-primary/80 border-primary shadow-md shadow-primary/20 scale-[1.01]"
+                  ? "ring-2 ring-[#17112B]/40 border-white shadow-lg scale-[1.01]"
                   : "hover:shadow-md",
               )}
             >
               {/* Header: Label & Icon */}
               <div className="flex items-start justify-between gap-1 z-10">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-sm sm:text-base font-semibold text-white tracking-tight leading-tight line-clamp-1">
+                  <span className="text-sm sm:text-base font-bold text-[#17112B] tracking-tight leading-tight line-clamp-1">
                     {item.label}
                   </span>
                   {isSuggested && !isActive && (
-                    <span className="shrink-0 rounded-full bg-white/20 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider text-white">
+                    <span className="shrink-0 rounded-full bg-white/75 border border-white/80 px-1.5 py-0.5 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider text-[#17112B] shadow-2xs">
                       Now
                     </span>
                   )}
@@ -254,20 +259,20 @@ export function MoodCardsSection({
 
               {/* Footer: Subtitle & Play / Status Button */}
               <div className="flex items-end justify-between gap-2 z-10 mt-auto">
-                <p className="text-[10px] sm:text-[11px] text-white/70 line-clamp-2 leading-tight font-normal">
+                <p className="text-[10px] sm:text-[11px] text-[#51476B] line-clamp-2 leading-tight font-medium">
                   {item.subtitle}
                 </p>
 
                 <div
                   className={cn(
-                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all duration-200 shadow-md",
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all duration-200 shadow-sm",
                     isActive
-                      ? "bg-primary text-primary-foreground scale-100 ring-2 ring-white/20"
-                      : "bg-white/15 text-white backdrop-blur-sm group-hover/mood:bg-primary group-hover/mood:text-primary-foreground group-hover/mood:scale-105",
+                      ? "bg-[#17112B] text-white scale-100 ring-2 ring-white/60 shadow-md"
+                      : "bg-white/90 text-[#17112B] border border-white/80 backdrop-blur-xs group-hover/mood:bg-white group-hover/mood:scale-105 group-hover/mood:shadow-md",
                   )}
                 >
                   {isLoading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-current" />
                   ) : isCurrentPlaying ? (
                     <Pause className="h-3.5 w-3.5 fill-current" />
                   ) : (
@@ -276,12 +281,13 @@ export function MoodCardsSection({
                 </div>
               </div>
 
-              {/* Ambient radial glow effect */}
+              {/* Ambient soft white highlights (no dark overlays) */}
               <div
-                className={cn(
-                  "pointer-events-none absolute -right-6 -bottom-6 h-24 w-24 rounded-full blur-2xl opacity-30 transition-opacity duration-300",
-                  isActive ? "opacity-60 bg-primary" : "group-hover/mood:opacity-50",
-                )}
+                className="pointer-events-none absolute -top-8 -left-8 h-20 w-20 rounded-full bg-white/35 blur-xl"
+                aria-hidden="true"
+              />
+              <div
+                className="pointer-events-none absolute -right-6 -bottom-6 h-20 w-20 rounded-full bg-white/40 blur-xl opacity-75 group-hover/mood:opacity-100 transition-opacity"
                 aria-hidden="true"
               />
             </button>
