@@ -465,39 +465,140 @@ html.light {
   }
 }
 
-/* Floating Music Notes Animation for Now Playing */
-@keyframes mm-float-note {
+/* Full-Screen Now Playing Ambient Animation System */
+
+/* Floating Notes Moving Upward */
+@keyframes mm-note-up {
   0% {
     opacity: 0;
-    transform: translate3d(0, 14px, 0) scale(0.65) rotate(-10deg);
+    transform: translate3d(0, 35px, 0) scale(0.65) rotate(-12deg);
   }
-  20% {
-    opacity: 0.85;
+  15% {
+    opacity: var(--note-max-opacity, 0.75);
   }
-  75% {
-    opacity: 0.7;
+  50% {
+    transform: translate3d(var(--note-drift-mid, 18px), -90px, 0) scale(1.0) rotate(6deg);
+  }
+  85% {
+    opacity: calc(var(--note-max-opacity, 0.75) * 0.85);
   }
   100% {
     opacity: 0;
-    transform: translate3d(var(--note-drift, 14px), -85px, 0) scale(1.15) rotate(14deg);
+    transform: translate3d(var(--note-drift-end, -14px), -210px, 0) scale(1.15) rotate(-8deg);
   }
 }
 
-@utility mm-music-note {
-  animation: mm-float-note var(--note-duration, 4.5s) ease-in-out infinite;
-  animation-delay: var(--note-delay, 0s);
-  will-change: transform, opacity;
+/* Floating Notes Moving Downward / Swaying */
+@keyframes mm-note-down {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -30px, 0) scale(0.7) rotate(10deg);
+  }
+  20% {
+    opacity: var(--note-max-opacity, 0.65);
+  }
+  55% {
+    transform: translate3d(var(--note-drift-mid, -16px), 80px, 0) scale(1.05) rotate(-6deg);
+  }
+  85% {
+    opacity: calc(var(--note-max-opacity, 0.65) * 0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--note-drift-end, 15px), 190px, 0) scale(1.2) rotate(12deg);
+  }
+}
+
+/* Glowing Particle Motion */
+@keyframes mm-particle-float {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.6);
+  }
+  25% {
+    opacity: var(--particle-max-opacity, 0.8);
+    transform: translate3d(var(--p-dx1, 12px), var(--p-dy1, -30px), 0) scale(1.2);
+  }
+  50% {
+    opacity: calc(var(--particle-max-opacity, 0.8) * 0.7);
+    transform: translate3d(var(--p-dx2, -15px), var(--p-dy2, -65px), 0) scale(0.9);
+  }
+  75% {
+    opacity: var(--particle-max-opacity, 0.8);
+    transform: translate3d(var(--p-dx3, 20px), var(--p-dy3, -110px), 0) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--p-dx4, 5px), var(--p-dy4, -160px), 0) scale(0.5);
+  }
+}
+
+/* Soft Ambient Light Waves */
+@keyframes mm-wave-shift-1 {
+  0%, 100% {
+    transform: translate3d(-8%, -6%, 0) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate3d(10%, 8%, 0) scale(1.15);
+    opacity: 0.9;
+  }
+}
+
+@keyframes mm-wave-shift-2 {
+  0%, 100% {
+    transform: translate3d(12%, 10%, 0) scale(1.12);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate3d(-10%, -8%, 0) scale(0.95);
+    opacity: 0.85;
+  }
 }
 
 @keyframes mm-artwork-glow-pulse {
   0%, 100% {
-    transform: scale(0.97);
-    opacity: 0.45;
+    transform: scale(0.96);
+    opacity: 0.42;
   }
   50% {
-    transform: scale(1.05);
-    opacity: 0.82;
+    transform: scale(1.06);
+    opacity: 0.85;
   }
+}
+
+@utility mm-music-note {
+  animation: mm-note-up var(--note-duration, 6.5s) ease-in-out infinite;
+  animation-delay: var(--note-delay, 0s);
+  will-change: transform, opacity;
+}
+
+@utility mm-music-note-up {
+  animation: mm-note-up var(--note-duration, 7s) ease-in-out infinite;
+  animation-delay: var(--note-delay, 0s);
+  will-change: transform, opacity;
+}
+
+@utility mm-music-note-down {
+  animation: mm-note-down var(--note-duration, 8s) ease-in-out infinite;
+  animation-delay: var(--note-delay, 0s);
+  will-change: transform, opacity;
+}
+
+@utility mm-glowing-particle {
+  animation: mm-particle-float var(--particle-duration, 6s) ease-in-out infinite;
+  animation-delay: var(--particle-delay, 0s);
+  will-change: transform, opacity;
+}
+
+@utility mm-wave-1 {
+  animation: mm-wave-shift-1 12s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@utility mm-wave-2 {
+  animation: mm-wave-shift-2 15s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 @utility mm-artwork-pulse {
@@ -507,6 +608,11 @@ html.light {
 
 @media (prefers-reduced-motion: reduce) {
   .mm-music-note,
+  .mm-music-note-up,
+  .mm-music-note-down,
+  .mm-glowing-particle,
+  .mm-wave-1,
+  .mm-wave-2,
   .mm-artwork-pulse {
     animation: none !important;
   }

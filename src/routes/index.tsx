@@ -4391,8 +4391,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   userName={userNameDisplay}
                   userEmail={auth.email}
                   userAvatar={auth.profile?.avatar_url ?? null}
-                  songsPlayedCount={history.length > 0 ? history.length : 128}
-                  listeningHours={Math.max(1, Math.round((history.length * 3.5) / 60)) || 24}
                   onNavigate={setTab}
                   onOpenSettings={() => setShowSettings(true)}
                   onSignIn={() => {

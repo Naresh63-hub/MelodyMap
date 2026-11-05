@@ -9,12 +9,8 @@ import {
   ListMusic,
   LogOut,
   Settings,
-  ShieldCheck,
-  Sparkles,
   User,
-  UserCheck,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { triggerHaptic } from "@/lib/haptics";
 import { MusicWaveBanner } from "./MusicWaveBanner";
 import type { NavTab } from "../layout/Sidebar";
@@ -23,8 +19,6 @@ interface ProfilePanelProps {
   userName?: string | undefined;
   userEmail?: string | null | undefined;
   userAvatar?: string | null | undefined;
-  songsPlayedCount?: number;
-  listeningHours?: number;
   onNavigate: (tab: NavTab) => void;
   onOpenSettings: () => void;
   onSignOut?: () => Promise<void> | void;
@@ -39,10 +33,7 @@ interface ProfilePanelProps {
  */
 export const ProfilePanel = memo(function ProfilePanel({
   userName = "Naresh G",
-  userEmail,
   userAvatar,
-  songsPlayedCount = 128,
-  listeningHours = 24,
   onNavigate,
   onOpenSettings,
   onSignOut,
@@ -125,8 +116,8 @@ export const ProfilePanel = memo(function ProfilePanel({
           <button
             type="button"
             onClick={onOpenSettings}
-            aria-label="Edit Profile"
-            className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full bg-[#7C3AED] text-white shadow-md hover:bg-[#6D28D9] transition-transform active:scale-95"
+            aria-label="Edit Profile Photo"
+            className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full bg-[#7C3AED] text-white shadow-md hover:bg-[#6D28D9] transition-transform active:scale-95 cursor-pointer"
           >
             <Camera className="h-4 w-4" />
           </button>
@@ -141,40 +132,20 @@ export const ProfilePanel = memo(function ProfilePanel({
             <span>·</span>
             <span>{isCloudAuth ? "Cloud Synced" : "Local Device"}</span>
           </div>
-        </div>
-      </div>
 
-      {/* Your Stats Card */}
-      <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">
-        <div className="flex items-center justify-between mb-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          <span>Your Stats</span>
-          <Sparkles className="h-3.5 w-3.5 text-[#7C3AED]" />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 divide-x divide-border">
-          <div className="text-center px-2">
-            <p className="text-2xl sm:text-3xl font-bold text-foreground font-display">
-              {songsPlayedCount}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">Songs</p>
+          {/* Edit Profile Action Button placed cleanly below account status */}
+          <div className="mt-3.5 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic("selection");
+                onOpenSettings();
+              }}
+              className="inline-flex items-center justify-center gap-1.5 px-5 py-2 min-h-[38px] rounded-full text-xs font-semibold text-primary bg-card hover:bg-surface-hover border border-primary/25 hover:border-primary/50 shadow-xs hover:shadow-sm transition-all active:scale-95 cursor-pointer"
+            >
+              <span>Edit Profile</span>
+            </button>
           </div>
-          <div className="text-center px-2">
-            <p className="text-2xl sm:text-3xl font-bold text-foreground font-display">
-              {listeningHours}h
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">Listening</p>
-          </div>
-        </div>
-
-        {/* Screen 18: Edit Profile Action Button */}
-        <div className="pt-3 mt-3 border-t border-border flex justify-center">
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[38px] rounded-full text-xs font-semibold text-primary border border-primary/30 hover:bg-primary/10 transition-colors active:scale-95 cursor-pointer"
-          >
-            <span>Edit Profile</span>
-          </button>
         </div>
       </div>
 
@@ -221,13 +192,13 @@ export const ProfilePanel = memo(function ProfilePanel({
         )}
       </div>
 
-      {/* Version badge matching Screen 11 */}
+      {/* Version badge */}
       <div className="flex items-center justify-center gap-2 pt-4 text-xs text-muted-foreground relative z-10">
         <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4 w-4 rounded-md object-contain" />
         <span>Version 1.0.9</span>
       </div>
 
-      {/* Screen 18: Bottom Signature Flowing Wave Ribbon */}
+      {/* Bottom Signature Flowing Wave Ribbon */}
       <MusicWaveBanner variant="bottom" />
     </div>
   );

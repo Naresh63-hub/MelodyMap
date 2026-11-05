@@ -80,13 +80,78 @@ type Props = {
 
 const SPEEDS = [1, 1.25, 1.5, 2];
 
-const FLOATING_NOTES = [
-  { symbol: "♪", left: "8%", bottom: "18%", delay: "0s", duration: "4.2s", size: "text-base", color: "text-[#8B5CF6]/70 dark:text-[#A78BFA]/70", drift: "-16px" },
-  { symbol: "♫", left: "20%", bottom: "36%", delay: "1.4s", duration: "5.0s", size: "text-xl", color: "text-[#A78BFA]/80 dark:text-[#C4B5FD]/80", drift: "14px" },
-  { symbol: "♬", right: "10%", bottom: "22%", delay: "0.7s", duration: "4.6s", size: "text-lg", color: "text-[#C4B5FD]/75 dark:text-[#DDD6FE]/75", drift: "18px" },
-  { symbol: "♪", right: "22%", bottom: "40%", delay: "2.1s", duration: "5.4s", size: "text-sm", color: "text-[#8B5CF6]/60 dark:text-[#A855F7]/70", drift: "-12px" },
-  { symbol: "♩", left: "5%", bottom: "54%", delay: "2.8s", duration: "4.8s", size: "text-base", color: "text-[#A78BFA]/65 dark:text-[#C4B5FD]/65", drift: "10px" },
-  { symbol: "♫", right: "7%", bottom: "60%", delay: "3.5s", duration: "4.4s", size: "text-xl", color: "text-[#8B5CF6]/75 dark:text-[#A78BFA]/80", drift: "-15px" },
+type FloatingNote = {
+  symbol: string;
+  left?: string;
+  right?: string;
+  top?: string;
+  bottom?: string;
+  direction: "up" | "down";
+  delay: string;
+  duration: string;
+  size: string;
+  color: string;
+  driftMid: string;
+  driftEnd: string;
+  maxOpacity?: string;
+};
+
+// Full-Screen Floating Musical Notes across all screen zones (Header, Artwork, Title, Controls, Toolbar)
+const FULL_SCREEN_NOTES: FloatingNote[] = [
+  // Top Zone (Header / Upper Screen)
+  { symbol: "♪", left: "8%", top: "7%", direction: "up", delay: "0s", duration: "6.5s", size: "text-sm sm:text-base", color: "text-[#8B5CF6]/70 dark:text-[#A78BFA]/70", driftMid: "14px", driftEnd: "-18px", maxOpacity: "0.7" },
+  { symbol: "♫", right: "10%", top: "10%", direction: "down", delay: "1.2s", duration: "7.2s", size: "text-base sm:text-lg", color: "text-[#A78BFA]/75 dark:text-[#C4B5FD]/75", driftMid: "-16px", driftEnd: "20px", maxOpacity: "0.75" },
+  { symbol: "♬", left: "25%", top: "15%", direction: "up", delay: "2.5s", duration: "6.8s", size: "text-xs sm:text-sm", color: "text-[#C4B5FD]/70 dark:text-[#DDD6FE]/70", driftMid: "-12px", driftEnd: "15px", maxOpacity: "0.65" },
+  { symbol: "♩", right: "22%", top: "18%", direction: "up", delay: "3.7s", duration: "7.5s", size: "text-sm", color: "text-[#8B5CF6]/65 dark:text-[#A855F7]/70", driftMid: "16px", driftEnd: "-12px", maxOpacity: "0.7" },
+
+  // Mid-Upper Zone (Artwork sides)
+  { symbol: "♫", left: "5%", top: "33%", direction: "up", delay: "0.8s", duration: "7.0s", size: "text-lg sm:text-xl", color: "text-[#8B5CF6]/80 dark:text-[#A78BFA]/85", driftMid: "-18px", driftEnd: "22px", maxOpacity: "0.8" },
+  { symbol: "♬", right: "6%", top: "36%", direction: "down", delay: "1.8s", duration: "8.0s", size: "text-xl sm:text-2xl", color: "text-[#A78BFA]/85 dark:text-[#C4B5FD]/85", driftMid: "22px", driftEnd: "-18px", maxOpacity: "0.8" },
+  { symbol: "♪", left: "14%", top: "45%", direction: "up", delay: "3.0s", duration: "6.6s", size: "text-sm sm:text-base", color: "text-[#C4B5FD]/70 dark:text-[#DDD6FE]/75", driftMid: "15px", driftEnd: "-20px", maxOpacity: "0.65" },
+  { symbol: "♫", right: "12%", top: "48%", direction: "up", delay: "4.2s", duration: "7.4s", size: "text-base sm:text-lg", color: "text-[#8B5CF6]/75 dark:text-[#A855F7]/80", driftMid: "-14px", driftEnd: "16px", maxOpacity: "0.75" },
+
+  // Lower-Mid Zone (Title / ScrubBar)
+  { symbol: "♩", left: "7%", top: "62%", direction: "down", delay: "0.5s", duration: "7.8s", size: "text-sm", color: "text-[#A78BFA]/70 dark:text-[#C4B5FD]/70", driftMid: "16px", driftEnd: "-14px", maxOpacity: "0.65" },
+  { symbol: "♪", right: "8%", top: "65%", direction: "up", delay: "2.1s", duration: "6.7s", size: "text-base sm:text-lg", color: "text-[#8B5CF6]/75 dark:text-[#A78BFA]/75", driftMid: "-15px", driftEnd: "18px", maxOpacity: "0.75" },
+  { symbol: "♫", left: "22%", top: "72%", direction: "up", delay: "3.4s", duration: "7.2s", size: "text-lg sm:text-xl", color: "text-[#C4B5FD]/75 dark:text-[#DDD6FE]/80", driftMid: "18px", driftEnd: "-16px", maxOpacity: "0.75" },
+
+  // Bottom Zone (Controls & Toolbar)
+  { symbol: "♬", right: "18%", top: "79%", direction: "up", delay: "1.0s", duration: "6.9s", size: "text-sm sm:text-base", color: "text-[#8B5CF6]/70 dark:text-[#A855F7]/75", driftMid: "-14px", driftEnd: "16px", maxOpacity: "0.7" },
+  { symbol: "♪", left: "10%", top: "86%", direction: "up", delay: "2.6s", duration: "6.4s", size: "text-base sm:text-lg", color: "text-[#A78BFA]/75 dark:text-[#C4B5FD]/75", driftMid: "16px", driftEnd: "-15px", maxOpacity: "0.75" },
+  { symbol: "♫", right: "7%", top: "89%", direction: "up", delay: "3.8s", duration: "7.1s", size: "text-sm sm:text-base", color: "text-[#8B5CF6]/70 dark:text-[#A78BFA]/70", driftMid: "-12px", driftEnd: "14px", maxOpacity: "0.7" },
+  { symbol: "♩", left: "45%", top: "93%", direction: "up", delay: "4.8s", duration: "7.6s", size: "text-xs sm:text-sm", color: "text-[#C4B5FD]/65 dark:text-[#DDD6FE]/65", driftMid: "10px", driftEnd: "-10px", maxOpacity: "0.6" },
+];
+
+type GlowingParticle = {
+  left: string;
+  top: string;
+  size: number;
+  delay: string;
+  duration: string;
+  opacity: string;
+  dx1: string;
+  dy1: string;
+  dx2: string;
+  dy2: string;
+  dx3: string;
+  dy3: string;
+  dx4: string;
+  dy4: string;
+};
+
+// Glowing particles spread across the entire screen
+const GLOWING_PARTICLES: GlowingParticle[] = [
+  { left: "12%", top: "11%", size: 4, delay: "0s", duration: "5.8s", opacity: "0.85", dx1: "12px", dy1: "-25px", dx2: "-14px", dy2: "-55px", dx3: "18px", dy3: "-90px", dx4: "6px", dy4: "-130px" },
+  { left: "84%", top: "15%", size: 5, delay: "1.4s", duration: "6.6s", opacity: "0.8", dx1: "-15px", dy1: "-30px", dx2: "16px", dy2: "-65px", dx3: "-14px", dy3: "-105px", dx4: "-4px", dy4: "-145px" },
+  { left: "26%", top: "27%", size: 3, delay: "2.8s", duration: "6.2s", opacity: "0.75", dx1: "14px", dy1: "-28px", dx2: "-10px", dy2: "-60px", dx3: "15px", dy3: "-95px", dx4: "8px", dy4: "-135px" },
+  { left: "74%", top: "33%", size: 4, delay: "0.7s", duration: "7.0s", opacity: "0.85", dx1: "-12px", dy1: "-32px", dx2: "14px", dy2: "-70px", dx3: "-16px", dy3: "-110px", dx4: "5px", dy4: "-150px" },
+  { left: "8%", top: "46%", size: 5, delay: "2.0s", duration: "6.4s", opacity: "0.8", dx1: "16px", dy1: "-26px", dx2: "-15px", dy2: "-58px", dx3: "18px", dy3: "-92px", dx4: "10px", dy4: "-132px" },
+  { left: "91%", top: "52%", size: 3, delay: "3.5s", duration: "5.9s", opacity: "0.7", dx1: "-14px", dy1: "-24px", dx2: "12px", dy2: "-52px", dx3: "-15px", dy3: "-85px", dx4: "-6px", dy4: "-125px" },
+  { left: "18%", top: "66%", size: 4, delay: "1.1s", duration: "6.8s", opacity: "0.85", dx1: "15px", dy1: "-30px", dx2: "-12px", dy2: "-65px", dx3: "16px", dy3: "-100px", dx4: "8px", dy4: "-140px" },
+  { left: "82%", top: "71%", size: 5, delay: "2.5s", duration: "6.5s", opacity: "0.8", dx1: "-16px", dy1: "-28px", dx2: "15px", dy2: "-62px", dx3: "-12px", dy3: "-98px", dx4: "-5px", dy4: "-138px" },
+  { left: "32%", top: "82%", size: 3, delay: "0.3s", duration: "6.0s", opacity: "0.75", dx1: "10px", dy1: "-22px", dx2: "-14px", dy2: "-50px", dx3: "12px", dy3: "-82px", dx4: "4px", dy4: "-120px" },
+  { left: "68%", top: "86%", size: 4, delay: "1.9s", duration: "6.7s", opacity: "0.85", dx1: "-14px", dy1: "-32px", dx2: "16px", dy2: "-68px", dx3: "-14px", dy3: "-106px", dx4: "6px", dy4: "-148px" },
+  { left: "48%", top: "91%", size: 4, delay: "3.1s", duration: "6.3s", opacity: "0.8", dx1: "12px", dy1: "-25px", dx2: "-16px", dy2: "-56px", dx3: "14px", dy3: "-90px", dx4: "7px", dy4: "-130px" },
 ];
 
 export function FullScreenPlayer({
@@ -252,16 +317,96 @@ export function FullScreenPlayer({
           : "transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease",
       }}
     >
-      {/* Soft ambient background art glow */}
+      {/* 1. Ambient blurred background artwork */}
       <div
         className="absolute inset-0 bg-cover bg-center blur-3xl opacity-15 dark:opacity-20 scale-125 transition-all duration-700 pointer-events-none"
         style={{
           backgroundImage: `url(${track.thumbnail})`,
         }}
       />
+      {/* 2. Theme background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-[#FAF8FF]/85 via-[#FAF8FF]/95 to-[#FAF8FF] dark:from-[#0b0813]/70 dark:via-[#0b0813]/90 dark:to-[#0b0813] pointer-events-none transition-colors duration-200" />
 
-      {/* Main Container */}
+      {/* 3. Full-Screen Continuous Ambient Music Animation Layer (Behind all UI) */}
+      <div
+        className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0"
+        aria-hidden="true"
+      >
+        {/* Soft Animated Light Wave 1 (Top-Left) */}
+        <div
+          className="absolute -top-[25%] -left-[20%] w-[140%] h-[80%] rounded-full blur-3xl pointer-events-none mm-wave-1 transition-opacity duration-1000"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(139, 92, 246, 0.16) 0%, rgba(196, 181, 253, 0.08) 50%, transparent 75%)",
+            animationPlayState: isPlaying ? "running" : "paused",
+            opacity: isPlaying ? 1 : 0.45,
+          }}
+        />
+        {/* Soft Animated Light Wave 2 (Bottom-Right) */}
+        <div
+          className="absolute -bottom-[20%] -right-[15%] w-[130%] h-[75%] rounded-full blur-3xl pointer-events-none mm-wave-2 transition-opacity duration-1000"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(167, 139, 250, 0.14) 0%, rgba(221, 214, 254, 0.06) 55%, transparent 75%)",
+            animationPlayState: isPlaying ? "running" : "paused",
+            opacity: isPlaying ? 1 : 0.45,
+          }}
+        />
+
+        {/* Small Glowing Particles Drifting Across Entire Viewport */}
+        {GLOWING_PARTICLES.map((particle, idx) => (
+          <span
+            key={`particle-${idx}`}
+            className="absolute rounded-full bg-[#8B5CF6] dark:bg-[#A78BFA] mm-glowing-particle"
+            style={{
+              left: particle.left,
+              top: particle.top,
+              width: `${particle.size}px`,
+              height: `${particle.size}px`,
+              boxShadow: "0 0 10px rgba(139, 92, 246, 0.75), 0 0 4px rgba(167, 139, 250, 0.9)",
+              animationPlayState: isPlaying ? "running" : "paused",
+              "--particle-delay": particle.delay,
+              "--particle-duration": particle.duration,
+              "--particle-max-opacity": particle.opacity,
+              "--p-dx1": particle.dx1,
+              "--p-dy1": particle.dy1,
+              "--p-dx2": particle.dx2,
+              "--p-dy2": particle.dy2,
+              "--p-dx3": particle.dx3,
+              "--p-dy3": particle.dy3,
+              "--p-dx4": particle.dx4,
+              "--p-dy4": particle.dy4,
+            } as React.CSSProperties}
+          />
+        ))}
+
+        {/* Full-Screen Floating Musical Notes (♪ ♫ ♬ ♩) across Header, Artwork, Title, Controls, Toolbar */}
+        {FULL_SCREEN_NOTES.map((note, idx) => (
+          <span
+            key={`note-${idx}`}
+            className={cn(
+              "absolute font-serif select-none pointer-events-none mm-music-note",
+              note.direction === "up" ? "mm-music-note-up" : "mm-music-note-down",
+              note.size,
+              note.color
+            )}
+            style={{
+              left: note.left,
+              right: note.right,
+              top: note.top,
+              bottom: note.bottom,
+              animationPlayState: isPlaying ? "running" : "paused",
+              "--note-delay": note.delay,
+              "--note-duration": note.duration,
+              "--note-drift-mid": note.driftMid,
+              "--note-drift-end": note.driftEnd,
+              "--note-max-opacity": note.maxOpacity,
+            } as React.CSSProperties}
+          >
+            {note.symbol}
+          </span>
+        ))}
+      </div>
+
+      {/* 4. Main Foreground UI Container (relative z-10) */}
       <div className="relative z-10 flex h-full w-full max-w-md flex-col justify-between px-6 py-5 pb-[calc(var(--mm-inset-bottom)+18px)] pt-[calc(var(--mm-inset-top)+14px)]">
         {/* Top Header */}
         <div className="flex w-full items-center justify-between">
@@ -295,46 +440,18 @@ export function FullScreenPlayer({
 
         {/* Center Area: Artwork OR Live Lyrics */}
         <div className="flex flex-col items-center justify-center my-auto w-full py-4 relative">
-          {/* Pulsing Ambient Glow Aura */}
+          {/* Subtle Animated Pulsing Glow Around Artwork */}
           <div
             className={cn(
               "absolute w-72 sm:w-88 h-72 sm:h-88 rounded-full blur-3xl pointer-events-none -z-0 transition-all duration-700",
               isPlaying && "mm-artwork-pulse"
             )}
             style={{
-              background: artworkTheme.ambientGlow,
-              opacity: isPlaying ? 0.75 : 0.4,
+              background: artworkTheme.ambientGlow || "radial-gradient(circle, rgba(139, 92, 246, 0.4) 0%, transparent 70%)",
+              opacity: isPlaying ? 0.75 : 0.35,
               animationPlayState: isPlaying ? "running" : "paused",
             }}
           />
-
-          {/* Floating Musical Notes Animation (♪ ♫ ♬) */}
-          <div
-            className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0"
-            aria-hidden="true"
-          >
-            {FLOATING_NOTES.map((note, idx) => (
-              <span
-                key={idx}
-                className={cn(
-                  "absolute font-serif select-none mm-music-note",
-                  note.size,
-                  note.color
-                )}
-                style={{
-                  left: note.left,
-                  right: note.right,
-                  bottom: note.bottom,
-                  animationPlayState: isPlaying ? "running" : "paused",
-                  "--note-delay": note.delay,
-                  "--note-duration": note.duration,
-                  "--note-drift": note.drift,
-                } as React.CSSProperties}
-              >
-                {note.symbol}
-              </span>
-            ))}
-          </div>
 
           {!showLiveLyrics ? (
             <div
@@ -683,7 +800,7 @@ export function FullScreenPlayer({
             </button>
           </div>
 
-          {/* Bottom Toolbar Row: Evenly distributed Speed, EQ, Timer, Help, Queue (Mini-player and duplicate lyrics removed) */}
+          {/* Bottom Toolbar Row: Evenly distributed Speed, EQ, Timer, Help, Queue */}
           <div className="flex items-center justify-between pt-3 border-t border-[#E5DDF5] dark:border-hair text-[#746A85] dark:text-muted-foreground">
             {/* Speed Badge */}
             <button

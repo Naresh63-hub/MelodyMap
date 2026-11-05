@@ -47,7 +47,7 @@ describe("FullScreenPlayer (Now Playing Screen)", () => {
     expect(html).toContain("dark:text-white");
   });
 
-  it("renders animated music symbols (♪ ♫ ♬) and pulsing aura synchronized with playback state", () => {
+  it("renders animated music symbols (♪ ♫ ♬), glowing particles, and ambient waves across the full screen", () => {
     const htmlPlaying = renderToStaticMarkup(
       React.createElement(FullScreenPlayer, {
         track: sampleTrack,
@@ -68,13 +68,23 @@ describe("FullScreenPlayer (Now Playing Screen)", () => {
       })
     );
 
-    // Notes ♪, ♫, ♬ are present
+    // Notes ♪, ♫, ♬, ♩ are present across the full-screen layers
     expect(htmlPlaying).toContain("♪");
     expect(htmlPlaying).toContain("♫");
     expect(htmlPlaying).toContain("♬");
+    expect(htmlPlaying).toContain("♩");
     expect(htmlPlaying).toContain("mm-music-note");
-    expect(htmlPlaying).toContain("animation-play-state:running");
+    expect(htmlPlaying).toContain("mm-music-note-up");
+    expect(htmlPlaying).toContain("mm-music-note-down");
+
+    // Glowing particles and ambient light waves
+    expect(htmlPlaying).toContain("mm-glowing-particle");
+    expect(htmlPlaying).toContain("mm-wave-1");
+    expect(htmlPlaying).toContain("mm-wave-2");
     expect(htmlPlaying).toContain("mm-artwork-pulse");
+
+    // Running animation play-state when playing
+    expect(htmlPlaying).toContain("animation-play-state:running");
 
     const htmlPaused = renderToStaticMarkup(
       React.createElement(FullScreenPlayer, {
@@ -96,6 +106,7 @@ describe("FullScreenPlayer (Now Playing Screen)", () => {
       })
     );
 
+    // Paused animation play-state when paused
     expect(htmlPaused).toContain("animation-play-state:paused");
     expect(htmlPaused).not.toContain("mm-artwork-pulse");
   });
