@@ -95,6 +95,8 @@ export async function searchAudius(
             artwork,
             provider: "audius",
             providerTrackId: String(t.id),
+            releaseDate: t.release_date || undefined,
+            playCount: typeof (t as any).play_count === "number" ? (t as any).play_count : undefined,
             playable: true,
             playbackSource: {
               provider: "audius",

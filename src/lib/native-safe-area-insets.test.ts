@@ -56,6 +56,7 @@ describe("Android edge-to-edge safe-area insets", () => {
       "src/components/music/layout/MobileNav.tsx",
       "src/components/music/layout/MiniPlayer.tsx",
       "src/components/music/ui/FullScreenPlayer.tsx",
+      "src/components/music/ui/LyricsPanel.tsx",
     ];
     for (const file of surfaces) {
       expect(read(file)).not.toContain("env(safe-area-inset");

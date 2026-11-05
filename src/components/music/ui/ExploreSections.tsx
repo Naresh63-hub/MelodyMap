@@ -1,5 +1,5 @@
-import { Disc3, Flame, Heart, Loader2, MoreHorizontal, MoreVertical, Music2, Pause, Play, TrendingUp } from "lucide-react";
-import { useRef, useState } from "react";
+import { Calendar, Disc3, Flame, Loader2, MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, TrendingUp, Trophy } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/library";
@@ -8,10 +8,13 @@ import { DownloadThumbnailOverlay, DownloadStatusBadge } from "@/components/musi
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { trackSubtitle, getTrackDisplayDuration } from "@/lib/track-metadata";
 
+export type ExploreTabId = "all" | "trending" | "releases" | "popular";
+
 type Props = {
   trending: Track[];
   oldSongs?: Track[] | undefined;
   newReleases: Track[];
+  popular?: Track[] | undefined;
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
   onOpenOptions?: ((track: Track) => void) | undefined;
   onToggleLike?: ((track: Track) => void) | undefined;
@@ -26,6 +29,68 @@ type Props = {
   loadingMoreTrending?: boolean;
   exploreExhaustedTrending?: boolean;
 };
+
+/**
+ * Format real numerical play count into human-readable metric (e.g. 27.2M plays, 375K plays)
+ */
+export function formatPlayCount(count?: number): string | undefined {
+  if (!count || count <= 0) return undefined;
+  if (count >= 1_000_000_000) {
+    return `${(count / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B plays`;
+  }
+  if (count >= 1_000_000) {
+    return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, "")}M plays`;
+  }
+  if (count >= 1_000) {
+    return `${(count / 1_000).toFixed(1).replace(/\.0$/, "")}K plays`;
+  }
+  return `${count} plays`;
+}
+
+/**
+ * Parse real release-date metadata into timestamp for accurate descending sort (newest first).
+ */
+export function getTrackReleaseTimestamp(track: Track): number {
+  if (track.releaseDate) {
+    const parsed = Date.parse(track.releaseDate);
+    if (!isNaN(parsed)) return parsed;
+    // Format DD-MM-YYYY
+    const parts = track.releaseDate.split("-");
+    if (parts.length === 3 && parts[0]?.length === 2 && parts[2]?.length === 4) {
+      const reversed = Date.parse(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      if (!isNaN(reversed)) return reversed;
+    }
+  }
+  if (track.year) {
+    const y = parseInt(String(track.year).trim(), 10);
+    if (!isNaN(y) && y > 1900 && y < 2100) {
+      return new Date(y, 0, 1).getTime();
+    }
+  }
+  return 0;
+}
+
+/**
+ * Robust track deduplication helper avoiding duplicate songs across feeds.
+ */
+export function dedupeTracks(tracks: Track[], excludeKeys?: Set<string>): Track[] {
+  const seen = new Set<string>(excludeKeys ?? []);
+  const result: Track[] = [];
+  for (const track of tracks) {
+    if (!track?.id) continue;
+    const idKey = track.id.toLowerCase();
+    const titleKey = `${(track.title || "").trim().toLowerCase()}:::${(track.artist || "").trim().toLowerCase()}`;
+    const canonicalKey = track.canonicalTrackId?.toLowerCase();
+    if (seen.has(idKey) || seen.has(titleKey) || (canonicalKey && seen.has(canonicalKey))) {
+      continue;
+    }
+    seen.add(idKey);
+    seen.add(titleKey);
+    if (canonicalKey) seen.add(canonicalKey);
+    result.push(track);
+  }
+  return result;
+}
 
 /** Horizontal scrollable row of JioSaavn-styled track cards */
 function HorizontalScrollRow({
@@ -88,7 +153,7 @@ function HorizontalScrollRow({
                   </div>
                 )}
 
-                {/* JioSaavn Dark Gradient Hover/Playing Overlay */}
+                {/* Dark Gradient Hover/Playing Overlay */}
                 <div
                   className={cn(
                     "absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-black/30 transition-opacity duration-200",
@@ -119,7 +184,7 @@ function HorizontalScrollRow({
                 )}
               </button>
 
-              {/* Bottom-Left Heart Button (Inside Artwork Overlay) */}
+              {/* Bottom-Left Heart Button */}
               {onToggleLike && (
                 <div
                   className={cn(
@@ -136,7 +201,7 @@ function HorizontalScrollRow({
                 </div>
               )}
 
-              {/* Bottom-Right 3-Dots Options Menu (Inside Artwork Overlay) */}
+              {/* Bottom-Right 3-Dots Options Menu */}
               {onOpenOptions && (
                 <div className="absolute bottom-1.5 right-1.5 z-10 opacity-0 group-hover/card:opacity-100 transition-opacity duration-150">
                   <button
@@ -179,7 +244,7 @@ function HorizontalScrollRow({
   );
 }
 
-/** Vertical song list row for Trending Songs */
+/** Vertical song list row for Explore views */
 function VerticalSongList({
   tracks,
   currentId,
@@ -191,6 +256,7 @@ function VerticalSongList({
   downloadedIds,
   downloadingIds,
   downloadProgress,
+  badgeType,
 }: {
   tracks: Track[];
   currentId?: string | null | undefined;
@@ -202,12 +268,16 @@ function VerticalSongList({
   downloadedIds?: Set<string> | undefined;
   downloadingIds?: Set<string> | undefined;
   downloadProgress?: Record<string, number> | undefined;
+  badgeType?: "playCount" | "releaseDate" | undefined;
 }) {
   return (
     <div className="space-y-1">
       {tracks.map((track, i) => {
         const active = currentId === track.id;
         const liked = likedIds?.has(track.id) ?? false;
+        const playCountLabel = formatPlayCount(track.playCount);
+        const releaseLabel = track.releaseDate || track.year;
+
         return (
           <div
             key={track.id}
@@ -256,8 +326,19 @@ function VerticalSongList({
               </p>
             </button>
 
-            {/* Song duration time & like button matching reference image */}
+            {/* Song metrics (play count / release date) + duration + like */}
             <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              {badgeType === "playCount" && playCountLabel && (
+                <span className="hidden sm:inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  {playCountLabel}
+                </span>
+              )}
+              {badgeType === "releaseDate" && releaseLabel && (
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-chip text-muted-foreground border border-hair">
+                  <Calendar className="w-3 h-3 text-muted-foreground/70" />
+                  {releaseLabel}
+                </span>
+              )}
               <DownloadStatusBadge
                 isDownloading={Boolean(downloadingIds?.has(track.id))}
                 isDownloaded={Boolean(downloadedIds?.has(track.id))}
@@ -297,9 +378,10 @@ function SectionHeader({
   title,
   icon: Icon,
   subtitle,
+  count,
 }: {
   title: string;
-  icon?: typeof TrendingUp | typeof Flame | typeof Disc3;
+  icon?: typeof TrendingUp | typeof Flame | typeof Disc3 | typeof Trophy | typeof Sparkles;
   subtitle?: string;
   count?: number;
 }) {
@@ -308,6 +390,9 @@ function SectionHeader({
       <div className="flex items-center gap-2">
         {Icon && <Icon className="h-4 w-4 text-primary" />}
         <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
+        {typeof count === "number" && (
+          <span className="text-xs text-muted-foreground font-medium">({count})</span>
+        )}
       </div>
       {subtitle && (
         <span className="text-[11px] font-normal text-muted-foreground">
@@ -318,17 +403,27 @@ function SectionHeader({
   );
 }
 
+function EmptyTabState({ message, hint }: { message: string; hint: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-2xl bg-card/40 border border-hair my-4">
+      <Music2 className="h-10 w-10 text-muted-foreground/40 mb-3 stroke-[1.5]" />
+      <p className="text-sm font-semibold text-foreground">{message}</p>
+      <p className="text-xs text-muted-foreground mt-1 max-w-sm">{hint}</p>
+    </div>
+  );
+}
+
 /**
- * JioSaavn Explore Feed:
- * STRICTLY contains ONLY:
- * 1. New Releases (fresh official JioSaavn releases)
- * 2. Old Songs (Golden Era & Retro classics)
- * 3. Trending Songs (top charts in user's language)
+ * MelodyMap Explore Feed:
+ * 1. Functional Tabs: All, Trending, New Releases, Popular
+ * 2. Genres section completely removed without dead space
+ * 3. Genuine metrics: Release date sorting (newest first) & play count popularity ranking
  */
 export function ExploreSections({
   trending,
   oldSongs,
   newReleases,
+  popular,
   onPlayTrack,
   onOpenOptions,
   onToggleLike,
@@ -343,6 +438,68 @@ export function ExploreSections({
   loadingMoreTrending = false,
   exploreExhaustedTrending = false,
 }: Props) {
+  const [activeFilter, setActiveFilter] = useState<ExploreTabId>("all");
+
+  // 1. Trending tracks (genuine provider chart order & verified popularity)
+  const trendingTracks = useMemo(() => {
+    return dedupeTracks(trending);
+  }, [trending]);
+
+  // 2. New Releases sorted by actual release date metadata (newest first)
+  const sortedNewReleases = useMemo(() => {
+    const pool = dedupeTracks(newReleases);
+    return [...pool].sort((a, b) => {
+      const timeA = getTrackReleaseTimestamp(a);
+      const timeB = getTrackReleaseTimestamp(b);
+      return timeB - timeA;
+    });
+  }, [newReleases]);
+
+  // 3. Popular tracks sorted genuinely by available play counts or provider popularity
+  const sortedPopular = useMemo(() => {
+    if (popular && popular.length > 0) {
+      return dedupeTracks(popular);
+    }
+    // Combine available feeds to aggregate all real tracks with play count data
+    const pool = dedupeTracks([...trending, ...newReleases, ...(oldSongs || [])]);
+    return [...pool].sort((a, b) => {
+      const playsA = a.playCount ?? 0;
+      const playsB = b.playCount ?? 0;
+      if (playsB !== playsA) {
+        return playsB - playsA;
+      }
+      return 0;
+    });
+  }, [popular, trending, newReleases, oldSongs]);
+
+  // 4. "All" tab deduplication: strictly combine trending, new releases, and popular without duplicate songs
+  const { allTrending, allNewReleases, allPopular, allOldSongs } = useMemo(() => {
+    const seenKeys = new Set<string>();
+
+    const recordSeen = (t: Track) => {
+      seenKeys.add(t.id.toLowerCase());
+      if (t.canonicalTrackId) seenKeys.add(t.canonicalTrackId.toLowerCase());
+      seenKeys.add(`${(t.title || "").trim().toLowerCase()}:::${(t.artist || "").trim().toLowerCase()}`);
+    };
+
+    // Primary: Trending Section
+    const allTrending = trendingTracks.slice(0, 15);
+    allTrending.forEach(recordSeen);
+
+    // Secondary: New Releases (excluding any tracks already present in Trending)
+    const allNewReleases = dedupeTracks(sortedNewReleases, seenKeys);
+    allNewReleases.forEach(recordSeen);
+
+    // Tertiary: Popular Hits (excluding tracks already in Trending or New Releases)
+    const allPopular = dedupeTracks(sortedPopular, seenKeys);
+    allPopular.forEach(recordSeen);
+
+    // Quaternary: Old Songs Classics (excluding already seen)
+    const allOldSongs = dedupeTracks(oldSongs || [], seenKeys);
+
+    return { allTrending, allNewReleases, allPopular, allOldSongs };
+  }, [trendingTracks, sortedNewReleases, sortedPopular, oldSongs]);
+
   if (loading) {
     return (
       <div className="space-y-6 pt-2">
@@ -364,18 +521,9 @@ export function ExploreSections({
     );
   }
 
-  const [activeFilter, setActiveFilter] = useState<"all" | "trending" | "releases" | "popular">("all");
-
-  const genres = [
-    { id: "pop", label: "Pop", icon: Heart, bg: "from-[#EC4899] to-[#F43F5E]" },
-    { id: "rock", label: "Rock", icon: Music2, bg: "from-[#2563EB] to-[#38BDF8]" },
-    { id: "hiphop", label: "Hip-Hop", icon: Flame, bg: "from-[#FF8A35] to-[#EA580C]" },
-    { id: "edm", label: "EDM", icon: Disc3, bg: "from-[#7C3AED] to-[#A855F7]" },
-  ];
-
   return (
     <div className="space-y-6 pt-1 animate-fade-in pb-12">
-      {/* Filter Pills matching Screen 5 in reference images */}
+      {/* 4 Functional Filter Pills: All, Trending, New Releases, Popular */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide pt-1">
         {[
           { id: "all" as const, label: "All" },
@@ -399,123 +547,273 @@ export function ExploreSections({
         ))}
       </div>
 
-      {/* Genres Grid matching Screen 5 in reference images */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between px-0.5">
-          <h2 className="text-base font-semibold tracking-tight text-foreground">Genres</h2>
-          <span className="text-xs text-primary font-medium hover:underline cursor-pointer">See all &gt;</span>
-        </div>
-
-        <div className="grid grid-cols-4 gap-3">
-          {genres.map((g) => {
-            const Icon = g.icon;
-            return (
-              <button
-                key={g.id}
-                type="button"
-                className="flex flex-col items-center gap-2 group cursor-pointer"
-              >
-                <div
-                  className={cn(
-                    "h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gradient-to-br flex items-center justify-center text-white shadow-md shadow-purple-900/15 group-hover:scale-105 active:scale-95 transition-transform",
-                    g.bg
+      {/* TAB 1: ALL — Curated combination of trending, new releases, and popular hits with zero duplicates */}
+      {activeFilter === "all" && (
+        <div className="space-y-6">
+          {/* Trending Section */}
+          {allTrending.length > 0 && (
+            <section>
+              <SectionHeader
+                title="Trending Songs"
+                count={allTrending.length}
+                icon={TrendingUp}
+                subtitle="Top charts in your language"
+              />
+              <VerticalSongList
+                tracks={allTrending}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onOpenOptions={onOpenOptions}
+                onToggleLike={onToggleLike}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+              />
+              {onLoadMoreTrending && (
+                <div className="flex flex-col items-center justify-center pt-4 pb-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onLoadMoreTrending}
+                    disabled={loadingMoreTrending || exploreExhaustedTrending}
+                    className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
+                  >
+                    {loadingMoreTrending ? (
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
+                    ) : null}
+                    {exploreExhaustedTrending ? "All caught up" : "Explore more songs"}
+                  </Button>
+                  {exploreExhaustedTrending && (
+                    <p className="text-[11px] text-muted-foreground">You've explored all currently available trending songs.</p>
                   )}
-                >
-                  <Icon className="h-6 w-6 stroke-[2.2]" />
                 </div>
-                <span className="text-xs font-medium text-foreground">{g.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+              )}
+            </section>
+          )}
 
-      {/* 1. Trending Songs (Promoted to Top for Instant Access) */}
-      {trending.length > 0 && (
-        <section>
+          {/* New Releases Section */}
+          {allNewReleases.length > 0 && (
+            <section>
+              <SectionHeader
+                title="New Releases"
+                count={allNewReleases.length}
+                icon={Flame}
+                subtitle="Fresh official drops"
+              />
+              <HorizontalScrollRow
+                tracks={allNewReleases}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onToggleLike={onToggleLike}
+                onOpenOptions={onOpenOptions}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+              />
+            </section>
+          )}
+
+          {/* Popular Hits Section */}
+          {allPopular.length > 0 && (
+            <section>
+              <SectionHeader
+                title="Popular Hits"
+                count={allPopular.length}
+                icon={Trophy}
+                subtitle="Most played across charts"
+              />
+              <HorizontalScrollRow
+                tracks={allPopular}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onToggleLike={onToggleLike}
+                onOpenOptions={onOpenOptions}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+              />
+            </section>
+          )}
+
+          {/* Old Songs / Golden Era */}
+          {allOldSongs.length > 0 && (
+            <section>
+              <SectionHeader
+                title="Old Songs"
+                count={allOldSongs.length}
+                icon={Disc3}
+                subtitle="2000s Hits & Nostalgia"
+              />
+              <HorizontalScrollRow
+                tracks={allOldSongs}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onToggleLike={onToggleLike}
+                onOpenOptions={onOpenOptions}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+              />
+            </section>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: TRENDING — Real provider trending charts */}
+      {activeFilter === "trending" && (
+        <section className="space-y-4">
           <SectionHeader
             title="Trending Songs"
-            count={trending.length}
+            count={trendingTracks.length}
             icon={TrendingUp}
             subtitle="Top charts in your language"
           />
-          <VerticalSongList
-            tracks={trending}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onOpenOptions={onOpenOptions}
-            onToggleLike={onToggleLike}
-            likedIds={likedIds}
-            downloadedIds={downloadedIds}
-            downloadingIds={downloadingIds}
-            downloadProgress={downloadProgress}
-          />
-          {onLoadMoreTrending && (
-            <div className="flex flex-col items-center justify-center pt-4 pb-2 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onLoadMoreTrending}
-                disabled={loadingMoreTrending || exploreExhaustedTrending}
-                className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
-              >
-                {loadingMoreTrending ? (
-                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
-                ) : null}
-                {exploreExhaustedTrending ? "All caught up" : "Explore more songs"}
-              </Button>
-              {exploreExhaustedTrending && (
-                <p className="text-[11px] text-muted-foreground">You've explored all currently available trending songs.</p>
+          {trendingTracks.length > 0 ? (
+            <>
+              <VerticalSongList
+                tracks={trendingTracks}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onOpenOptions={onOpenOptions}
+                onToggleLike={onToggleLike}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+              />
+              {onLoadMoreTrending && (
+                <div className="flex flex-col items-center justify-center pt-4 pb-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onLoadMoreTrending}
+                    disabled={loadingMoreTrending || exploreExhaustedTrending}
+                    className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
+                  >
+                    {loadingMoreTrending ? (
+                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
+                    ) : null}
+                    {exploreExhaustedTrending ? "All caught up" : "Explore more songs"}
+                  </Button>
+                  {exploreExhaustedTrending && (
+                    <p className="text-[11px] text-muted-foreground">You've explored all currently available trending songs.</p>
+                  )}
+                </div>
               )}
-            </div>
+            </>
+          ) : (
+            <EmptyTabState
+              message="No trending songs found"
+              hint="Try refreshing the Explore feed or selecting additional languages in Settings."
+            />
           )}
         </section>
       )}
 
-      {/* 2. New Releases */}
-      {newReleases.length > 0 && (
-        <section>
+      {/* TAB 3: NEW RELEASES — Sorted by actual release date (newest first) */}
+      {activeFilter === "releases" && (
+        <section className="space-y-4">
           <SectionHeader
             title="New Releases"
+            count={sortedNewReleases.length}
             icon={Flame}
-            subtitle="Fresh official drops"
+            subtitle="Sorted by actual release date (newest first)"
           />
-          <HorizontalScrollRow
-            tracks={newReleases}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onToggleLike={onToggleLike}
-            onOpenOptions={onOpenOptions}
-            likedIds={likedIds}
-            downloadedIds={downloadedIds}
-            downloadingIds={downloadingIds}
-            downloadProgress={downloadProgress}
-          />
+          {sortedNewReleases.length > 0 ? (
+            <div className="space-y-4">
+              {/* Spotlight row of top fresh drops */}
+              <HorizontalScrollRow
+                tracks={sortedNewReleases.slice(0, 10)}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onToggleLike={onToggleLike}
+                onOpenOptions={onOpenOptions}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+              />
+
+              {/* Full vertical list with release date badge */}
+              <VerticalSongList
+                tracks={sortedNewReleases}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onOpenOptions={onOpenOptions}
+                onToggleLike={onToggleLike}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+                badgeType="releaseDate"
+              />
+            </div>
+          ) : (
+            <EmptyTabState
+              message="No new releases available"
+              hint="Check back soon for fresh music drops and album releases."
+            />
+          )}
         </section>
       )}
 
-      {/* 3. Old Songs / Golden Era */}
-      {oldSongs && oldSongs.length > 0 && (
-        <section>
+      {/* TAB 4: POPULAR — Sorted genuinely by play counts and streaming popularity */}
+      {activeFilter === "popular" && (
+        <section className="space-y-4">
           <SectionHeader
-            title="Old Songs"
-            icon={Disc3}
-            subtitle="2000s Hits & Nostalgia"
+            title="Most Popular"
+            count={sortedPopular.length}
+            icon={Trophy}
+            subtitle="Ranked by play counts and chart popularity"
           />
-          <HorizontalScrollRow
-            tracks={oldSongs}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onToggleLike={onToggleLike}
-            onOpenOptions={onOpenOptions}
-            likedIds={likedIds}
-            downloadedIds={downloadedIds}
-            downloadingIds={downloadingIds}
-            downloadProgress={downloadProgress}
-          />
+          {sortedPopular.length > 0 ? (
+            <div className="space-y-4">
+              {/* Spotlight row of top most popular songs */}
+              <HorizontalScrollRow
+                tracks={sortedPopular.slice(0, 10)}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onToggleLike={onToggleLike}
+                onOpenOptions={onOpenOptions}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+              />
+
+              {/* Full vertical list with verified play count badge */}
+              <VerticalSongList
+                tracks={sortedPopular}
+                currentId={currentId}
+                isPlaying={isPlaying}
+                onPlayTrack={onPlayTrack}
+                onOpenOptions={onOpenOptions}
+                onToggleLike={onToggleLike}
+                likedIds={likedIds}
+                downloadedIds={downloadedIds}
+                downloadingIds={downloadingIds}
+                downloadProgress={downloadProgress}
+                badgeType="playCount"
+              />
+            </div>
+          ) : (
+            <EmptyTabState
+              message="No popular songs available"
+              hint="Try exploring trending charts or refreshing your languages."
+            />
+          )}
         </section>
       )}
     </div>

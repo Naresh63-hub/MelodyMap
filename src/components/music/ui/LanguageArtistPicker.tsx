@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 
 import { LANGUAGES, SUGGESTED_ARTISTS, calculateLanguageWeights, type RecSettings, type Track } from "@/lib/library";
 import { languagePicks } from "@/lib/music.functions";
+import { areSameTrack } from "@/lib/track-dedup";
 import { HorizontalScroll } from "./HorizontalScroll";
 import { MediaCard } from "./MediaCard";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,84 @@ type Props = {
   actionLabel?: string;
   onAction?: () => void;
 };
+
+/**
+ * Deduplicates preview tracks before updating state.
+ * Prefers unique track ID; falls back to normalized title + artist.
+ * Normalizes case and whitespace; does not remove different songs with same title but different artist.
+ */
+export function deduplicateTracks(tracks: Track[]): Track[] {
+  const seenIds = new Set<string>();
+  const seenKeys = new Set<string>();
+  const out: Track[] = [];
+
+  for (const track of tracks) {
+    if (!track) continue;
+    const id = track.id?.trim();
+    if (id && seenIds.has(id)) {
+      continue;
+    }
+
+    const normTitle = (track.title || "")
+      .toLowerCase()
+      .replace(/[‘'’`]/g, "'")
+      .replace(/[()[\]{}]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const normArtist = (track.artist || "")
+      .toLowerCase()
+      .replace(/[‘'’`]/g, "'")
+      .replace(/[()[\]{}]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const key = `${normTitle}:::${normArtist}`;
+
+    if (key !== ":::" && seenKeys.has(key)) {
+      continue;
+    }
+
+    // Check if an existing track represents the same song:
+    // Never remove songs that have different artists, even if titles match.
+    const isSameSong = out.some((existing) => {
+      const exTitle = (existing.title || "")
+        .toLowerCase()
+        .replace(/[‘'’`]/g, "'")
+        .replace(/[()[\]{}]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      const exArtist = (existing.artist || "")
+        .toLowerCase()
+        .replace(/[‘'’`]/g, "'")
+        .replace(/[()[\]{}]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const existingTokens = new Set(exArtist.split(/\s+/).filter(Boolean));
+      const hasArtistOverlap = normArtist
+        .split(/\s+/)
+        .filter(Boolean)
+        .some((token) => existingTokens.has(token));
+
+      if (exTitle === normTitle) {
+        return hasArtistOverlap;
+      }
+
+      return hasArtistOverlap && areSameTrack(existing, track);
+    });
+
+    if (isSameSong) {
+      continue;
+    }
+
+    if (id) seenIds.add(id);
+    if (key !== ":::") seenKeys.add(key);
+    out.push(track);
+  }
+
+  return out;
+}
 
 /** Reusable language + artist/singer picker used on login and in settings. */
 export function LanguageArtistPicker({
@@ -42,13 +121,14 @@ export function LanguageArtistPicker({
     const timer = setTimeout(async () => {
       setLoading(true);
       const res = await runLanguagePicks({
-        data: { languages, artists, count: 8 },
+        data: { languages, artists, count: 16 },
       });
       if (!res.error && res.tracks) {
-        setPreview(res.tracks as Track[]);
+        const unique = deduplicateTracks(res.tracks as Track[]);
+        setPreview(unique.slice(0, 8));
       }
       setLoading(false);
-    }, 1000); // debounce API calls
+    }, 600); // debounce API calls
     return () => clearTimeout(timer);
   }, [languages, artists, runLanguagePicks]);
 
@@ -206,25 +286,25 @@ export function LanguageArtistPicker({
               }
             }}
             placeholder="Add an artist or singer…"
-            className="h-8 min-w-0 flex-1 rounded-full border border-hair-strong bg-chip px-3 text-xs text-foreground placeholder:text-foreground/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
+            className="h-9 sm:h-8 min-w-0 flex-1 rounded-xl sm:rounded-full border border-hair-strong bg-chip px-3 text-xs text-foreground placeholder:text-foreground/30 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
           />
           <button
             type="button"
             onClick={() => addArtist(artistDraft)}
             aria-label="Add artist"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-hair-strong bg-chip text-foreground/60 transition-colors hover:border-purple-500/40 hover:text-foreground button-press"
+            className="flex h-9 w-9 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl sm:rounded-full border border-hair-strong bg-chip text-foreground/60 transition-colors hover:border-purple-500/40 hover:text-foreground button-press active:scale-95 cursor-pointer"
           >
             <Plus className="h-4 w-4" />
           </button>
         </div>
         {suggested.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             {suggested.slice(0, 12).map((a) => (
               <button
                 key={a}
                 type="button"
                 onClick={() => addArtist(a)}
-                className="rounded-full border border-hair bg-chip-subtle px-2.5 py-0.5 text-[11px] text-foreground/40 transition-colors hover:border-purple-500/30 hover:text-foreground/80"
+                className="rounded-full border border-hair bg-chip-subtle px-3 py-1 sm:px-2.5 sm:py-0.5 text-xs sm:text-[11px] text-foreground/50 transition-colors hover:border-purple-500/30 hover:text-foreground active:scale-95 cursor-pointer"
               >
                 + {a}
               </button>
@@ -235,20 +315,20 @@ export function LanguageArtistPicker({
 
       {/* Preview Section */}
       {(languages.length > 0 || artists.length > 0) && (
-        <div className="mt-6 border-t border-hair-strong pt-4">
-          <p className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <div className="mt-5 border-t border-hair-strong pt-4">
+          <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {loading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
             ) : (
-              <Music2 className="h-3.5 w-3.5" />
+              <Music2 className="h-3.5 w-3.5 text-primary" />
             )}
             Preview Songs
           </p>
           {preview.length > 0 ? (
             <HorizontalScroll>
-              <div className="flex gap-3 pb-4">
-                {preview.map((track) => (
-                  <div key={track.id} className="w-32 shrink-0">
+              <div className="flex gap-3 pb-3">
+                {preview.map((track, idx) => (
+                  <div key={track.id || `${track.title}-${track.artist}-${idx}`} className="w-28 sm:w-32 shrink-0">
                     <MediaCard
                       title={track.title}
                       subtitle={track.artist}

@@ -107,7 +107,7 @@ export const ProfilePanel = memo(function ProfilePanel({
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8 space-y-6 pb-28 max-w-2xl mx-auto w-full animate-fade-in relative">
+    <div className="flex-1 overflow-y-auto px-3.5 py-5 sm:px-6 lg:px-8 space-y-5 sm:space-y-6 pb-28 max-w-2xl mx-auto w-full animate-fade-in relative">
       {/* User Hero Section */}
       <div className="flex flex-col items-center text-center space-y-3 pt-2">
         <div className="relative group shrink-0">
@@ -171,7 +171,7 @@ export const ProfilePanel = memo(function ProfilePanel({
           <button
             type="button"
             onClick={onOpenSettings}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold text-primary border border-primary/30 hover:bg-primary/10 transition-colors active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[38px] rounded-full text-xs font-semibold text-primary border border-primary/30 hover:bg-primary/10 transition-colors active:scale-95 cursor-pointer"
           >
             <span>Edit Profile</span>
           </button>

@@ -12,7 +12,8 @@ export type TelemetryEventType =
   | "LIKED"
   | "DISLIKED"
   | "REPLAYED"
-  | "ADDED_TO_LIBRARY";
+  | "ADDED_TO_LIBRARY"
+  | "DOWNLOADED";
 
 export interface PlaybackTelemetryEvent {
   id: string; // unique event id
@@ -44,6 +45,7 @@ export interface TelemetryRewardConfig {
   disliked: number;
   replayed: number;
   addedToLibrary: number;
+  downloaded: number;
 }
 
 export const DEFAULT_REWARD_CONFIG: TelemetryRewardConfig = {
@@ -59,6 +61,7 @@ export const DEFAULT_REWARD_CONFIG: TelemetryRewardConfig = {
   disliked: -2.5,
   replayed: 1.5,
   addedToLibrary: 1.8,
+  downloaded: 2.0,
 };
 
 /**
@@ -89,6 +92,9 @@ export function calculateTelemetryReward(
 
     case "ADDED_TO_LIBRARY":
       return config.addedToLibrary;
+
+    case "DOWNLOADED":
+      return config.downloaded;
 
     case "PLAY_85_PERCENT":
       return config.milestone85p;

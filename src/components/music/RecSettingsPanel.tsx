@@ -39,7 +39,7 @@ export function RecSettingsPanel({
     });
 
   return (
-    <section className="rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
+    <section className="rounded-2xl border border-border bg-card/95 p-3.5 sm:p-5 shadow-xs">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Tune your picks</h2>
@@ -128,8 +128,8 @@ export function RecSettingsPanel({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Discovery & Energy
             </p>
-            <div className="flex items-center gap-3">
-              <span className="w-28 shrink-0 text-xs text-muted-foreground">Familiar → Deep</span>
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <span className="w-24 sm:w-28 shrink-0 text-xs text-muted-foreground">Familiar → Deep</span>
               <Slider
                 value={[settings.discovery]}
                 max={100}
@@ -142,8 +142,8 @@ export function RecSettingsPanel({
                 {settings.discovery}%
               </span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="w-28 shrink-0 text-xs text-muted-foreground">Calm → Energetic</span>
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <span className="w-24 sm:w-28 shrink-0 text-xs text-muted-foreground">Calm → Energetic</span>
               <Slider
                 value={[settings.energy]}
                 max={100}
@@ -213,7 +213,7 @@ export function RecSettingsPanel({
         </div>
       </div>
 
-      <Button className="mt-5 w-full rounded-full font-semibold" onClick={onApply} disabled={loading}>
+      <Button className="mt-5 w-full rounded-full font-semibold min-h-[44px]" onClick={onApply} disabled={loading}>
         {loading ? "Refreshing…" : "Apply & refresh For you"}
       </Button>
     </section>

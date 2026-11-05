@@ -16,6 +16,8 @@ export type Track = {
   source?: "youtube" | "deezer" | "audius" | "jamendo" | "archive" | "podcast" | "multi" | undefined;
   album?: string | undefined;
   year?: string | undefined;
+  releaseDate?: string | undefined;
+  playCount?: number | undefined;
   canonicalTrackId?: string | undefined;
   provider?: string | undefined;
   providerTrackId?: string | undefined;
@@ -891,22 +893,50 @@ export function replayMix(stats: Stats, limit = 30): Track[] {
     .map((s) => cleanTrackDisplayMetadata(s.track));
 }
 
-/** Artists you actually listen to, ranked by plays then likes. */
-export function topArtists(stats: Stats, likes: Track[], limit = 12): string[] {
+/** Artists you actually listen to, ranked by plays, downloads, then likes with diversity saturation. */
+export function topArtists(stats: Stats, likes: Track[], limit = 12, downloads?: Track[]): string[] {
   const score = new Map<string, number>();
+  const displayMap = new Map<string, string>();
+
   for (const s of Object.values(stats)) {
-    const artist = s.track.artist;
+    const artist = s.track?.artist;
     if (!artist) continue;
-    score.set(artist, (score.get(artist) ?? 0) + s.plays + s.completions * 2 - s.skips);
+    const normA = artist.toLowerCase().trim();
+    if (!displayMap.has(normA)) displayMap.set(normA, artist);
+    score.set(normA, (score.get(normA) ?? 0) + s.plays + s.completions * 2 - s.skips);
   }
+
+  // Cap like influence per artist so one artist with 15 likes doesn't monopolize the top artist pool
+  const likeCountPerArtist = new Map<string, number>();
   for (const t of likes) {
-    if (t.artist) score.set(t.artist, (score.get(t.artist) ?? 0) + 3);
+    if (!t.artist) continue;
+    const normA = t.artist.toLowerCase().trim();
+    if (!displayMap.has(normA)) displayMap.set(normA, t.artist);
+    const count = likeCountPerArtist.get(normA) || 0;
+    if (count < 3) {
+      likeCountPerArtist.set(normA, count + 1);
+      score.set(normA, (score.get(normA) ?? 0) + 2.5);
+    }
   }
+
+  // Downloads indicate explicit user commitment: give positive weight
+  const downloadCountPerArtist = new Map<string, number>();
+  for (const t of downloads || []) {
+    if (!t.artist) continue;
+    const normA = t.artist.toLowerCase().trim();
+    if (!displayMap.has(normA)) displayMap.set(normA, t.artist);
+    const count = downloadCountPerArtist.get(normA) || 0;
+    if (count < 3) {
+      downloadCountPerArtist.set(normA, count + 1);
+      score.set(normA, (score.get(normA) ?? 0) + 3.0);
+    }
+  }
+
   return [...score.entries()]
     .filter(([, v]) => v > 0)
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map(([artist]) => artist);
+    .map(([normA]) => displayMap.get(normA) || normA);
 }
 
 /** Songs you keep skipping — a strong negative signal for the next picks. */

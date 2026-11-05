@@ -1,4 +1,5 @@
 import type { TrackLike } from "./track-dedup";
+import { normalizeArtistAlias, areSameTrack } from "./track-dedup";
 import { safeStorage } from "./safe-storage";
 import {
   detectTrackEnergy,
@@ -24,6 +25,15 @@ export interface SessionContext {
   familiarArtists?: Set<string> | undefined;
   activeMood?: string | null | undefined;
   transitionAffinity?: number | ((from?: string, to?: string) => number) | undefined;
+  downloadedTracks?: TrackLike[] | undefined;
+  downloadedIds?: Set<string> | ReadonlySet<string> | undefined;
+  likedTracks?: TrackLike[] | undefined;
+  likedIds?: Set<string> | ReadonlySet<string> | undefined;
+  dislikedTracks?: TrackLike[] | undefined;
+  dislikedIds?: Set<string> | ReadonlySet<string> | undefined;
+  penalizedArtists?: Set<string> | string[] | undefined;
+  preferredLanguages?: string[] | undefined;
+  primaryLanguage?: string | undefined;
 }
 
 export interface BanditModelState {
@@ -175,6 +185,7 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
   private mu: number[]; // Estimated feature parameter mean
   private totalUpdates = 0;
   private lastUpdated = Date.now();
+  private trainedEventIds = new Set<string>();
 
   constructor() {
     this.B = Array.from({ length: this.dimension }, (_, i) =>
@@ -249,48 +260,99 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
       x[2] = 0.5; // neutral when no current track
     }
 
-    // x3: Artist historical affinity derived from raw behavior
-    const artist = (candidate.artist || "").toLowerCase().trim();
-    if (artist && context.stats) {
+    // x3: User Taste & Artist historical affinity derived from behavior, likes, downloads & penalties
+    const rawArtist = (candidate.artist || "").trim();
+    const normArtist = normalizeArtistAlias(rawArtist);
+    const candidateId = candidate.id || "";
+
+    // Check strict dislike penalty
+    const isDisliked = context.dislikedIds?.has(candidateId) ||
+      (context.dislikedTracks && context.dislikedTracks.some((d) => areSameTrack(d, candidate)));
+    const isPenalized = context.penalizedArtists && (
+      context.penalizedArtists instanceof Set
+        ? context.penalizedArtists.has(normArtist) || context.penalizedArtists.has(rawArtist.toLowerCase())
+        : Array.isArray(context.penalizedArtists) && context.penalizedArtists.some((p) => normalizeArtistAlias(p) === normArtist)
+    );
+
+    if (isDisliked || isPenalized) {
+      x[3] = 0.02; // Severely penalized: strong negative preference
+    } else {
+      // Check liked and downloaded status for artist affinity boost
+      const isLikedArtist = context.likedTracks
+        ? context.likedTracks.some((l) => normalizeArtistAlias(l.artist) === normArtist)
+        : false;
+      const isDownloadedArtist = context.downloadedTracks
+        ? context.downloadedTracks.some((d) => normalizeArtistAlias(d.artist) === normArtist)
+        : false;
+
       let totalPlays = 0;
       let completions = 0;
       let skips = 0;
+      let replays = 0;
 
-      for (const item of Object.values(context.stats)) {
-        const itemArtist = (item.track?.artist || "").toLowerCase().trim();
-        if (itemArtist === artist) {
-          totalPlays += item.plays || 0;
-          completions += item.completions || 0;
-          skips += item.skips || 0;
+      if (context.stats) {
+        for (const item of Object.values(context.stats)) {
+          const itemNormArtist = normalizeArtistAlias(item.track?.artist);
+          if (itemNormArtist === normArtist) {
+            const ply = item.plays || 0;
+            const comp = item.completions || 0;
+            const skp = item.skips || 0;
+            totalPlays += ply;
+            completions += comp;
+            skips += skp;
+            // A replay is a repeated completed or successful play, never an early skip
+            const successfulPlays = Math.max(comp, Math.max(0, ply - skp));
+            if (successfulPlays > 1) {
+              replays += (successfulPlays - 1);
+            }
+          }
         }
       }
 
-      // Raw behavioral ratio: completions / (totalPlays + skips + 1)
       if (totalPlays > 0 || skips > 0) {
-        const ratio = (completions * 1.5) / (totalPlays + skips + 1);
-        x[3] = Math.max(0.0, Math.min(1.0, ratio));
+        // Behavioral affinity incorporating completions, replays, likes, downloads and skips
+        const positiveMass = completions * 1.5 + replays * 2.0 + (isLikedArtist ? 1.0 : 0) + (isDownloadedArtist ? 1.5 : 0);
+        const negativeMass = totalPlays + skips * 2.0 + 1;
+        const ratio = positiveMass / negativeMass;
+        // If the artist has repeated skips and zero completions, damp ratio heavily
+        const skipDampening = (skips >= 2 && completions === 0) ? Math.max(0.01, 1.0 / (skips + 1)) : 1.0;
+        x[3] = Math.max(0.0, Math.min(1.0, ratio * skipDampening));
+      } else if (isDownloadedArtist) {
+        x[3] = 0.75; // Downloaded artist prior: strong positive
+      } else if (isLikedArtist) {
+        x[3] = 0.70; // Liked artist prior: strong positive
       } else {
-        x[3] = 0.3; // neutral prior for unplayed artist
+        x[3] = 0.35; // Neutral unplayed prior
       }
-    } else {
-      x[3] = 0.3;
     }
 
     // x4: Discovery / Novelty preference
     const discoveryRatio = (context.discoveryPercent ?? 40) / 100;
     const isFamiliar = context.familiarArtists
-      ? context.familiarArtists.has(artist)
-      : (x[3] ?? 0) > 0.4;
+      ? context.familiarArtists.has(normArtist) || context.familiarArtists.has(rawArtist.toLowerCase())
+      : (x[3] ?? 0) > 0.45;
     // If user wants high discovery (ratio -> 1), unfamiliar artists get higher x4;
     // If user wants low discovery (ratio -> 0), familiar artists get higher x4
     const noveltyVal = isFamiliar ? 0.0 : 1.0;
     x[4] = Math.max(0.0, Math.min(1.0, noveltyVal * discoveryRatio + (1.0 - noveltyVal) * (1.0 - discoveryRatio)));
 
-    // x5: Session state / momentum (recent completions ratio in session)
+    // x5: Session state, momentum & language coherence
     const sessionComp = context.sessionCompletions ?? 0;
     const sessionSkips = context.sessionSkips ?? 0;
     const totalSessionActions = sessionComp + sessionSkips;
-    x[5] = totalSessionActions > 0 ? sessionComp / (totalSessionActions + 1) : 0.5;
+    const momentum = totalSessionActions > 0 ? sessionComp / (totalSessionActions + 1) : 0.5;
+
+    // Check language coherence if preferred languages are present
+    let langCoherence = 1.0;
+    if (context.preferredLanguages && context.preferredLanguages.length > 0) {
+      const candidateLang = ((candidate as any).language || (candidate as any).languageCode || "").toLowerCase().trim();
+      if (candidateLang) {
+        const matches = context.preferredLanguages.some((pl) => pl.toLowerCase().trim() === candidateLang);
+        langCoherence = matches ? 1.0 : 0.25;
+      }
+    }
+
+    x[5] = Math.max(0.0, Math.min(1.0, 0.7 * momentum + 0.3 * langCoherence));
 
     return x;
   }
@@ -347,11 +409,45 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
 
   /**
    * Online Bayesian update given a playback telemetry event.
+   * Ensures deliberate terminal actions update the model and prevents
+   * duplicate events from training multiple times.
    */
   public recordFeedback(event: PlaybackTelemetryEvent, context?: SessionContext): void {
+    if (!event || !event.eventType) return;
+
+    // Prevent duplicate event training
+    if (event.id) {
+      if (this.trainedEventIds.has(event.id)) {
+        return;
+      }
+      this.trainedEventIds.add(event.id);
+      if (this.trainedEventIds.size > 1000) {
+        // Evict oldest entries
+        const iterator = this.trainedEventIds.values();
+        for (let i = 0; i < 200; i++) {
+          const val = iterator.next().value;
+          if (val) this.trainedEventIds.delete(val);
+        }
+      }
+    }
+
+    // Progress milestones are telemetry observation points; only terminal/deliberate actions update LinTS
+    const terminalEventTypes = new Set([
+      "COMPLETED",
+      "SKIPPED",
+      "LIKED",
+      "DISLIKED",
+      "REPLAYED",
+      "ADDED_TO_LIBRARY",
+      "DOWNLOADED",
+    ]);
+    if (!terminalEventTypes.has(event.eventType)) {
+      return;
+    }
+
     const reward = calculateTelemetryReward(event);
-    if (reward === 0.0 && event.eventType === "PLAY_START") {
-      return; // Neutral baseline
+    if (reward === 0.0) {
+      return;
     }
 
     const dummyTrack: TrackLike = {

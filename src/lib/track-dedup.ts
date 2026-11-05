@@ -104,35 +104,194 @@ function durationSec(d: string | number | undefined): number {
 
 // ─── Identity & Multi-Factor Similarity ──────────────────────────
 
+const KNOWN_PROVIDERS = ["saavn", "yt", "youtube", "audius", "jamendo", "podcast"] as const;
+
+/**
+ * Extracts canonical provider + pure track ID (e.g. "saavn:123", "yt:abc").
+ * Normalizes repeated prefixes ("saavn:saavn:123" -> "saavn:123").
+ */
+export function getCanonicalTrackId(trackOrId: TrackLike | string, source?: string): string {
+  const rawId = typeof trackOrId === "string" ? trackOrId : trackOrId.id;
+  if (!rawId || typeof rawId !== "string") return "";
+  const rawSource = typeof trackOrId !== "string" ? trackOrId.source : source;
+  let current = rawId.trim();
+  let provider: string | undefined;
+
+  while (true) {
+    const colonIdx = current.indexOf(":");
+    if (colonIdx === -1) break;
+    const prefix = current.slice(0, colonIdx).toLowerCase();
+    const rest = current.slice(colonIdx + 1);
+    if ((KNOWN_PROVIDERS as readonly string[]).includes(prefix)) {
+      provider = prefix === "youtube" ? "yt" : prefix;
+      current = rest;
+    } else {
+      break;
+    }
+  }
+
+  if (!provider && rawSource) {
+    const s = rawSource.toLowerCase().trim();
+    provider = s === "youtube" ? "yt" : s;
+  }
+
+  return provider ? `${provider}:${current}` : current;
+}
+
+export type TrackVersion =
+  | "original"
+  | "remix"
+  | "acoustic"
+  | "live"
+  | "cover"
+  | "reprise"
+  | "instrumental"
+  | "karaoke"
+  | "slowed"
+  | "female"
+  | "male";
+
+/**
+ * Extracts musical version signature from track title to prevent different
+ * recordings, remixes, covers, acoustics, and live versions from merging.
+ */
+export function extractTrackVersion(title: string): TrackVersion {
+  const t = (title || "").toLowerCase();
+  if (/\b(remix|remixed|dj\s*remix|club\s*mix|edm\s*mix|party\s*mix|dance\s*remix)\b/i.test(t)) return "remix";
+  if (/\b(acoustic|unplugged)\b/i.test(t)) return "acoustic";
+  if (/\b(live|concert|live\s*version)\b/i.test(t)) return "live";
+  if (/\b(cover|covered\s*by)\b/i.test(t)) return "cover";
+  if (/\b(reprise)\b/i.test(t)) return "reprise";
+  if (/\b(instrumental|karaoke|backing\s*track)\b/i.test(t)) return "instrumental";
+  if (/\b(slowed|reverb|lofi|lo-fi)\b/i.test(t)) return "slowed";
+  if (/\b(female\s*version|female\s*vocals?)\b/i.test(t)) return "female";
+  if (/\b(male\s*version|male\s*vocals?)\b/i.test(t)) return "male";
+  return "original";
+}
+
+const ARTIST_ALIASES: Record<string, string> = {
+  dsp: "devi sri prasad",
+  "devi sri prasad": "devi sri prasad",
+  "a r rahman": "ar rahman",
+  "ar rahman": "ar rahman",
+  arrahman: "ar rahman",
+  rahman: "ar rahman",
+  spb: "sp balasubrahmanyam",
+  "sp balasubrahmanyam": "sp balasubrahmanyam",
+  "s p balasubrahmanyam": "sp balasubrahmanyam",
+  "ks chithra": "ks chithra",
+  "k s chithra": "ks chithra",
+  chithra: "ks chithra",
+  "p susheela": "p susheela",
+  "s janaki": "s janaki",
+  "kj yesudas": "kj yesudas",
+  "k j yesudas": "kj yesudas",
+  yesudas: "kj yesudas",
+  "shreya ghoshal": "shreya ghoshal",
+  "shreya ghosal": "shreya ghoshal",
+  "harris jayaraj": "harris jayaraj",
+  "harris jayraj": "harris jayaraj",
+  "gv prakash kumar": "gv prakash kumar",
+  "g v prakash kumar": "gv prakash kumar",
+  "gv prakash": "gv prakash kumar",
+  "mm keeravaani": "mm keeravaani",
+  "m m keeravaani": "mm keeravaani",
+  "mm keeravani": "mm keeravaani",
+  "m m keeravani": "mm keeravaani",
+  keeravani: "mm keeravaani",
+  maragathamani: "mm keeravaani",
+  "yuvan shankar raja": "yuvan shankar raja",
+  yuvan: "yuvan shankar raja",
+  ilaiyaraaja: "ilaiyaraaja",
+  ilaiyaraja: "ilaiyaraaja",
+  ilayaraja: "ilaiyaraaja",
+  ilayaraaja: "ilaiyaraaja",
+  "anirudh ravichander": "anirudh ravichander",
+  anirudh: "anirudh ravichander",
+  "thaman s": "thaman s",
+  "s thaman": "thaman s",
+  "ss thaman": "thaman s",
+  thaman: "thaman s",
+  "sid sriram": "sid sriram",
+  "s sriram": "sid sriram",
+  "arijit singh": "arijit singh",
+  arijit: "arijit singh",
+  "yo yo honey singh": "honey singh",
+  "honey singh": "honey singh",
+  "guru randhawa": "guru randhawa",
+  "the weeknd": "the weeknd",
+  weeknd: "the weeknd",
+};
+
+/**
+ * Normalizes artist name, resolving well-known aliases to canonical identities.
+ */
+export function normalizeArtistAlias(rawArtist?: string | null | undefined): string {
+  if (!rawArtist) return "";
+  const primary = extractPrimaryArtist(rawArtist);
+  const n = norm(primary);
+  return ARTIST_ALIASES[n] || n;
+}
+
 /**
  * Stable identity string for a track.
+ * Priority:
+ * 1. Canonical track ID from music provider.
+ * 2. Normalized title + primary artist + version + duration bucket fallback.
  */
 export function getTrackIdentity(track: TrackLike): string {
-  if (track.source && track.id) {
-    return `${track.source}:${track.id}`;
+  const canonId = getCanonicalTrackId(track);
+  if (canonId) {
+    return `canon:${canonId}`;
   }
-  return `meta:${norm(track.title)}|${norm(track.artist)}`;
+  const cleanTitle = cleanSongTitle(track.title) || track.title;
+  const version = extractTrackVersion(track.title);
+  const durSec = durationSec(track.duration);
+  const durBucket = durSec > 0 ? Math.round(durSec / 10) * 10 : 0;
+  return `meta:${norm(cleanTitle)}|${normalizeArtistAlias(track.artist)}|${version}|${durBucket}`;
 }
 
 /**
  * Multi-factor similarity score between two tracks (0.0 to 1.0).
- * Weighted across Title (40%), Artist (40%), and Duration (20%).
+ * Weighted across Title, Artist, Version signature, and Duration.
  */
 export function calculateTrackSimilarity(a: TrackLike, b: TrackLike): number {
-  if (a.id === b.id) return 1.0;
+  // 1. Exact or canonical ID match
+  if (a.id && b.id && a.id === b.id) return 1.0;
+  const canonA = getCanonicalTrackId(a);
+  const canonB = getCanonicalTrackId(b);
+  if (canonA && canonB && canonA === canonB) return 1.0;
+
+  // 2. Version signature gate: remixes, covers, acoustic & live recordings MUST NOT merge
+  const verA = extractTrackVersion(a.title);
+  const verB = extractTrackVersion(b.title);
+  if (verA !== verB) {
+    return 0.1;
+  }
 
   const titleScore = Math.max(
     stringSimilarity(a.title, b.title),
     stringSimilarity(cleanSongTitle(a.title), cleanSongTitle(b.title)),
   );
-  const artistScore = stringSimilarity(a.artist, b.artist);
+
+  const normArtA = normalizeArtistAlias(a.artist);
+  const normArtB = normalizeArtistAlias(b.artist);
+  const artistScore = normArtA && normArtB && normArtA === normArtB
+    ? 1.0
+    : Math.max(stringSimilarity(a.artist, b.artist), stringSimilarity(normArtA, normArtB));
 
   const durA = durationSec(a.duration);
   const durB = durationSec(b.duration);
 
   // Same song re-uploaded by a different label channel (e.g. Sony Music India vs Aditya Music):
-  // near-identical title AND duration => same song regardless of channel name
-  if (titleScore >= 0.92 && durA > 0 && durB > 0 && Math.abs(durA - durB) <= 3) {
+  // near-identical title AND duration => same song if one artist is a label/channel or artists match
+  if (
+    titleScore >= 0.92 &&
+    durA > 0 &&
+    durB > 0 &&
+    Math.abs(durA - durB) <= 3 &&
+    (isChannelOrLabelName(a.artist) || isChannelOrLabelName(b.artist) || artistScore >= 0.6)
+  ) {
     return 0.95; // >= 0.88 threshold => duplicate
   }
 
@@ -154,6 +313,9 @@ export function calculateTrackSimilarity(a: TrackLike, b: TrackLike): number {
  */
 export function areSameTrack(a: TrackLike, b: TrackLike): boolean {
   if (a.id && b.id && a.id === b.id) return true;
+  const canonA = getCanonicalTrackId(a);
+  const canonB = getCanonicalTrackId(b);
+  if (canonA && canonB && canonA === canonB) return true;
   return calculateTrackSimilarity(a, b) >= 0.88;
 }
 
@@ -167,9 +329,31 @@ export function dedupeTracks<T extends TrackLike>(tracks: T[]): T[] {
   const out: T[] = [];
 
   for (const candidate of tracks) {
-    const isDuplicate = out.some((existing) => areSameTrack(existing, candidate));
-    if (!isDuplicate) {
+    if (!candidate) continue;
+    const existingIndex = out.findIndex((existing) => areSameTrack(existing, candidate));
+    if (existingIndex === -1) {
       out.push(candidate);
+    } else {
+      // Merge metadata: retain highest-fidelity metadata
+      const existing = out[existingIndex]!;
+      const existingHasBetterArtist = existing.artist && !isChannelOrLabelName(existing.artist);
+      const candidateHasBetterArtist = candidate.artist && !isChannelOrLabelName(candidate.artist);
+      const chosenArtist = existingHasBetterArtist
+        ? existing.artist
+        : candidateHasBetterArtist
+          ? candidate.artist
+          : existing.artist || candidate.artist;
+
+      const merged: T = {
+        ...candidate,
+        ...existing,
+        artist: chosenArtist,
+        album: existing.album || candidate.album,
+        duration: existing.duration || candidate.duration,
+        thumbnail: existing.thumbnail || candidate.thumbnail,
+        previewUrl: existing.previewUrl || candidate.previewUrl,
+      };
+      out[existingIndex] = merged;
     }
   }
   return out;

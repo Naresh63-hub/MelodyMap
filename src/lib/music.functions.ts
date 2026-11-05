@@ -3,7 +3,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 import type { Track } from "./types";
-import { norm, areSameTrack, diversifyTrackList } from "./track-dedup";
+import { norm, areSameTrack, dedupeTracks, diversifyTrackList, normalizeArtistAlias } from "./track-dedup";
+import { cleanSongTitle } from "./track-metadata";
 import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext, MOOD_ENVELOPES } from "./context-engine";
 import { isLanguageConsistent, isOldEraTrack } from "./library";
@@ -23,9 +24,23 @@ export function sanitizePromptInput(str: string | undefined): string {
 
 /** Canonical composite key for track deduplication */
 function getTrackDedupeKey(title: string, artist?: string): string {
-  const t = norm(title);
-  const a = artist ? norm(artist) : "";
+  const t = norm(cleanSongTitle(title) || title);
+  const a = artist ? normalizeArtistAlias(artist) : "";
   return a ? `${t}::${a}` : t;
+}
+
+/** Extracts clean artist name from 'Title — Artist' or 'Title - Artist' labels */
+export function extractArtistFromLabel(label: string): string {
+  if (!label) return "";
+  if (label.includes(" — ")) {
+    const parts = label.split(" — ");
+    return parts[parts.length - 1]?.trim() || "";
+  }
+  if (label.includes(" - ")) {
+    const parts = label.split(" - ");
+    return parts[parts.length - 1]?.trim() || "";
+  }
+  return label.trim();
 }
 
 const SearchInput = z.object({
@@ -192,6 +207,7 @@ const RecommendInput = z.object({
   isNewUser: z.boolean().optional(),
   primaryLanguage: z.string().max(40).optional(),
   languageWeights: z.record(z.string(), z.number()).optional(),
+  downloadedArtists: z.array(z.string()).max(30).optional(),
 });
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -282,10 +298,14 @@ function getDynamicQueries(
     }
   }
 
-  // 2. Exploration / Related artists queries if discovery slider > 30
+  // 2. Exploration / Related artists queries: discover fresh artists outside existing favorites
   const discovery = options?.discovery ?? 40;
-  if (discovery > 30 && filteredRelatedArtists.length > 0) {
-    for (const art of filteredRelatedArtists.slice(0, 4)) {
+  const explorePool = filteredRelatedArtists.length > 0
+    ? filteredRelatedArtists
+    : shuffleArray(langArtistPool.filter((a) => !priorityArtists.some((p) => p.toLowerCase() === a.toLowerCase()))).slice(0, 6);
+
+  if (explorePool.length > 0) {
+    for (const art of explorePool.slice(0, 4)) {
       generalNewQ.push(`${art}${langQualifier} movie songs`);
       generalNewQ.push(`${art}${langQualifier} songs`);
       generalOldQ.push(`${art}${langQualifier} movie songs`);
@@ -404,6 +424,7 @@ async function getLocalPicks(data: {
   languages?: string[] | undefined;
   refreshNonce?: string | number | undefined;
   exclude?: string[] | undefined;
+  liked?: string[] | undefined;
   discovery?: number | undefined;
   affinityArtists?: string[] | undefined;
   penalizedArtists?: string[] | undefined;
@@ -419,18 +440,24 @@ async function getLocalPicks(data: {
   const artists = data.artists.map((a) => a.trim()).filter(Boolean);
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
   const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
+  const likedSet = new Set((data.liked ?? []).map((s) => norm(s)));
+  const likedTitleSet = new Set((data.liked ?? []).map((s) => {
+    const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
+    return norm(t || "");
+  }));
   const penalizedSet = new Set((data.penalizedArtists ?? []).map((s) => norm(s)));
   const isNewUser = Boolean(
     data.isNewUser ?? (artists.length === 0 && (data.affinityArtists?.length ?? 0) === 0 && (data.exclude?.length ?? 0) === 0),
   );
 
-  // Filter out any excluded / recently played / penalized / cross-language tracks
+  // Filter out any excluded / recently played / liked / penalized / cross-language tracks
   const isCandidateValid = (t: Track) => {
     const key = norm(`${t.artist} - ${t.title}`);
     const titleKey = norm(t.title);
     const artKey = norm(t.artist);
     if (excludeSet.has(key) || excludeSet.has(titleKey)) return false;
-    if (penalizedSet.has(artKey)) return false;
+    if (likedSet.has(key) || likedTitleSet.has(titleKey)) return false;
+    if (penalizedSet.has(artKey) || penalizedSet.has(normalizeArtistAlias(t.artist))) return false;
     if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
     if (isNewUser && isOldEraTrack(t)) return false;
     return isOriginalSong(t);
@@ -912,10 +939,12 @@ export const recommendTracks = createServerFn({ method: "POST" })
     const key = process.env["AI_API_KEY"];
     if (!key) {
       // No AI key — fall back to local YouTube-based picks with dynamic New & Old mix
+      const likedArtists = (data.liked ?? []).map(extractArtistFromLabel).filter(Boolean);
+      const downloadedArtists = (data.downloadedArtists ?? []).filter(Boolean);
       const artists = [
         ...new Set(
-          [...(data.affinityArtists ?? []), ...data.liked, ...data.recent, ...(data.artists ?? [])]
-            .map((s) => s.split(" - ")[0]?.trim())
+          [...(data.affinityArtists ?? []), ...downloadedArtists, ...likedArtists, ...(data.artists ?? [])]
+            .map((s) => s.trim())
             .filter((a): a is string => !!a),
         ),
       ].slice(0, 8);
@@ -926,7 +955,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         page: data.page ?? 1,
         languages: data.languages,
         refreshNonce: data.refreshNonce,
-        exclude: data.recent,
+        exclude: [...(data.recent ?? []), ...(data.liked ?? [])],
+        liked: data.liked,
         discovery: data.discovery,
         affinityArtists: data.affinityArtists,
         penalizedArtists: data.penalizedArtists,
@@ -997,10 +1027,12 @@ export const recommendTracks = createServerFn({ method: "POST" })
       .join("\n");
 
     const fallbackToLocal = async () => {
+      const likedArtists = (data.liked ?? []).map(extractArtistFromLabel).filter(Boolean);
+      const downloadedArtists = (data.downloadedArtists ?? []).filter(Boolean);
       const artists = [
         ...new Set(
-          [...(data.affinityArtists ?? []), ...data.liked, ...data.recent, ...(data.artists ?? [])]
-            .map((s) => s.split(" - ")[0]?.trim())
+          [...(data.affinityArtists ?? []), ...downloadedArtists, ...likedArtists, ...(data.artists ?? [])]
+            .map((s) => s.trim())
             .filter((a): a is string => !!a),
         ),
       ].slice(0, 8);
@@ -1011,7 +1043,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         page: data.page ?? 1,
         languages: data.languages,
         refreshNonce: data.refreshNonce,
-        exclude: data.recent,
+        exclude: [...(data.recent ?? []), ...(data.liked ?? [])],
+        liked: data.liked,
         discovery: data.discovery,
         affinityArtists: data.affinityArtists,
         penalizedArtists: data.penalizedArtists,
@@ -1046,6 +1079,11 @@ export const recommendTracks = createServerFn({ method: "POST" })
     }
 
     const recentSet = new Set(data.recent.map((s) => norm(s)));
+    const likedSet = new Set((data.liked ?? []).map((s) => norm(s)));
+    const likedTitleSet = new Set((data.liked ?? []).map((s) => {
+      const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
+      return norm(t || "");
+    }));
     const penalizedSet = new Set((data.penalizedArtists ?? []).map((s) => norm(s)));
     const valid = picks
       .filter((p) => {
@@ -1054,7 +1092,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         const titleKey = norm(p.title);
         const artKey = norm(p.artist);
         if (recentSet.has(fullKey) || recentSet.has(titleKey)) return false;
-        if (penalizedSet.has(artKey)) return false;
+        if (likedSet.has(fullKey) || likedTitleSet.has(titleKey)) return false;
+        if (penalizedSet.has(artKey) || penalizedSet.has(normalizeArtistAlias(p.artist))) return false;
         return true;
       })
       .slice(0, count);
@@ -1494,10 +1533,18 @@ export const getDailyMix = createServerFn({ method: "POST" })
     const seenKeys = new Set<string>();
     const deduplicatedCandidates: Track[] = [];
 
+    const likedSet = new Set((data.liked || []).map((s) => norm(s)));
+    const likedTitleSet = new Set((data.liked || []).map((s) => {
+      const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
+      return norm(t || "");
+    }));
+
     for (const t of combined) {
       if (!t || !t.id || seenIds.has(t.id)) continue;
       const key = getTrackDedupeKey(t.title, t.artist);
       if (key && seenKeys.has(key)) continue;
+      const titleKey = norm(t.title);
+      if (likedSet.has(key) || likedTitleSet.has(titleKey)) continue;
       if (key) seenKeys.add(key);
       seenIds.add(t.id);
       deduplicatedCandidates.push(t);
@@ -1667,26 +1714,57 @@ export const languagePicks = createServerFn({ method: "POST" })
     const artists = data.artists.map((a) => a.trim()).filter(Boolean).slice(0, 6);
 
     const out: Track[] = [];
-    const seen = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenKeys = new Set<string>();
+
+    const getCompositeKey = (t: Track): string => {
+      const normTitle = (t.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+      const normArtist = (t.artist || "").toLowerCase().replace(/\s+/g, " ").trim();
+      return `${normTitle}:::${normArtist}`;
+    };
+
+    const isDuplicate = (t: Track): boolean => {
+      if (t.id && seenIds.has(t.id)) return true;
+      const key = getCompositeKey(t);
+      if (key !== ":::" && seenKeys.has(key)) return true;
+
+      const normTitle = (t.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+      const normArtist = (t.artist || "").toLowerCase().replace(/\s+/g, " ").trim();
+      const tokens = new Set(normArtist.split(/\s+/).filter(Boolean));
+
+      return out.some((existing) => {
+        const exTitle = (existing.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+        const exArtist = (existing.artist || "").toLowerCase().replace(/\s+/g, " ").trim();
+        const hasArtistOverlap = exArtist.split(/\s+/).filter(Boolean).some((tok) => tokens.has(tok));
+        if (exTitle === normTitle) return hasArtistOverlap;
+        return hasArtistOverlap && areSameTrack(existing, t);
+      });
+    };
+
+    const registerTrack = (t: Track) => {
+      if (t.id) seenIds.add(t.id);
+      const key = getCompositeKey(t);
+      if (key !== ":::") seenKeys.add(key);
+      out.push(t);
+    };
 
     const add = async (queries: string[], quota: number) => {
       if (out.length >= count || quota <= 0) return;
-      const per = Math.max(1, Math.ceil(quota / queries.length));
+      const per = Math.max(2, Math.ceil(quota / queries.length));
       for (const query of queries) {
         if (out.length >= count) return;
         let tracks: Track[] = [];
         try {
           const { searchSaavn } = await import("./providers/saavn");
-          const saavnHits = await searchSaavn(query, { limit: per + 6 });
+          const saavnHits = await searchSaavn(query, { limit: Math.max(per + 8, 14) });
           tracks = (saavnHits as Track[]) ?? [];
         } catch {
           continue;
         }
         for (const t of tracks) {
           if (out.length >= count) return;
-          if (seen.has(t.id)) continue;
-          seen.add(t.id);
-          out.push(t);
+          if (isDuplicate(t)) continue;
+          registerTrack(t);
         }
       }
     };
@@ -1714,7 +1792,7 @@ export const languagePicks = createServerFn({ method: "POST" })
     const picks = data.languages.length > 0
       ? out.filter((t) => isLanguageConsistent(t, data.languages))
       : out;
-    return { tracks: picks.slice(0, count), error: null };
+    return { tracks: dedupeTracks(picks).slice(0, count), error: null };
   });
 
 
@@ -1739,31 +1817,62 @@ export const languageCharts = createServerFn({ method: "POST" })
     if (langs.length === 0) return { tracks: [], error: null };
 
     const out: Track[] = [];
-    const seen = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenKeys = new Set<string>();
     const per = Math.max(4, Math.ceil(count / langs.length));
+
+    const getCompositeKey = (t: Track): string => {
+      const normTitle = (t.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+      const normArtist = (t.artist || "").toLowerCase().replace(/\s+/g, " ").trim();
+      return `${normTitle}:::${normArtist}`;
+    };
+
+    const isDuplicate = (t: Track): boolean => {
+      if (t.id && seenIds.has(t.id)) return true;
+      const key = getCompositeKey(t);
+      if (key !== ":::" && seenKeys.has(key)) return true;
+
+      const normTitle = (t.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+      const normArtist = (t.artist || "").toLowerCase().replace(/\s+/g, " ").trim();
+      const tokens = new Set(normArtist.split(/\s+/).filter(Boolean));
+
+      return out.some((existing) => {
+        const exTitle = (existing.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+        const exArtist = (existing.artist || "").toLowerCase().replace(/\s+/g, " ").trim();
+        const hasArtistOverlap = exArtist.split(/\s+/).filter(Boolean).some((tok) => tokens.has(tok));
+        if (exTitle === normTitle) return hasArtistOverlap;
+        return hasArtistOverlap && areSameTrack(existing, t);
+      });
+    };
+
+    const registerTrack = (t: Track) => {
+      if (t.id) seenIds.add(t.id);
+      const key = getCompositeKey(t);
+      if (key !== ":::") seenKeys.add(key);
+      out.push(t);
+    };
 
     for (const lang of langs) {
       if (out.length >= count) break;
       let tracks: Track[] = [];
       try {
         const { getSaavnTrendingSongs, searchSaavn } = await import("./providers/saavn");
-        const trending = await getSaavnTrendingSongs([lang], per + 6);
+        const trending = await getSaavnTrendingSongs([lang], per + 8);
         if (trending.length > 0) {
           tracks = trending as Track[];
         } else {
-          tracks = (await searchSaavn(`top ${lang} hits`, { limit: per + 6 })) as Track[];
+          tracks = (await searchSaavn(`top ${lang} hits`, { limit: per + 8 })) as Track[];
         }
       } catch {
         continue;
       }
       for (const t of tracks) {
         if (out.length >= count) break;
-        if (seen.has(t.id)) continue;
-        seen.add(t.id);
-        out.push(t);
+        if (isDuplicate(t)) continue;
+        registerTrack(t);
       }
     }
-    return { tracks: out.slice(0, count), error: null };
+    return { tracks: dedupeTracks(out).slice(0, count), error: null };
   });
 
 

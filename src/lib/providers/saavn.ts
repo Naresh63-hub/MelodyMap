@@ -92,6 +92,15 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
   const encryptedUrl = raw.more_info?.encrypted_media_url || raw.encrypted_media_url;
   const streamUrl = decryptSaavnMediaUrl(encryptedUrl, "high");
 
+  const rawPlayCount = raw.play_count || raw.more_info?.play_count;
+  const playCount = rawPlayCount ? Number(String(rawPlayCount).replace(/,/g, "")) || undefined : undefined;
+  const rawReleaseDate = raw.release_date || raw.more_info?.release_date;
+  const releaseDate = rawReleaseDate
+    ? String(rawReleaseDate).trim()
+    : raw.year || raw.more_info?.year
+      ? String(raw.year || raw.more_info?.year).trim()
+      : undefined;
+
   return {
     id: `saavn:${songId}`,
     canonicalTrackId: `saavn:${songId}`,
@@ -104,6 +113,8 @@ function mapSaavnSongToUnified(raw: any): UnifiedTrack | null {
     artwork,
     languageCode: raw.language ? String(raw.language).toLowerCase() : undefined,
     year: raw.year || raw.more_info?.year ? String(raw.year || raw.more_info?.year) : undefined,
+    releaseDate,
+    playCount,
     provider: "saavn",
     source: "saavn",
     providerTrackId: songId,

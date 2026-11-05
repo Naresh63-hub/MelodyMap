@@ -1,4 +1,5 @@
 import type { TrackLike } from "./track-dedup";
+import { normalizeArtistAlias } from "./track-dedup";
 import { safeStorage } from "./safe-storage";
 
 export type TimeOfDay = "morning" | "afternoon" | "evening" | "night";
@@ -417,17 +418,22 @@ export class ContextEngineSession {
 
   /**
    * Calculate top positive affinity artists and heavily penalized artists from
-   * session history, accumulated player stats, and fast-skips.
+   * session history, accumulated player stats, likes, downloads, and fast-skips.
    */
   getAffinityWeights(
     stats?: Record<string, { plays?: number; skips?: number; completions?: number; track?: any }>,
+    options?: {
+      likes?: readonly TrackLike[] | undefined;
+      downloads?: readonly TrackLike[] | undefined;
+      dislikes?: readonly TrackLike[] | undefined;
+    },
   ): AffinityAnalysis {
     const scores: Record<string, { completions: number; skips: number; replays: number; net: number }> = {};
     const artistDisplayMap = new Map<string, string>();
 
     const touch = (rawName: string) => {
       const name = rawName.trim();
-      const key = name.toLowerCase();
+      const key = normalizeArtistAlias(name) || name.toLowerCase();
       if (!scores[key]) {
         scores[key] = { completions: 0, skips: 0, replays: 0, net: 0 };
       }
@@ -468,6 +474,34 @@ export class ContextEngineSession {
         scores[key]!.skips += skp;
         scores[key]!.replays += replays;
         scores[key]!.net += (comp * 2.0) + (replays * 3.0) - (skp * 2.5);
+      }
+    }
+
+    // 3. Process liked songs (strong positive taste signal)
+    if (options?.likes) {
+      for (const l of options.likes) {
+        if (!l.artist) continue;
+        const { key } = touch(l.artist);
+        scores[key]!.net += 2.0;
+      }
+    }
+
+    // 4. Process downloaded songs (strong positive taste signal)
+    if (options?.downloads) {
+      for (const d of options.downloads) {
+        if (!d.artist) continue;
+        const { key } = touch(d.artist);
+        scores[key]!.net += 2.5;
+      }
+    }
+
+    // 5. Process disliked songs (strong negative signal)
+    if (options?.dislikes) {
+      for (const dl of options.dislikes) {
+        if (!dl.artist) continue;
+        const { key } = touch(dl.artist);
+        scores[key]!.net -= 4.0;
+        scores[key]!.skips += 2;
       }
     }
 

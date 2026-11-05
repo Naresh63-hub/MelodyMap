@@ -285,108 +285,115 @@ export function SettingsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-full max-w-2xl overflow-y-auto p-0 text-foreground glass-heavy rounded-2xl scrollbar-hide">
-        {/* Header - Native App Style */}
-        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-hair-strong glass-frosted px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
-              <Sliders className="h-4 w-4 text-primary" />
+      <DialogContent
+        hideCloseButton
+        className="fixed inset-0 top-0 left-0 translate-x-0 translate-y-0 h-[100dvh] max-h-[100dvh] w-full max-w-none rounded-none border-0 p-0 gap-0 text-foreground bg-background sm:bg-card/95 sm:backdrop-blur-2xl sm:inset-auto sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-auto sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl sm:border sm:border-border sm:shadow-2xl flex flex-col overflow-hidden"
+      >
+        {/* Header - Native App Bar */}
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-card/95 backdrop-blur-md px-4 py-3 sm:px-6 sm:py-4 shrink-0 pt-[max(0.75rem,env(safe-area-inset-top,0.75rem))]">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 border border-primary/20 text-primary">
+              <Sliders className="h-4 w-4" />
             </div>
-            <div>
-              <DialogTitle className="text-base font-semibold text-foreground tracking-[-0.01em]">Settings &amp; Profile</DialogTitle>
-              <p className="text-[11px] text-muted-foreground">Personalize identity, recommendations, audio &amp; cloud sync</p>
+            <div className="min-w-0">
+              <DialogTitle className="text-base sm:text-lg font-bold text-foreground tracking-[-0.01em] truncate">
+                Settings &amp; Profile
+              </DialogTitle>
+              <p className="text-[11px] sm:text-xs text-muted-foreground truncate">
+                Personalize identity, recommendations, audio &amp; cloud sync
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => onOpenChange(false)}
             aria-label="Close Settings"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-hover text-muted-foreground hover:bg-surface-hover-strong hover:text-foreground transition-all cursor-pointer"
+            className="flex h-9 w-9 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full bg-surface-hover text-muted-foreground hover:bg-surface-hover-strong hover:text-foreground transition-all cursor-pointer active:scale-95 touch-manipulation"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Section Navigation Pills */}
-        <div className="flex border-b border-border bg-card px-6 py-2.5 gap-2 overflow-x-auto scrollbar-hide">
+        <div className="flex border-b border-border bg-card/95 px-3 py-2 sm:px-6 sm:py-2.5 gap-1.5 sm:gap-2 overflow-x-auto scrollbar-hide no-scrollbar shrink-0 -webkit-overflow-scrolling-touch">
           <button
             type="button"
             onClick={() => setActiveSection("account")}
             className={cn(
-              "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
+              "flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer min-h-[38px]",
               activeSection === "account"
-              ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
+                ? "bg-primary/15 text-primary border border-primary/30 shadow-xs font-bold"
+                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             )}
           >
-            <User className="h-3.5 w-3.5 text-primary" />
-            Profile &amp; Account
+            <User className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>Profile &amp; Account</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveSection("languages")}
             className={cn(
-              "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
+              "flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer min-h-[38px]",
               activeSection === "languages"
-              ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
+                ? "bg-primary/15 text-primary border border-primary/30 shadow-xs font-bold"
+                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             )}
           >
-            <Globe2 className="h-3.5 w-3.5 text-primary" />
-            Languages &amp; Artists
+            <Globe2 className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>Languages &amp; Artists</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveSection("picks")}
             className={cn(
-              "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
+              "flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer min-h-[38px]",
               activeSection === "picks"
-              ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
+                ? "bg-primary/15 text-primary border border-primary/30 shadow-xs font-bold"
+                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             )}
           >
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            AI Taste Picks
+            <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>Personalization</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveSection("playback")}
             className={cn(
-              "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
+              "flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer min-h-[38px]",
               activeSection === "playback"
-              ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
+                ? "bg-primary/15 text-primary border border-primary/30 shadow-xs font-bold"
+                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             )}
           >
-            <Volume2 className="h-3.5 w-3.5 text-primary" />
-            Playback &amp; Hardware
+            <Volume2 className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>Playback &amp; Hardware</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveSection("insights")}
             className={cn(
-              "flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer",
+              "flex items-center gap-1.5 sm:gap-2 rounded-xl px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold transition-all shrink-0 cursor-pointer min-h-[38px]",
               activeSection === "insights"
-              ? "bg-primary/15 text-primary border border-primary/30"
-                : "text-foreground/50 hover:bg-chip hover:text-foreground/80"
+                ? "bg-primary/15 text-primary border border-primary/30 shadow-xs font-bold"
+                : "text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             )}
           >
-            <Activity className="h-3.5 w-3.5 text-primary" />
-            Listening Insights
+            <Activity className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span>Listening Insights</span>
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-5 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-6 space-y-4 sm:space-y-6 pb-28 sm:pb-6">
           {/* 1. PROFILE & ACCOUNT SECTION */}
           {activeSection === "account" && (
             <div className="space-y-5">
               {/* Profile Card */}
-              <div className="rounded-xl border border-border bg-card p-5 sm:p-6 space-y-5">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-5">
+              <div className="rounded-2xl border border-border bg-card p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-xs">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 text-center sm:text-left">
                   {/* Avatar with Edit Overlay */}
                   <div className="relative group shrink-0">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 text-2xl font-semibold text-primary ring-1 ring-border overflow-hidden">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/15 text-2xl font-bold text-primary ring-2 ring-primary/30 overflow-hidden shadow-xs">
                       {safeAvatarUrl ? (
                         <img
                           src={safeAvatarUrl}
@@ -403,42 +410,42 @@ export function SettingsModal({
                       type="button"
                       onClick={() => setIsEditingAvatar((v) => !v)}
                       aria-label="Change avatar"
-                      className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer ring-2 ring-card"
+                      className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer ring-2 ring-card shadow-xs active:scale-95 touch-manipulation"
                     >
                       <Camera className="h-3.5 w-3.5" />
                     </button>
                   </div>
 
                   {/* Profile Details & Inline Name Edit */}
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-primary uppercase tracking-[0.06em]">
+                  <div className="min-w-0 flex-1 space-y-2.5 w-full">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-primary uppercase tracking-[0.06em]">
                         {userId ? "MelodyMap Listener" : "Guest Listener"}
                       </span>
-                      <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
+                      <div className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-500 border border-emerald-500/25">
                         <ShieldCheck className="h-3 w-3" />
                         <span>{userId ? "Cloud Synced" : "Local Device"}</span>
                       </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <Label htmlFor="displayNameInput" className="text-[11px] text-foreground/50 font-medium">
+                    <div className="space-y-1 text-left">
+                      <Label htmlFor="displayNameInput" className="text-[11px] text-muted-foreground font-medium">
                         Display Name
                       </Label>
-                      <div className="flex items-center gap-2 max-w-md">
+                      <div className="flex items-center gap-2 w-full max-w-md">
                         <Input
                           id="displayNameInput"
                           value={displayName}
                           onChange={(e) => setDisplayName(e.target.value)}
                           maxLength={50}
                           placeholder="Your display name"
-                          className="h-9 rounded-lg border-border bg-surface-hover px-3 text-xs text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+                          className="h-9 rounded-xl border-border bg-surface-hover px-3 text-xs text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40 flex-1 min-w-0"
                         />
                         <Button
                           size="sm"
                           disabled={profileSaving}
                           onClick={handleSaveProfile}
-                          className="h-9 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 shrink-0 cursor-pointer"
+                          className="h-9 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 shrink-0 px-3.5 cursor-pointer shadow-xs active:scale-95"
                         >
                           {profileSaving ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -451,7 +458,7 @@ export function SettingsModal({
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-foreground/40 truncate">
+                    <p className="text-[11px] text-muted-foreground truncate">
                       {userEmail || "Signed in locally (guest mode). Your playlists & favorites stay on this device."}
                     </p>
                   </div>
@@ -749,23 +756,23 @@ export function SettingsModal({
               )}
 
               {/* Library Backup & Restore Card */}
-              <div className="rounded-3xl border border-hair-strong bg-chip-subtle p-5 space-y-4 shadow-lg backdrop-blur-md">
+              <div className="rounded-2xl sm:rounded-3xl border border-border bg-card p-4 sm:p-5 space-y-4 shadow-xs">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-300">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-500/20 text-cyan-400">
                     <HardDrive className="h-4 w-4" />
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-foreground">Library Backup &amp; Portability</h4>
-                    <p className="text-xs text-foreground/40">1-Click export and import of all playlists, likes, and history</p>
+                    <p className="text-xs text-muted-foreground">1-Click export and import of all playlists, likes, and history</p>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2.5 pt-1">
+                <div className="flex flex-col xs:flex-row flex-wrap gap-2 sm:gap-2.5 pt-1">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleExportBackup}
-                    className="rounded-xl border-purple-500/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 text-xs font-medium cursor-pointer"
+                    className="w-full xs:w-auto rounded-xl border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold cursor-pointer min-h-[38px]"
                   >
                     <Download className="mr-1.5 h-3.5 w-3.5" />
                     Export Library JSON
@@ -774,7 +781,7 @@ export function SettingsModal({
                     variant="outline"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
-                    className="rounded-xl border-hair-strong bg-chip text-foreground/80 hover:bg-chip-strong text-xs font-medium cursor-pointer"
+                    className="w-full xs:w-auto rounded-xl border-border bg-surface-hover text-foreground hover:bg-surface-hover-strong text-xs font-semibold cursor-pointer min-h-[38px]"
                   >
                     <Upload className="mr-1.5 h-3.5 w-3.5" />
                     Import Backup JSON
@@ -789,7 +796,7 @@ export function SettingsModal({
                 </div>
 
                 {backupStatus && (
-                  <div className="flex items-center gap-2 rounded-xl bg-chip px-3.5 py-2 text-xs text-purple-300 animate-in fade-in">
+                  <div className="flex items-center gap-2 rounded-xl bg-chip px-3.5 py-2 text-xs text-primary animate-in fade-in">
                     {backupStatus.includes("fail") ? (
                       <AlertCircle className="h-3.5 w-3.5 text-rose-400" />
                     ) : (
@@ -1014,7 +1021,7 @@ export function SettingsModal({
                   </div>
 
                   {/* Preset Quick Buttons */}
-                  <div className="grid grid-cols-4 gap-2 pt-0.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
                     {[
                       { seconds: 0, label: "0s (Gapless)" },
                       { seconds: 3, label: "3s (Standard)" },
@@ -1025,10 +1032,10 @@ export function SettingsModal({
                         key={p.seconds}
                         type="button"
                         onClick={() => handleCrossfadeChange(p.seconds)}
-                        className={`rounded-lg px-2 py-1.5 text-[11px] font-medium transition-all text-center border ${
+                        className={`rounded-xl px-2 py-2 text-xs font-semibold transition-all text-center border min-h-[36px] active:scale-95 cursor-pointer ${
                           currentCrossfade === p.seconds
-                            ? "bg-primary/20 border-primary/40 text-primary"
-                            : "bg-chip-subtle border-hair text-foreground/60 hover:text-foreground hover:bg-chip"
+                            ? "bg-primary/20 border-primary/40 text-primary shadow-xs"
+                            : "bg-surface-hover border-border text-muted-foreground hover:text-foreground hover:bg-surface-hover-strong"
                         }`}
                       >
                         {p.label}
@@ -1039,10 +1046,10 @@ export function SettingsModal({
 
                 <div className="h-px bg-chip" />
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">10-Band Hardware Equalizer &amp; Crossfader</h3>
-                    <p className="text-xs text-foreground/40 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Fine-tune 32Hz–16kHz frequencies, loudness compression &amp; seamless crossfade
                     </p>
                   </div>
@@ -1054,7 +1061,7 @@ export function SettingsModal({
                         onOpenChange(false);
                         onOpenEqualizer();
                       }}
-                      className="rounded-xl border-purple-500/30 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20 text-xs font-semibold cursor-pointer"
+                      className="w-full xs:w-auto shrink-0 rounded-xl border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 text-xs font-semibold cursor-pointer min-h-[38px]"
                     >
                       <Sliders className="mr-1.5 h-3.5 w-3.5" />
                       Open Equalizer
@@ -1064,10 +1071,10 @@ export function SettingsModal({
 
                 <div className="h-px bg-chip" />
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">Sleep Timer</h3>
-                    <p className="text-xs text-foreground/40 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       Schedule music to fade out gently after a preset duration
                     </p>
                   </div>
@@ -1079,7 +1086,7 @@ export function SettingsModal({
                         onOpenChange(false);
                         onOpenSleepTimer();
                       }}
-                      className="rounded-xl border-hair-strong bg-chip text-foreground/80 hover:bg-chip-strong text-xs cursor-pointer"
+                      className="w-full xs:w-auto shrink-0 rounded-xl border-border bg-surface-hover text-foreground hover:bg-surface-hover-strong text-xs font-semibold cursor-pointer min-h-[38px]"
                     >
                       <Clock className="mr-1.5 h-3.5 w-3.5" />
                       Set Sleep Timer
@@ -1089,10 +1096,10 @@ export function SettingsModal({
 
                 <div className="h-px bg-chip" />
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">Keyboard Shortcuts</h3>
-                    <p className="text-xs text-foreground/40 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       View hotkeys for playback, scrub, volume, and queue navigation
                     </p>
                   </div>

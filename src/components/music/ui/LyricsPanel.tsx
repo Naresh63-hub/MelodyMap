@@ -143,26 +143,31 @@ export function LyricsPanel({
 
   return (
     <div
-      className="dark fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#130d22]/95 text-white backdrop-blur-xl border-l border-hair shadow-2xl animate-slide-up sm:max-w-sm md:max-w-md flex flex-col"
+      className="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-[#FAF8FF] dark:bg-[#130d22]/95 text-[#211536] dark:text-white backdrop-blur-xl border-l border-[#E5DDF5] dark:border-hair shadow-2xl animate-slide-up sm:max-w-sm md:max-w-md flex flex-col overflow-hidden transition-colors duration-200"
       role="dialog"
       aria-label="Lyrics panel"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-hair p-4 shrink-0">
+      {/* Header with Android Safe Area Protection (positioned completely below status bar) */}
+      <div
+        className="flex items-center justify-between border-b border-[#E5DDF5] dark:border-hair px-4 pb-3.5 shrink-0 bg-white dark:bg-[#171128] transition-colors"
+        style={{
+          paddingTop: "max(calc(var(--mm-inset-top, 0px) + 0.875rem), 2.5rem)",
+        }}
+      >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-pink-500/15 border border-pink-500/25">
-            <MessageSquare className="h-4.5 w-4.5 text-pink-400" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F1EBFF] dark:bg-pink-500/15 border border-[#E5DDF5] dark:border-pink-500/25">
+            <MessageSquare className="h-4.5 w-4.5 text-[#8B5CF6] dark:text-pink-400" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-foreground text-sm">Lyrics</h3>
+              <h3 className="font-bold text-[#211536] dark:text-foreground text-sm">Lyrics</h3>
               {source && (
-                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded-full bg-chip text-muted-foreground border border-hair">
+                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded-full bg-[#F1EBFF] dark:bg-chip text-[#8B5CF6] dark:text-muted-foreground border border-[#E5DDF5] dark:border-hair">
                   {isSynced ? "Synced" : "Plain"} · {source}
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground truncate max-w-[210px] mt-0.5">
+            <p className="text-xs text-[#746A85] dark:text-muted-foreground truncate max-w-[210px] mt-0.5">
               {trackTitle} · {trackArtist}
             </p>
           </div>
@@ -176,9 +181,9 @@ export function LyricsPanel({
               onClick={handleCopy}
               aria-label="Copy lyrics"
               title="Copy lyrics to clipboard"
-              className="h-8 w-8 text-foreground/60 hover:text-foreground"
+              className="h-8 w-8 text-[#746A85] dark:text-foreground/60 hover:text-[#211536] dark:hover:text-foreground hover:bg-[#F1EBFF] dark:hover:bg-chip rounded-full transition-colors cursor-pointer"
             >
-              {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+              {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
             </Button>
           )}
 
@@ -187,29 +192,29 @@ export function LyricsPanel({
             size="icon"
             onClick={onClose}
             aria-label="Close lyrics"
-            className="h-8 w-8 text-foreground/60 hover:text-foreground"
+            className="h-8 w-8 text-[#746A85] dark:text-foreground/60 hover:text-[#211536] dark:hover:text-foreground hover:bg-[#F1EBFF] dark:hover:bg-chip rounded-full transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      {hasAnyLyrics && !isInstrumental && (
-        <div className="p-3 border-b border-hair shrink-0">
+      {/* Rounded Search Bar (Starts Below Header) */}
+      {!isInstrumental && (
+        <div className="p-3 border-b border-[#E5DDF5] dark:border-hair shrink-0 bg-[#FAF8FF] dark:bg-transparent">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#746A85] dark:text-muted-foreground" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search in lyrics..."
-              className="pl-8.5 h-8.5 text-xs bg-chip border-hair text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-primary/40"
+              className="pl-9 h-9 text-xs rounded-full bg-[#F1EBFF] dark:bg-chip border-[#E5DDF5] dark:border-hair text-[#211536] dark:text-foreground placeholder:text-[#746A85] dark:placeholder:text-muted-foreground focus:ring-1 focus:ring-[#8B5CF6] focus:border-[#8B5CF6]"
             />
           </div>
         </div>
       )}
 
-      {/* Lyrics Content Container */}
+      {/* Lyrics Content Container with Premium Scrollbar */}
       <div
         ref={containerRef}
         onScroll={handleUserScroll}
@@ -219,28 +224,28 @@ export function LyricsPanel({
       >
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-16">
-            <Loader2 className="h-8 w-8 text-primary animate-spin" />
-            <p className="text-xs text-muted-foreground">Finding synchronized lyrics...</p>
+            <Loader2 className="h-8 w-8 text-[#8B5CF6] dark:text-primary animate-spin" />
+            <p className="text-xs text-[#746A85] dark:text-muted-foreground">Finding synchronized lyrics...</p>
           </div>
         ) : isInstrumental ? (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-16">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-[#8B5CF6] dark:text-primary">
               <Music2 className="h-7 w-7" />
             </div>
-            <h4 className="font-semibold text-foreground text-base">Instrumental Song</h4>
-            <p className="text-xs text-muted-foreground max-w-[240px]">
+            <h4 className="font-semibold text-[#211536] dark:text-foreground text-base">Instrumental Song</h4>
+            <p className="text-xs text-[#746A85] dark:text-muted-foreground max-w-[240px]">
               This track is recorded without vocals. Enjoy the pure instrumentation!
             </p>
           </div>
         ) : !hasAnyLyrics ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-16 space-y-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-chip border border-hair text-muted-foreground">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F1EBFF] dark:bg-chip border border-[#E5DDF5] dark:border-hair text-[#746A85] dark:text-muted-foreground">
               <MessageSquare className="h-6 w-6" />
             </div>
-            <p className="text-sm font-medium text-foreground/60">
+            <p className="text-sm font-medium text-[#211536]/70 dark:text-foreground/60">
               {searchQuery ? "No lyrics found matching search" : "Lyrics not available for this track"}
             </p>
-            <p className="text-xs text-muted-foreground max-w-[220px]">
+            <p className="text-xs text-[#746A85] dark:text-muted-foreground max-w-[220px]">
               We search LRCLIB and JioSaavn catalogs for live lyrics.
             </p>
           </div>
@@ -261,11 +266,11 @@ export function LyricsPanel({
                   className={cn(
                     "w-full text-left transition-all duration-300 py-2.5 px-4 rounded-xl cursor-pointer select-none",
                     isActive
-                      ? "text-foreground font-semibold text-base sm:text-lg bg-chip-strong border border-hair-strong shadow-sm scale-[1.02]"
-                      : "text-muted-foreground text-sm hover:text-foreground/80 hover:bg-chip/50",
+                      ? "text-white font-semibold text-base sm:text-lg bg-[#8B5CF6] border border-[#A78BFA] shadow-md shadow-purple-500/25 scale-[1.02]"
+                      : "text-[#746A85] dark:text-muted-foreground text-sm hover:text-[#211536] dark:hover:text-foreground/80 hover:bg-[#F1EBFF] dark:hover:bg-chip/50",
                   )}
                 >
-                  <p className="leading-relaxed">{line.text}</p>
+                  <p className="leading-relaxed font-sans break-words tracking-normal">{line.text}</p>
                 </button>
               );
             })}
@@ -273,8 +278,8 @@ export function LyricsPanel({
         ) : (
           /* Plain Text Stanza Lyrics (e.g. JioSaavn or un-timed LRCLIB) */
           <div className="space-y-6 py-6 px-1">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium pb-2 border-b border-hair">
-              <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+            <div className="flex items-center gap-1.5 text-xs text-[#746A85] dark:text-muted-foreground font-medium pb-2 border-b border-[#E5DDF5] dark:border-hair">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
               <span>Full Song Lyrics</span>
             </div>
             {filteredPlainParagraphs.map((para, pIdx) => (
@@ -282,7 +287,7 @@ export function LyricsPanel({
                 {para.map((line, lIdx) => (
                   <p
                     key={lIdx}
-                    className="text-sm sm:text-base text-foreground/90 font-normal leading-relaxed select-text"
+                    className="text-sm sm:text-base text-[#211536]/90 dark:text-foreground/90 font-sans font-normal leading-relaxed break-words tracking-normal select-text"
                   >
                     {line}
                   </p>
@@ -294,8 +299,8 @@ export function LyricsPanel({
       </div>
 
       {/* Footer Info */}
-      <div className="border-t border-hair p-3 text-center shrink-0 bg-surface/60">
-        <p className="text-[11px] text-muted-foreground">
+      <div className="border-t border-[#E5DDF5] dark:border-hair p-3 text-center shrink-0 bg-white/80 dark:bg-surface/60">
+        <p className="text-[11px] text-[#746A85] dark:text-muted-foreground">
           {loading
             ? "Searching lyrics..."
             : isSynced
