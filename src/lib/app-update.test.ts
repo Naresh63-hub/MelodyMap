@@ -25,12 +25,17 @@ type WindowMock = {
   __melodymap_update_permission_needed?: () => void;
 };
 
+let originalWindow: any;
+
 function setGlobalWindow(mock: WindowMock | undefined): void {
   (globalThis as unknown as { window?: WindowMock | undefined }).window = mock;
 }
 
 describe("In-App Update Engine (app-update.ts)", () => {
   beforeEach(() => {
+    if (originalWindow === undefined) {
+      originalWindow = (globalThis as any).window;
+    }
     safeStorage.clear();
     vi.restoreAllMocks();
     setGlobalWindow({});
@@ -39,7 +44,11 @@ describe("In-App Update Engine (app-update.ts)", () => {
   afterEach(() => {
     safeStorage.clear();
     vi.restoreAllMocks();
-    setGlobalWindow(undefined);
+    if (originalWindow !== undefined) {
+      (globalThis as any).window = originalWindow;
+    } else {
+      delete (globalThis as any).window;
+    }
   });
 
   describe("Semver parsing and comparison", () => {
