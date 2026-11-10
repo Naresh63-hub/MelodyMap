@@ -58,6 +58,25 @@ describe("isOriginalSong", () => {
     expect(isOriginalSong({ title: "Best Of Tollywood 2023", artist: "Various Artists" })).toBe(false);
   });
 
+  it("rejects playlist/compilation uploads instead of treating them as songs", () => {
+    expect(isOriginalSong({ title: "Prabhas Romantic Mood", artist: "Various Artists" })).toBe(false);
+    expect(isOriginalSong({ title: "Romantic 90's", artist: "Various Artists" })).toBe(false);
+    expect(isOriginalSong({ title: "Telugu Love Songs", artist: "Various Artists" })).toBe(false);
+    expect(isOriginalSong({ title: "Evergreen Melodies", artist: "Various Artists" })).toBe(false);
+    expect(isOriginalSong({ title: "Tollywood Songs 90s", artist: "Various Artists" })).toBe(false);
+    expect(isOriginalSong({ title: "Best Of Arijit Singh", artist: "Arijit Singh" })).toBe(false);
+    expect(isOriginalSong({ title: "Neelothi", album: "Romantic Hits Collection" })).toBe(false);
+  });
+
+  it("keeps single-song titles that merely contain mood or era words", () => {
+    expect(isOriginalSong({ title: "Mood", artist: "24kGoldn" })).toBe(true);
+    expect(isOriginalSong({ title: "Romantic", artist: "Stanaj" })).toBe(true);
+    expect(isOriginalSong({ title: "Melody", artist: "Anderson East" })).toBe(true);
+    expect(isOriginalSong({ title: "90's Love", artist: "NCT U" })).toBe(true);
+    expect(isOriginalSong({ title: "Love Story", artist: "Taylor Swift" })).toBe(true);
+    expect(isOriginalSong({ title: "Neelothi", artist: "Sooraj Santhosh, Chinmayi Sripada", album: "Sita Ramam" })).toBe(true);
+  });
+
   it("rejects devotional, temple, religious chants and hymns", () => {
     expect(isOriginalSong({ title: "Amalo Maa Yamma", album: "Akkadevathala Paatalu", artist: "Village Deity" })).toBe(false);
     expect(isOriginalSong({ title: "Adivo Alladivo", subtitle: "Annamayya Keerthana", album: "Classical" })).toBe(false);

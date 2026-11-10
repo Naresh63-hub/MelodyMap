@@ -121,7 +121,7 @@ export const Route = createFileRoute("/auth")({
 type AuthMode = "signin" | "signup" | "forgot" | "reset_password" | "verify_email";
 
 function getPasswordStrength(pwd: string): { score: number; label: string; color: string } {
-  if (!pwd) return { score: 0, label: "", color: "#E9DDFD" };
+  if (!pwd) return { score: 0, label: "", color: "#E9DDFB" };
   let score = 0;
   if (pwd.length >= 6) score += 1;
   if (pwd.length >= 9) score += 1;
@@ -138,7 +138,7 @@ function getPasswordStrength(pwd: string): { score: number; label: string; color
     case 4:
       return { score: 4, label: "Strong", color: "#7C3AED" };
     default:
-      return { score: 0, label: "Too short", color: "#E9DDFD" };
+      return { score: 0, label: "Too short", color: "#E9DDFB" };
   }
 }
 
@@ -402,7 +402,7 @@ function AuthPage() {
   const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   return (
-    <div className="min-h-screen bg-[#F8F5FF] dark:bg-[#0D0819] text-[#1A1033] dark:text-[#FFFFFF] selection:bg-[#F3EEFF] dark:selection:bg-[#2E1065] selection:text-[#7C3AED] dark:selection:text-[#C084FC] transition-colors duration-300 relative overflow-x-hidden flex flex-col justify-between">
+    <div className="min-h-screen bg-[#F8F5FF] dark:bg-[#0D0819] text-[#211536] dark:text-[#FFFFFF] selection:bg-[#F3EEFF] dark:selection:bg-[#2E1065] selection:text-[#7C3AED] dark:selection:text-[#C084FC] transition-colors duration-300 relative overflow-x-hidden flex flex-col justify-between">
       {/* Ambient Decorative Background Lights & Floating Elements */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-0">
         {/* Soft violet radial glows */}
@@ -459,7 +459,7 @@ function AuthPage() {
 
         {/* Right: Tagline with Live Equalizer & Back Shortcut */}
         <div className="flex items-center gap-4 sm:gap-6">
-          <div className="hidden sm:flex items-center gap-2.5 text-xs lg:text-sm font-medium text-[#1A1033] dark:text-[#D4CBEA]">
+          <div className="hidden sm:flex items-center gap-2.5 text-xs lg:text-sm font-medium text-[#211536] dark:text-[#D4CBEA]">
             {/* Equalizer sound bars */}
             <div className="flex items-center gap-0.5 h-4 text-[#8B5CF6]" aria-hidden="true">
               <span className="w-1 h-2 bg-[#8B5CF6] rounded-full animate-pulse" />
@@ -474,7 +474,7 @@ function AuthPage() {
           <Link
             to="/"
             aria-label="Back to App"
-            className="flex items-center gap-1.5 text-xs font-semibold text-[#716A80] dark:text-[#A69ABD] hover:text-[#7C3AED] dark:hover:text-[#C084FC] transition-colors py-2 px-3.5 rounded-full hover:bg-white/60 dark:hover:bg-white/5 border border-transparent hover:border-purple-200 dark:hover:border-purple-800/40 min-h-[44px] cursor-pointer"
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#746A85] dark:text-[#A69ABD] hover:text-[#7C3AED] dark:hover:text-[#C084FC] transition-colors py-2 px-3.5 rounded-full hover:bg-white/60 dark:hover:bg-white/5 border border-transparent hover:border-purple-200 dark:hover:border-purple-800/40 min-h-[44px] cursor-pointer"
           >
             <ArrowLeft aria-hidden="true" className="w-4 h-4" />
             <span className="hidden sm:inline">Back</span>
@@ -488,7 +488,7 @@ function AuthPage() {
           {/* LEFT COLUMN: Hero Artwork Showcase */}
           <div className="lg:col-span-7 xl:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
             {/* Big Headline */}
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#1A1033] dark:text-white tracking-tight leading-[1.12]">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-[#211536] dark:text-white tracking-tight leading-[1.12]">
               Your Music<br className="hidden sm:inline" />{" "}
               Journey{" "}
               <span className="bg-gradient-to-r from-[#8B5CF6] via-[#EC4899] to-[#FF7A00] bg-clip-text text-transparent">
@@ -498,35 +498,52 @@ function AuthPage() {
 
             {/* Subtitle & Gradient Accent Underline */}
             <div className="mt-3 inline-block">
-              <p className="text-base sm:text-lg font-bold text-[#1A1033] dark:text-[#E2D9F3] tracking-wide">
+              <p className="text-base sm:text-lg font-bold text-[#211536] dark:text-[#E2D9F3] tracking-wide">
                 Discover. Feel. Play.
               </p>
               <div className="mt-1 h-1 w-24 rounded-full bg-gradient-to-r from-[#FF7A00] via-[#EC4899] to-[#8B5CF6]" />
             </div>
 
-            {/* Centerpiece 3D Headphones on Glowing Stage Artwork */}
-            <div className="relative w-full max-w-[460px] my-2 sm:my-3 flex justify-center lg:justify-start">
-              <img
-                src="/brand/auth-headphones-3d.png"
-                alt="MelodyMap 3D Hi-Fi Sound Experience"
-                className="w-full h-auto max-h-[280px] sm:max-h-[320px] object-contain drop-shadow-[0_16px_35px_rgba(124,58,237,0.20)] select-none pointer-events-none"
-              />
+            {/* Centerpiece 3D Headphones on Glowing Sound Stage Artwork */}
+            <div className="relative w-full max-w-[420px] my-3 sm:my-4 flex items-center justify-center lg:justify-start">
+              <div className="relative flex items-center justify-center">
+                {/* Dynamic Sound Aura & Stage Ripples */}
+                <div
+                  className="absolute inset-0 -m-8 rounded-full bg-radial from-[#8B5CF6]/20 via-[#EC4899]/10 to-transparent blur-xl pointer-events-none"
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute -inset-3 rounded-full border border-[#8B5CF6]/25 animate-pulse [animation-duration:4s] pointer-events-none"
+                  aria-hidden="true"
+                />
+                <div
+                  className="absolute -inset-7 rounded-full border border-[#A855F7]/15 pointer-events-none"
+                  aria-hidden="true"
+                />
+
+                {/* 3D Hi-Fi Headphones Artwork */}
+                <img
+                  src="/brand/auth-headphones-3d.png"
+                  alt="MelodyMap 3D Hi-Fi Sound Experience"
+                  className="relative z-10 w-auto h-auto max-h-[220px] sm:max-h-[260px] lg:max-h-[280px] object-contain drop-shadow-[0_20px_40px_rgba(139,92,246,0.22)] select-none pointer-events-none transition-transform duration-500 hover:scale-102"
+                />
+              </div>
             </div>
 
             {/* Bottom Capsule Pill: 3 Highlights */}
-            <div className="inline-flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-4 px-5 py-2.5 rounded-full bg-white/70 dark:bg-[#1E1435]/80 backdrop-blur-md border border-[#E9DDFD] dark:border-purple-700/30 shadow-sm text-xs font-semibold text-[#1A1033] dark:text-white">
+            <div className="inline-flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-4 px-5 py-2.5 rounded-full bg-white/80 dark:bg-[#1E1435]/80 backdrop-blur-md border border-[#E9DDFB] dark:border-purple-700/30 shadow-xs text-xs font-semibold text-[#211536] dark:text-white">
               <div className="flex items-center gap-1.5">
-                <Music className="w-3.5 h-3.5 text-[#7C3AED]" />
+                <Music className="w-3.5 h-3.5 text-[#8B5CF6]" />
                 <span>Personalized Recommendations</span>
               </div>
-              <div className="hidden sm:block h-3.5 w-px bg-purple-200 dark:bg-purple-700/50" />
+              <div className="hidden sm:block h-3.5 w-px bg-[#E9DDFB] dark:bg-purple-700/50" />
               <div className="flex items-center gap-1.5">
                 <Heart className="w-3.5 h-3.5 text-[#EC4899]" />
                 <span>Create Your Mixes</span>
               </div>
-              <div className="hidden sm:block h-3.5 w-px bg-purple-200 dark:bg-purple-700/50" />
+              <div className="hidden sm:block h-3.5 w-px bg-[#E9DDFB] dark:bg-purple-700/50" />
               <div className="flex items-center gap-1.5">
-                <Mic className="w-3.5 h-3.5 text-[#7C3AED]" />
+                <Mic className="w-3.5 h-3.5 text-[#8B5CF6]" />
                 <span>Listen to Podcasts</span>
               </div>
             </div>
@@ -534,7 +551,7 @@ function AuthPage() {
 
           {/* RIGHT COLUMN: Premium Floating Authentication Card */}
           <div className="lg:col-span-5 xl:col-span-5 flex justify-center w-full">
-            <div className="w-full max-w-md rounded-[32px] bg-white dark:bg-[#1B132E] border border-[#E9DDFD] dark:border-purple-800/40 p-6 sm:p-8 shadow-[0_24px_60px_-12px_rgba(124,58,237,0.18)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl space-y-4 relative">
+            <div className="w-full max-w-md rounded-[32px] bg-white dark:bg-[#1B132E] border border-[#E9DDFB] dark:border-purple-800/40 p-6 sm:p-8 shadow-[0_24px_60px_-12px_rgba(124,58,237,0.18)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl space-y-4 relative">
               {/* Card Top Logo with Glowing Halo */}
               <div className="flex justify-center -mt-1">
                 <div className="relative">
@@ -552,14 +569,14 @@ function AuthPage() {
 
               {/* Form Title & Context */}
               <div className="text-center space-y-1">
-                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-[#1A1033] dark:text-white font-display">
+                <h2 className="text-xl sm:text-2xl font-black tracking-tight text-[#211536] dark:text-white font-display">
                   {mode === "signin" && "Welcome to MelodyMap"}
                   {mode === "signup" && "Join MelodyMap"}
                   {mode === "verify_email" && "Check Your Inbox"}
                   {mode === "forgot" && "Reset Password"}
                   {mode === "reset_password" && "Set New Password"}
                 </h2>
-                <p className="text-xs sm:text-sm text-[#716A80] dark:text-[#A69ABD]">
+                <p className="text-xs sm:text-sm text-[#746A85] dark:text-[#A69ABD]">
                   {mode === "signin" && "Sign in to continue your musical journey"}
                   {mode === "signup" && "Start your musical journey"}
                   {mode === "verify_email" && `We've sent a verification link to ${email || "your email"}.`}
@@ -585,7 +602,7 @@ function AuthPage() {
                 <div
                   role="status"
                   aria-live="polite"
-                  className="flex items-start gap-2.5 rounded-2xl bg-[#F3EEFF] dark:bg-purple-950/40 border border-[#E9DDFD] dark:border-purple-800/40 p-3 text-xs text-[#7C3AED] dark:text-purple-300 animate-fade-in"
+                  className="flex items-start gap-2.5 rounded-2xl bg-[#F3EEFF] dark:bg-purple-950/40 border border-[#E9DDFB] dark:border-purple-800/40 p-3 text-xs text-[#7C3AED] dark:text-purple-300 animate-fade-in"
                 >
                   <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
                   <p className="flex-1 font-medium leading-relaxed">{successNote}</p>
@@ -600,7 +617,7 @@ function AuthPage() {
                     variant="outline"
                     disabled={googleBusy || submitting}
                     onClick={handleGoogleSignIn}
-                    className="w-full h-11 sm:h-12 rounded-full bg-white dark:bg-[#23183D] hover:bg-[#FAF9FF] dark:hover:bg-[#2B1D4A] text-[#1A1033] dark:text-white border border-[#E9DDFD] dark:border-purple-800/40 font-semibold flex items-center justify-center gap-3 shadow-xs active:scale-[0.99] transition-all text-xs sm:text-sm cursor-pointer"
+                    className="w-full h-11 sm:h-12 rounded-full bg-white dark:bg-[#23183D] hover:bg-[#FAF9FF] dark:hover:bg-[#2B1D4A] text-[#211536] dark:text-white border border-[#E9DDFB] dark:border-purple-800/40 font-semibold flex items-center justify-center gap-3 shadow-xs active:scale-[0.99] transition-all text-xs sm:text-sm cursor-pointer"
                   >
                     {googleBusy ? (
                       <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[#7C3AED]" />
@@ -628,8 +645,8 @@ function AuthPage() {
                   </Button>
 
                   <div className="relative flex items-center justify-center my-2">
-                    <div className="border-t border-[#E9DDFD] dark:border-purple-900/50 w-full" />
-                    <span className="bg-white dark:bg-[#1B132E] px-3 text-[11px] font-bold text-[#716A80] dark:text-[#A69ABD] uppercase tracking-wider">
+                    <div className="border-t border-[#E9DDFB] dark:border-purple-900/50 w-full" />
+                    <span className="bg-white dark:bg-[#1B132E] px-3 text-[11px] font-bold text-[#746A85] dark:text-[#A69ABD] uppercase tracking-wider">
                       OR
                     </span>
                   </div>
@@ -641,7 +658,7 @@ function AuthPage() {
                 <div
                   role="tablist"
                   aria-label="Authentication mode"
-                  className="flex rounded-full bg-[#F3EEFC] dark:bg-[#130D22] p-1 border border-[#E9DDFD] dark:border-purple-900/40 shadow-inner"
+                  className="flex rounded-full bg-[#F3EEFC] dark:bg-[#130D22] p-1 border border-[#E9DDFB] dark:border-purple-900/40 shadow-inner"
                 >
                   <button
                     type="button"
@@ -656,7 +673,7 @@ function AuthPage() {
                     className={`flex-1 rounded-full py-2 min-h-[44px] flex items-center justify-center text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] cursor-pointer ${
                       mode === "signin"
                         ? "bg-[#7C3AED] text-white shadow-md shadow-[#7C3AED]/30"
-                        : "text-[#716A80] dark:text-[#A69ABD] hover:text-[#1A1033] dark:hover:text-white"
+                        : "text-[#746A85] dark:text-[#A69ABD] hover:text-[#211536] dark:hover:text-white"
                     }`}
                   >
                     Sign In
@@ -674,7 +691,7 @@ function AuthPage() {
                     className={`flex-1 rounded-full py-2 min-h-[44px] flex items-center justify-center text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] cursor-pointer ${
                       mode === "signup"
                         ? "bg-[#7C3AED] text-white shadow-md shadow-[#7C3AED]/30"
-                        : "text-[#716A80] dark:text-[#A69ABD] hover:text-[#1A1033] dark:hover:text-white"
+                        : "text-[#746A85] dark:text-[#A69ABD] hover:text-[#211536] dark:hover:text-white"
                     }`}
                   >
                     Create Account
@@ -685,18 +702,18 @@ function AuthPage() {
               {/* Dedicated Verify Email Screen */}
               {mode === "verify_email" && (
                 <div className="space-y-4 py-2">
-                  <div className="rounded-2xl bg-[#FAF9FF] dark:bg-[#160F25] border border-[#E9DDFD] dark:border-[rgba(168,85,247,0.22)] p-4 sm:p-5 space-y-3">
+                  <div className="rounded-2xl bg-[#FAF9FF] dark:bg-[#160F25] border border-[#E9DDFB] dark:border-[rgba(168,85,247,0.22)] p-4 sm:p-5 space-y-3">
                     <div className="flex items-center gap-3">
-                      <div className="h-11 w-11 rounded-2xl bg-[#F3EEFF] dark:bg-[#24183D] text-[#7C3AED] dark:text-[#C084FC] flex items-center justify-center shrink-0 border border-[#E9DDFD] dark:border-[rgba(168,85,247,0.25)]">
+                      <div className="h-11 w-11 rounded-2xl bg-[#F3EEFF] dark:bg-[#24183D] text-[#7C3AED] dark:text-[#C084FC] flex items-center justify-center shrink-0 border border-[#E9DDFB] dark:border-[rgba(168,85,247,0.25)]">
                         <Mail aria-hidden="true" className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-xs sm:text-sm font-semibold text-[#1A1033] dark:text-white">Verification Link Sent</p>
-                        <p className="text-[11px] text-[#716A80] dark:text-[#D4CBEA] break-all font-mono mt-0.5">{email}</p>
+                        <p className="text-xs sm:text-sm font-semibold text-[#211536] dark:text-white">Verification Link Sent</p>
+                        <p className="text-[11px] text-[#746A85] dark:text-[#D4CBEA] break-all font-mono mt-0.5">{email}</p>
                       </div>
                     </div>
 
-                    <div className="text-[11px] text-[#716A80] dark:text-[#D4CBEA] space-y-1.5 border-t border-[#E9DDFD] dark:border-[rgba(168,85,247,0.18)] pt-3">
+                    <div className="text-[11px] text-[#746A85] dark:text-[#D4CBEA] space-y-1.5 border-t border-[#E9DDFB] dark:border-[rgba(168,85,247,0.18)] pt-3">
                       <p>1. Open your inbox and tap the confirmation link.</p>
                       <p>2. Check your spam or promotions folder if not received in 1 minute.</p>
                       <p className="text-[#7C3AED] dark:text-[#C084FC] font-medium pt-1">
@@ -711,7 +728,7 @@ function AuthPage() {
                       variant="outline"
                       disabled={resending || resendCooldown > 0}
                       onClick={handleResendVerification}
-                      className="w-full h-11 sm:h-12 rounded-full border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white bg-white dark:bg-[#171126] hover:bg-[#FAF9FF] dark:hover:bg-[#24183D] text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full h-11 sm:h-12 rounded-full border-[#E9DDFB] dark:border-purple-800/40 text-[#211536] dark:text-white bg-white dark:bg-[#171126] hover:bg-[#FAF9FF] dark:hover:bg-[#24183D] text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer"
                     >
                       {resending ? (
                         <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[#7C3AED]" />
@@ -745,7 +762,7 @@ function AuthPage() {
                 <form id="auth-form" onSubmit={handleSubmit} className="space-y-3.5">
                   {mode === "signup" && (
                     <div className="space-y-1">
-                      <Label htmlFor="auth-name" className="text-xs font-semibold text-[#1A1033] dark:text-purple-100 flex items-center gap-1.5">
+                      <Label htmlFor="auth-name" className="text-xs font-semibold text-[#211536] dark:text-purple-100 flex items-center gap-1.5">
                         <User aria-hidden="true" className="w-3.5 h-3.5 text-[#7C3AED]" />
                         <span>Full Name</span>
                       </Label>
@@ -762,7 +779,7 @@ function AuthPage() {
                           disabled={submitting}
                           aria-invalid={Boolean(errorNote)}
                           aria-describedby={errorNote ? "auth-error-note" : undefined}
-                          className="pl-11 pr-4 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                          className="pl-11 pr-4 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFB] dark:border-purple-800/40 text-[#211536] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
                           required
                         />
                       </div>
@@ -771,7 +788,7 @@ function AuthPage() {
 
                   {mode !== "reset_password" && (
                     <div className="space-y-1">
-                      <Label htmlFor="auth-email" className="text-xs font-semibold text-[#1A1033] dark:text-purple-100 flex items-center gap-1.5">
+                      <Label htmlFor="auth-email" className="text-xs font-semibold text-[#211536] dark:text-purple-100 flex items-center gap-1.5">
                         <Mail aria-hidden="true" className="w-3.5 h-3.5 text-[#7C3AED]" />
                         <span>Email Address</span>
                       </Label>
@@ -788,7 +805,7 @@ function AuthPage() {
                           disabled={submitting}
                           aria-invalid={Boolean(errorNote)}
                           aria-describedby={errorNote ? "auth-error-note" : undefined}
-                          className="pl-11 pr-4 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                          className="pl-11 pr-4 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFB] dark:border-purple-800/40 text-[#211536] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
                           required
                         />
                       </div>
@@ -798,7 +815,7 @@ function AuthPage() {
                   {mode !== "forgot" && (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="auth-password" className="text-xs font-semibold text-[#1A1033] dark:text-purple-100 flex items-center gap-1.5">
+                        <Label htmlFor="auth-password" className="text-xs font-semibold text-[#211536] dark:text-purple-100 flex items-center gap-1.5">
                           <Lock aria-hidden="true" className="w-3.5 h-3.5 text-[#7C3AED]" />
                           <span>{mode === "reset_password" ? "New Password" : "Password"}</span>
                         </Label>
@@ -830,7 +847,7 @@ function AuthPage() {
                           disabled={submitting}
                           aria-invalid={Boolean(errorNote)}
                           aria-describedby={errorNote ? "auth-error-note" : undefined}
-                          className="pl-11 pr-12 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                          className="pl-11 pr-12 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFB] dark:border-purple-800/40 text-[#211536] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
                           required
                         />
                         <button
@@ -838,7 +855,7 @@ function AuthPage() {
                           onClick={() => setShowPassword(!showPassword)}
                           aria-label={showPassword ? "Hide password" : "Show password"}
                           aria-pressed={showPassword}
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#716A80] dark:text-[#948BA8] hover:text-[#1A1033] dark:hover:text-white transition-colors rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] cursor-pointer"
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#746A85] dark:text-[#948BA8] hover:text-[#211536] dark:hover:text-white transition-colors rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] cursor-pointer"
                         >
                           {showPassword ? (
                             <EyeOff aria-hidden="true" className="h-4 w-4" />
@@ -852,7 +869,7 @@ function AuthPage() {
                       {(mode === "signup" || mode === "reset_password") && password.length > 0 && (
                         <div className="pt-1 space-y-1.5 animate-fade-in">
                           <div className="flex items-center justify-between text-[11px]">
-                            <span className="text-[#716A80] dark:text-[#D4CBEA]">Password strength:</span>
+                            <span className="text-[#746A85] dark:text-[#D4CBEA]">Password strength:</span>
                             <span className="font-semibold text-[#7C3AED] dark:text-[#C084FC]">
                               {passwordStrength.label}
                             </span>
@@ -864,7 +881,7 @@ function AuthPage() {
                                 className="rounded-full transition-all duration-300"
                                 style={{
                                   backgroundColor:
-                                    bar <= passwordStrength.score ? passwordStrength.color : "#E9DDFD",
+                                    bar <= passwordStrength.score ? passwordStrength.color : "#E9DDFB",
                                 }}
                               />
                             ))}
@@ -877,7 +894,7 @@ function AuthPage() {
                   {(mode === "signup" || mode === "reset_password") && (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="auth-confirm-password" className="text-xs font-semibold text-[#1A1033] dark:text-purple-100 flex items-center gap-1.5">
+                        <Label htmlFor="auth-confirm-password" className="text-xs font-semibold text-[#211536] dark:text-purple-100 flex items-center gap-1.5">
                           <Lock aria-hidden="true" className="w-3.5 h-3.5 text-[#7C3AED]" />
                           <span>Confirm Password</span>
                         </Label>
@@ -905,7 +922,7 @@ function AuthPage() {
                           disabled={submitting}
                           aria-invalid={Boolean(errorNote)}
                           aria-describedby={errorNote ? "auth-error-note" : undefined}
-                          className="pl-11 pr-12 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFD] dark:border-purple-800/40 text-[#1A1033] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
+                          className="pl-11 pr-12 bg-[#F3EEFC] dark:bg-[#160F25] border-[#E9DDFB] dark:border-purple-800/40 text-[#211536] dark:text-white placeholder:text-purple-300 dark:placeholder:text-purple-400/60 h-11 sm:h-12 rounded-full focus-visible:ring-2 focus-visible:ring-[#7C3AED]/40 focus:border-[#7C3AED]"
                           required
                         />
                       </div>
@@ -947,7 +964,7 @@ function AuthPage() {
                     setErrorNote(null);
                     setSuccessNote(null);
                   }}
-                  className="w-full py-2 min-h-[44px] flex items-center justify-center text-xs text-[#716A80] dark:text-[#D4CBEA] hover:text-[#1A1033] dark:hover:text-white font-medium transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-full cursor-pointer"
+                  className="w-full py-2 min-h-[44px] flex items-center justify-center text-xs text-[#746A85] dark:text-[#D4CBEA] hover:text-[#211536] dark:hover:text-white font-medium transition-colors text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-full cursor-pointer"
                 >
                   Back to Sign In
                 </button>
@@ -958,7 +975,7 @@ function AuthPage() {
                 <button
                   type="button"
                   onClick={continueAsGuest}
-                  className="min-h-[44px] py-2 px-4 inline-flex items-center justify-center gap-1.5 text-xs text-[#716A80] dark:text-[#D4CBEA] hover:text-[#7C3AED] dark:hover:text-[#C084FC] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-full hover:bg-[#F3EEFF] dark:hover:bg-[#24183D] cursor-pointer"
+                  className="min-h-[44px] py-2 px-4 inline-flex items-center justify-center gap-1.5 text-xs text-[#746A85] dark:text-[#D4CBEA] hover:text-[#7C3AED] dark:hover:text-[#C084FC] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C3AED] rounded-full hover:bg-[#F3EEFF] dark:hover:bg-[#24183D] cursor-pointer"
                 >
                   <User aria-hidden="true" className="h-3.5 w-3.5 text-[#7C3AED] dark:text-[#A855F7]" />
                   <span>Explore as Guest &rarr;</span>
@@ -971,7 +988,7 @@ function AuthPage() {
 
       {/* FOOTER: Minimal copyright & compliance info */}
       <footer className="w-full px-6 py-3 relative z-10 text-center">
-        <p className="text-[11px] text-[#716A80]/70 dark:text-[#948BA8]/70">
+        <p className="text-[11px] text-[#746A85]/70 dark:text-[#948BA8]/70">
           MelodyMap &bull; Stream everywhere with zero interruptions
         </p>
       </footer>

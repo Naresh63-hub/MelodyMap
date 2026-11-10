@@ -481,7 +481,18 @@ async function getLocalPicks(data: {
       popularQueries.push(`${lang} new releases ${CURRENT_YEAR}`);
     }
 
-    const queryOffset = (page - 1) * 3;
+    const nonceNum =
+      typeof data.refreshNonce === "number"
+        ? Math.abs(data.refreshNonce)
+        : typeof data.refreshNonce === "string"
+          ? Math.abs(
+              data.refreshNonce.split("").reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0),
+            )
+          : 0;
+    const refreshShift = nonceNum > 0 ? (nonceNum % 13) + 1 : 0;
+    const queryOffset = (page - 1) * 3 + refreshShift;
+    const queryPage = page + Math.floor(refreshShift / 4);
+
     const rotateQueries = (arr: string[], offset: number) => {
       if (arr.length === 0) return [];
       const normalized = offset % arr.length;
@@ -492,7 +503,7 @@ async function getLocalPicks(data: {
     const pickedPopular = rotateQueries(popularQueries, queryOffset).slice(0, 4);
 
     const [queryCandidates, trendingCandidates, newReleasesCandidates] = await Promise.all([
-      runQueryBatch([...pickedNew, ...pickedPopular], 14, true, bypassCache, page),
+      runQueryBatch([...pickedNew, ...pickedPopular], 14, true, bypassCache, queryPage),
       (async () => {
         try {
           const { getSaavnTrendingSongs } = await import("./providers/saavn");
@@ -566,8 +577,18 @@ async function getLocalPicks(data: {
     languageWeights: data.languageWeights,
   });
 
-  // Sample queries with offset rotation based on page depth so deeper pages explore different facets/discographies
-  const queryOffset = (page - 1) * 3;
+  const nonceNum =
+    typeof data.refreshNonce === "number"
+      ? Math.abs(data.refreshNonce)
+      : typeof data.refreshNonce === "string"
+        ? Math.abs(
+            data.refreshNonce.split("").reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0),
+          )
+        : 0;
+  const refreshShift = nonceNum > 0 ? (nonceNum % 13) + 1 : 0;
+  const queryOffset = (page - 1) * 3 + refreshShift;
+  const queryPage = page + Math.floor(refreshShift / 4);
+
   const rotateQueries = (arr: string[], offset: number) => {
     if (arr.length === 0) return [];
     const normalized = offset % arr.length;
@@ -578,8 +599,8 @@ async function getLocalPicks(data: {
   const pickedOld = rotateQueries(oldQueries, queryOffset).slice(0, 6);
 
   const [newCandidates, oldCandidates] = await Promise.all([
-    runQueryBatch(pickedNew, 14, true, bypassCache, page),
-    runQueryBatch(pickedOld, 14, true, bypassCache, page),
+    runQueryBatch(pickedNew, 14, true, bypassCache, queryPage),
+    runQueryBatch(pickedOld, 14, true, bypassCache, queryPage),
   ]);
 
   const newQuota = Math.ceil(count / 2);
@@ -963,6 +984,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         clientHour: data.clientHour,
         isNewUser,
         mood: data.mood,
+        primaryLanguage: data.primaryLanguage,
+        languageWeights: data.languageWeights,
       });
       return { tracks, error: null };
     }
@@ -1051,6 +1074,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         clientHour: data.clientHour,
         isNewUser,
         mood: data.mood,
+        primaryLanguage: data.primaryLanguage,
+        languageWeights: data.languageWeights,
       });
       return { tracks, error: null };
     };
@@ -1465,6 +1490,9 @@ const DailyMixInput = z.object({
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   count: z.number().min(1).max(60).optional(),
   isNewUser: z.boolean().optional(),
+  exclude: z.array(z.string()).max(200).optional(),
+  primaryLanguage: z.string().max(40).optional(),
+  languageWeights: z.record(z.string(), z.number()).optional(),
 });
 
 /**
@@ -1483,11 +1511,30 @@ export const getDailyMix = createServerFn({ method: "POST" })
     const artists = data.artists.map((a) => a.trim()).filter(Boolean);
     const languages = data.languages.map((l) => l.trim()).filter(Boolean);
     const isNewUser = Boolean(data.isNewUser ?? (artists.length === 0 && (data.liked?.length ?? 0) === 0));
-    const { newQueries, oldQueries } = getDynamicQueries(languages, artists);
+    const { newQueries, oldQueries } = getDynamicQueries(languages, artists, {
+      primaryLanguage: data.primaryLanguage,
+      languageWeights: data.languageWeights,
+    });
 
-    // Pick 4 dynamic new queries and 4 dynamic old queries (randomized on refresh, seeded on daily view)
+    const nonceNum =
+      typeof data.refreshNonce === "number"
+        ? Math.abs(data.refreshNonce)
+        : typeof data.refreshNonce === "string"
+          ? Math.abs(
+              data.refreshNonce.split("").reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0),
+            )
+          : 0;
+    const refreshShift = nonceNum > 0 ? (nonceNum % 11) + 1 : 0;
+
+    const rotateQueries = (arr: string[], offset: number) => {
+      if (arr.length === 0) return [];
+      const normalized = offset % arr.length;
+      return [...arr.slice(normalized), ...arr.slice(0, normalized)];
+    };
+
+    // Pick dynamic new queries and dynamic old queries (randomized on refresh, seeded on daily view)
     const pickedNew = data.refreshNonce
-      ? shuffleArray(newQueries).slice(0, 4)
+      ? shuffleArray(rotateQueries(newQueries, refreshShift)).slice(0, 4)
       : seededShuffleArray(newQueries, `${dateSeed}-new`).slice(0, 4);
 
     let pickedQueries: string[];
@@ -1495,40 +1542,33 @@ export const getDailyMix = createServerFn({ method: "POST" })
       const popularQueries: string[] = [];
       const activeLangs = languages.length > 0 ? languages : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
       for (const lang of activeLangs) {
-        popularQueries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
-        popularQueries.push(`${lang} Most Popular Viral Songs`);
+        popularQueries.push(`${lang} soundtrack hits`);
+        popularQueries.push(`${lang} super hits`);
+        popularQueries.push(`${lang} melody mix`);
         popularQueries.push(`Top 50 ${lang} songs`);
       }
-      const pickedPopular = shuffleArray(popularQueries).slice(0, 4);
+      const pickedPopular = data.refreshNonce
+        ? shuffleArray(rotateQueries(popularQueries, refreshShift)).slice(0, 4)
+        : seededShuffleArray(popularQueries, `${dateSeed}-popular`).slice(0, 4);
       pickedQueries = [...pickedNew, ...pickedPopular];
     } else {
       const pickedOld = data.refreshNonce
-        ? shuffleArray(oldQueries).slice(0, 4)
+        ? shuffleArray(rotateQueries(oldQueries, refreshShift)).slice(0, 4)
         : seededShuffleArray(oldQueries, `${dateSeed}-old`).slice(0, 4);
-      pickedQueries = [...pickedNew, ...pickedOld];
+      // Generate artist-specific mix queries (radio mix, best songs) instead of copying Explore trending/new releases
+      const artistMixQueries: string[] = [];
+      for (const art of artists.slice(0, 6)) {
+        artistMixQueries.push(`${art} radio mix`);
+        artistMixQueries.push(`best of ${art}`);
+      }
+      const pickedArtistMix = data.refreshNonce
+        ? shuffleArray(rotateQueries(artistMixQueries, refreshShift)).slice(0, 4)
+        : seededShuffleArray(artistMixQueries, `${dateSeed}-art`).slice(0, 4);
+      pickedQueries = [...pickedNew, ...pickedOld, ...pickedArtistMix];
     }
 
-    const [queryCandidates, trendingCandidates, newReleasesCandidates] = await Promise.all([
-      runQueryBatch(pickedQueries, 10, true, bypassCache),
-      (async () => {
-        try {
-          const { getSaavnTrendingSongs } = await import("./providers/saavn");
-          return await getSaavnTrendingSongs(languages, 12);
-        } catch {
-          return [];
-        }
-      })(),
-      (async () => {
-        try {
-          const { getSaavnNewReleases } = await import("./providers/saavn");
-          return await getSaavnNewReleases(languages, 10);
-        } catch {
-          return [];
-        }
-      })(),
-    ]);
+    const queryCandidates = await runQueryBatch(pickedQueries, 12, true, bypassCache);
 
-    const combined = [...queryCandidates, ...(trendingCandidates as Track[]), ...(newReleasesCandidates as Track[])];
     const seenIds = new Set<string>();
     const seenKeys = new Set<string>();
     const deduplicatedCandidates: Track[] = [];
@@ -1538,13 +1578,15 @@ export const getDailyMix = createServerFn({ method: "POST" })
       const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
       return norm(t || "");
     }));
+    const excludeSet = new Set((data.exclude || []).map((s) => norm(s)));
 
-    for (const t of combined) {
+    for (const t of queryCandidates) {
       if (!t || !t.id || seenIds.has(t.id)) continue;
       const key = getTrackDedupeKey(t.title, t.artist);
       if (key && seenKeys.has(key)) continue;
       const titleKey = norm(t.title);
       if (likedSet.has(key) || likedTitleSet.has(titleKey)) continue;
+      if (excludeSet.has(t.id) || (key && excludeSet.has(key)) || excludeSet.has(titleKey)) continue;
       if (key) seenKeys.add(key);
       seenIds.add(t.id);
       deduplicatedCandidates.push(t);

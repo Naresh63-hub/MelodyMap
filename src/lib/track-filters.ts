@@ -177,9 +177,22 @@ export const SPOKEN_AND_PROMO_REGEX =
   /\b(speech|speeches|pravachanam|pravachan|discourse|web\s*series|kadapa|short\s*film|promo|first\s*look|motion\s*poster|glimpse|press\s*meet|audio\s*launch|dialogue\s*promo|dialogue|interview|scene|scenes)\b/i;
 
 /**
+ * Titles that name a COLLECTION rather than a song — mood/era/star playlists
+ * packaged as if they were tracks ("Prabhas Romantic Mood", "Romantic 90's",
+ * "Love Songs Jukebox"). These uploads are setlists, not individual songs, and
+ * must never reach the play queue or the feed.
+ *
+ * Every branch pairs a qualifier with a collection word, so ordinary titles
+ * such as "Mood", "Romantic", "Melody" or "90's Love" stay allowed.
+ */
+export const PLAYLIST_COLLECTION_REGEX =
+  /\b(romantic|love|melody|melodies|sad|breakup|rainy|night|mass|retro|evergreen|devotional|party|workout|friendship|feel\s+good)\s+(songs?|mood|melodies|hits|mix|special|playlist|collection)\b|\b(90'?s|80'?s|70'?s|2000s|nineties|eighties)\b[^|]{0,24}\b(songs?|hits|melodies|special|playlist|mix|collection)\b|\b(songs?|hits|melodies|playlist|collection)\b[^|]{0,24}\b(90'?s|80'?s|70'?s|2000s)\b|\b(romantic|love|melody|melodies|sad|evergreen|retro|classic|best)\s+(90'?s|80'?s|70'?s|2000s)\b|\b(best\s+of|all\s+time|top\s+\d+|jukebox|playlist|non[\s-]?stop)\b/i;
+
+/**
  * Strict validator to guarantee a track is an original song.
  * Rejects remixes, covers, mixes, mashups, instrumentals, acoustic cuts, lofi,
- * cheap local compilations, devotional hymns, and spoken-word promos.
+ * cheap local compilations, playlist/collection uploads, devotional hymns, and
+ * spoken-word promos.
  */
 export function isOriginalSong(track: {
   title?: string | undefined;
@@ -203,6 +216,11 @@ export function isOriginalSong(track: {
   if (LOCAL_COMPILATION_REGEX.test(title)) return false;
   if (album && LOCAL_COMPILATION_REGEX.test(album)) return false;
   if (subtitle && LOCAL_COMPILATION_REGEX.test(subtitle)) return false;
+
+  // 2b. Reject playlist/compilation uploads (mood, era and "best of" sets)
+  if (PLAYLIST_COLLECTION_REGEX.test(title)) return false;
+  if (album && PLAYLIST_COLLECTION_REGEX.test(album)) return false;
+  if (subtitle && PLAYLIST_COLLECTION_REGEX.test(subtitle)) return false;
 
   // 3. Reject devotional / religious temple chants & hymns
   if (DEVOTIONAL_REGEX.test(title)) return false;

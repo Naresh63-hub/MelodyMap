@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/library";
+import { sameSong } from "@/lib/feed-freshness";
 
 type Props = {
   tracks: Track[];
@@ -34,7 +35,23 @@ export function MobileQueue({
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
   const current = tracks[index];
-  const upcoming = tracks.slice(index + 1);
+
+  // Deduplicate upcoming: exclude any track matching current, previously played in this queue, or repeated in upcoming
+  const seenIds = new Set<string>();
+  if (current?.id) seenIds.add(current.id);
+  for (let p = 0; p <= index; p++) {
+    if (tracks[p]?.id) seenIds.add(tracks[p]!.id);
+  }
+
+  const upcomingEntries: { track: Track; realIndex: number }[] = [];
+  for (let i = index + 1; i < tracks.length; i++) {
+    const t = tracks[i];
+    if (!t?.id) continue;
+    if (current && (t.id === current.id || sameSong(t, current))) continue;
+    if (seenIds.has(t.id) || upcomingEntries.some((item) => sameSong(item.track, t))) continue;
+    seenIds.add(t.id);
+    upcomingEntries.push({ track: t, realIndex: i });
+  }
 
   return (
     <div
@@ -118,14 +135,13 @@ export function MobileQueue({
           )}
 
           {/* Upcoming */}
-          {upcoming.length > 0 && (
+          {upcomingEntries.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-1">
                 Next Up
               </p>
               <div className="space-y-1">
-                {upcoming.map((track, i) => {
-                  const realIndex = index + 1 + i;
+                {upcomingEntries.map(({ track, realIndex }) => {
                   const isDragging = dragIndex === realIndex;
                   const isOver = overIndex === realIndex;
                   return (
@@ -195,7 +211,7 @@ export function MobileQueue({
           )}
 
           {/* Empty upcoming state */}
-          {current && upcoming.length === 0 && (
+          {current && upcomingEntries.length === 0 && (
             <div className="py-8 text-center">
               <p className="text-xs text-muted-foreground">No more songs in queue</p>
               <p className="text-[11px] text-muted-foreground/60 mt-1">Select any song or album to add to Up Next</p>

@@ -1,18 +1,20 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useState, useEffect, useMemo } from "react";
 import {
   Camera,
   ChevronRight,
+  Clock,
   Download,
   Heart,
   HelpCircle,
   Info,
   ListMusic,
   LogOut,
+  Music,
   Settings,
+  Sparkles,
   User,
 } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
-import { MusicWaveBanner } from "./MusicWaveBanner";
 import type { NavTab } from "../layout/Sidebar";
 import { CURRENT_APP_VERSION, getCurrentAppVersion } from "@/lib/app-update";
 
@@ -20,6 +22,9 @@ interface ProfilePanelProps {
   userName?: string | undefined;
   userEmail?: string | null | undefined;
   userAvatar?: string | null | undefined;
+  songsPlayedCount?: number;
+  listeningHours?: number;
+  likedSongsCount?: number;
   onNavigate: (tab: NavTab) => void;
   onOpenSettings: () => void;
   onSignOut?: () => Promise<void> | void;
@@ -30,12 +35,15 @@ interface ProfilePanelProps {
 
 /**
  * Screen 12: Profile and Account Overview
- * Matches the uploaded UI reference images for both Midnight Music (Dark)
- * and Purple Dream (Light).
+ * Designed with a bright premium white theme (#FFFFFF, #F8F5FF, #E9DDFB, #211536, #746A85).
+ * Real application statistics, interactive menu items, and balanced spacing.
  */
 export const ProfilePanel = memo(function ProfilePanel({
   userName = "Naresh G",
   userAvatar,
+  songsPlayedCount = 0,
+  listeningHours = 0,
+  likedSongsCount,
   onNavigate,
   onOpenSettings,
   onSignOut,
@@ -48,6 +56,16 @@ export const ProfilePanel = memo(function ProfilePanel({
   useEffect(() => {
     void getCurrentAppVersion().then(setAppVersion);
   }, []);
+
+  const formattedListeningTime = useMemo(() => {
+    if (listeningHours <= 0) return "0h";
+    if (listeningHours < 1) {
+      const mins = Math.max(1, Math.round(listeningHours * 60));
+      return `${mins}m`;
+    }
+    return `${Math.round(listeningHours)}h`;
+  }, [listeningHours]);
+
   const menuItems = [
     {
       id: "playlists",
@@ -71,6 +89,7 @@ export const ProfilePanel = memo(function ProfilePanel({
       id: "likes",
       label: "Liked Songs",
       icon: Heart,
+      badge: typeof likedSongsCount === "number" && likedSongsCount > 0 ? `${likedSongsCount}` : undefined,
       onClick: () => {
         triggerHaptic("selection");
         onNavigate("likes");
@@ -106,16 +125,16 @@ export const ProfilePanel = memo(function ProfilePanel({
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-3.5 py-5 sm:px-6 lg:px-8 space-y-5 sm:space-y-6 pb-28 max-w-2xl mx-auto w-full animate-fade-in relative">
+    <div className="flex-1 overflow-y-auto px-3.5 py-5 sm:px-6 lg:px-8 space-y-4 sm:space-y-5 pb-8 sm:pb-12 max-w-2xl mx-auto w-full animate-fade-in relative">
       {/* User Hero Section */}
-      <div className="flex flex-col items-center text-center space-y-3 pt-2">
+      <div className="flex flex-col items-center text-center space-y-2.5 pt-1">
         <div className="relative group shrink-0">
-          <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-gradient-to-tr from-[#7C3AED] via-[#A855F7] to-[#FF8A35] p-1 shadow-lg shadow-purple-900/20">
-            <div className="h-full w-full rounded-full overflow-hidden bg-card flex items-center justify-center">
+          <div className="h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-gradient-to-tr from-[#8B5CF6] via-[#A855F7] to-[#FF8A35] p-1 shadow-lg shadow-purple-900/15">
+            <div className="h-full w-full rounded-full overflow-hidden bg-white dark:bg-card flex items-center justify-center">
               {userAvatar ? (
                 <img src={userAvatar} alt={userName} className="h-full w-full object-cover" />
               ) : (
-                <span className="text-3xl font-bold text-primary">
+                <span className="text-3xl font-extrabold text-[#8B5CF6] dark:text-primary">
                   {userName?.[0]?.toUpperCase() || "N"}
                 </span>
               )}
@@ -125,31 +144,31 @@ export const ProfilePanel = memo(function ProfilePanel({
             type="button"
             onClick={onOpenSettings}
             aria-label="Edit Profile Photo"
-            className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full bg-[#7C3AED] text-white shadow-md hover:bg-[#6D28D9] transition-transform active:scale-95 cursor-pointer"
+            className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-full bg-[#8B5CF6] text-white shadow-md hover:bg-[#7C3AED] transition-transform active:scale-95 cursor-pointer"
           >
             <Camera className="h-4 w-4" />
           </button>
         </div>
 
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-black text-[#211536] dark:text-foreground tracking-tight">
             {userName}
           </h2>
-          <div className="flex items-center justify-center gap-1.5 mt-1 text-xs text-muted-foreground">
-            <span className="font-medium text-[#7C3AED] dark:text-[#A855F7]">Free Plan</span>
+          <div className="flex items-center justify-center gap-1.5 mt-1 text-xs text-[#746A85] dark:text-muted-foreground">
+            <span className="font-semibold text-[#8B5CF6] dark:text-[#A855F7]">Free Plan</span>
             <span>·</span>
             <span>{isCloudAuth ? "Cloud Synced" : "Local Device"}</span>
           </div>
 
           {/* Edit Profile Action Button placed cleanly below account status */}
-          <div className="mt-3.5 flex justify-center">
+          <div className="mt-3 flex justify-center">
             <button
               type="button"
               onClick={() => {
                 triggerHaptic("selection");
                 onOpenSettings();
               }}
-              className="inline-flex items-center justify-center gap-1.5 px-5 py-2 min-h-[38px] rounded-full text-xs font-semibold text-primary bg-card hover:bg-surface-hover border border-primary/25 hover:border-primary/50 shadow-xs hover:shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-5 py-1.5 min-h-[38px] rounded-full text-xs font-semibold text-[#8B5CF6] dark:text-primary bg-white dark:bg-card hover:bg-[#F8F5FF] dark:hover:bg-surface-hover border border-[#E9DDFB] dark:border-primary/25 hover:border-[#8B5CF6]/50 shadow-xs hover:shadow-sm transition-all active:scale-95 cursor-pointer"
             >
               <span>Edit Profile</span>
             </button>
@@ -157,28 +176,67 @@ export const ProfilePanel = memo(function ProfilePanel({
         </div>
       </div>
 
+      {/* Real Application Statistics Section */}
+      <div className="rounded-2xl border border-[#E9DDFB] dark:border-purple-800/30 bg-white dark:bg-card p-4 sm:p-5 shadow-xs">
+        <div className="flex items-center justify-between mb-3 text-xs font-semibold text-[#746A85] dark:text-muted-foreground uppercase tracking-wider">
+          <span className="flex items-center gap-1.5 font-bold text-[#211536] dark:text-foreground">
+            <Sparkles className="h-3.5 w-3.5 text-[#8B5CF6]" />
+            Your Activity
+          </span>
+          <span className="text-[11px] font-medium text-[#8B5CF6] dark:text-[#A855F7] lowercase">live stats</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 divide-x divide-[#E9DDFB] dark:divide-border">
+          <div className="text-center px-2">
+            <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-[#746A85] dark:text-muted-foreground mb-1">
+              <Music className="h-3.5 w-3.5 text-[#8B5CF6]" />
+              <span>Songs Played</span>
+            </div>
+            <p className="text-2xl sm:text-3xl font-extrabold text-[#211536] dark:text-foreground font-display tracking-tight">
+              {songsPlayedCount}
+            </p>
+          </div>
+          <div className="text-center px-2">
+            <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-[#746A85] dark:text-muted-foreground mb-1">
+              <Clock className="h-3.5 w-3.5 text-[#EC4899]" />
+              <span>Listening Time</span>
+            </div>
+            <p className="text-2xl sm:text-3xl font-extrabold text-[#211536] dark:text-foreground font-display tracking-tight">
+              {formattedListeningTime}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Menu Navigation Items */}
-      <div className="rounded-2xl border border-border bg-card divide-y divide-border overflow-hidden shadow-xs">
-        {menuItems.map(({ id, label, icon: Icon, onClick }) => (
+      <div className="rounded-2xl border border-[#E9DDFB] dark:border-border bg-white dark:bg-card divide-y divide-[#E9DDFB] dark:divide-border overflow-hidden shadow-xs">
+        {menuItems.map(({ id, label, icon: Icon, badge, onClick }) => (
           <button
             key={id}
             type="button"
             onClick={onClick}
-            className="flex w-full items-center justify-between p-3.5 sm:p-4 text-left text-sm font-medium text-foreground hover:bg-surface-hover transition-colors active:scale-[0.99] cursor-pointer"
+            className="flex w-full items-center justify-between p-3.5 sm:p-4 text-left text-sm font-medium text-[#211536] dark:text-foreground hover:bg-[#F8F5FF] dark:hover:bg-surface-hover transition-colors active:scale-[0.99] cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#8B5CF6]/10 text-[#8B5CF6]">
                 <Icon className="h-4.5 w-4.5" />
               </div>
-              <span className="font-medium">{label}</span>
+              <span className="font-semibold text-sm">{label}</span>
             </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              {badge && (
+                <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-[#8B5CF6]/15 text-[#8B5CF6] dark:text-[#C084FC]">
+                  {badge}
+                </span>
+              )}
+              <ChevronRight className="h-4 w-4 text-[#746A85] dark:text-muted-foreground" />
+            </div>
           </button>
         ))}
       </div>
 
       {/* Sign In / Sign Out Button */}
-      <div className="pt-2">
+      <div className="pt-1">
         {isCloudAuth ? (
           <button
             type="button"
@@ -192,7 +250,7 @@ export const ProfilePanel = memo(function ProfilePanel({
           <button
             type="button"
             onClick={onSignIn}
-            className="mm-btn-gradient flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-sm font-semibold shadow-md active:scale-95 cursor-pointer"
+            className="mm-btn-gradient flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 px-4 text-sm font-semibold shadow-md active:scale-95 cursor-pointer text-white"
           >
             <User className="h-4 w-4" />
             <span>Sign In to MelodyMap</span>
@@ -201,24 +259,21 @@ export const ProfilePanel = memo(function ProfilePanel({
       </div>
 
       {/* Version badge */}
-      <div className="flex flex-col items-center justify-center gap-1.5 pt-4 text-xs text-muted-foreground relative z-10">
+      <div className="flex flex-col items-center justify-center gap-1 pt-2 text-xs text-[#746A85] dark:text-muted-foreground relative z-10">
         <div className="flex items-center gap-2">
           <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
-          <span>Version {appVersion}</span>
+          <span className="font-medium">Version {appVersion}</span>
         </div>
         {onCheckForUpdates && (
           <button
             type="button"
             onClick={onCheckForUpdates}
-            className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline font-medium cursor-pointer"
+            className="text-[11px] text-[#8B5CF6] dark:text-violet-400 hover:underline font-semibold cursor-pointer"
           >
             Check for updates
           </button>
         )}
       </div>
-
-      {/* Bottom Signature Flowing Wave Ribbon */}
-      <MusicWaveBanner variant="bottom" />
     </div>
   );
 });
