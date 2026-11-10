@@ -69,7 +69,7 @@ export function GuestSignInPromptModal({
                   alt="MelodyMap"
                   width={36}
                   height={36}
-                  className="h-9 w-9 rounded-xl object-contain"
+                  className="h-9 w-9 object-contain drop-shadow-sm select-none"
                 />
               </picture>
             </div>

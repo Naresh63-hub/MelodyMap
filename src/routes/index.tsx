@@ -80,6 +80,13 @@ import { TrackList } from "@/components/music/TrackList";
 import { Button } from "@/components/ui/button";
 import { AuthModal } from "@/components/common/AuthModal";
 import { AccountSheet } from "@/components/common/AccountSheet";
+import { AppUpdateModal } from "@/components/music/ui/AppUpdateModal";
+import {
+  checkForAppUpdate,
+  getCurrentAppVersion,
+  type AppRelease,
+  CURRENT_APP_VERSION,
+} from "@/lib/app-update";
 
 import { useAuth } from "@/lib/auth";
 import { useJamSession } from "@/lib/use-jam-session";
@@ -327,6 +334,9 @@ function MusicApp() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAccountSheet, setShowAccountSheet] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<"signin" | "signup" | "profile">("signin");
+  const [appVersion, setAppVersion] = useState(CURRENT_APP_VERSION);
+  const [updateRelease, setUpdateRelease] = useState<AppRelease | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const [continuous, setContinuous] = useState(true);
@@ -443,6 +453,29 @@ function MusicApp() {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Background In-App APK update check (Option B)
+  useEffect(() => {
+    let active = true;
+    void getCurrentAppVersion().then((v) => {
+      if (active) setAppVersion(v);
+    });
+
+    // Check for published release with verified APK asset after 3.5s delay
+    const timer = setTimeout(() => {
+      void checkForAppUpdate({ force: false }).then((res) => {
+        if (active && res.isUpdateAvailable && res.latestRelease) {
+          setUpdateRelease(res.latestRelease);
+          setShowUpdateModal(true);
+        }
+      });
+    }, 3500);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
     };
   }, []);
 
@@ -3034,6 +3067,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
     if (Capacitor.isNativePlatform()) {
       App.addListener("backButton", ({ canGoBack }) => {
+        if (showUpdateModal) {
+          setShowUpdateModal(false);
+          return;
+        }
         if (showFeedbackSheet) {
           setShowFeedbackSheet(false);
           return;
@@ -3125,6 +3162,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     };
   }, [
     showAuthModal,
+    showUpdateModal,
     showFullScreen,
     showSettings,
     showQueue,
@@ -4445,6 +4483,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     setTimeout(() => setMessage(null), 3000);
                   }}
                   isCloudAuth={auth.isCloudAuth}
+                  onCheckForUpdates={async () => {
+                    setMessage("Checking for updates...");
+                    const res = await checkForAppUpdate({ force: true });
+                    if (res.isUpdateAvailable && res.latestRelease) {
+                      setUpdateRelease(res.latestRelease);
+                      setShowUpdateModal(true);
+                      setMessage(null);
+                    } else if (res.error) {
+                      setMessage("Could not check updates. Please try again later.");
+                      setTimeout(() => setMessage(null), 3000);
+                    } else {
+                      setMessage(`MelodyMap v${res.currentVersion} is up to date!`);
+                      setTimeout(() => setMessage(null), 3000);
+                    }
+                  }}
                 />
               </div>
             )}
@@ -4898,6 +4951,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onUpdateProfile={auth.updateProfile}
           onUpdatePassword={auth.updatePassword}
           onSignOut={auth.signOut}
+          onOpenUpdateModal={(rel) => {
+            setUpdateRelease(rel);
+            setShowUpdateModal(true);
+          }}
           onLibraryRestored={() => {
             setShowSettings(false);
             void loadRecommendations();
@@ -4991,6 +5048,35 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setShowAuthModal(true);
           }}
         />
+
+        {/* IN-APP APK UPDATE MODAL (OPTION B HANDOFF) */}
+        <AppUpdateModal
+          open={showUpdateModal}
+          onOpenChange={setShowUpdateModal}
+          updateInfo={updateRelease}
+          currentVersion={appVersion}
+        />
+
+        {/* ANDROID FIRST-EXPERIENCE EXIT FEEDBACK BOTTOM SHEET */}
+        <FeedbackBottomSheet
+          open={showFeedbackSheet}
+          onClose={() => setShowFeedbackSheet(false)}
+          onExit={() => {
+            setShowFeedbackSheet(false);
+            void App.exitApp();
+          }}
+          userId={auth.userId}
+          isGuest={!auth.userId || !auth.isCloudAuth}
+        />
+
+        {/* WEB/DESKTOP FIRST-EXPERIENCE NON-BLOCKING FEEDBACK PROMPT */}
+        {showWebFeedbackPrompt && !Capacitor.isNativePlatform() && (
+          <WebFeedbackPrompt
+            userId={auth.userId}
+            isGuest={!auth.userId || !auth.isCloudAuth}
+            onDismiss={() => setShowWebFeedbackPrompt(false)}
+          />
+        )}
       </Suspense>
 
       {/* MOBILE QUEUE BOTTOM SHEET (Top stacking order z-[70] over full-screen player and modals) */}

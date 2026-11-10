@@ -51,6 +51,9 @@ public class MainActivity extends BridgeActivity {
 
                 // Register Native Theme synchronization bridge
                 webView.addJavascriptInterface(new ThemeBridge(this), "AndroidTheme");
+
+                // Register Native APK Update bridge (Option B in-app installation)
+                webView.addJavascriptInterface(new UpdateBridge(this), "AndroidUpdate");
             }
         } catch (Exception ignored) {}
 

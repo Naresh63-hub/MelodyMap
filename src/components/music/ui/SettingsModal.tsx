@@ -25,6 +25,7 @@ import {
   Sun,
   Moon,
   Laptop,
+  RefreshCw,
 } from "lucide-react";
 import { loadEqualizerSettings, saveEqualizerSettings } from "@/lib/equalizer";
 import { useNavigate } from "@tanstack/react-router";
@@ -54,6 +55,12 @@ import type { Profile } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/lib/theme";
 import { isSafeAvatarUrl, getSafeAvatarUrl } from "@/lib/avatar-url";
+import {
+  checkForAppUpdate,
+  getCurrentAppVersion,
+  type AppRelease,
+  CURRENT_APP_VERSION,
+} from "@/lib/app-update";
 
 const PRESET_AVATARS = [
   { id: "cyber-dj", label: "Cyber DJ", url: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=160&auto=format&fit=crop&q=80" },
@@ -87,6 +94,7 @@ type Props = {
   onUpdatePassword?: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
   onSignOut?: () => Promise<void>;
   onLibraryRestored?: () => void;
+  onOpenUpdateModal?: (release: AppRelease) => void;
 };
 
 export function SettingsModal({
@@ -112,6 +120,7 @@ export function SettingsModal({
   onUpdatePassword,
   onSignOut,
   onLibraryRestored,
+  onOpenUpdateModal,
 }: Props) {
   const navigate = useNavigate();
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -140,6 +149,37 @@ export function SettingsModal({
   };
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // App Update State
+  const [appVersion, setAppVersion] = useState(CURRENT_APP_VERSION);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateStatusText, setUpdateStatusText] = useState<string | null>(null);
+  const [updateAvailableRelease, setUpdateAvailableRelease] = useState<AppRelease | null>(null);
+
+  useEffect(() => {
+    void getCurrentAppVersion().then((v) => setAppVersion(v));
+  }, []);
+
+  const handleManualCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateStatusText(null);
+    try {
+      const result = await checkForAppUpdate({ force: true });
+      if (result.isUpdateAvailable && result.latestRelease) {
+        setUpdateAvailableRelease(result.latestRelease);
+        setUpdateStatusText(`Update v${result.latestRelease.version} available!`);
+        onOpenUpdateModal?.(result.latestRelease);
+      } else if (result.error) {
+        setUpdateStatusText("Could not check updates. Check connection.");
+      } else {
+        setUpdateStatusText(`v${result.currentVersion} is the latest version!`);
+      }
+    } catch {
+      setUpdateStatusText("Could not check updates.");
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   // Profile Edit State
   const [displayName, setDisplayName] = useState(userProfile?.display_name || "");
@@ -1127,10 +1167,40 @@ export function SettingsModal({
             <ListeningInsightsPanel />
           )}
 
-          {/* Screen 11: Version 1.0.9 Footer Badge */}
-          <div className="flex items-center justify-center gap-2 pt-6 pb-2 text-xs text-muted-foreground border-t border-border">
-            <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
-            <span className="font-medium">Version 1.0.9</span>
+          {/* Screen 11: App Version & In-App Update Section */}
+          <div className="flex flex-col items-center justify-center gap-2 pt-6 pb-2 text-xs border-t border-border">
+            <div className="flex flex-wrap items-center justify-center gap-2 text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
+                <span className="font-semibold text-foreground/80">MelodyMap v{appVersion}</span>
+              </div>
+              <span className="text-muted-foreground/40 hidden sm:inline">·</span>
+              <button
+                type="button"
+                onClick={handleManualCheckUpdate}
+                disabled={checkingUpdate}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-violet-600/10 hover:bg-violet-600/20 text-violet-600 dark:text-violet-400 font-semibold transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={cn("w-3 h-3", checkingUpdate && "animate-spin")} />
+                <span>{checkingUpdate ? "Checking..." : "Check for Updates"}</span>
+              </button>
+            </div>
+
+            {updateStatusText && (
+              <div className="flex items-center gap-1.5 text-[11px] font-medium animate-in fade-in">
+                {updateAvailableRelease ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenUpdateModal?.(updateAvailableRelease)}
+                    className="text-violet-600 dark:text-violet-400 font-bold underline cursor-pointer hover:opacity-80"
+                  >
+                    {updateStatusText} (Tap to install)
+                  </button>
+                ) : (
+                  <span className="text-muted-foreground">{updateStatusText}</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>

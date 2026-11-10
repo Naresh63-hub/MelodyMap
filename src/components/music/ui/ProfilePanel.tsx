@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState, useEffect } from "react";
 import {
   Camera,
   ChevronRight,
@@ -14,6 +14,7 @@ import {
 import { triggerHaptic } from "@/lib/haptics";
 import { MusicWaveBanner } from "./MusicWaveBanner";
 import type { NavTab } from "../layout/Sidebar";
+import { CURRENT_APP_VERSION, getCurrentAppVersion } from "@/lib/app-update";
 
 interface ProfilePanelProps {
   userName?: string | undefined;
@@ -24,6 +25,7 @@ interface ProfilePanelProps {
   onSignOut?: () => Promise<void> | void;
   onSignIn?: () => void;
   isCloudAuth?: boolean;
+  onCheckForUpdates?: () => void;
 }
 
 /**
@@ -39,7 +41,13 @@ export const ProfilePanel = memo(function ProfilePanel({
   onSignOut,
   onSignIn,
   isCloudAuth = false,
+  onCheckForUpdates,
 }: ProfilePanelProps) {
+  const [appVersion, setAppVersion] = useState(CURRENT_APP_VERSION);
+
+  useEffect(() => {
+    void getCurrentAppVersion().then(setAppVersion);
+  }, []);
   const menuItems = [
     {
       id: "playlists",
@@ -193,9 +201,20 @@ export const ProfilePanel = memo(function ProfilePanel({
       </div>
 
       {/* Version badge */}
-      <div className="flex items-center justify-center gap-2 pt-4 text-xs text-muted-foreground relative z-10">
-        <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
-        <span>Version 1.0.9</span>
+      <div className="flex flex-col items-center justify-center gap-1.5 pt-4 text-xs text-muted-foreground relative z-10">
+        <div className="flex items-center gap-2">
+          <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
+          <span>Version {appVersion}</span>
+        </div>
+        {onCheckForUpdates && (
+          <button
+            type="button"
+            onClick={onCheckForUpdates}
+            className="text-[11px] text-violet-600 dark:text-violet-400 hover:underline font-medium cursor-pointer"
+          >
+            Check for updates
+          </button>
+        )}
       </div>
 
       {/* Bottom Signature Flowing Wave Ribbon */}
