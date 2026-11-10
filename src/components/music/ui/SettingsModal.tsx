@@ -1129,7 +1129,7 @@ export function SettingsModal({
 
           {/* Screen 11: Version 1.0.9 Footer Badge */}
           <div className="flex items-center justify-center gap-2 pt-6 pb-2 text-xs text-muted-foreground border-t border-border">
-            <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4 w-4 rounded-md object-contain" />
+            <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
             <span className="font-medium">Version 1.0.9</span>
           </div>
         </div>

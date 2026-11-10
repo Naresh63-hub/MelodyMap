@@ -127,12 +127,15 @@ export function Sidebar({
           collapsed && "justify-center px-2",
         )}
       >
-        <div className="relative shrink-0">
-          <img
-            src="/brand/app-icon.png"
-            alt="MelodyMap"
-            className="h-8 w-8 rounded-xl object-contain shadow-sm ring-1 ring-primary/30"
-          />
+        <div className="relative shrink-0 flex items-center justify-center">
+          <picture>
+            <source srcSet="/brand/app-icon.webp" type="image/webp" />
+            <img
+              src="/brand/app-icon.png"
+              alt="MelodyMap"
+              className="h-9 w-9 object-contain drop-shadow-sm select-none"
+            />
+          </picture>
         </div>
         {!collapsed && (
           <div className="min-w-0 animate-fade-in-up">

@@ -101,12 +101,21 @@ export function AccountSheet({
                 <DialogDescription className="text-xs text-muted-foreground truncate mt-0.5">
                   {email}
                 </DialogDescription>
-                <div className="mt-1.5 flex items-center gap-1.5">
+                <div className="mt-1.5 flex items-center justify-between gap-1.5">
                   {auth.isCloudAuth ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                      <CheckCircle2 className="h-2.5 w-2.5" />
-                      Cloud Synced
-                    </span>
+                    <>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        <CheckCircle2 className="h-2.5 w-2.5" />
+                        Cloud Synced
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleAction(onOpenSettings)}
+                        className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                      >
+                        Edit Profile
+                      </button>
+                    </>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-chip text-muted-foreground border border-hair">
                       Guest Mode

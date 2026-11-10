@@ -17,12 +17,83 @@ export type Profile = {
   provider?: string | null;
 };
 
+export function getInitialCachedAuthState(): {
+  userId: string | null;
+  isCloudAuth: boolean;
+  email: string | null;
+  profile: Profile | null;
+} {
+  try {
+    const len = safeStorage.length || 0;
+    for (let i = 0; i < len; i++) {
+      const k = safeStorage.key(i);
+      if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+        const raw = safeStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const session = parsed?.currentSession || parsed;
+          const user = session?.user;
+          const expiresAt = session?.expires_at;
+          const isExpired = expiresAt ? expiresAt * 1000 < Date.now() : false;
+          if (user?.id && !isExpired) {
+            const isAnonymous = Boolean(user.is_anonymous);
+            const userProvider = user.app_metadata?.provider || (isAnonymous ? "anonymous" : "email");
+            const displayName =
+              user.user_metadata?.display_name ||
+              user.user_metadata?.full_name ||
+              user.email?.split("@")[0] ||
+              "Listener";
+            return {
+              userId: user.id,
+              isCloudAuth: !isAnonymous,
+              email: user.email || null,
+              profile: {
+                id: user.id,
+                display_name: displayName,
+                avatar_url: user.user_metadata?.avatar_url || null,
+                email: user.email || null,
+                provider: userProvider,
+              },
+            };
+          }
+        }
+      }
+    }
+
+    const rawLocal = safeStorage.getItem("melodymap.local_user");
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal);
+      if (parsed && typeof parsed === "object") {
+        const localId = parsed.id || "local-listener";
+        return {
+          userId: localId,
+          isCloudAuth: false,
+          email: parsed.email || null,
+          profile: {
+            id: localId,
+            display_name: parsed.name || parsed.display_name || "Listener",
+            avatar_url: parsed.avatar_url || null,
+          },
+        };
+      }
+    }
+  } catch {}
+
+  return {
+    userId: null,
+    isCloudAuth: false,
+    email: null,
+    profile: null,
+  };
+}
+
 /** Session + profile for the signed-in listener backed by Supabase Auth & PostgreSQL */
 export function useAuth() {
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isCloudAuth, setIsCloudAuth] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [initialState] = useState(getInitialCachedAuthState);
+  const [userId, setUserId] = useState<string | null>(initialState.userId);
+  const [isCloudAuth, setIsCloudAuth] = useState(initialState.isCloudAuth);
+  const [email, setEmail] = useState<string | null>(initialState.email);
+  const [profile, setProfile] = useState<Profile | null>(initialState.profile);
   const [ready, setReady] = useState(false);
 
   // Sync profile from Supabase profiles table

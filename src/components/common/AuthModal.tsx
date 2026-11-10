@@ -62,7 +62,9 @@ export function AuthModal({
       setName(currentName);
       setEmail(currentEmail);
 
-      if (defaultMode && (defaultMode === "signin" || defaultMode === "signup")) {
+      if (auth.isCloudAuth && defaultMode !== "signup") {
+        setMode("profile");
+      } else if (defaultMode && (defaultMode === "signin" || defaultMode === "signup")) {
         setMode(defaultMode);
       } else if (auth.isCloudAuth) {
         setMode("profile");

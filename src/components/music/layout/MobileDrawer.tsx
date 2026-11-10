@@ -24,6 +24,7 @@ type Props = {
   onClose: () => void;
   onNavigate: (tab: NavTab) => void;
   onOpenSettings: () => void;
+  onManageAccount?: () => void;
   onOpenJam?: () => void;
   jamActive?: boolean;
   jamParticipantsCount?: number;
@@ -42,6 +43,7 @@ export function MobileDrawer({
   onClose,
   onNavigate,
   onOpenSettings,
+  onManageAccount,
   onOpenJam,
   jamActive = false,
   jamParticipantsCount = 1,
@@ -96,11 +98,14 @@ export function MobileDrawer({
         {/* Header with guaranteed clearance below Android status bar and camera cutouts */}
         <div className="flex items-center justify-between px-5 pb-4 drawer-safe-top border-b border-hair-strong bg-surface">
           <div className="flex items-center gap-2.5">
-            <img
-              src="/brand/app-icon.png"
-              alt="MelodyMap"
-              className="h-8 w-8 rounded-xl object-contain shadow-sm ring-1 ring-primary/30"
-            />
+            <picture className="shrink-0 flex items-center justify-center">
+              <source srcSet="/brand/app-icon.webp" type="image/webp" />
+              <img
+                src="/brand/app-icon.png"
+                alt="MelodyMap"
+                className="h-8.5 w-8.5 object-contain drop-shadow-sm select-none"
+              />
+            </picture>
             <span className="font-display text-base font-semibold">
               <span className="text-foreground">Melody</span>
               <span className="text-primary">Map</span>
@@ -119,12 +124,30 @@ export function MobileDrawer({
         {(() => {
           const displayUserName = userName === "Google Listener" ? "My Account" : userName;
           const displayInitial = displayUserName.charAt(0).toUpperCase() || "M";
+          const handleAccountAction = () => {
+            onClose();
+            if (isSynced) {
+              if (onManageAccount) {
+                onManageAccount();
+              } else {
+                onOpenSettings();
+              }
+            } else {
+              if (onSignIn) {
+                onSignIn();
+              }
+            }
+          };
+
           return (
             <div
-              onClick={() => {
-                if (onSignIn) {
-                  onClose();
-                  onSignIn();
+              onClick={handleAccountAction}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleAccountAction();
                 }
               }}
               className="flex items-center justify-between gap-3 px-5 py-3.5 bg-card border-b border-hair-strong cursor-pointer transition-colors hover:bg-chip"
@@ -148,7 +171,7 @@ export function MobileDrawer({
                     {displayUserName}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    {isSynced ? "Synced Account • Tap to edit" : "Tap to sign in / manage"}
+                    {isSynced ? "Synced Account • Tap to manage" : "Tap to sign in / manage"}
                   </p>
                 </div>
               </div>
@@ -157,8 +180,7 @@ export function MobileDrawer({
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onClose();
-                  if (onSignIn) onSignIn();
+                  handleAccountAction();
                 }}
                 className="shrink-0 rounded-full bg-chip border border-hair px-3 py-1 text-xs font-semibold text-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
               >

@@ -70,11 +70,14 @@ export function MobileHeader({
           </button>
         )}
 
-        <img
-          src="/brand/app-icon.png"
-          alt="MelodyMap"
-          className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl object-contain ring-1 ring-primary/30 shrink-0 shadow-sm"
-        />
+        <picture className="shrink-0 flex items-center justify-center">
+          <source srcSet="/brand/app-icon.webp" type="image/webp" />
+          <img
+            src="/brand/app-icon.png"
+            alt="MelodyMap"
+            className="h-9 w-9 sm:h-10 sm:w-10 object-contain drop-shadow-sm shrink-0 select-none"
+          />
+        </picture>
 
         <div className="min-w-0">
           <h1

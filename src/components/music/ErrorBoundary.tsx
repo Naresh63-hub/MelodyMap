@@ -66,7 +66,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <img
               src="/brand/app-icon.png"
               alt="MelodyMap"
-              className="h-16 w-16 mx-auto mb-4 rounded-xl object-contain shadow-md"
+              className="h-16 w-16 mx-auto mb-4 object-contain drop-shadow-md select-none"
             />
             <h1 className="text-xl font-bold text-foreground">
               {isStorageError ? "Storage restricted in this browser" : "Something went wrong"}

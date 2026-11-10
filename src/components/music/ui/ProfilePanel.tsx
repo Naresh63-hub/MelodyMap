@@ -194,7 +194,7 @@ export const ProfilePanel = memo(function ProfilePanel({
 
       {/* Version badge */}
       <div className="flex items-center justify-center gap-2 pt-4 text-xs text-muted-foreground relative z-10">
-        <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4 w-4 rounded-md object-contain" />
+        <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
         <span>Version 1.0.9</span>
       </div>
 

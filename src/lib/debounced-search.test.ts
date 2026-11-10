@@ -12,6 +12,7 @@ describe("Debounced Search Controller", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 

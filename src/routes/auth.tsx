@@ -447,12 +447,13 @@ function AuthPage() {
               <img
                 src="/brand/app-icon.png"
                 alt="MelodyMap"
-                className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-2xl object-contain shadow-md"
+                className="relative w-10 h-10 sm:w-11 sm:h-11 object-contain drop-shadow-md select-none"
               />
             </picture>
           </div>
-          <span className="text-xl sm:text-2xl font-black tracking-tight text-[#1A1033] dark:text-white font-display">
-            MelodyMap
+          <span className="text-xl sm:text-2xl font-black tracking-tight font-display">
+            <span className="text-[#080138] dark:text-white">Melody</span>
+            <span className="text-[#8E2EFC]">Map</span>
           </span>
         </Link>
 
@@ -543,7 +544,7 @@ function AuthPage() {
                     <img
                       src="/brand/app-icon.png"
                       alt="MelodyMap"
-                      className="relative w-12 h-12 rounded-2xl shadow-md object-contain"
+                      className="relative w-12 h-12 object-contain drop-shadow-md select-none"
                     />
                   </picture>
                 </div>

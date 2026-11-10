@@ -162,6 +162,9 @@ import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
 import { GuestSignInPromptModal } from "@/components/music/ui/GuestSignInPromptModal";
 import { ProfilePanel } from "@/components/music/ui/ProfilePanel";
+import { FeedbackBottomSheet } from "@/components/music/ui/FeedbackBottomSheet";
+import { WebFeedbackPrompt } from "@/components/music/ui/WebFeedbackPrompt";
+import { shouldPromptFeedback } from "@/lib/feedback";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -352,6 +355,9 @@ function MusicApp() {
   const [showEqualizer, setShowEqualizer] = useState(false);
   const [showJamModal, setShowJamModal] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const sessionStartTimeRef = useRef(Date.now());
+  const [showFeedbackSheet, setShowFeedbackSheet] = useState(false);
+  const [showWebFeedbackPrompt, setShowWebFeedbackPrompt] = useState(false);
   const [showFloatingMini, setShowFloatingMini] = useState(false);
   const [optionsTrack, setOptionsTrack] = useState<Track | null>(null);
   const [showSleepTimer, setShowSleepTimer] = useState(false);
@@ -3028,6 +3034,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
     if (Capacitor.isNativePlatform()) {
       App.addListener("backButton", ({ canGoBack }) => {
+        if (showFeedbackSheet) {
+          setShowFeedbackSheet(false);
+          return;
+        }
         if (showAuthModal) {
           setShowAuthModal(false);
           return;
@@ -3088,6 +3098,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           setTab("foryou");
           return;
         }
+        const sessionSeconds = Math.round((Date.now() - sessionStartTimeRef.current) / 1000);
+        if (shouldPromptFeedback({ historyCount: history.length, sessionDurationSeconds: sessionSeconds })) {
+          setShowFeedbackSheet(true);
+          return;
+        }
         if (canGoBack) {
           window.history.back();
         } else {
@@ -3123,7 +3138,30 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     createPlaylistTrack,
     drawerOpen,
     tab,
+    showFeedbackSheet,
+    history.length,
   ]);
+
+  // Web/Desktop first-experience non-blocking feedback prompt
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) return;
+    if (showWebFeedbackPrompt) return;
+
+    const checkEligibility = () => {
+      const sessionSeconds = Math.round((Date.now() - sessionStartTimeRef.current) / 1000);
+      if (shouldPromptFeedback({ historyCount: history.length, sessionDurationSeconds: sessionSeconds })) {
+        setShowWebFeedbackPrompt(true);
+      }
+    };
+
+    if (history.length >= 1) {
+      const timer = setTimeout(checkEligibility, 2500);
+      return () => clearTimeout(timer);
+    }
+
+    const interval = setInterval(checkEligibility, 15000);
+    return () => clearInterval(interval);
+  }, [history.length, showWebFeedbackPrompt]);
 
   const onSearch = (event: React.FormEvent) => {
     event.preventDefault();
@@ -3804,6 +3842,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         onOpenSettings={() => {
           setDrawerOpen(false);
           setShowSettings(true);
+        }}
+        onManageAccount={() => {
+          setDrawerOpen(false);
+          setShowAccountSheet(true);
         }}
         onOpenJam={() => {
           setDrawerOpen(false);
