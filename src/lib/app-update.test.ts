@@ -219,15 +219,15 @@ describe("In-App Update Engine (app-update.ts)", () => {
         ok: true,
         json: async () => [
           {
-            tag_name: "v1.3.8",
-            name: "MelodyMap v1.3.8",
+            tag_name: "v1.3.9",
+            name: "MelodyMap v1.3.9",
             published_at: "2026-10-06T12:00:00Z",
             draft: false,
             assets: [
               {
-                name: "MelodyMap-v1.3.8.apk",
+                name: "MelodyMap-v1.3.9.apk",
                 size: 20000000,
-                browser_download_url: "https://github.com/Naresh63-hub/MelodyMap/releases/download/v1.3.8/app.apk",
+                browser_download_url: "https://github.com/Naresh63-hub/MelodyMap/releases/download/v1.3.9/app.apk",
               },
             ],
           },

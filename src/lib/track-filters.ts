@@ -185,8 +185,26 @@ export const SPOKEN_AND_PROMO_REGEX =
  * Every branch pairs a qualifier with a collection word, so ordinary titles
  * such as "Mood", "Romantic", "Melody" or "90's Love" stay allowed.
  */
-export const PLAYLIST_COLLECTION_REGEX =
-  /\b(romantic|love|melody|melodies|sad|breakup|rainy|night|mass|retro|evergreen|devotional|party|workout|friendship|feel\s+good)\s+(songs?|mood|melodies|hits|mix|special|playlist|collection)\b|\b(90'?s|80'?s|70'?s|2000s|nineties|eighties)\b[^|]{0,24}\b(songs?|hits|melodies|special|playlist|mix|collection)\b|\b(songs?|hits|melodies|playlist|collection)\b[^|]{0,24}\b(90'?s|80'?s|70'?s|2000s)\b|\b(romantic|love|melody|melodies|sad|evergreen|retro|classic|best)\s+(90'?s|80'?s|70'?s|2000s)\b|\b(best\s+of|all\s+time|top\s+\d+|jukebox|playlist|non[\s-]?stop)\b/i;
+export const PLAYLIST_COLLECTION_REGEX = new RegExp(
+  [
+    // "Prabhas Romantic Mood", "Retro Hits", "Evergreen Melodies", "Love Playlist"
+    String.raw`\b(romantic|love|melody|sad|breakup|rainy|monsoon|night|mass|retro|evergreen|party|workout|friendship|feel\s+good)\s+(mood|playlist|collection|melodies|hits|special)\b`,
+    // "Telugu Love Songs", "Mass Songs" — plural only, so "Love Song" stays valid
+    String.raw`\b(romantic|love|sad|melody|retro|evergreen|mass|breakup|rainy|monsoon|workout|friendship)\s+songs\b`,
+    // "Romantic 90's", "Best of 80s", "Classic 2000s"
+    String.raw`\b(romantic|love|melody|melodies|sad|evergreen|retro|classic|best)\s+(90['']?s|80['']?s|70['']?s|2000s)\b`,
+    // "90's Songs", "Tollywood Songs 90s", "90s Hits"
+    String.raw`\b(90['']?s|80['']?s|70['']?s|2000s)\b[^|]{0,24}\b(songs|hits|melodies|special|playlist|collection)\b`,
+    String.raw`\b(songs|hits|melodies)\b[^|]{0,24}\b(90['']?s|80['']?s|70['']?s|2000s)\b`,
+    // "Best of Arijit Singh", "Top 50 Telugu", "All time hits"
+    String.raw`\bbest\s+of\s+\S+\s+\S+|(?:^|[^a-z])top\s+\d{1,3}\b|\ball\s+time\s+(?:hits|classics|greatest|favourites|favorites)\b`,
+    // "Playlist", "Songs Jukebox", "Superhit Jukebox" (bare "Jukebox Hero" stays valid)
+    String.raw`\bplaylist\b|\b(songs?|audio|hits?|superhits?|melodies)\s+jukebox\b|\bjukebox\s+(songs?|audio|hits?|melodies|playlist)\b`,
+    // "Non stop songs", "Non-stop hits"
+    String.raw`\bnon[\s-]?stop\s+(songs?|hits|mix|playlist|melodies)\b`,
+  ].join("|"),
+  "i",
+);
 
 /**
  * Strict validator to guarantee a track is an original song.

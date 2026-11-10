@@ -25,6 +25,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { CURRENT_APP_VERSION } from "@/lib/app-update";
 
 interface AccountSheetProps {
   open: boolean;
@@ -343,7 +344,7 @@ export function AccountSheet({
           )}
 
           <p className="text-center text-[10px] text-muted-foreground/60 tracking-wider font-mono">
-            MelodyMap v1.3.8 · Pure Sound
+            MelodyMap v{CURRENT_APP_VERSION} · Pure Sound
           </p>
         </div>
       </DialogContent>

@@ -14,7 +14,7 @@
 import { App } from "@capacitor/app";
 import { safeStorage } from "@/lib/safe-storage";
 
-export const CURRENT_APP_VERSION = "1.3.8";
+export const CURRENT_APP_VERSION = "1.3.9";
 
 const GITHUB_REPO = "Naresh63-hub/MelodyMap";
 const GITHUB_RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=10`;
