@@ -81,7 +81,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover",
+      },
       { name: "theme-color", content: "#10091f" },
       { name: "color-scheme", content: "dark" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
@@ -171,6 +174,20 @@ function RootShell({ children }: { children: ReactNode }) {
               'document.documentElement.style.colorScheme="dark";' +
               'var mt=document.querySelector(\'meta[name="theme-color"]\');if(mt)mt.content="#0b0813";' +
               'if(window.AndroidTheme&&window.AndroidTheme.setStatusBarTheme){window.AndroidTheme.setStatusBarTheme(false);}' +
+              '}' +
+              '}catch(e){}})();',
+          }}
+        />
+        {/* Native mobile touch & zoom lock: block pinch-zoom and double-tap gestures */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{' +
+              'if(typeof document!=="undefined"){' +
+              'document.addEventListener("gesturestart",function(e){e.preventDefault();},{passive:false});' +
+              'document.addEventListener("gesturechange",function(e){e.preventDefault();},{passive:false});' +
+              'document.addEventListener("gestureend",function(e){e.preventDefault();},{passive:false});' +
+              'document.addEventListener("touchstart",function(e){if(e.touches&&e.touches.length>1){e.preventDefault();}},{passive:false});' +
               '}' +
               '}catch(e){}})();',
           }}

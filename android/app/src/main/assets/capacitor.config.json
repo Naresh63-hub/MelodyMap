@@ -8,7 +8,8 @@
 	},
 	"android": {
 		"allowMixedContent": false,
-		"backgroundColor": "#10091f"
+		"backgroundColor": "#10091f",
+		"zoomEnabled": false
 	},
 	"plugins": {
 		"SystemBars": {

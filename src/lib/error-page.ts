@@ -18,7 +18,7 @@ export function renderErrorPage(error?: unknown): string {
   <head>
     <meta charset="utf-8" />
     <title>MelodyMap — Something went wrong</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <style>
       body { font: 15px/1.5 system-ui, -apple-system, sans-serif; background: #0a0a18; color: #f1f1f1; display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 1.5rem; }
       .card { max-width: 28rem; width: 100%; text-align: center; padding: 2rem; }

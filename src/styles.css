@@ -260,8 +260,48 @@ html.light {
 
 
 @layer base {
-  * {
+  *, ::before, ::after {
     border-color: var(--color-border);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    touch-action: pan-x pan-y;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior-y: none;
+    overscroll-behavior-x: none;
+  }
+
+  /* Keep input controls and text editable regions fully selectable */
+  input,
+  textarea,
+  [contenteditable="true"],
+  .select-text {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
+    touch-action: auto;
+  }
+
+  /* Prevent dragging images like a desktop browser */
+  img {
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+
+  /* Prevent mobile browser auto-zoom on input focus */
+  @media (max-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 
   body {

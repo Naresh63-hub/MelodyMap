@@ -3,6 +3,7 @@ package com.melodymap.music;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
@@ -26,19 +27,13 @@ public class MainActivity extends BridgeActivity {
             setStatusBarStyle(true);
         } catch (Exception ignored) {}
 
-        // Allow media autoplay without requiring immediate user gesture on each track transition
+        // Enforce strict native app webview parameters (disable all zoom and web artifacts)
+        configureNativeWebView();
+
+        // Register bridges and configure WebView interfaces
         try {
             WebView webView = getBridge().getWebView();
             if (webView != null) {
-                WebSettings settings = webView.getSettings();
-                settings.setMediaPlaybackRequiresUserGesture(false);
-
-                // Native app feel: disable browser-style pinch/zoom controls.
-                // The layout already fits the viewport; zooming only breaks it.
-                settings.setSupportZoom(false);
-                settings.setBuiltInZoomControls(false);
-                settings.setDisplayZoomControls(false);
-
                 // Register SleepTimer JavaScript interface bridge
                 webView.addJavascriptInterface(new SleepTimerBridge(this), "AndroidSleepTimer");
 
@@ -156,6 +151,39 @@ public class MainActivity extends BridgeActivity {
                 }
             } catch (Exception ignored) {}
         });
+    }
+
+    /**
+     * Enforce strict native app feel: disable all browser-style zoom gestures,
+     * zoom controls, text magnification, overscroll glow/bounce, and scrollbars.
+     */
+    private void configureNativeWebView() {
+        try {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+                WebView webView = getBridge().getWebView();
+                WebSettings settings = webView.getSettings();
+                settings.setMediaPlaybackRequiresUserGesture(false);
+
+                // Strictly disable pinch zoom, double-tap zoom, and built-in zoom controls
+                settings.setSupportZoom(false);
+                settings.setBuiltInZoomControls(false);
+                settings.setDisplayZoomControls(false);
+
+                // Lock text zoom to 100% so system display/font size variations do not distort layout
+                settings.setTextZoom(100);
+
+                // Disable browser-like scrollbars and overscroll bounces
+                webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+                webView.setVerticalScrollBarEnabled(false);
+                webView.setHorizontalScrollBarEnabled(false);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        configureNativeWebView();
     }
 
     @Override

@@ -13,6 +13,8 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: isDev,
     backgroundColor: '#10091f',
+    // Strictly disable browser zoom gestures to guarantee a 100% native app experience
+    zoomEnabled: false,
     // NOTE: `android.adjustMarginsForEdgeToEdge` is not a Capacitor option —
     // it is absent from CapConfig.java and the CLI config type, so it was
     // silently ignored and never kept the WebView out of the system bars.
