@@ -7,6 +7,7 @@ declare global {
       isAvailable: () => boolean;
       signIn: (webClientId: string) => void;
       signOut: () => void;
+      openBrowser?: (url: string) => void;
     };
     __melodymap_handle_google_id_token?: (idToken: string, email: string, displayName: string) => void;
     __melodymap_handle_google_error?: (errorMessage: string) => void;
@@ -73,7 +74,7 @@ export interface NativeGoogleTokenResult {
  */
 export function requestNativeGoogleToken(
   webClientId: string,
-  timeoutMs = 120000,
+  timeoutMs = 15000,
 ): Promise<NativeGoogleTokenResult> {
   return new Promise((resolve, reject) => {
     if (!isNativeGoogleAuthSupported() || !window.AndroidGoogleAuth) {

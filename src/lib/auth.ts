@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { safeStorage } from "@/lib/safe-storage";
-import { getOAuthRedirectUrl } from "@/lib/auth-deep-link";
+import { getOAuthRedirectUrl, isNativeApp } from "@/lib/auth-deep-link";
+import { Capacitor } from "@capacitor/core";
 import {
   isNativeGoogleAuthSupported,
   getGoogleWebClientId,
@@ -314,6 +315,33 @@ export function useAuth() {
       }
 
       const redirectUrl = getOAuthRedirectUrl();
+      const isNative = Capacitor.isNativePlatform() || isNativeApp();
+
+      if (isNative) {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: redirectUrl,
+            skipBrowserRedirect: true,
+            queryParams: {
+              access_type: "offline",
+              prompt: "consent",
+            },
+          },
+        });
+        if (error) throw error;
+        if (data?.url) {
+          if (typeof window !== "undefined") {
+            if (window.AndroidGoogleAuth && typeof window.AndroidGoogleAuth.openBrowser === "function") {
+              window.AndroidGoogleAuth.openBrowser(data.url);
+            } else {
+              window.open(data.url, "_system");
+            }
+          }
+          return { success: true };
+        }
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {

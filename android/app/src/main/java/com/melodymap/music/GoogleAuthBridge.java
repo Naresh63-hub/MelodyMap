@@ -2,6 +2,7 @@ package com.melodymap.music;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
@@ -97,6 +98,25 @@ public class GoogleAuthBridge {
         activity.runOnUiThread(() -> {
             if (googleSignInClient != null) {
                 googleSignInClient.signOut();
+            }
+        });
+    }
+
+    /**
+     * Opens an external OAuth URL in the system browser so Google sign-in works
+     * without "disallowed_useragent" restrictions, then returns back to app via deep-link.
+     */
+    @JavascriptInterface
+    public void openBrowser(String url) {
+        if (url == null || url.trim().isEmpty()) return;
+        activity.runOnUiThread(() -> {
+            try {
+                Uri uri = Uri.parse(url.trim());
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                activity.startActivity(intent);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to launch external browser for URL: " + url, e);
             }
         });
     }

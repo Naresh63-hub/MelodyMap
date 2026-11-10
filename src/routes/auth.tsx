@@ -20,6 +20,7 @@ import {
   Sparkles,
   User,
   Volume2,
+  X,
 } from "lucide-react";
 import { useEffect, useState, useId } from "react";
 import { Button } from "@/components/ui/button";
@@ -207,15 +208,24 @@ function AuthPage() {
   const handleGoogleSignIn = async () => {
     setGoogleBusy(true);
     setErrorNote(null);
-    setSuccessNote(null);
+    setSuccessNote("Connecting with Google...");
+
+    // Auto-clear success note after 8 seconds if user is still on this screen
+    const timer = setTimeout(() => {
+      setSuccessNote((prev) => (prev === "Connecting with Google..." ? null : prev));
+      setGoogleBusy(false);
+    }, 8000);
+
     try {
       const res = await auth.signInWithGoogle();
-      if (res.success) {
-        setSuccessNote("Connecting with Google...");
-      } else {
+      if (!res.success) {
+        clearTimeout(timer);
+        setSuccessNote(null);
         setErrorNote(formatAuthError(res.error || "Google Sign-in failed"));
       }
     } catch (err: any) {
+      clearTimeout(timer);
+      setSuccessNote(null);
       setErrorNote(formatAuthError(err?.message || "Google Sign-in failed"));
     } finally {
       setGoogleBusy(false);
@@ -401,9 +411,15 @@ function AuthPage() {
   const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   return (
-    <div className="min-h-screen bg-[#F8F5FF] dark:bg-[#0D0819] text-[#211536] dark:text-[#FFFFFF] selection:bg-[#F3EEFF] dark:selection:bg-[#2E1065] selection:text-[#8B5CF6] dark:selection:text-[#C084FC] transition-colors duration-300 relative overflow-x-hidden flex flex-col justify-between">
+    <div
+      className="min-h-screen w-full bg-[#F8F5FF] dark:bg-[#0D0819] text-[#211536] dark:text-[#FFFFFF] selection:bg-[#F3EEFF] dark:selection:bg-[#2E1065] selection:text-[#8B5CF6] dark:selection:text-[#C084FC] transition-colors duration-300 relative overflow-x-hidden overflow-y-auto flex flex-col justify-between"
+      style={{
+        WebkitOverflowScrolling: "touch",
+        touchAction: "pan-y",
+      }}
+    >
       {/* Soft Ambient Background Blooms & Floating Musical Notes matching screenshot */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-0">
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-10">
         {/* Soft atmospheric lavender & violet radial blooms */}
         <div className="absolute top-12 right-12 w-80 sm:w-96 h-80 sm:h-96 rounded-full bg-gradient-to-br from-[#A855F7]/12 via-[#EC4899]/8 to-transparent blur-3xl" />
         <div className="absolute bottom-12 left-10 w-80 sm:w-96 h-80 sm:h-96 rounded-full bg-gradient-to-tr from-[#8B5CF6]/12 via-[#FF7A00]/8 to-transparent blur-3xl" />
@@ -427,12 +443,17 @@ function AuthPage() {
       </div>
 
       {/* TOP NAVIGATION BAR: Brand Logo + Wave Equalizer Tagline */}
-      <header className="w-full flex items-center justify-between px-6 sm:px-12 py-5 lg:py-6 relative z-20 max-w-7xl mx-auto">
+      <header
+        className="w-full flex items-center justify-between px-4 sm:px-8 lg:px-12 pb-2 sm:pb-4 lg:py-6 relative z-20 max-w-7xl mx-auto shrink-0"
+        style={{
+          paddingTop: "max(calc(var(--mm-inset-top, 0px) + 0.75rem), 3rem)",
+        }}
+      >
         {/* Left: Official MelodyMap Logo + Wordmark */}
         <Link
           to="/"
           aria-label="Back to MelodyMap Home"
-          className="group flex items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] rounded-2xl cursor-pointer"
+          className="group flex items-center gap-2.5 sm:gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] rounded-2xl cursor-pointer"
         >
           <div className="relative">
             <div className="absolute inset-0 bg-[#8B5CF6]/25 rounded-2xl blur-md group-hover:blur-lg transition-all" />
@@ -441,18 +462,18 @@ function AuthPage() {
               <img
                 src="/brand/app-icon.png"
                 alt="MelodyMap"
-                className="relative w-10 h-10 sm:w-11 sm:h-11 object-contain drop-shadow-sm select-none"
+                className="relative w-9 h-9 sm:w-11 sm:h-11 object-contain drop-shadow-sm select-none"
               />
             </picture>
           </div>
-          <span className="text-xl sm:text-2xl font-black tracking-tight font-display">
+          <span className="text-lg sm:text-2xl font-black tracking-tight font-display">
             <span className="text-[#211536] dark:text-white">Melody</span>
             <span className="text-[#8B5CF6]">Map</span>
           </span>
         </Link>
 
         {/* Right: Tagline with Live Equalizer & Back Shortcut */}
-        <div className="flex items-center gap-4 sm:gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <div className="hidden sm:flex items-center gap-2.5 text-xs lg:text-sm font-medium text-[#211536] dark:text-[#D4CBEA]">
             {/* Equalizer sound bars */}
             <div className="flex items-center gap-0.5 h-4" aria-hidden="true">
@@ -468,7 +489,7 @@ function AuthPage() {
           <Link
             to="/"
             aria-label="Back to App"
-            className="flex items-center gap-1.5 text-xs font-semibold text-[#746A85] dark:text-[#A69ABD] hover:text-[#8B5CF6] dark:hover:text-[#C084FC] transition-colors py-2 px-3 rounded-full hover:bg-white/60 dark:hover:bg-white/5 min-h-[44px] cursor-pointer"
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#746A85] dark:text-[#A69ABD] hover:text-[#8B5CF6] dark:hover:text-[#C084FC] transition-colors py-2 px-3 sm:px-3.5 rounded-full bg-white/70 dark:bg-white/10 hover:bg-white/90 dark:hover:bg-white/20 border border-[#E9D8FF]/60 dark:border-purple-800/30 shadow-xs min-h-[44px] min-w-[44px] justify-center cursor-pointer"
           >
             <ArrowLeft aria-hidden="true" className="w-4 h-4" />
             <span className="hidden sm:inline">Back</span>
@@ -477,12 +498,12 @@ function AuthPage() {
       </header>
 
       {/* MAIN CONTAINER: Two-Column Composition */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 sm:px-12 flex-1 flex flex-col justify-center py-4 sm:py-6 lg:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 flex-1 flex flex-col justify-start lg:justify-center py-2 sm:py-4 lg:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-center">
           {/* LEFT COLUMN: Hero Artwork Showcase */}
           <div className="lg:col-span-7 xl:col-span-7 flex flex-col items-center lg:items-start text-center lg:text-left">
             {/* Big Headline */}
-            <h1 className="text-3xl sm:text-4xl lg:text-[46px] font-black text-[#211536] dark:text-white tracking-tight leading-[1.12]">
+            <h1 className="text-2xl sm:text-4xl lg:text-[46px] font-black text-[#211536] dark:text-white tracking-tight leading-[1.15]">
               Your Music<br className="hidden sm:inline" />{" "}
               Journey{" "}
               <span className="bg-gradient-to-r from-[#8B5CF6] via-[#EC4899] to-[#FF7A00] bg-clip-text text-transparent">
@@ -491,15 +512,15 @@ function AuthPage() {
             </h1>
 
             {/* Subtitle & Gradient Accent Underline */}
-            <div className="mt-3 inline-block">
-              <p className="text-base sm:text-lg font-bold text-[#211536] dark:text-[#E2D9F3] tracking-wide">
+            <div className="mt-1.5 sm:mt-3 inline-block">
+              <p className="text-xs sm:text-base lg:text-lg font-bold text-[#211536] dark:text-[#E2D9F3] tracking-wide">
                 Discover. Feel. Play.
               </p>
-              <div className="mt-1 h-1 w-20 rounded-full bg-gradient-to-r from-[#FF7A00] via-[#EC4899] to-[#8B5CF6]" />
+              <div className="mt-1 h-1 w-14 sm:w-20 rounded-full bg-gradient-to-r from-[#FF7A00] via-[#EC4899] to-[#8B5CF6] mx-auto lg:mx-0" />
             </div>
 
-            {/* Centerpiece 3D Headphones on Glowing Sound Stage Artwork */}
-            <div className="relative w-full max-w-[420px] my-3 sm:my-4 flex items-center justify-center lg:justify-start">
+            {/* Centerpiece 3D Headphones on Glowing Sound Stage Artwork (showcase on large screens) */}
+            <div className="hidden lg:flex relative w-full max-w-[420px] my-3 sm:my-4 items-center justify-center lg:justify-start">
               <div className="relative flex items-center justify-center">
                 {/* Dynamic Sound Aura */}
                 <div
@@ -530,8 +551,8 @@ function AuthPage() {
               </div>
             </div>
 
-            {/* Bottom Capsule Pill: 3 Highlights */}
-            <div className="inline-flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-3.5 px-4 sm:px-5 py-2.5 rounded-full bg-white/80 dark:bg-[#1E1435]/80 backdrop-blur-md border border-[#E9D8FF] dark:border-purple-700/30 shadow-xs text-xs font-semibold text-[#211536] dark:text-white">
+            {/* Bottom Capsule Pill: 3 Highlights (showcase on large screens) */}
+            <div className="hidden lg:inline-flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-3.5 px-4 sm:px-5 py-2.5 rounded-full bg-white/80 dark:bg-[#1E1435]/80 backdrop-blur-md border border-[#E9D8FF] dark:border-purple-700/30 shadow-xs text-xs font-semibold text-[#211536] dark:text-white">
               <div className="flex items-center gap-1.5">
                 <Music className="w-3.5 h-3.5 text-[#8B5CF6]" />
                 <span>Personalized Recommendations</span>
@@ -551,7 +572,7 @@ function AuthPage() {
 
           {/* RIGHT COLUMN: Premium Floating Authentication Card */}
           <div className="lg:col-span-5 xl:col-span-5 flex justify-center w-full">
-            <div className="w-full max-w-[420px] rounded-[32px] bg-white dark:bg-[#1B132E] border border-[#E9D8FF] dark:border-purple-800/40 p-6 sm:p-8 shadow-[0_20px_50px_-10px_rgba(139,92,246,0.12)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl space-y-4 relative">
+            <div className="w-full max-w-[420px] rounded-[28px] sm:rounded-[32px] bg-white dark:bg-[#1B132E] border border-[#E9D8FF] dark:border-purple-800/40 p-5 sm:p-8 shadow-[0_20px_50px_-10px_rgba(139,92,246,0.12)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl space-y-3.5 sm:space-y-4 relative">
               {/* Card Top Logo with Glowing Halo */}
               <div className="flex justify-center -mt-1">
                 <div className="relative">
@@ -595,6 +616,14 @@ function AuthPage() {
                 >
                   <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
                   <p className="flex-1 font-medium leading-relaxed">{errorNote}</p>
+                  <button
+                    type="button"
+                    onClick={() => setErrorNote(null)}
+                    aria-label="Dismiss error"
+                    className="text-[#C53030]/70 hover:text-[#C53030] dark:text-rose-400/70 dark:hover:text-rose-200 p-0.5 rounded cursor-pointer min-h-[32px] min-w-[32px] inline-flex items-center justify-center -mr-1 -mt-0.5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               )}
 
@@ -606,6 +635,14 @@ function AuthPage() {
                 >
                   <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 mt-0.5" />
                   <p className="flex-1 font-medium leading-relaxed">{successNote}</p>
+                  <button
+                    type="button"
+                    onClick={() => setSuccessNote(null)}
+                    aria-label="Dismiss notification"
+                    className="text-[#8B5CF6]/70 hover:text-[#8B5CF6] dark:text-purple-300/70 dark:hover:text-purple-200 p-0.5 rounded cursor-pointer min-h-[32px] min-w-[32px] inline-flex items-center justify-center -mr-1 -mt-0.5"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               )}
 
@@ -987,7 +1024,12 @@ function AuthPage() {
       </main>
 
       {/* FOOTER: Minimal copyright & compliance info matching screenshot */}
-      <footer className="w-full px-6 py-3 relative z-10 text-center">
+      <footer
+        className="w-full px-6 py-3 relative z-10 text-center shrink-0"
+        style={{
+          paddingBottom: "max(calc(var(--mm-inset-bottom, 0px) + 0.5rem), 0.75rem)",
+        }}
+      >
         <p className="text-[11px] text-[#746A85]/70 dark:text-[#948BA8]/70">
           MelodyMap &bull; Stream everywhere with zero interruptions
         </p>
