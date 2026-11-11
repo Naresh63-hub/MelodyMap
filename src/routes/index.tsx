@@ -4703,29 +4703,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   userName={userNameDisplay}
                   userEmail={auth.email}
                   userAvatar={auth.profile?.avatar_url ?? null}
-                  songsPlayedCount={
-                    stats && Object.keys(stats).length > 0
-                      ? Object.values(stats).reduce((acc, s) => acc + (s.plays || 1), 0)
-                      : history.length
-                  }
-                  listeningHours={(() => {
-                    let totalSec = 0;
-                    if (stats && Object.keys(stats).length > 0) {
-                      for (const s of Object.values(stats)) {
-                        const parsed = parseDurationSeconds(s.track?.duration);
-                        const dur = parsed > 0 ? parsed : (s.track?.durationSeconds || 210);
-                        totalSec += (s.plays || 1) * dur;
-                      }
-                    } else {
-                      for (const h of history) {
-                        const parsed = parseDurationSeconds(h.duration);
-                        const dur = parsed > 0 ? parsed : (h.durationSeconds || 210);
-                        totalSec += dur;
-                      }
-                    }
-                    const hrs = totalSec / 3600;
-                    return hrs > 0 && hrs < 1 ? Math.round(hrs * 10) / 10 : Math.round(hrs);
-                  })()}
                   likedSongsCount={likes.length}
                   onNavigate={setTab}
                   onOpenSettings={() => setShowSettings(true)}

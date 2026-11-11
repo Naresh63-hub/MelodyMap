@@ -1,17 +1,14 @@
-import { memo, useState, useEffect, useMemo } from "react";
+import { memo, useState, useEffect } from "react";
 import {
   Camera,
   ChevronRight,
-  Clock,
   Download,
   Heart,
   HelpCircle,
   Info,
   ListMusic,
   LogOut,
-  Music,
   Settings,
-  Sparkles,
   User,
 } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
@@ -22,8 +19,6 @@ interface ProfilePanelProps {
   userName?: string | undefined;
   userEmail?: string | null | undefined;
   userAvatar?: string | null | undefined;
-  songsPlayedCount?: number;
-  listeningHours?: number;
   likedSongsCount?: number;
   onNavigate: (tab: NavTab) => void;
   onOpenSettings: () => void;
@@ -36,13 +31,11 @@ interface ProfilePanelProps {
 /**
  * Screen 12: Profile and Account Overview
  * Designed with a bright premium white theme (#FFFFFF, #F8F5FF, #E9DDFB, #211536, #746A85).
- * Real application statistics, interactive menu items, and balanced spacing.
+ * Real account status, interactive menu items, and balanced spacing.
  */
 export const ProfilePanel = memo(function ProfilePanel({
   userName = "Naresh G",
   userAvatar,
-  songsPlayedCount = 0,
-  listeningHours = 0,
   likedSongsCount,
   onNavigate,
   onOpenSettings,
@@ -56,15 +49,6 @@ export const ProfilePanel = memo(function ProfilePanel({
   useEffect(() => {
     void getCurrentAppVersion().then(setAppVersion);
   }, []);
-
-  const formattedListeningTime = useMemo(() => {
-    if (listeningHours <= 0) return "0h";
-    if (listeningHours < 1) {
-      const mins = Math.max(1, Math.round(listeningHours * 60));
-      return `${mins}m`;
-    }
-    return `${Math.round(listeningHours)}h`;
-  }, [listeningHours]);
 
   const menuItems = [
     {
@@ -172,38 +156,6 @@ export const ProfilePanel = memo(function ProfilePanel({
             >
               <span>Edit Profile</span>
             </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Real Application Statistics Section */}
-      <div className="rounded-2xl border border-[#E9DDFB] dark:border-purple-800/30 bg-white dark:bg-card p-4 sm:p-5 shadow-xs">
-        <div className="flex items-center justify-between mb-3 text-xs font-semibold text-[#746A85] dark:text-muted-foreground uppercase tracking-wider">
-          <span className="flex items-center gap-1.5 font-bold text-[#211536] dark:text-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-[#8B5CF6]" />
-            Your Activity
-          </span>
-          <span className="text-[11px] font-medium text-[#8B5CF6] dark:text-[#A855F7] lowercase">live stats</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 divide-x divide-[#E9DDFB] dark:divide-border">
-          <div className="text-center px-2">
-            <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-[#746A85] dark:text-muted-foreground mb-1">
-              <Music className="h-3.5 w-3.5 text-[#8B5CF6]" />
-              <span>Songs Played</span>
-            </div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-[#211536] dark:text-foreground font-display tracking-tight">
-              {songsPlayedCount}
-            </p>
-          </div>
-          <div className="text-center px-2">
-            <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-[#746A85] dark:text-muted-foreground mb-1">
-              <Clock className="h-3.5 w-3.5 text-[#EC4899]" />
-              <span>Listening Time</span>
-            </div>
-            <p className="text-2xl sm:text-3xl font-extrabold text-[#211536] dark:text-foreground font-display tracking-tight">
-              {formattedListeningTime}
-            </p>
           </div>
         </div>
       </div>

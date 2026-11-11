@@ -2,18 +2,18 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-describe("ProfilePanel responsive layout & real statistics", () => {
+describe("ProfilePanel responsive layout & clean profile overview", () => {
   const profilePanelSource = readFileSync(
     resolve(__dirname, "./ProfilePanel.tsx"),
     "utf-8"
   );
 
-  it("renders real application statistics for songs played and listening time", () => {
-    expect(profilePanelSource).toContain("songsPlayedCount");
-    expect(profilePanelSource).toContain("listeningHours");
-    expect(profilePanelSource).toContain("Songs Played");
-    expect(profilePanelSource).toContain("Listening Time");
-    expect(profilePanelSource).toContain("Your Activity");
+  it("does not render Your Activity statistics section (songs played / listening time)", () => {
+    expect(profilePanelSource).not.toContain("Your Activity");
+    expect(profilePanelSource).not.toContain("Songs Played");
+    expect(profilePanelSource).not.toContain("Listening Time");
+    expect(profilePanelSource).not.toContain("songsPlayedCount");
+    expect(profilePanelSource).not.toContain("listeningHours");
   });
 
   it("renders Edit Profile button in user hero section below account status", () => {
