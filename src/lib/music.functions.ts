@@ -208,6 +208,8 @@ const RecommendInput = z.object({
   primaryLanguage: z.string().max(40).optional(),
   languageWeights: z.record(z.string(), z.number()).optional(),
   downloadedArtists: z.array(z.string()).max(30).optional(),
+  exclude: z.array(z.string()).max(150).default([]).optional(),
+  recentSeenIds: z.array(z.string()).max(300).default([]).optional(),
 });
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -433,6 +435,7 @@ async function getLocalPicks(data: {
   mood?: string | undefined;
   primaryLanguage?: string | undefined;
   languageWeights?: Record<string, number> | undefined;
+  recentSeenIds?: string[] | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
   const page = Math.max(1, data.page ?? 1);
@@ -440,6 +443,7 @@ async function getLocalPicks(data: {
   const artists = data.artists.map((a) => a.trim()).filter(Boolean);
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
   const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
+  const recentSeenSet = new Set((data.recentSeenIds ?? []).map((id) => id.toLowerCase().trim()));
   const likedSet = new Set((data.liked ?? []).map((s) => norm(s)));
   const likedTitleSet = new Set((data.liked ?? []).map((s) => {
     const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
@@ -452,10 +456,12 @@ async function getLocalPicks(data: {
 
   // Filter out any excluded / recently played / liked / penalized / cross-language tracks
   const isCandidateValid = (t: Track) => {
+    if (!t || !t.id) return false;
+    if (recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase().trim())) return false;
     const key = norm(`${t.artist} - ${t.title}`);
     const titleKey = norm(t.title);
     const artKey = norm(t.artist);
-    if (excludeSet.has(key) || excludeSet.has(titleKey)) return false;
+    if (excludeSet.has(key) || excludeSet.has(titleKey) || excludeSet.has(norm(t.id))) return false;
     if (likedSet.has(key) || likedTitleSet.has(titleKey)) return false;
     if (penalizedSet.has(artKey) || penalizedSet.has(normalizeArtistAlias(t.artist))) return false;
     if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
@@ -507,7 +513,7 @@ async function getLocalPicks(data: {
       (async () => {
         try {
           const { getSaavnTrendingSongs } = await import("./providers/saavn");
-          return await getSaavnTrendingSongs(languages, 15);
+          return await getSaavnTrendingSongs(languages, 25, data.refreshNonce, page);
         } catch {
           return [];
         }
@@ -515,7 +521,7 @@ async function getLocalPicks(data: {
       (async () => {
         try {
           const { getSaavnNewReleases } = await import("./providers/saavn");
-          return await getSaavnNewReleases(languages, 15);
+          return await getSaavnNewReleases(languages, 25, data.refreshNonce, page);
         } catch {
           return [];
         }
@@ -969,6 +975,11 @@ export const recommendTracks = createServerFn({ method: "POST" })
             .filter((a): a is string => !!a),
         ),
       ].slice(0, 8);
+      const excludeList = [
+        ...(data.recent ?? []),
+        ...(data.liked ?? []),
+        ...(data.exclude ?? []),
+      ];
       const tracks = await getLocalPicks({
         artists,
         mode: "feed",
@@ -976,7 +987,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         page: data.page ?? 1,
         languages: data.languages,
         refreshNonce: data.refreshNonce,
-        exclude: [...(data.recent ?? []), ...(data.liked ?? [])],
+        exclude: excludeList,
+        recentSeenIds: data.recentSeenIds,
         liked: data.liked,
         discovery: data.discovery,
         affinityArtists: data.affinityArtists,
@@ -1002,6 +1014,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
     const sanitizedMood = sanitizePromptInput(data.mood);
     const sanitizedBrief = sanitizePromptInput(data.brief);
     const sanitizedLangs = data.languages.map(sanitizePromptInput).filter(Boolean);
+    const sanitizedExclude = (data.exclude ?? []).slice(0, 30).map(sanitizePromptInput).filter(Boolean);
 
     const temporalCtx = getTemporalContext(data.clientHour);
     const timeInstruction = data.temporalContext || temporalCtx.promptContext;
@@ -1038,6 +1051,9 @@ export const recommendTracks = createServerFn({ method: "POST" })
       sanitizedLangs.length > 0
         ? `CRITICAL LANGUAGE RESTRICTION: The user strictly wants songs in: ${sanitizedLangs.join(", ")}. EVERY single recommended track MUST be in one of these languages: ${sanitizedLangs.join(", ")}. Do NOT suggest tracks in any other language.`
         : "",
+      sanitizedExclude.length > 0
+        ? `STRICT EXCLUSION: Listener just heard or was shown these songs — NEVER recommend them:\n${sanitizedExclude.join("\n")}`
+        : "",
       "",
       isNewUser
         ? `The listener is brand new. Recommend ${count} songs composed ONLY of brand new releases (released in ${PREV_YEAR}-${CURRENT_YEAR}) and the most popular songs that are currently trending and viral hits in their selected languages (${sanitizedLangs.join(", ")}). Absolutely DO NOT include any old, retro, vintage, 90s, or 2000s classics.`
@@ -1059,6 +1075,11 @@ export const recommendTracks = createServerFn({ method: "POST" })
             .filter((a): a is string => !!a),
         ),
       ].slice(0, 8);
+      const excludeList = [
+        ...(data.recent ?? []),
+        ...(data.liked ?? []),
+        ...(data.exclude ?? []),
+      ];
       const tracks = await getLocalPicks({
         artists,
         mode: "feed",
@@ -1066,7 +1087,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         page: data.page ?? 1,
         languages: data.languages,
         refreshNonce: data.refreshNonce,
-        exclude: [...(data.recent ?? []), ...(data.liked ?? [])],
+        exclude: excludeList,
+        recentSeenIds: data.recentSeenIds,
         liked: data.liked,
         discovery: data.discovery,
         affinityArtists: data.affinityArtists,
@@ -1105,6 +1127,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
 
     const recentSet = new Set(data.recent.map((s) => norm(s)));
     const likedSet = new Set((data.liked ?? []).map((s) => norm(s)));
+    const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
+    const recentSeenSet = new Set((data.recentSeenIds ?? []).map((id) => id.toLowerCase().trim()));
     const likedTitleSet = new Set((data.liked ?? []).map((s) => {
       const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
       return norm(t || "");
@@ -1118,6 +1142,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         const artKey = norm(p.artist);
         if (recentSet.has(fullKey) || recentSet.has(titleKey)) return false;
         if (likedSet.has(fullKey) || likedTitleSet.has(titleKey)) return false;
+        if (excludeSet.has(fullKey) || excludeSet.has(titleKey)) return false;
         if (penalizedSet.has(artKey) || penalizedSet.has(normalizeArtistAlias(p.artist))) return false;
         return true;
       })

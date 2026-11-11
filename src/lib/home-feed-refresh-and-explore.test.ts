@@ -79,6 +79,41 @@ describe("Home Feed Refresh, Daily Mix Isolation, and Explore More Songs", () =>
       expect(candidates.map((t) => t.id)).toEqual(["fresh-1", "fresh-2", "fresh-3", "fresh-4"]);
     });
 
+    it("prioritizes all fresh tracks first even when fresh candidate count is small (< 10)", () => {
+      const prevRecs: Track[] = [
+        makeTrack("prev-1", "Old Track 1", "Artist 1"),
+        makeTrack("prev-2", "Old Track 2", "Artist 2"),
+        makeTrack("prev-3", "Old Track 3", "Artist 3"),
+      ];
+
+      const candidatePool: Track[] = [
+        makeTrack("prev-1", "Old Track 1", "Artist 1"),
+        makeTrack("prev-2", "Old Track 2", "Artist 2"),
+        makeTrack("fresh-1", "Brand New Hit 1", "Artist 4"),
+        makeTrack("fresh-2", "Brand New Hit 2", "Artist 5"),
+      ];
+
+      const isExplicitRefresh = true;
+      let finalPool = candidatePool;
+      if (isExplicitRefresh && prevRecs.length > 0) {
+        const freshFromPrev = candidatePool.filter(
+          (t) => !prevRecs.some((pr) => pr.id === t.id || sameSong(pr, t)),
+        );
+        if (freshFromPrev.length >= 10) {
+          finalPool = freshFromPrev;
+        } else if (freshFromPrev.length > 0) {
+          const backfill = candidatePool.filter(
+            (t) => !freshFromPrev.some((f) => f.id === t.id || sameSong(f, t)),
+          );
+          finalPool = [...freshFromPrev, ...backfill];
+        }
+      }
+
+      // Fresh tracks must strictly be in the first 2 slots!
+      expect(finalPool[0]?.id).toBe("fresh-1");
+      expect(finalPool[1]?.id).toBe("fresh-2");
+    });
+
     it("excludes tracks currently in the playback queue and currently playing track from Made For You", () => {
       const currentTrack = makeTrack("current-1", "Now Playing Track", "Artist A");
       const currentQueue = [

@@ -1921,6 +1921,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         dislikes,
       });
       const isNewUser = likes.length === 0 && history.length === 0;
+      const recentSeenIdentities = getRecentlySeenIdentities();
+      const prevRecIds = prevRecs.map((t) => t.id).filter(Boolean);
+      const prevRecLabels = prevRecs.map(trackLabel);
+      const combinedExcludeIds = isExplicitRefresh
+        ? [...new Set([...recentSeenIdentities, ...prevRecIds])]
+        : recentSeenIdentities;
 
       try {
         await Promise.allSettled([
@@ -1952,6 +1958,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   affinityArtists: affinity.affinityArtists,
                   penalizedArtists: affinity.penalizedArtists,
                   clientHour,
+                  exclude: isExplicitRefresh ? prevRecLabels : undefined,
+                  recentSeenIds: combinedExcludeIds,
                 },
               });
               if (res.tracks) {
@@ -1975,8 +1983,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     languages: settings.languages,
                     primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                     languageWeights: settings.languageWeights,
-                    count: 20,
+                    count: 30,
                     page: targetPage,
+                    refreshNonce: nonce,
+                    recentSeenIds: combinedExcludeIds,
                   },
                 });
                 if (fallbackRes.tracks) {
@@ -1993,12 +2003,50 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   data: {
                     mood: "Melody",
                     languages: settings.languages,
-                    primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                    languageWeights: settings.languageWeights,
+                    language: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                   },
                 });
                 if (fallbackRes.tracks) {
                   for (const t of fallbackRes.tracks as Track[]) {
+                    if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
+                    if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                      pureMusic.push(t);
+                    }
+                  }
+                  fresh = applyFeedFilters(pureMusic);
+                }
+              }
+            }
+
+            // On explicit refresh, if available fresh tracks not in previous recs is small (< 15), query altPage for deep discovery
+            if (isExplicitRefresh && prevRecs.length > 0) {
+              const freshFromPrevCount = pureMusic.filter(
+                (t) => !prevRecs.some((pr) => pr.id === t.id || sameSong(pr, t)),
+              ).length;
+              if (freshFromPrevCount < 15) {
+                const altPage = (targetPage % 5) + 1;
+                const altRes = await runRecommend({
+                  data: {
+                    isNewUser,
+                    liked: likes.slice(0, 15).map(trackLabel),
+                    recent: history.slice(0, 15).map(trackLabel),
+                    disliked: dislikes.slice(0, 15).map(trackLabel),
+                    count: 35,
+                    page: altPage,
+                    languages: settings.languages,
+                    primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                    languageWeights: settings.languageWeights,
+                    artists: topArtists(stats, likes, 12, downloadedTracks),
+                    refreshNonce: `${nonce}-alt`,
+                    discovery: settings.discovery ?? 40,
+                    clientHour,
+                    exclude: prevRecLabels,
+                    recentSeenIds: combinedExcludeIds,
+                  },
+                });
+                if (altRes.tracks) {
+                  for (const t of altRes.tracks as Track[]) {
+                    if (isNewUser && isOldEraTrack(t)) continue;
                     if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
                     if (!pureMusic.some((existing) => sameSong(existing, t))) {
                       pureMusic.push(t);
@@ -2018,6 +2066,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               );
               if (freshFromPrev.length >= 10) {
                 candidatePool = freshFromPrev;
+              } else if (freshFromPrev.length > 0) {
+                const backfill = candidatePool.filter(
+                  (t) => !freshFromPrev.some((f) => f.id === t.id || sameSong(f, t)),
+                );
+                candidatePool = [...freshFromPrev, ...backfill];
               }
             }
 
@@ -2062,6 +2115,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setRecs(cleanFinalRecs);
             markFeedDisplayed(cleanFinalRecs);
             writeHomeCache({ recs: cleanFinalRecs });
+            recordSeenTrackIdentities(cleanFinalRecs);
           })(),
           (async () => {
             await loadDailyMix(nonce);
@@ -3730,13 +3784,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (cleanMixTracks) setMixTracks(cleanMixTracks);
     if (cleanDailyMix.length) setDailyMixTracks(cleanDailyMix);
 
-    // Auto-refresh recommendations on startup if cached feed is empty or lacks clean tracks matching user languages
+    // Auto-refresh recommendations on startup if cached feed is empty, lacks clean tracks, or is stale (> 5 mins)
     const hasCachedHome = cleanRecs.length >= 6;
     markFeedDisplayed([
       ...cleanRecs,
       ...cleanDailyMix,
     ]);
-    if (!hasCachedHome) {
+    const cacheAge = cachedFeed.timestamp ? Date.now() - cachedFeed.timestamp : Infinity;
+    const isStale = cacheAge > 5 * 60 * 1000;
+    if (!hasCachedHome || isStale) {
       void loadHomeFeeds();
     }
 
