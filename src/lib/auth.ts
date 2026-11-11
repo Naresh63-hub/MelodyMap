@@ -335,7 +335,7 @@ export function useAuth() {
             if (window.AndroidGoogleAuth && typeof window.AndroidGoogleAuth.openBrowser === "function") {
               window.AndroidGoogleAuth.openBrowser(data.url);
             } else {
-              window.open(data.url, "_system");
+              window.open(data.url, "_system", "noopener,noreferrer");
             }
           }
           return { success: true };

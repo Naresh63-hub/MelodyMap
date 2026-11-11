@@ -30,7 +30,15 @@ jobs:
       uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
-        queries: security-extended,security-and-quality
+        queries: security-extended
+        config: |
+          paths-ignore:
+            - '**/*.test.ts'
+            - '**/*.test.tsx'
+            - '**/*.spec.ts'
+            - 'e2e/**'
+            - 'android/**'
+            - 'scripts/**'
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v4

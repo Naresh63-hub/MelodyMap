@@ -35,7 +35,8 @@ export function ShareModal({ open, track, onClose }: Props) {
       action: () =>
         window.open(
           `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${shareUrl}`)}`,
-          "_blank"
+          "_blank",
+          "noopener,noreferrer"
         ),
     },
     {
@@ -45,7 +46,8 @@ export function ShareModal({ open, track, onClose }: Props) {
       action: () =>
         window.open(
           `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
-          "_blank"
+          "_blank",
+          "noopener,noreferrer"
         ),
     },
     {
@@ -55,7 +57,8 @@ export function ShareModal({ open, track, onClose }: Props) {
       action: () =>
         window.open(
           `sms:?&body=${encodeURIComponent(`${shareText} ${shareUrl}`)}`,
-          "_blank"
+          "_blank",
+          "noopener,noreferrer"
         ),
     },
   ];
