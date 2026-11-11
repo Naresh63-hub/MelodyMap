@@ -13,7 +13,7 @@ describe("2-Step Confirmation for Download Deletion", () => {
 
   it("Step 1: Selecting delete on a downloaded song opens confirmation step rather than immediately deleting", () => {
     let deleteConfirmTrack: Track | null = null;
-    let removeDownloadCalled = false;
+    const removeDownloadCalled = false;
 
     // Simulate clicking trash or Delete Download in options
     const onInitiateDelete = (track: Track) => {
@@ -28,7 +28,7 @@ describe("2-Step Confirmation for Download Deletion", () => {
 
   it("Step 2 (Cancel): Dismissing the confirmation retains the downloaded song intact", () => {
     let deleteConfirmTrack: Track | null = sampleTrack;
-    let downloadedIds = new Set(["saavn:song-123", "saavn:other-456"]);
+    const downloadedIds = new Set(["saavn:song-123", "saavn:other-456"]);
 
     // User clicks Cancel or presses Escape
     const onCancel = () => {
@@ -44,7 +44,7 @@ describe("2-Step Confirmation for Download Deletion", () => {
   it("Step 2 (Confirm to delete): Clicking 'Confirm to delete' removes offline copy and clears confirmation state", async () => {
     let deleteConfirmTrack: Track | null = sampleTrack;
     let downloadedTracks: Track[] = [sampleTrack];
-    let downloadedIds = new Set(["saavn:song-123"]);
+    const downloadedIds = new Set(["saavn:song-123"]);
     let message: string | null = null;
 
     const mockRemoveDownload = vi.fn(async (trackId: string) => {

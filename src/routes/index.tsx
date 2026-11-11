@@ -2105,7 +2105,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
             // Candidates to rank:
             // When user explicitly refreshed, prioritize tracks NOT in prevRecs and NOT in queue
-            let candidatePool = fresh.length > 0 ? fresh : pureMusic;
+            const candidatePool = fresh.length > 0 ? fresh : pureMusic;
             const currentQueue = queueRef.current;
             const currentTrack = currentRef.current;
             const isQueued = (t: Track) => {
@@ -2114,7 +2114,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               return false;
             };
 
-            let cleanFinalRecs: Track[] = [];
+            let cleanFinalRecs: Track[];
 
             if (isExplicitRefresh && prevRecs.length > 0) {
               const freshFromPrev = candidatePool.filter(
@@ -2549,7 +2549,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         // - never include disliked tracks
         // - enforce language consistency, duration, and original song criteria
         const currentHistory = history.slice(0, 50);
-        let candidatesToRank = moreCandidates.filter(
+        const candidatesToRank = moreCandidates.filter(
           (t) =>
             hasPlayableDuration(t) &&
             isOriginalSong(t) &&

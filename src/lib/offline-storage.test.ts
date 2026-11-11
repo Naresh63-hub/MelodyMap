@@ -321,7 +321,7 @@ describe("Offline Storage & Playback Reliability", () => {
         { id: "s1", title: "Song 1", artist: "Artist A", duration: "3:00", thumbnail: "" },
         { id: "s2", title: "Song 2", artist: "Artist B", duration: "3:10", thumbnail: "" },
       ];
-      let queue = [...originalQueue];
+      const queue = [...originalQueue];
       let message = "";
       let actionLabel = "";
 

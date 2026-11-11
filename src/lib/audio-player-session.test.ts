@@ -120,7 +120,7 @@ describe("Audio Player Session Isolation and Stream Resolution", () => {
 
     it("recovers an errored audio element on manual retry by resetting attempts and re-assigning source", () => {
       let reconnectAttempts = 5;
-      let error = { code: 4, message: "MEDIA_ERR_SRC_NOT_SUPPORTED" };
+      const error = { code: 4, message: "MEDIA_ERR_SRC_NOT_SUPPORTED" };
       let audioSrc = "https://example.com/dead-link.mp3";
       let loadCalled = false;
 

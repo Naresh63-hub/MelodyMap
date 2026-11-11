@@ -269,7 +269,7 @@ describe("MelodyMap Jam Session Synchronization Engine", () => {
 
     it("routes skip-vote track advancement exclusively through the session host", () => {
       let hostAdvancedCount = 0;
-      let guestAdvancedCount = 0;
+      const guestAdvancedCount = 0;
 
       function onSkipVoteReceived(isHost: boolean, thresholdReached: boolean) {
         if (isHost && thresholdReached) {
@@ -452,7 +452,7 @@ describe("MelodyMap Jam Session Synchronization Engine", () => {
     it("ensures unverified playback broadcasts cannot alter audio playback state (SEC-01 remediation)", () => {
       // In the hardened architecture, broadcast playback_sync handler is strictly decoupled
       // from audio player commands. Only server-verified postgres_changes can invoke seek, pause, resume, or play.
-      let playerSeekCount = 0;
+      const playerSeekCount = 0;
       let playerPauseCount = 0;
       let playerResumeCount = 0;
 
@@ -889,7 +889,7 @@ describe("MelodyMap Jam Session Synchronization Engine", () => {
         ];
 
         // Authoritative database queue state
-        let dbQueue = [
+        const dbQueue = [
           { id: "q-1", trackId: "track-1" },
         ];
 

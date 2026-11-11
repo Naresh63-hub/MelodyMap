@@ -24,7 +24,7 @@ class MockStorage {
 }
 
 const mockStorage = new MockStorage();
-const eventListeners: Record<string, Set<Function>> = {};
+const eventListeners: Record<string, Set<(...args: any[]) => void>> = {};
 
 if (typeof globalThis.localStorage === "undefined") {
   (globalThis as any).localStorage = mockStorage;
@@ -33,11 +33,11 @@ if (typeof globalThis.localStorage === "undefined") {
 if (typeof globalThis.window === "undefined") {
   (globalThis as any).window = {
     localStorage: mockStorage,
-    addEventListener: (type: string, fn: Function) => {
+    addEventListener: (type: string, fn: (...args: any[]) => void) => {
       if (!eventListeners[type]) eventListeners[type] = new Set();
       eventListeners[type].add(fn);
     },
-    removeEventListener: (type: string, fn: Function) => {
+    removeEventListener: (type: string, fn: (...args: any[]) => void) => {
       eventListeners[type]?.delete(fn);
     },
     dispatchEvent: (ev: any) => {

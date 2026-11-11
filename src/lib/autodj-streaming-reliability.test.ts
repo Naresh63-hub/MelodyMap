@@ -133,7 +133,7 @@ describe("MelodyMap AutoDJ & Streaming Reliability Regression Suite", () => {
     it("stops cleanly (returns -1) when queue ends and repeatMode is off", () => {
       const queue = [{ id: "track-1" }, { id: "track-2" }];
       const currentIdx = 1; // last song
-      let repeatMode: "off" | "all" | "one" = "off";
+      const repeatMode: "off" | "all" | "one" = "off";
 
       const loop = (repeatMode as string) === "all";
       const nextIdx = findNextTrackIdx(queue, currentIdx, loop);
@@ -143,7 +143,7 @@ describe("MelodyMap AutoDJ & Streaming Reliability Regression Suite", () => {
     it("loops to track 0 when queue ends and repeatMode is all", () => {
       const queue = [{ id: "track-1" }, { id: "track-2" }];
       const currentIdx = 1; // last song
-      let repeatMode: "off" | "all" | "one" = "all";
+      const repeatMode: "off" | "all" | "one" = "all";
 
       const loop = (repeatMode as string) === "all";
       const nextIdx = findNextTrackIdx(queue, currentIdx, loop);
