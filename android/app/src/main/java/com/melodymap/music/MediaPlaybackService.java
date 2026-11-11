@@ -345,12 +345,20 @@ public class MediaPlaybackService extends Service {
                     ? PlaybackStateCompat.STATE_PLAYING
                     : PlaybackStateCompat.STATE_PAUSED;
             float speed = isJsPlaying ? 1.0f : 0f;
+            // On modern Android (API 33+, including OxygenOS / ColorOS 14+), the lock-screen
+            // media player layout offers 3 primary transport slots:
+            //   Slot 1: Play/Pause (ACTION_PLAY_PAUSE)
+            //   Slot 2: Previous OR Custom Action fallback (if ACTION_SKIP_TO_PREVIOUS is omitted)
+            //   Slot 3: Next (ACTION_SKIP_TO_NEXT)
+            // Omitting ACTION_SKIP_TO_PREVIOUS promotes our first Custom Action (the Heart / Like button)
+            // directly into Slot 2 on the lock-screen row:
+            //   [ Like (♡ / ♥) ]   [ Play/Pause ]   [ Next ]   [ Output Switcher ]
+            // In-app previous navigation and headset media button callbacks remain fully active.
             PlaybackStateCompat playbackState = new PlaybackStateCompat.Builder()
                     .setActions(
                             PlaybackStateCompat.ACTION_PLAY
                                     | PlaybackStateCompat.ACTION_PAUSE
                                     | PlaybackStateCompat.ACTION_PLAY_PAUSE
-                                    | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
                                     | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
                                     | PlaybackStateCompat.ACTION_SEEK_TO
                                     | PlaybackStateCompat.ACTION_STOP)
@@ -455,10 +463,9 @@ public class MediaPlaybackService extends Service {
             // Two rendering paths exist and both are covered here:
             //
             //  * Android 13+ (this app targets API 36): SystemUI builds the media
-            //    panel from the session PlaybackState, NOT from these notification
-            //    actions. Preview/Next claim slots 2-3, so the Like custom action
-            //    lands in slot 4 of the 5 available slots:
-            //    [ Prev ] [ Play/Pause ] [ Next ] [ Like ] [ 5th slot ]
+            //    panel from the session PlaybackState. Because ACTION_SKIP_TO_PREVIOUS is
+            //    omitted from PlaybackState actions, Slot 2 falls back to our Custom Action:
+            //    [ Like (♡ / ♥) ] [ Play/Pause ] [ Next ] [ Output Switcher ]
             //
             //  * Legacy path: the notification action row is used, and
             //    setShowActionsInCompactView() picks at most THREE indices for the
