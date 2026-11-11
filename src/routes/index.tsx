@@ -4762,25 +4762,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       Clear history
                     </Button>
                   )}
-                  {tab === "downloads" && downloadedTracks.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={async () => {
-                        if (typeof window !== "undefined" && window.confirm("Clear all offline downloads?")) {
-                          await clearDownloads();
-                          setDownloadedIds(new Set());
-                          setDownloadedTracks([]);
-                          void refreshStorageStats();
-                          setMessage("Cleared all offline downloads");
-                          setTimeout(() => setMessage(null), 3000);
-                        }
-                      }}
-                      className="text-xs text-muted-foreground hover:text-red-400"
-                    >
-                      Clear all
-                    </Button>
-                  )}
                 </div>
 
                 {/* Storage Dashboard: displays offline data usage, item count, and >30-day cleanup */}
