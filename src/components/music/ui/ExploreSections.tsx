@@ -1,5 +1,5 @@
 import { Calendar, Disc3, Flame, Loader2, MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, TrendingUp, Trophy } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import type { Track } from "@/lib/library";
@@ -439,11 +439,18 @@ export function ExploreSections({
   exploreExhaustedTrending = false,
 }: Props) {
   const [activeFilter, setActiveFilter] = useState<ExploreTabId>("all");
+  const [visibleTrendingLimit, setVisibleTrendingLimit] = useState(15);
 
   // 1. Trending tracks (genuine provider chart order & verified popularity)
   const trendingTracks = useMemo(() => {
     return dedupeTracks(trending);
   }, [trending]);
+
+  useEffect(() => {
+    if (trendingTracks.length <= 15) {
+      setVisibleTrendingLimit(15);
+    }
+  }, [trendingTracks.length]);
 
   // 2. New Releases sorted by actual release date metadata (newest first)
   const sortedNewReleases = useMemo(() => {
@@ -482,8 +489,8 @@ export function ExploreSections({
       seenKeys.add(`${(t.title || "").trim().toLowerCase()}:::${(t.artist || "").trim().toLowerCase()}`);
     };
 
-    // Primary: Trending Section
-    const allTrending = trendingTracks.slice(0, 15);
+    // Primary: Trending Section (expands smoothly when user requests to explore more)
+    const allTrending = trendingTracks.slice(0, visibleTrendingLimit);
     allTrending.forEach(recordSeen);
 
     // Secondary: New Releases (excluding any tracks already present in Trending)
@@ -576,16 +583,19 @@ export function ExploreSections({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={onLoadMoreTrending}
-                    disabled={loadingMoreTrending || exploreExhaustedTrending}
+                    onClick={() => {
+                      setVisibleTrendingLimit((prev) => prev + 15);
+                      onLoadMoreTrending();
+                    }}
+                    disabled={loadingMoreTrending || (exploreExhaustedTrending && visibleTrendingLimit >= trendingTracks.length)}
                     className="rounded-full border-hair bg-chip-subtle px-5 py-2 text-xs font-normal text-secondary-foreground hover:bg-chip-strong hover:text-foreground transition-all shadow-md"
                   >
                     {loadingMoreTrending ? (
                       <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin text-primary" />
                     ) : null}
-                    {exploreExhaustedTrending ? "All caught up" : "Explore more songs"}
+                    {exploreExhaustedTrending && visibleTrendingLimit >= trendingTracks.length ? "All caught up" : "Explore more songs"}
                   </Button>
-                  {exploreExhaustedTrending && (
+                  {exploreExhaustedTrending && visibleTrendingLimit >= trendingTracks.length && (
                     <p className="text-[11px] text-muted-foreground">You've explored all currently available trending songs.</p>
                   )}
                 </div>

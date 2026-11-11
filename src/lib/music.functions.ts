@@ -389,13 +389,11 @@ export async function runQueryBatch(
         if (saavnRes.length > 0) return saavnRes as Track[];
       } catch {}
 
-      if (!musicOnly) {
-        try {
-          const { searchMultiProvider } = await import("./providers/multi-search");
-          const multi = await searchMultiProvider(q, { limit: perQueryLimit, page });
-          if (multi.tracks.length > 0) return multi.tracks as Track[];
-        } catch {}
-      }
+      try {
+        const { searchMultiProvider } = await import("./providers/multi-search");
+        const multi = await searchMultiProvider(q, { limit: perQueryLimit, page });
+        if (multi.tracks.length > 0) return multi.tracks as Track[];
+      } catch {}
 
       return [];
     }),
@@ -475,9 +473,9 @@ async function getLocalPicks(data: {
   );
 
   // Filter out any excluded / recently played / liked / penalized / cross-language tracks
-  const isCandidateValid = (t: Track) => {
+  const isCandidateValid = (t: Track, relaxRecentSeen = false) => {
     if (!t || !t.id) return false;
-    if (recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase().trim())) return false;
+    if (!relaxRecentSeen && recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase().trim())) return false;
     const key = getTrackDedupeKey(t.title, t.artist);
     const titleKey = norm(t.title);
     const titleCleanKey = norm(cleanSongTitle(t.title));
@@ -565,12 +563,24 @@ async function getLocalPicks(data: {
 
     for (const t of combined) {
       if (!t || !t.id || seenIds.has(t.id)) continue;
-      if (!isCandidateValid(t)) continue;
+      if (!isCandidateValid(t, false)) continue;
       const key = getTrackDedupeKey(t.title, t.artist);
       if (key && seenKeys.has(key)) continue;
       if (key) seenKeys.add(key);
       seenIds.add(t.id);
       validCandidates.push(t);
+    }
+
+    if (validCandidates.length < count && recentSeenSet.size > 0) {
+      for (const t of combined) {
+        if (!t || !t.id || seenIds.has(t.id)) continue;
+        if (!isCandidateValid(t, true)) continue;
+        const key = getTrackDedupeKey(t.title, t.artist);
+        if (key && seenKeys.has(key)) continue;
+        if (key) seenKeys.add(key);
+        seenIds.add(t.id);
+        validCandidates.push(t);
+      }
     }
 
     const shuffled = shuffleArray(validCandidates);
@@ -637,8 +647,14 @@ async function getLocalPicks(data: {
   const newQuota = Math.ceil(count / 2);
   const oldQuota = count - newQuota;
 
-  const filteredNew = newCandidates.filter(isCandidateValid);
-  const filteredOld = oldCandidates.filter(isCandidateValid);
+  let filteredNew = newCandidates.filter((t) => isCandidateValid(t, false));
+  let filteredOld = oldCandidates.filter((t) => isCandidateValid(t, false));
+
+  // If recentSeenSet over-filtered candidates, gracefully relax recentSeenSet so user gets songs
+  if (filteredNew.length + filteredOld.length < count && recentSeenSet.size > 0) {
+    filteredNew = newCandidates.filter((t) => isCandidateValid(t, true));
+    filteredOld = oldCandidates.filter((t) => isCandidateValid(t, true));
+  }
 
   // Prioritize primary language candidates in recommendations
   const primaryLangPref = (data.primaryLanguage || languages[0] || "").toLowerCase().trim();
@@ -847,7 +863,7 @@ export const getRealTrendingTracks = createServerFn({ method: "POST" })
     const unseenFallback = recentSeenSet.size > 0
       ? filteredTracks.filter((t) => !recentSeenSet.has(t.id.toLowerCase()))
       : filteredTracks;
-    const finalFallback = unseenFallback.length > 0 ? unseenFallback : (recentSeenSet.size > 0 ? [] : filteredTracks);
+    const finalFallback = unseenFallback.length > 0 ? unseenFallback : filteredTracks;
     return { tracks: shuffleArray(finalFallback).slice(0, count), error: null };
   });
 
@@ -972,7 +988,7 @@ export const getOldSongsTracks = createServerFn({ method: "POST" })
     const unseenFallback = recentSeenSet.size > 0
       ? filteredTracks.filter((t) => !recentSeenSet.has(t.id.toLowerCase()))
       : filteredTracks;
-    const finalFallback = unseenFallback.length > 0 ? unseenFallback : (recentSeenSet.size > 0 ? [] : filteredTracks);
+    const finalFallback = unseenFallback.length > 0 ? unseenFallback : filteredTracks;
     return { tracks: shuffleArray(finalFallback).slice(0, count), error: null };
   });
 

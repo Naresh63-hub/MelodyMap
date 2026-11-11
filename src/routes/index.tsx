@@ -2372,66 +2372,70 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         const clientHour = new Date().getHours();
         const affinity = contextEngine.getAffinityWeights(stats);
         const moreCandidates: Track[] = [];
-        let fresh: Track[] = [];
         const baseNonce = Date.now();
+        const currentRecs = recsRef.current;
 
         const isNewUser = likes.length === 0 && history.length === 0;
 
-        // 1. Primary AI / Deep Local Recommendation with deep ocean pagination
+        // 1. Primary AI / Deep Recommendation with deep pagination
         for (let depth = 1; depth <= 3; depth++) {
-          const res = await runRecommend({
-            data: {
-              isNewUser,
-              liked: likes.slice(0, 15).map(trackLabel),
-              recent: history.slice(0, 15).map(trackLabel),
-              disliked: dislikes.slice(0, 15).map(trackLabel),
-              sequence: sequenceBrief(history, stats),
-              skipped: skippedLabels(stats),
-              count: 16,
-              page: targetPage + (depth - 1),
-              ...(mood ? { mood } : {}),
-              languages: settings.languages,
-                  primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                  languageWeights: settings.languageWeights,
-              brief: settingsToBrief(settings),
-              artists: topArtists(stats, likes, 12, downloadedTracks),
-            downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
-              refreshNonce: `${baseNonce}-more-p${targetPage}-d${depth}`,
-              discovery: settings.discovery ?? 40,
-              affinityArtists: affinity.affinityArtists,
-              penalizedArtists: affinity.penalizedArtists,
-              clientHour,
-              exclude: recsRef.current.slice(-30).map(trackLabel),
-              recentSeenIds: getRecentlySeenIdentities(),
-            },
-          });
-          if (res.tracks && res.tracks.length > 0) {
-            for (const t of res.tracks as Track[]) {
-              if (
-                t &&
-                isOriginalSong(t) &&
-                (!isNewUser || !isOldEraTrack(t)) &&
-                hasPlayableDuration(t) &&
-                (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
-                !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
-              ) {
-                moreCandidates.push(t);
+          try {
+            const res = await runRecommend({
+              data: {
+                isNewUser,
+                liked: likes.slice(0, 15).map(trackLabel),
+                recent: history.slice(0, 15).map(trackLabel),
+                disliked: dislikes.slice(0, 15).map(trackLabel),
+                sequence: sequenceBrief(history, stats),
+                skipped: skippedLabels(stats),
+                count: 18,
+                page: targetPage + (depth - 1),
+                ...(mood ? { mood } : {}),
+                languages: settings.languages,
+                primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                languageWeights: settings.languageWeights,
+                brief: settingsToBrief(settings),
+                artists: topArtists(stats, likes, 12, downloadedTracks),
+                downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
+                refreshNonce: `${baseNonce}-more-p${targetPage}-d${depth}`,
+                discovery: settings.discovery ?? 40,
+                affinityArtists: affinity.affinityArtists,
+                penalizedArtists: affinity.penalizedArtists,
+                clientHour,
+                exclude: currentRecs.slice(-30).map(trackLabel),
+                recentSeenIds: currentRecs.slice(-50).map((t) => t.id).filter(Boolean),
+              },
+            });
+            if (res.tracks && res.tracks.length > 0) {
+              for (const t of res.tracks as Track[]) {
+                if (
+                  t &&
+                  isOriginalSong(t) &&
+                  (!isNewUser || !isOldEraTrack(t)) &&
+                  hasPlayableDuration(t) &&
+                  (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
+                  !currentRecs.some((existing) => isFuzzySameSong(existing, t)) &&
+                  !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
+                ) {
+                  moreCandidates.push(t);
+                }
               }
+              if (moreCandidates.length >= 12) break;
             }
-            fresh = applyFeedFilters(moreCandidates);
-            if (fresh.length >= 8) break;
+          } catch (err) {
+            console.warn("[loadMoreRecommendations] runRecommend error:", err);
           }
         }
 
         // 2. Song Radio Deep Fallback across recent seeds if candidates are sparse
-        if (fresh.length < 6) {
+        if (moreCandidates.length < 8) {
           const seedCandidates: Track[] = [
-            ...recsRef.current.slice(-6).reverse(),
+            ...currentRecs.slice(-6).reverse(),
             ...likes.slice(0, 6),
             ...history.slice(0, 6),
           ].filter((s) => Boolean(s?.id));
 
-          const pickedSeeds = seedCandidates.slice(0, 2);
+          const pickedSeeds = seedCandidates.slice(0, 3);
           for (const seed of pickedSeeds) {
             try {
               const radioRes = await getSongRadio({
@@ -2454,24 +2458,24 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     isOriginalSong(t) &&
                     hasPlayableDuration(t) &&
                     (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
+                    !currentRecs.some((existing) => isFuzzySameSong(existing, t)) &&
                     !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
                   ) {
                     moreCandidates.push(t);
                   }
                 }
-                fresh = applyFeedFilters(moreCandidates);
-                if (fresh.length >= 8) break;
+                if (moreCandidates.length >= 10) break;
               }
             } catch {
-              // fall through to next seed or relaxed freshness
+              // fall through to next seed
             }
           }
         }
 
         // 2b. Mood Picks Fallback if candidates are still sparse (< 8)
-        if (fresh.length < 8) {
-          const moodOptions = ["Melody", "Hits", "Chill", "Romantic", "Party"];
-          const pickedMood = mood || moodOptions[targetPage % moodOptions.length];
+        if (moreCandidates.length < 8) {
+          const moodOptions = ["Melody", "Hits", "Chill", "Romantic", "Party", "Trending"];
+          const pickedMood = mood || moodOptions[(targetPage - 1) % moodOptions.length];
           try {
             const moodRes = await runMoodPicks({
               data: {
@@ -2488,12 +2492,43 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   (!isNewUser || !isOldEraTrack(t)) &&
                   hasPlayableDuration(t) &&
                   (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
+                  !currentRecs.some((existing) => isFuzzySameSong(existing, t)) &&
                   !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
                 ) {
                   moreCandidates.push(t);
                 }
               }
-              fresh = applyFeedFilters(moreCandidates);
+            }
+          } catch {}
+        }
+
+        // 2c. Trending / New Releases Fallback if candidates are still sparse (< 6)
+        if (moreCandidates.length < 6) {
+          try {
+            const trendingRes = await runTrending({
+              data: {
+                languages: settings.languages,
+                primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                languageWeights: settings.languageWeights,
+                count: 20,
+                page: (targetPage % 5) + 1,
+                clientHour,
+                refreshNonce: `${baseNonce}-trending-more`,
+              },
+            });
+            if (trendingRes.tracks && trendingRes.tracks.length > 0) {
+              for (const t of trendingRes.tracks as Track[]) {
+                if (
+                  t &&
+                  isOriginalSong(t) &&
+                  hasPlayableDuration(t) &&
+                  (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
+                  !currentRecs.some((existing) => isFuzzySameSong(existing, t)) &&
+                  !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
+                ) {
+                  moreCandidates.push(t);
+                }
+              }
             }
           } catch {}
         }
@@ -2507,36 +2542,27 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           return 0;
         });
 
-        // 3. Relaxed Session Freshness Fallback:
-        // If fresh is still sparse (< 6) due to session-level displayed sets,
-        // relax previouslyDisplayedIds exclusion, but STILL strictly enforce:
+        // 3. Relaxed Session Freshness Filter:
+        // Strictly enforce:
         // - never duplicate tracks currently displayed in recs
         // - never repeat recently played songs (history.slice(0, 50))
         // - never include disliked tracks
         // - enforce language consistency, duration, and original song criteria
-        let candidatesToRank = fresh;
-        if (candidatesToRank.length < 6 && moreCandidates.length > 0) {
-          const currentRecs = recsRef.current;
-          const currentHistory = history.slice(0, 50);
-          const relaxed = moreCandidates.filter(
-            (t) =>
-              hasPlayableDuration(t) &&
-              isOriginalSong(t) &&
-              !trackExistsIn(currentRecs, t as TrackLike) &&
-              !trackExistsIn(currentHistory, t as TrackLike) &&
-              !dislikedIdsRef.current.has(t.id) &&
-              (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)),
-          );
-          if (relaxed.length > candidatesToRank.length) {
-            candidatesToRank = dedupeTracks([...candidatesToRank, ...relaxed]);
-          }
-        }
+        const currentHistory = history.slice(0, 50);
+        let candidatesToRank = moreCandidates.filter(
+          (t) =>
+            hasPlayableDuration(t) &&
+            isOriginalSong(t) &&
+            !trackExistsIn(currentRecs, t as TrackLike) &&
+            !trackExistsIn(currentHistory, t as TrackLike) &&
+            !dislikedIdsRef.current.has(t.id) &&
+            (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)),
+        );
 
         // 4. Thompson Sampling Ranking & Diversified Batch Append
         if (candidatesToRank.length > 0) {
           if (currentGen !== recsGenerationRef.current) return;
           const ranked = thompsonSamplingPolicy.rankCandidates(candidatesToRank, getSessionContext());
-          const currentRecs = recsRef.current;
           const trulyNew = ranked.filter(
             (cand) => !currentRecs.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
           );
@@ -2563,12 +2589,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             markFeedDisplayed(diversifiedBatch);
             setExploreExhausted(false);
           } else {
-            if (targetPage >= 6) {
+            if (targetPage >= 8) {
               setExploreExhausted(true);
             }
           }
         } else {
-          if (targetPage >= 6) {
+          if (targetPage >= 8) {
             setExploreExhausted(true);
           }
         }
@@ -2582,13 +2608,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       runRecommend,
       getSongRadio,
       runMoodPicks,
+      runTrending,
       likes,
       history,
       dislikes,
       stats,
       settings,
       getSessionContext,
-      applyFeedFilters,
       markFeedDisplayed,
     ],
   );
@@ -2601,45 +2627,171 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       moreTrendingPageRef.current += 1;
       const targetPage = moreTrendingPageRef.current;
       const clientHour = new Date().getHours();
-      const currentIds = trendingList.map((t) => t.id);
-      const res = await runTrending({
-        data: {
-          languages: settings.languages,
-                  primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                  languageWeights: settings.languageWeights,
-          count: 35,
-          page: targetPage,
-          recentSeenIds: currentIds.slice(-200),
-          clientHour,
-        },
-      });
-      if (res.tracks && res.tracks.length > 0) {
-        const incoming = (res.tracks as Track[]).filter(
-          (t) => isOriginalSong(t) && (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)),
-        );
-        const currentTrending = trendingRef.current;
-        const trulyNew = incoming.filter(
-          (cand) => !currentTrending.some((p) => p.id === cand.id || sameSong(p, cand)),
-        );
-        if (trulyNew.length > 0) {
-          setTrendingList((prev) => {
-            const batchToAdd = trulyNew.filter(
-              (cand) => !prev.some((p) => p.id === cand.id || sameSong(p, cand)),
-            );
-            if (batchToAdd.length === 0) return prev;
-            const combined = dedupeTracks([...prev, ...batchToAdd]);
-            writeHomeCache({ trendingList: combined });
-            recordSeenTrackIdentities(batchToAdd);
-            return combined;
-          });
-          setExploreExhaustedTrending(false);
-        } else {
-          if (targetPage >= 6) {
-            setExploreExhaustedTrending(true);
+      const currentTrending = trendingRef.current;
+      const currentIds = currentTrending.map((t) => t.id).filter(Boolean);
+      const baseNonce = `${Date.now()}-explore-${targetPage}`;
+
+      const incomingCandidates: Track[] = [];
+
+      // 1. Fetch from runTrending with targetPage and refreshNonce
+      try {
+        const res = await runTrending({
+          data: {
+            languages: settings.languages,
+            primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+            languageWeights: settings.languageWeights,
+            count: 30,
+            page: targetPage,
+            recentSeenIds: currentIds.slice(-40),
+            clientHour,
+            refreshNonce: baseNonce,
+          },
+        });
+        if (res.tracks && res.tracks.length > 0) {
+          for (const t of res.tracks as Track[]) {
+            if (
+              t &&
+              isOriginalSong(t) &&
+              hasPlayableDuration(t) &&
+              (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages))
+            ) {
+              if (
+                !currentTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
+                !incomingCandidates.some((p) => p.id === t.id || sameSong(p, t))
+              ) {
+                incomingCandidates.push(t);
+              }
+            }
           }
         }
+      } catch (err) {
+        console.warn("[loadMoreExploreSongs] runTrending error:", err);
+      }
+
+      // 2. If incomingCandidates is still < 10, fetch from new releases
+      if (incomingCandidates.length < 10) {
+        try {
+          const artistList = topArtists(stats, likes, 8);
+          const newSongsRes = await runNewSongs({
+            data: {
+              artists: artistList,
+              languages: settings.languages,
+              count: 25,
+              page: targetPage,
+              refreshNonce: `${baseNonce}-new`,
+              primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+              languageWeights: settings.languageWeights,
+            },
+          });
+          if (newSongsRes.tracks && newSongsRes.tracks.length > 0) {
+            for (const t of newSongsRes.tracks as Track[]) {
+              if (
+                t &&
+                isOriginalSong(t) &&
+                hasPlayableDuration(t) &&
+                (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages))
+              ) {
+                if (
+                  !currentTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
+                  !incomingCandidates.some((p) => p.id === t.id || sameSong(p, t))
+                ) {
+                  incomingCandidates.push(t);
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("[loadMoreExploreSongs] runNewSongs fallback error:", err);
+        }
+      }
+
+      // 3. If incomingCandidates is still < 10, fetch from diverse mood picks
+      if (incomingCandidates.length < 10) {
+        const exploreMoods = ["Hits", "Trending", "Party", "Melody", "Viral"];
+        const pickedMood = exploreMoods[(targetPage - 1) % exploreMoods.length] || "Hits";
+        try {
+          const moodRes = await runMoodPicks({
+            data: {
+              mood: pickedMood,
+              languages: settings.languages,
+              language: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+            },
+          });
+          if (moodRes.tracks && moodRes.tracks.length > 0) {
+            for (const t of moodRes.tracks as Track[]) {
+              if (
+                t &&
+                isOriginalSong(t) &&
+                hasPlayableDuration(t) &&
+                (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages))
+              ) {
+                if (
+                  !currentTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
+                  !incomingCandidates.some((p) => p.id === t.id || sameSong(p, t))
+                ) {
+                  incomingCandidates.push(t);
+                }
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // 4. If incomingCandidates is still < 10, seed radio from existing trending songs
+      if (incomingCandidates.length < 10 && currentTrending.length > 0) {
+        const seedIndex = (targetPage * 3) % currentTrending.length;
+        const seed = currentTrending[seedIndex];
+        if (seed?.id) {
+          try {
+            const radioRes = await getSongRadio({
+              data: {
+                videoId: seed.id,
+                title: seed.title,
+                artist: seed.artist,
+                album: seed.album,
+                languages: settings.languages,
+                primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                limit: 15,
+                page: targetPage,
+              },
+            });
+            if (radioRes.tracks && radioRes.tracks.length > 0) {
+              for (const t of radioRes.tracks as Track[]) {
+                if (
+                  t &&
+                  isOriginalSong(t) &&
+                  hasPlayableDuration(t) &&
+                  (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages))
+                ) {
+                  if (
+                    !currentTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
+                    !incomingCandidates.some((p) => p.id === t.id || sameSong(p, t))
+                  ) {
+                    incomingCandidates.push(t);
+                  }
+                }
+              }
+            }
+          } catch {}
+        }
+      }
+
+      // Append new tracks to trendingList
+      if (incomingCandidates.length > 0) {
+        const batchToAdd = incomingCandidates.slice(0, 20);
+        setTrendingList((prev) => {
+          const trulyNew = batchToAdd.filter(
+            (cand) => !prev.some((p) => p.id === cand.id || sameSong(p, cand)),
+          );
+          if (trulyNew.length === 0) return prev;
+          const combined = dedupeTracks([...prev, ...trulyNew]);
+          writeHomeCache({ trendingList: combined });
+          recordSeenTrackIdentities(trulyNew);
+          return combined;
+        });
+        setExploreExhaustedTrending(false);
       } else {
-        if (targetPage >= 6) {
+        if (targetPage >= 8) {
           setExploreExhaustedTrending(true);
         }
       }
@@ -2649,7 +2801,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       setLoadingMoreExplore(false);
       isFetchingMoreTrendingRef.current = false;
     }
-  }, [loadingMoreExplore, exploreExhaustedTrending, runTrending, settings.languages, trendingList]);
+  }, [
+    loadingMoreExplore,
+    exploreExhaustedTrending,
+    runTrending,
+    runNewSongs,
+    runMoodPicks,
+    getSongRadio,
+    stats,
+    likes,
+    settings.languages,
+    settings.primaryLanguage,
+    settings.languageWeights,
+  ]);
 
   const extendQueue = useCallback(async (): Promise<Track[]> => {
     // Synchronous mutex guard against overlapping concurrent extensions
