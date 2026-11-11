@@ -1,7 +1,16 @@
 import { useState } from "react";
-import { Check, Copy, MessageCircle, Send, Twitter, X } from "lucide-react";
+import { Check, Copy, MessageCircle, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Track } from "@/lib/library";
+
+function TwitterIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4l11.733 16h4.267l-11.733 -16z" />
+      <path d="M4 20l6.768 -6.768m2.46 -2.46l6.772 -6.772" />
+    </svg>
+  );
+}
 
 type Props = {
   open: boolean;
@@ -41,7 +50,7 @@ export function ShareModal({ open, track, onClose }: Props) {
     },
     {
       name: "Twitter / X",
-      icon: Twitter,
+      icon: TwitterIcon,
       bg: "bg-sky-500/20 text-sky-400 border-sky-500/30",
       action: () =>
         window.open(
