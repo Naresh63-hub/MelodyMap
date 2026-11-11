@@ -11,6 +11,7 @@
 
 import { parseDurationSeconds } from "./track-filters";
 import { cleanMovieName, cleanSongTitle, isChannelOrLabelName } from "./track-metadata";
+export { cleanSongTitle };
 
 /** Minimal track shape used for identity and comparison. */
 export interface TrackLike {

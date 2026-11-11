@@ -19,7 +19,7 @@
  * next-track selection.
  */
 
-import { areSameTrack, norm, stringSimilarity, type TrackLike } from "./track-dedup";
+import { areSameTrack, cleanSongTitle, norm, normalizeArtistAlias, stringSimilarity, type TrackLike } from "./track-dedup";
 import { MAX_TRACK_DURATION_SECONDS, parseDurationSeconds } from "./track-filters";
 import type { Track } from "./types";
 
@@ -63,6 +63,30 @@ export function sameSong(a: TrackLike, b: TrackLike): boolean {
   // "Arijit Singh" vs "Arijit Singh - Topic" merges (norm strips "topic");
   // "Love" by Artist A vs "Love" by Artist B stays distinct in practice.
   return stringSimilarity(artistA, artistB) >= 0.9;
+}
+
+/**
+ * Robust cross-section and queue deduplication check:
+ * Matches identical songs across different providers or upload versions
+ * (e.g. YouTube video with intro/dialogue vs JioSaavn studio track),
+ * even when durations differ slightly.
+ */
+export function isFuzzySameSong(a: TrackLike, b: TrackLike): boolean {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
+  if (sameSong(a, b)) return true;
+  const titleA = norm(cleanSongTitle(a.title) || a.title);
+  const titleB = norm(cleanSongTitle(b.title) || b.title);
+  if (!titleA || !titleB) return false;
+  if (titleA === titleB || stringSimilarity(titleA, titleB) >= 0.85) {
+    const artA = normalizeArtistAlias(a.artist);
+    const artB = normalizeArtistAlias(b.artist);
+    if (!artA || !artB) return true;
+    if (artA === artB || stringSimilarity(artA, artB) >= 0.75) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

@@ -444,9 +444,9 @@ function AuthPage() {
 
       {/* TOP NAVIGATION BAR: Brand Logo + Wave Equalizer Tagline */}
       <header
-        className="w-full flex items-center justify-between px-4 sm:px-8 lg:px-12 pb-2 sm:pb-4 lg:py-6 relative z-20 max-w-7xl mx-auto shrink-0"
+        className="w-full flex items-center justify-between px-4 sm:px-8 lg:px-12 pb-2 sm:pb-4 lg:py-6 relative z-20 max-w-7xl mx-auto shrink-0 header-safe-top"
         style={{
-          paddingTop: "max(calc(var(--mm-inset-top, 0px) + 0.75rem), 3rem)",
+          paddingTop: "max(calc(var(--mm-inset-top, 0px) + 1.25rem), 3.75rem)",
         }}
       >
         {/* Left: Official MelodyMap Logo + Wordmark */}

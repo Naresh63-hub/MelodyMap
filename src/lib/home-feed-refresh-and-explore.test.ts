@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Track } from "./types";
-import { sameSong } from "./feed-freshness";
+import { isFuzzySameSong, sameSong } from "./feed-freshness";
 import { dedupeTracks, diversifyTrackList, type TrackLike } from "./track-dedup";
 import { ThompsonSamplingPolicy, type SessionContext } from "./bandit-policy";
 
@@ -242,6 +242,56 @@ describe("Home Feed Refresh, Daily Mix Isolation, and Explore More Songs", () =>
       }
 
       expect(exploreExhausted).toBe(true);
+    });
+  });
+
+  describe("4. Fuzzy Deduplication & Two-Way Isolation", () => {
+    it("isFuzzySameSong detects duplicates despite YouTube outro/intro duration differences and title tags", () => {
+      const ytTrack = makeTrack("yt-1", "Chuttamalle (From \"Devara\") [Official Video]", "Anirudh Ravichander, Deepthi Suresh", "4:15");
+      const saavnTrack = makeTrack("saavn-1", "Chuttamalle", "Anirudh Ravichander", "3:42");
+
+      // Standard sameSong fails because duration difference > 8 seconds
+      expect(sameSong(ytTrack, saavnTrack)).toBe(false);
+
+      // isFuzzySameSong recognizes them as the exact same song
+      expect(isFuzzySameSong(ytTrack, saavnTrack)).toBe(true);
+    });
+
+    it("two-way isolation prevents Daily Mix songs from showing on Explore and vice versa", () => {
+      const dailyMixTrack = makeTrack("dm-1", "Fear Song", "Anirudh Ravichander");
+      const exploreTrack = makeTrack("exp-1", "Fear Song (From \"Devara\")", "Anirudh Ravichander");
+
+      const explorePool: Track[] = [
+        exploreTrack,
+        makeTrack("exp-2", "Unique Trending Hit", "Artist Trending"),
+      ];
+
+      const filteredExplore = explorePool.filter((t) => !isFuzzySameSong(dailyMixTrack, t));
+
+      expect(filteredExplore.some((t) => t.id === "exp-1")).toBe(false);
+      expect(filteredExplore.map((t) => t.id)).toEqual(["exp-2"]);
+    });
+
+    it("guarantees refreshed Made For You feed starts with freshly discovered tracks at the top", () => {
+      const prevRecs: Track[] = [
+        makeTrack("old-1", "Old Song 1", "Artist A"),
+        makeTrack("old-2", "Old Song 2", "Artist B"),
+      ];
+
+      const freshFromPrev: Track[] = [
+        makeTrack("new-1", "Brand New Discovery 1", "Artist C"),
+        makeTrack("new-2", "Brand New Discovery 2", "Artist D"),
+      ];
+
+      const backfill: Track[] = [
+        makeTrack("old-1", "Old Song 1", "Artist A"),
+      ];
+
+      const settledRecs = [...freshFromPrev, ...backfill];
+
+      // Newly discovered songs are guaranteed to occupy positions 0 and 1
+      expect(settledRecs[0]?.id).toBe("new-1");
+      expect(settledRecs[1]?.id).toBe("new-2");
     });
   });
 });

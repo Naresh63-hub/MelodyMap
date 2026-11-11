@@ -442,7 +442,27 @@ async function getLocalPicks(data: {
   const bypassCache = !!data.refreshNonce || page > 1;
   const artists = data.artists.map((a) => a.trim()).filter(Boolean);
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
-  const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
+  const excludeSet = new Set<string>();
+  for (const raw of data.exclude ?? []) {
+    if (!raw) continue;
+    const cleanRaw = raw.trim();
+    excludeSet.add(cleanRaw.toLowerCase());
+    excludeSet.add(norm(cleanRaw));
+    if (cleanRaw.includes(" — ") || cleanRaw.includes(" - ")) {
+      const parts = cleanRaw.split(/ — | - /);
+      const titlePart = parts[0]?.trim() || "";
+      const artistPart = parts[1]?.trim() || "";
+      if (titlePart) {
+        excludeSet.add(norm(titlePart));
+        excludeSet.add(norm(cleanSongTitle(titlePart)));
+        if (artistPart) {
+          excludeSet.add(getTrackDedupeKey(titlePart, artistPart));
+          excludeSet.add(norm(`${titlePart} ${artistPart}`));
+          excludeSet.add(norm(`${artistPart} ${titlePart}`));
+        }
+      }
+    }
+  }
   const recentSeenSet = new Set((data.recentSeenIds ?? []).map((id) => id.toLowerCase().trim()));
   const likedSet = new Set((data.liked ?? []).map((s) => norm(s)));
   const likedTitleSet = new Set((data.liked ?? []).map((s) => {
@@ -458,11 +478,22 @@ async function getLocalPicks(data: {
   const isCandidateValid = (t: Track) => {
     if (!t || !t.id) return false;
     if (recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase().trim())) return false;
-    const key = norm(`${t.artist} - ${t.title}`);
+    const key = getTrackDedupeKey(t.title, t.artist);
     const titleKey = norm(t.title);
+    const titleCleanKey = norm(cleanSongTitle(t.title));
+    const titleArtistKey = norm(`${t.title} ${t.artist}`);
+    const artistTitleKey = norm(`${t.artist} ${t.title}`);
     const artKey = norm(t.artist);
-    if (excludeSet.has(key) || excludeSet.has(titleKey) || excludeSet.has(norm(t.id))) return false;
-    if (likedSet.has(key) || likedTitleSet.has(titleKey)) return false;
+    if (
+      excludeSet.has(t.id.toLowerCase()) ||
+      excludeSet.has(norm(t.id)) ||
+      (key && excludeSet.has(key)) ||
+      excludeSet.has(titleKey) ||
+      excludeSet.has(titleCleanKey) ||
+      excludeSet.has(titleArtistKey) ||
+      excludeSet.has(artistTitleKey)
+    ) return false;
+    if (likedSet.has(key) || likedTitleSet.has(titleKey) || likedTitleSet.has(titleCleanKey)) return false;
     if (penalizedSet.has(artKey) || penalizedSet.has(normalizeArtistAlias(t.artist))) return false;
     if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
     if (isNewUser && isOldEraTrack(t)) return false;
@@ -480,11 +511,14 @@ async function getLocalPicks(data: {
     const popularQueries: string[] = [];
     const activeLangs = languages.length > 0 ? languages : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
     for (const lang of activeLangs) {
-      popularQueries.push(`${lang} Top Trending Hit Songs ${CURRENT_YEAR}`);
-      popularQueries.push(`${lang} Most Popular Viral Songs`);
-      popularQueries.push(`Top 50 ${lang} songs`);
-      popularQueries.push(`${lang} latest hit songs ${CURRENT_YEAR}`);
-      popularQueries.push(`${lang} new releases ${CURRENT_YEAR}`);
+      const langArtists = LANGUAGE_ARTISTS[lang] || [];
+      const topLangArtists = langArtists.slice(0, 10);
+      for (const a of topLangArtists) {
+        popularQueries.push(`${a} latest songs`);
+        popularQueries.push(`${a} soundtrack songs`);
+      }
+      popularQueries.push(`${lang} new release songs ${CURRENT_YEAR}`);
+      popularQueries.push(`${lang} movie songs ${CURRENT_YEAR}`);
     }
 
     const nonceNum =
@@ -508,16 +542,8 @@ async function getLocalPicks(data: {
     const pickedNew = rotateQueries(newQueries, queryOffset).slice(0, 4);
     const pickedPopular = rotateQueries(popularQueries, queryOffset).slice(0, 4);
 
-    const [queryCandidates, trendingCandidates, newReleasesCandidates] = await Promise.all([
+    const [queryCandidates, newReleasesCandidates] = await Promise.all([
       runQueryBatch([...pickedNew, ...pickedPopular], 14, true, bypassCache, queryPage),
-      (async () => {
-        try {
-          const { getSaavnTrendingSongs } = await import("./providers/saavn");
-          return await getSaavnTrendingSongs(languages, 25, data.refreshNonce, page);
-        } catch {
-          return [];
-        }
-      })(),
       (async () => {
         try {
           const { getSaavnNewReleases } = await import("./providers/saavn");
@@ -530,7 +556,6 @@ async function getLocalPicks(data: {
 
     const combined = [
       ...queryCandidates,
-      ...(trendingCandidates as Track[]),
       ...(newReleasesCandidates as Track[]),
     ];
 
@@ -1567,10 +1592,15 @@ export const getDailyMix = createServerFn({ method: "POST" })
       const popularQueries: string[] = [];
       const activeLangs = languages.length > 0 ? languages : ["Telugu", "Hindi", "Tamil", "English", "Punjabi"];
       for (const lang of activeLangs) {
+        const langArtists = LANGUAGE_ARTISTS[lang] || [];
+        const topLangArtists = rotateQueries(langArtists, refreshShift).slice(0, 4);
+        for (const a of topLangArtists) {
+          popularQueries.push(`${a} soundtrack songs`);
+          popularQueries.push(`${a} melody songs`);
+        }
         popularQueries.push(`${lang} soundtrack hits`);
         popularQueries.push(`${lang} super hits`);
         popularQueries.push(`${lang} melody mix`);
-        popularQueries.push(`Top 50 ${lang} songs`);
       }
       const pickedPopular = data.refreshNonce
         ? shuffleArray(rotateQueries(popularQueries, refreshShift)).slice(0, 4)
@@ -1603,15 +1633,50 @@ export const getDailyMix = createServerFn({ method: "POST" })
       const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
       return norm(t || "");
     }));
-    const excludeSet = new Set((data.exclude || []).map((s) => norm(s)));
+    const excludeSet = new Set<string>();
+    for (const raw of data.exclude || []) {
+      if (!raw) continue;
+      const cleanRaw = raw.trim();
+      excludeSet.add(cleanRaw.toLowerCase());
+      excludeSet.add(norm(cleanRaw));
+      if (cleanRaw.includes(" — ") || cleanRaw.includes(" - ")) {
+        const parts = cleanRaw.split(/ — | - /);
+        const titlePart = parts[0]?.trim() || "";
+        const artistPart = parts[1]?.trim() || "";
+        if (titlePart) {
+          excludeSet.add(norm(titlePart));
+          excludeSet.add(norm(cleanSongTitle(titlePart)));
+          if (artistPart) {
+            excludeSet.add(getTrackDedupeKey(titlePart, artistPart));
+            excludeSet.add(norm(`${titlePart} ${artistPart}`));
+            excludeSet.add(norm(`${artistPart} ${titlePart}`));
+          }
+        }
+      }
+    }
 
     for (const t of queryCandidates) {
       if (!t || !t.id || seenIds.has(t.id)) continue;
       const key = getTrackDedupeKey(t.title, t.artist);
       if (key && seenKeys.has(key)) continue;
       const titleKey = norm(t.title);
-      if (likedSet.has(key) || likedTitleSet.has(titleKey)) continue;
-      if (excludeSet.has(t.id) || (key && excludeSet.has(key)) || excludeSet.has(titleKey)) continue;
+      const titleCleanKey = norm(cleanSongTitle(t.title));
+      const titleArtistKey = norm(`${t.title} ${t.artist}`);
+      const artistTitleKey = norm(`${t.artist} ${t.title}`);
+      if (
+        likedSet.has(key) ||
+        likedTitleSet.has(titleKey) ||
+        likedTitleSet.has(titleCleanKey)
+      ) continue;
+      if (
+        excludeSet.has(t.id.toLowerCase()) ||
+        excludeSet.has(norm(t.id)) ||
+        (key && excludeSet.has(key)) ||
+        excludeSet.has(titleKey) ||
+        excludeSet.has(titleCleanKey) ||
+        excludeSet.has(titleArtistKey) ||
+        excludeSet.has(artistTitleKey)
+      ) continue;
       if (key) seenKeys.add(key);
       seenIds.add(t.id);
       deduplicatedCandidates.push(t);

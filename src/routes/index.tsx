@@ -156,6 +156,7 @@ import { createNativeLikeGuard } from "@/lib/native-like";
 import {
   filterFeedCandidates,
   hasPlayableDuration,
+  isFuzzySameSong,
   sameSong,
 } from "@/lib/feed-freshness";
 import {
@@ -1594,23 +1595,38 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const isNewUser = likes.length === 0 && history.length === 0;
       const currentQueue = queueRef.current;
       const currentTrack = currentRef.current;
-      const currentExplore = [...trendingRef.current, ...oldSongsRef.current];
+      const cached = readHomeCache();
+      const cachedExplore = [
+        ...(cached.trendingList || []),
+        ...(cached.oldSongsList || []),
+        ...(cached.mixTracks?.newrelease || []),
+        ...(cached.mixTracks?.discover || []),
+        ...(cached.mixTracks?.explore || []),
+      ];
+      const currentExplore = [
+        ...trendingRef.current,
+        ...oldSongsRef.current,
+        ...cachedExplore,
+      ];
 
       const excludeLabels = [
+        ...currentQueue.map((t) => t.id),
         ...currentQueue.map(trackLabel),
-        ...(currentTrack ? [trackLabel(currentTrack)] : []),
+        ...(currentTrack ? [currentTrack.id, trackLabel(currentTrack)] : []),
+        ...currentExplore.map((t) => t.id),
         ...currentExplore.map(trackLabel),
       ].filter(Boolean);
 
       const isDuplicateWithQueueOrExplore = (t: Track) => {
         if (!t) return true;
-        if (currentTrack && (t.id === currentTrack.id || sameSong(t, currentTrack))) return true;
-        if (currentQueue.some((q) => q.id === t.id || sameSong(q, t))) return true;
-        if (currentExplore.some((e) => e.id === t.id || sameSong(e, t))) return true;
+        if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return true;
+        if (currentQueue.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return true;
+        if (currentExplore.some((e) => e.id === t.id || isFuzzySameSong(e, t))) return true;
         return false;
       };
 
       try {
+        const recentSeenIds = getRecentlySeenIdentities();
         const res = await runDailyMix({
           data: {
             isNewUser,
@@ -1622,6 +1638,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             count: 40,
             refreshNonce: nonce,
             exclude: excludeLabels,
+            recentSeenIds,
           },
         });
         if (res.tracks) {
@@ -1645,6 +1662,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 count: 40,
                 refreshNonce: `${nonce}-2`,
                 exclude: excludeLabels,
+                recentSeenIds,
               },
             });
             if (res2.tracks) {
@@ -1652,7 +1670,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 if (isNewUser && isOldEraTrack(t)) continue;
                 if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
                 if (isDuplicateWithQueueOrExplore(t)) continue;
-                if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                if (!pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
                   pureMusic.push(t);
                 }
               }
@@ -1703,6 +1721,22 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const prevNew = [...(mixTracksRef.current?.newrelease || [])];
       const prevOld = [...oldSongsRef.current];
 
+      const cached = readHomeCache();
+      const currentQueue = queueRef.current;
+      const currentTrack = currentRef.current;
+      const currentDailyMix = [
+        ...dailyMixTracksRef.current,
+        ...(cached.dailyMixTracks || []),
+      ];
+
+      const isDuplicateWithQueueOrDailyMix = (t: Track) => {
+        if (!t) return true;
+        if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return true;
+        if (currentQueue.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return true;
+        if (currentDailyMix.some((d) => d.id === t.id || isFuzzySameSong(d, t))) return true;
+        return false;
+      };
+
       try {
         await Promise.allSettled([
           (async () => {
@@ -1720,10 +1754,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (currentReqId !== exploreRequestIdRef.current) return;
             if (res.tracks && res.tracks.length > 0) {
-              const pool = (res.tracks as Track[]).filter(isOriginalSong);
+              const pool = (res.tracks as Track[]).filter(
+                (t) => isOriginalSong(t) && !isDuplicateWithQueueOrDailyMix(t),
+              );
               let fresh = pool;
               if (isExplicitRefresh && prevTrending.length > 0) {
-                fresh = pool.filter((t) => !prevTrending.some((p) => p.id === t.id || sameSong(p, t)));
+                fresh = pool.filter((t) => !prevTrending.some((p) => p.id === t.id || isFuzzySameSong(p, t)));
                 // If the target page returned too few fresh non-duplicate tracks (< 10), try another supported query
                 if (fresh.length < 10) {
                   const altPage = (targetPage % 5) + 1;
@@ -1740,11 +1776,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     },
                   });
                   if (currentReqId === exploreRequestIdRef.current && altRes.tracks && altRes.tracks.length > 0) {
-                    const altPool = (altRes.tracks as Track[]).filter(isOriginalSong);
+                    const altPool = (altRes.tracks as Track[]).filter(
+                      (t) => isOriginalSong(t) && !isDuplicateWithQueueOrDailyMix(t),
+                    );
                     for (const t of altPool) {
                       if (
-                        !prevTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
-                        !fresh.some((f) => f.id === t.id || sameSong(f, t))
+                        !prevTrending.some((p) => p.id === t.id || isFuzzySameSong(p, t)) &&
+                        !fresh.some((f) => f.id === t.id || isFuzzySameSong(f, t))
                       ) {
                         fresh.push(t);
                       }
@@ -1777,10 +1815,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (currentReqId !== exploreRequestIdRef.current) return;
             if (res.tracks && res.tracks.length > 0) {
-              const pool = (res.tracks as Track[]).filter((t) => !isOldEraTrack(t));
+              const pool = (res.tracks as Track[]).filter(
+                (t) => !isOldEraTrack(t) && !isDuplicateWithQueueOrDailyMix(t),
+              );
               let fresh = pool;
               if (isExplicitRefresh && prevNew.length > 0) {
-                fresh = pool.filter((t) => !prevNew.some((p) => p.id === t.id || sameSong(p, t)));
+                fresh = pool.filter((t) => !prevNew.some((p) => p.id === t.id || isFuzzySameSong(p, t)));
                 if (fresh.length < 10) {
                   const altPage = (targetPage % 5) + 1;
                   const altRes = await runNewSongs({
@@ -1796,11 +1836,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     },
                   });
                   if (currentReqId === exploreRequestIdRef.current && altRes.tracks && altRes.tracks.length > 0) {
-                    const altPool = (altRes.tracks as Track[]).filter((t) => !isOldEraTrack(t));
+                    const altPool = (altRes.tracks as Track[]).filter(
+                      (t) => !isOldEraTrack(t) && !isDuplicateWithQueueOrDailyMix(t),
+                    );
                     for (const t of altPool) {
                       if (
-                        !prevNew.some((p) => p.id === t.id || sameSong(p, t)) &&
-                        !fresh.some((f) => f.id === t.id || sameSong(f, t))
+                        !prevNew.some((p) => p.id === t.id || isFuzzySameSong(p, t)) &&
+                        !fresh.some((f) => f.id === t.id || isFuzzySameSong(f, t))
                       ) {
                         fresh.push(t);
                       }
@@ -1841,11 +1883,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (currentReqId !== exploreRequestIdRef.current) return;
             if (res.tracks && res.tracks.length > 0) {
-              const pool = (res.tracks as Track[]).filter(isOldEraTrack);
-              const candidates = pool.length > 0 ? pool : (res.tracks as Track[]);
+              const pool = (res.tracks as Track[]).filter(
+                (t) => isOldEraTrack(t) && !isDuplicateWithQueueOrDailyMix(t),
+              );
+              const candidates = pool.length > 0 ? pool : (res.tracks as Track[]).filter((t) => !isDuplicateWithQueueOrDailyMix(t));
               let fresh = candidates;
               if (isExplicitRefresh && prevOld.length > 0) {
-                fresh = candidates.filter((t) => !prevOld.some((p) => p.id === t.id || sameSong(p, t)));
+                fresh = candidates.filter((t) => !prevOld.some((p) => p.id === t.id || isFuzzySameSong(p, t)));
                 if (fresh.length < 10) {
                   const altPage = (targetPage % 5) + 1;
                   const altRes = await runOldSongs({
@@ -1862,12 +1906,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     },
                   });
                   if (currentReqId === exploreRequestIdRef.current && altRes.tracks && altRes.tracks.length > 0) {
-                    const altPool = (altRes.tracks as Track[]).filter(isOldEraTrack);
-                    const altCandidates = altPool.length > 0 ? altPool : (altRes.tracks as Track[]);
+                    const altPool = (altRes.tracks as Track[]).filter(
+                      (t) => isOldEraTrack(t) && !isDuplicateWithQueueOrDailyMix(t),
+                    );
+                    const altCandidates = altPool.length > 0 ? altPool : (altRes.tracks as Track[]).filter((t) => !isDuplicateWithQueueOrDailyMix(t));
                     for (const t of altCandidates) {
                       if (
-                        !prevOld.some((p) => p.id === t.id || sameSong(p, t)) &&
-                        !fresh.some((f) => f.id === t.id || sameSong(f, t))
+                        !prevOld.some((p) => p.id === t.id || isFuzzySameSong(p, t)) &&
+                        !fresh.some((f) => f.id === t.id || isFuzzySameSong(f, t))
                       ) {
                         fresh.push(t);
                       }
@@ -1966,7 +2012,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 for (const t of res.tracks as Track[]) {
                   if (isNewUser && isOldEraTrack(t)) continue;
                   if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
-                  if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                  if (!pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
                     pureMusic.push(t);
                   }
                 }
@@ -1991,7 +2037,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 });
                 if (fallbackRes.tracks) {
                   for (const t of fallbackRes.tracks as Track[]) {
-                    if (!isOldEraTrack(t) && !pureMusic.some((existing) => sameSong(existing, t))) {
+                    if (!isOldEraTrack(t) && !pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
                       if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
                       pureMusic.push(t);
                     }
@@ -2009,7 +2055,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 if (fallbackRes.tracks) {
                   for (const t of fallbackRes.tracks as Track[]) {
                     if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
-                    if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                    if (!pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
                       pureMusic.push(t);
                     }
                   }
@@ -2021,7 +2067,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             // On explicit refresh, if available fresh tracks not in previous recs is small (< 15), query altPage for deep discovery
             if (isExplicitRefresh && prevRecs.length > 0) {
               const freshFromPrevCount = pureMusic.filter(
-                (t) => !prevRecs.some((pr) => pr.id === t.id || sameSong(pr, t)),
+                (t) => !prevRecs.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)),
               ).length;
               if (freshFromPrevCount < 15) {
                 const altPage = (targetPage % 5) + 1;
@@ -2048,7 +2094,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   for (const t of altRes.tracks as Track[]) {
                     if (isNewUser && isOldEraTrack(t)) continue;
                     if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
-                    if (!pureMusic.some((existing) => sameSong(existing, t))) {
+                    if (!pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
                       pureMusic.push(t);
                     }
                   }
@@ -2058,52 +2104,93 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
 
             // Candidates to rank:
-            // When user explicitly refreshed, prioritize tracks NOT in prevRecs
+            // When user explicitly refreshed, prioritize tracks NOT in prevRecs and NOT in queue
             let candidatePool = fresh.length > 0 ? fresh : pureMusic;
-            if (isExplicitRefresh && prevRecs.length > 0) {
-              const freshFromPrev = candidatePool.filter(
-                (t) => !prevRecs.some((pr) => pr.id === t.id || sameSong(pr, t)),
-              );
-              if (freshFromPrev.length >= 10) {
-                candidatePool = freshFromPrev;
-              } else if (freshFromPrev.length > 0) {
-                const backfill = candidatePool.filter(
-                  (t) => !freshFromPrev.some((f) => f.id === t.id || sameSong(f, t)),
-                );
-                candidatePool = [...freshFromPrev, ...backfill];
-              }
-            }
-
-            // Exclude tracks in the current queue and the currently playing track
             const currentQueue = queueRef.current;
             const currentTrack = currentRef.current;
-            const nonQueueCandidates = candidatePool.filter((t) => {
-              if (currentTrack && (t.id === currentTrack.id || sameSong(t, currentTrack))) return false;
-              if (currentQueue.some((q) => q.id === t.id || sameSong(q, t))) return false;
-              return true;
-            });
-            const effectiveCandidates = nonQueueCandidates.length >= 10 ? nonQueueCandidates : candidatePool;
+            const isQueued = (t: Track) => {
+              if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return true;
+              if (currentQueue.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return true;
+              return false;
+            };
 
-            const dedupedFresh = dedupeTracks(effectiveCandidates);
-            const ranked = thompsonSamplingPolicy.rankCandidates(
-              dedupedFresh,
-              getSessionContext(),
-            );
-            const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
-            const diversified = diversifyTrackList(distributed, {
-              maxPerArtist: 2,
-              maxPerAlbum: 1,
-              minArtistSpacing: 2,
-              minAlbumSpacing: 3,
-            });
+            let cleanFinalRecs: Track[] = [];
+
+            if (isExplicitRefresh && prevRecs.length > 0) {
+              const freshFromPrev = candidatePool.filter(
+                (t) => !isQueued(t) && !prevRecs.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)),
+              );
+              const backfill = candidatePool.filter(
+                (t) => !isQueued(t) && !freshFromPrev.some((f) => f.id === t.id || isFuzzySameSong(f, t)),
+              );
+
+              if (freshFromPrev.length > 0) {
+                // Newly discovered tracks ranked with recommendation algorithm
+                const rankedFresh = thompsonSamplingPolicy.rankCandidates(
+                  dedupeTracks(freshFromPrev),
+                  getSessionContext(),
+                );
+                const distributedFresh = applyDiscoveryDistribution(rankedFresh, affinity.affinityArtists, settings.discovery ?? 40);
+                const diversifiedFresh = diversifyTrackList(distributedFresh, {
+                  maxPerArtist: 2,
+                  maxPerAlbum: 1,
+                  minArtistSpacing: 2,
+                  minAlbumSpacing: 3,
+                });
+
+                // Backfill tracks ranked separately
+                const rankedBackfill = thompsonSamplingPolicy.rankCandidates(
+                  dedupeTracks(backfill),
+                  getSessionContext(),
+                );
+                const distributedBackfill = applyDiscoveryDistribution(rankedBackfill, affinity.affinityArtists, settings.discovery ?? 40);
+                const diversifiedBackfill = diversifyTrackList(distributedBackfill, {
+                  maxPerArtist: 2,
+                  maxPerAlbum: 1,
+                  minArtistSpacing: 2,
+                  minAlbumSpacing: 3,
+                });
+
+                // Fresh discoveries are guaranteed at the top of the feed!
+                cleanFinalRecs = dedupeTracks([...diversifiedFresh, ...diversifiedBackfill]);
+              } else {
+                const nonQueueCandidates = candidatePool.filter((t) => !isQueued(t));
+                const poolToRank = nonQueueCandidates.length >= 10 ? nonQueueCandidates : candidatePool;
+                const ranked = thompsonSamplingPolicy.rankCandidates(
+                  dedupeTracks(poolToRank),
+                  getSessionContext(),
+                );
+                const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+                cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
+                  maxPerArtist: 2,
+                  maxPerAlbum: 1,
+                  minArtistSpacing: 2,
+                  minAlbumSpacing: 3,
+                }));
+              }
+            } else {
+              const nonQueueCandidates = candidatePool.filter((t) => !isQueued(t));
+              const poolToRank = nonQueueCandidates.length >= 10 ? nonQueueCandidates : candidatePool;
+              const ranked = thompsonSamplingPolicy.rankCandidates(
+                dedupeTracks(poolToRank),
+                getSessionContext(),
+              );
+              const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+              cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
+                maxPerArtist: 2,
+                maxPerAlbum: 1,
+                minArtistSpacing: 2,
+                minAlbumSpacing: 3,
+              }));
+            }
 
             // Cross-check Home recommendations against current Trending list and deprioritize overlapping tracks
             const currentTrending = trendingRef.current;
-            const nonTrendingRecs = diversified.filter(
-              (t) => !currentTrending.some((tr) => tr.id === t.id || sameSong(tr, t)),
+            const nonTrendingRecs = cleanFinalRecs.filter(
+              (t) => !currentTrending.some((tr) => tr.id === t.id || isFuzzySameSong(tr, t)),
             );
-            const overlappingRecs = diversified.filter(
-              (t) => currentTrending.some((tr) => tr.id === t.id || sameSong(tr, t)),
+            const overlappingRecs = cleanFinalRecs.filter(
+              (t) => currentTrending.some((tr) => tr.id === t.id || isFuzzySameSong(tr, t)),
             );
 
             // Prioritize distinct personalized discovery; allow limited overlap only if available pool is too small (< 10)
@@ -2111,11 +2198,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               ? nonTrendingRecs
               : [...nonTrendingRecs, ...overlappingRecs];
 
-            const cleanFinalRecs = dedupeTracks(finalRecs);
-            setRecs(cleanFinalRecs);
-            markFeedDisplayed(cleanFinalRecs);
-            writeHomeCache({ recs: cleanFinalRecs });
-            recordSeenTrackIdentities(cleanFinalRecs);
+            const settledRecs = dedupeTracks(finalRecs);
+            setRecs(settledRecs);
+            markFeedDisplayed(settledRecs);
+            writeHomeCache({ recs: settledRecs });
+            recordSeenTrackIdentities(settledRecs);
           })(),
           (async () => {
             await loadDailyMix(nonce);
@@ -2314,6 +2401,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               affinityArtists: affinity.affinityArtists,
               penalizedArtists: affinity.penalizedArtists,
               clientHour,
+              exclude: recsRef.current.slice(-30).map(trackLabel),
+              recentSeenIds: getRecentlySeenIdentities(),
             },
           });
           if (res.tracks && res.tracks.length > 0) {
@@ -2324,7 +2413,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 (!isNewUser || !isOldEraTrack(t)) &&
                 hasPlayableDuration(t) &&
                 (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
-                !moreCandidates.some((existing) => sameSong(existing, t))
+                !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
               ) {
                 moreCandidates.push(t);
               }
@@ -2365,7 +2454,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     isOriginalSong(t) &&
                     hasPlayableDuration(t) &&
                     (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
-                    !moreCandidates.some((existing) => sameSong(existing, t))
+                    !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
                   ) {
                     moreCandidates.push(t);
                   }
@@ -2377,6 +2466,36 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               // fall through to next seed or relaxed freshness
             }
           }
+        }
+
+        // 2b. Mood Picks Fallback if candidates are still sparse (< 8)
+        if (fresh.length < 8) {
+          const moodOptions = ["Melody", "Hits", "Chill", "Romantic", "Party"];
+          const pickedMood = mood || moodOptions[targetPage % moodOptions.length];
+          try {
+            const moodRes = await runMoodPicks({
+              data: {
+                mood: pickedMood,
+                languages: settings.languages,
+                language: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+              },
+            });
+            if (moodRes.tracks && moodRes.tracks.length > 0) {
+              for (const t of moodRes.tracks as Track[]) {
+                if (
+                  t &&
+                  isOriginalSong(t) &&
+                  (!isNewUser || !isOldEraTrack(t)) &&
+                  hasPlayableDuration(t) &&
+                  (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
+                  !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
+                ) {
+                  moreCandidates.push(t);
+                }
+              }
+              fresh = applyFeedFilters(moreCandidates);
+            }
+          } catch {}
         }
 
         // Prioritize tracks with legitimate movie metadata
@@ -2419,19 +2538,22 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           const ranked = thompsonSamplingPolicy.rankCandidates(candidatesToRank, getSessionContext());
           const currentRecs = recsRef.current;
           const trulyNew = ranked.filter(
-            (cand) => !currentRecs.some((p) => p.id === cand.id || sameSong(p, cand)),
+            (cand) => !currentRecs.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
           );
-          const diversifiedBatch = diversifyTrackList(trulyNew, {
+          let diversifiedBatch = diversifyTrackList(trulyNew, {
             maxPerArtist: 2,
             maxPerAlbum: 1,
             minArtistSpacing: 2,
             minAlbumSpacing: 3,
           });
+          if (diversifiedBatch.length === 0 && trulyNew.length > 0) {
+            diversifiedBatch = trulyNew.slice(0, 15);
+          }
 
           if (diversifiedBatch.length > 0) {
             setRecs((prev) => {
               const batchToAdd = diversifiedBatch.filter(
-                (cand) => !prev.some((p) => p.id === cand.id || sameSong(p, cand)),
+                (cand) => !prev.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
               );
               if (batchToAdd.length === 0) return prev;
               const updated = [...prev, ...batchToAdd];
@@ -2459,6 +2581,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       loadingMoreRecs,
       runRecommend,
       getSongRadio,
+      runMoodPicks,
       likes,
       history,
       dislikes,
@@ -4589,13 +4712,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     let totalSec = 0;
                     if (stats && Object.keys(stats).length > 0) {
                       for (const s of Object.values(stats)) {
-                        const dur = typeof s.track?.duration === "number" ? s.track.duration : Number(s.track?.duration);
-                        totalSec += (s.plays || 1) * (dur > 0 ? dur : 210);
+                        const parsed = parseDurationSeconds(s.track?.duration);
+                        const dur = parsed > 0 ? parsed : (s.track?.durationSeconds || 210);
+                        totalSec += (s.plays || 1) * dur;
                       }
                     } else {
                       for (const h of history) {
-                        const dur = typeof h.duration === "number" ? h.duration : Number(h.duration);
-                        totalSec += dur > 0 ? dur : 210;
+                        const parsed = parseDurationSeconds(h.duration);
+                        const dur = parsed > 0 ? parsed : (h.durationSeconds || 210);
+                        totalSec += dur;
                       }
                     }
                     const hrs = totalSec / 3600;
