@@ -446,11 +446,10 @@ export function ExploreSections({
     return dedupeTracks(trending);
   }, [trending]);
 
+  const firstTrendingId = trendingTracks[0]?.id ?? null;
   useEffect(() => {
-    if (trendingTracks.length <= 15) {
-      setVisibleTrendingLimit(15);
-    }
-  }, [trendingTracks.length]);
+    setVisibleTrendingLimit(15);
+  }, [firstTrendingId]);
 
   // 2. New Releases sorted by actual release date metadata (newest first)
   const sortedNewReleases = useMemo(() => {
@@ -505,7 +504,7 @@ export function ExploreSections({
     const allOldSongs = dedupeTracks(oldSongs || [], seenKeys);
 
     return { allTrending, allNewReleases, allPopular, allOldSongs };
-  }, [trendingTracks, sortedNewReleases, sortedPopular, oldSongs]);
+  }, [trendingTracks, sortedNewReleases, sortedPopular, oldSongs, visibleTrendingLimit]);
 
   if (loading) {
     return (

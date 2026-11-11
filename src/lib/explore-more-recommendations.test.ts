@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { dedupeTracks, trackExistsIn, diversifyTrackList, type TrackLike } from "./track-dedup";
-import { filterFeedCandidates, hasPlayableDuration, sameSong } from "./feed-freshness";
+import { filterFeedCandidates, hasPlayableDuration, isFuzzySameSong, sameSong } from "./feed-freshness";
+import { ThompsonSamplingPolicy } from "./bandit-policy";
 import type { Track } from "./types";
 
 function mkTrack(id: string, title: string, artist: string, duration = "3:30"): Track {
@@ -175,6 +176,89 @@ describe("Feature 1: Explore More Songs Regression Test Suite", () => {
       pageRef = 1;
       expect(pageRef).toBe(1);
       expect(getNextPage()).toBe(2);
+    });
+  });
+
+  describe("D. Queue exclusion & recommendation analysis for Explore More Songs", () => {
+    it("strictly excludes both active queue and previous persisted queue songs", () => {
+      const currentQueue = [mkTrack("q-active-1", "Pushpa Pushpa", "Devi Sri Prasad")];
+      const persistedQueue = [mkTrack("q-prev-1", "Chuttamalle", "Anirudh Ravichander")];
+      const allQueueTracks = [...currentQueue, ...persistedQueue];
+      const currentTrack = mkTrack("playing-1", "Fear Song", "Anirudh Ravichander");
+
+      const candidates = [
+        mkTrack("q-active-1", "Pushpa Pushpa", "Devi Sri Prasad"),
+        mkTrack("q-prev-2", "Chuttamalle (From \"Devara\")", "Anirudh Ravichander"), // Fuzzy match to previous queue!
+        mkTrack("playing-1", "Fear Song", "Anirudh Ravichander"),
+        mkTrack("fresh-rec-1", "Devara Theme", "Anirudh Ravichander"),
+        mkTrack("fresh-rec-2", "Tauba Tauba", "Karan Aujla"),
+      ];
+
+      const eligible = candidates.filter((t) => {
+        if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return false;
+        if (allQueueTracks.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return false;
+        return true;
+      });
+
+      expect(eligible.map((t) => t.id)).toEqual(["fresh-rec-1", "fresh-rec-2"]);
+    });
+
+    it("ranks explore candidates with Thompson Sampling and inserts analyzed tracks at reveal boundary while pruning queued tail", () => {
+      const policy = new ThompsonSamplingPolicy();
+      const allQueueTracks = [mkTrack("q-old-1", "Prev Queue Track", "Artist Q")];
+
+      const sampleTitles = [
+        ["Butta Bomma", "Armaan Malik"],
+        ["Samajavaragamana", "Sid Sriram"],
+        ["Inkem Inkem", "Sid Sriram"],
+        ["Ramuloo Ramulaa", "Anurag Kulkarni"],
+        ["Srivalli", "Javed Ali"],
+        ["Oo Antava", "Indravathi Chauhan"],
+        ["Saami Saami", "Mounika Yadav"],
+        ["Naatu Naatu", "Rahul Sipligunj"],
+        ["Kalavathi", "Sid Sriram"],
+        ["Maguva Maguva", "Sid Sriram"],
+        ["Saranga Dariya", "Mangli"],
+        ["Rowdy Baby", "Dhanush"],
+        ["Vaathi Coming", "Anirudh Ravichander"],
+        ["Arabic Kuthu", "Anirudh Ravichander"],
+        ["Kesariya", "Arijit Singh"],
+      ] as const;
+      const visibleHead = sampleTitles.map(([title, artist], idx) =>
+        mkTrack(`head-${idx + 1}`, title, artist),
+      );
+      const staleTail = [
+        mkTrack("q-old-1", "Prev Queue Track", "Artist Q"), // Previously queued track sitting in unrevealed cache
+        mkTrack("tail-keep-1", "Clean Tail Song", "Artist T"),
+      ];
+      const prevTrending = [...visibleHead, ...staleTail];
+
+      const incomingPool = [
+        mkTrack("analyzed-1", "Sooseki", "Shreya Ghoshal"),
+        mkTrack("analyzed-2", "Kurchi Madathapetti", "Thaman S"),
+        mkTrack("q-old-1", "Prev Queue Track", "Artist Q"), // Should be excluded
+      ].filter((t) => !allQueueTracks.some((q) => q.id === t.id || isFuzzySameSong(q, t)));
+
+      const ranked = policy.rankCandidates(incomingPool, {
+        discoveryPercent: 40,
+        likedTracks: [mkTrack("like-1", "Melody Hit", "Shreya Ghoshal")],
+        preferredLanguages: ["Telugu"],
+      });
+      const diversified = diversifyTrackList(ranked, { maxPerArtist: 2, maxPerAlbum: 1 });
+
+      const visibleFloor = 15;
+      const head = prevTrending.slice(0, visibleFloor);
+      const cleanTail = prevTrending
+        .slice(visibleFloor)
+        .filter((t) => !allQueueTracks.some((q) => q.id === t.id || isFuzzySameSong(q, t)));
+      const combined = dedupeTracks([...head, ...diversified, ...cleanTail]);
+
+      // Queue track must never appear in expanded results
+      expect(combined.some((t) => t.id === "q-old-1")).toBe(false);
+      // Newly analyzed tracks occupy slots 15 & 16 immediately after visibleHead
+      expect(combined.slice(15, 17).map((t) => t.id).sort()).toEqual(["analyzed-1", "analyzed-2"]);
+      // Clean tail remains preserved afterward
+      expect(combined.some((t) => t.id === "tail-keep-1")).toBe(true);
     });
   });
 });

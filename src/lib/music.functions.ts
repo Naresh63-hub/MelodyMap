@@ -415,6 +415,45 @@ export async function runQueryBatch(
   return results;
 }
 
+function buildTrackLabelExclusionSet(items: readonly string[]): Set<string> {
+  const set = new Set<string>();
+  for (const raw of items) {
+    if (!raw) continue;
+    const cleanRaw = raw.trim();
+    set.add(cleanRaw.toLowerCase());
+    set.add(norm(cleanRaw));
+    if (cleanRaw.includes(" — ") || cleanRaw.includes(" - ")) {
+      const parts = cleanRaw.split(/ — | - /);
+      const titlePart = parts[0]?.trim() || "";
+      const artistPart = parts[1]?.trim() || "";
+      if (titlePart) {
+        set.add(norm(titlePart));
+        set.add(norm(cleanSongTitle(titlePart)));
+        if (artistPart) {
+          set.add(getTrackDedupeKey(titlePart, artistPart));
+          set.add(norm(`${titlePart} ${artistPart}`));
+          set.add(norm(`${artistPart} ${titlePart}`));
+        }
+      }
+    }
+  }
+  return set;
+}
+
+function matchesExclusionSet(
+  title: string,
+  artist: string,
+  id: string | undefined,
+  excludeSet: Set<string>,
+): boolean {
+  if (id && (excludeSet.has(id.toLowerCase()) || excludeSet.has(norm(id)))) return true;
+  const key = getTrackDedupeKey(title, artist);
+  if (key && excludeSet.has(key)) return true;
+  if (excludeSet.has(norm(title)) || excludeSet.has(norm(cleanSongTitle(title)))) return true;
+  if (excludeSet.has(norm(`${title} ${artist}`)) || excludeSet.has(norm(`${artist} ${title}`))) return true;
+  return false;
+}
+
 async function getLocalPicks(data: {
   artists: string[];
   currentArtist?: string | undefined;
@@ -440,33 +479,9 @@ async function getLocalPicks(data: {
   const bypassCache = !!data.refreshNonce || page > 1;
   const artists = data.artists.map((a) => a.trim()).filter(Boolean);
   const languages = (data.languages ?? []).map((l) => l.trim()).filter(Boolean);
-  const excludeSet = new Set<string>();
-  for (const raw of data.exclude ?? []) {
-    if (!raw) continue;
-    const cleanRaw = raw.trim();
-    excludeSet.add(cleanRaw.toLowerCase());
-    excludeSet.add(norm(cleanRaw));
-    if (cleanRaw.includes(" — ") || cleanRaw.includes(" - ")) {
-      const parts = cleanRaw.split(/ — | - /);
-      const titlePart = parts[0]?.trim() || "";
-      const artistPart = parts[1]?.trim() || "";
-      if (titlePart) {
-        excludeSet.add(norm(titlePart));
-        excludeSet.add(norm(cleanSongTitle(titlePart)));
-        if (artistPart) {
-          excludeSet.add(getTrackDedupeKey(titlePart, artistPart));
-          excludeSet.add(norm(`${titlePart} ${artistPart}`));
-          excludeSet.add(norm(`${artistPart} ${titlePart}`));
-        }
-      }
-    }
-  }
+  const excludeSet = buildTrackLabelExclusionSet(data.exclude ?? []);
   const recentSeenSet = new Set((data.recentSeenIds ?? []).map((id) => id.toLowerCase().trim()));
-  const likedSet = new Set((data.liked ?? []).map((s) => norm(s)));
-  const likedTitleSet = new Set((data.liked ?? []).map((s) => {
-    const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
-    return norm(t || "");
-  }));
+  const likedSet = buildTrackLabelExclusionSet(data.liked ?? []);
   const penalizedSet = new Set((data.penalizedArtists ?? []).map((s) => norm(s)));
   const isNewUser = Boolean(
     data.isNewUser ?? (artists.length === 0 && (data.affinityArtists?.length ?? 0) === 0 && (data.exclude?.length ?? 0) === 0),
@@ -476,22 +491,9 @@ async function getLocalPicks(data: {
   const isCandidateValid = (t: Track, relaxRecentSeen = false) => {
     if (!t || !t.id) return false;
     if (!relaxRecentSeen && recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase().trim())) return false;
-    const key = getTrackDedupeKey(t.title, t.artist);
-    const titleKey = norm(t.title);
-    const titleCleanKey = norm(cleanSongTitle(t.title));
-    const titleArtistKey = norm(`${t.title} ${t.artist}`);
-    const artistTitleKey = norm(`${t.artist} ${t.title}`);
+    if (matchesExclusionSet(t.title, t.artist, t.id, excludeSet)) return false;
+    if (matchesExclusionSet(t.title, t.artist, t.id, likedSet)) return false;
     const artKey = norm(t.artist);
-    if (
-      excludeSet.has(t.id.toLowerCase()) ||
-      excludeSet.has(norm(t.id)) ||
-      (key && excludeSet.has(key)) ||
-      excludeSet.has(titleKey) ||
-      excludeSet.has(titleCleanKey) ||
-      excludeSet.has(titleArtistKey) ||
-      excludeSet.has(artistTitleKey)
-    ) return false;
-    if (likedSet.has(key) || likedTitleSet.has(titleKey) || likedTitleSet.has(titleCleanKey)) return false;
     if (penalizedSet.has(artKey) || penalizedSet.has(normalizeArtistAlias(t.artist))) return false;
     if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
     if (isNewUser && isOldEraTrack(t)) return false;
@@ -1055,7 +1057,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
     const sanitizedMood = sanitizePromptInput(data.mood);
     const sanitizedBrief = sanitizePromptInput(data.brief);
     const sanitizedLangs = data.languages.map(sanitizePromptInput).filter(Boolean);
-    const sanitizedExclude = (data.exclude ?? []).slice(0, 30).map(sanitizePromptInput).filter(Boolean);
+    const sanitizedExclude = (data.exclude ?? []).slice(0, 80).map(sanitizePromptInput).filter(Boolean);
 
     const temporalCtx = getTemporalContext(data.clientHour);
     const timeInstruction = data.temporalContext || temporalCtx.promptContext;
@@ -1166,24 +1168,18 @@ export const recommendTracks = createServerFn({ method: "POST" })
       return await fallbackToLocal();
     }
 
-    const recentSet = new Set(data.recent.map((s) => norm(s)));
-    const likedSet = new Set((data.liked ?? []).map((s) => norm(s)));
-    const excludeSet = new Set((data.exclude ?? []).map((s) => norm(s)));
+    const recentSet = buildTrackLabelExclusionSet(data.recent);
+    const likedSet = buildTrackLabelExclusionSet(data.liked ?? []);
+    const excludeSet = buildTrackLabelExclusionSet(data.exclude ?? []);
     const recentSeenSet = new Set((data.recentSeenIds ?? []).map((id) => id.toLowerCase().trim()));
-    const likedTitleSet = new Set((data.liked ?? []).map((s) => {
-      const t = s.includes(" — ") ? s.split(" — ")[0] : s.includes(" - ") ? s.split(" - ")[0] : s;
-      return norm(t || "");
-    }));
     const penalizedSet = new Set((data.penalizedArtists ?? []).map((s) => norm(s)));
     const valid = picks
       .filter((p) => {
         if (!p.title || !p.artist) return false;
-        const fullKey = norm(`${p.artist} - ${p.title}`);
-        const titleKey = norm(p.title);
         const artKey = norm(p.artist);
-        if (recentSet.has(fullKey) || recentSet.has(titleKey)) return false;
-        if (likedSet.has(fullKey) || likedTitleSet.has(titleKey)) return false;
-        if (excludeSet.has(fullKey) || excludeSet.has(titleKey)) return false;
+        if (matchesExclusionSet(p.title, p.artist, undefined, recentSet)) return false;
+        if (matchesExclusionSet(p.title, p.artist, undefined, likedSet)) return false;
+        if (matchesExclusionSet(p.title, p.artist, undefined, excludeSet)) return false;
         if (penalizedSet.has(artKey) || penalizedSet.has(normalizeArtistAlias(p.artist))) return false;
         return true;
       })
@@ -1213,9 +1209,12 @@ export const recommendTracks = createServerFn({ method: "POST" })
         }),
       );
       for (const t of batch) {
-        if (t && (data.languages.length === 0 || isLanguageConsistent(t, data.languages))) {
-          resolved.push(t);
-        }
+        if (!t || !t.id) continue;
+        if (data.languages.length > 0 && !isLanguageConsistent(t, data.languages)) continue;
+        if (recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase().trim())) continue;
+        if (matchesExclusionSet(t.title, t.artist, t.id, recentSet)) continue;
+        if (matchesExclusionSet(t.title, t.artist, t.id, excludeSet)) continue;
+        resolved.push(t);
       }
     }
 

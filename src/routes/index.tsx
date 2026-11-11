@@ -1722,7 +1722,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const prevOld = [...oldSongsRef.current];
 
       const cached = readHomeCache();
-      const currentQueue = queueRef.current;
+      const persistedQueue = readPlayback()?.queue ?? [];
+      const currentQueue = [...queueRef.current, ...persistedQueue];
       const currentTrack = currentRef.current;
       const currentDailyMix = [
         ...dailyMixTracksRef.current,
@@ -1733,6 +1734,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (!t) return true;
         if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return true;
         if (currentQueue.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return true;
+        if (history.some((h) => h.id === t.id || isFuzzySameSong(h, t))) return true;
+        if (dislikedIdsRef.current.has(t.id) || dislikes.some((d) => d.id === t.id || isFuzzySameSong(d, t))) return true;
         if (currentDailyMix.some((d) => d.id === t.id || isFuzzySameSong(d, t))) return true;
         return false;
       };
@@ -2359,6 +2362,83 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferencesSignature, resumed]);
 
+  /**
+   * Builds exclusion sets and predicates across the active playback queue,
+   * persisted previous queue, currently playing track, full listening history,
+   * dislikes, and recent seen identities so "Explore more songs" never re-surfaces
+   * previous queue songs or already-played tracks.
+   */
+  const getQueueAndPlaybackExclusionSets = useCallback(() => {
+    const persistedQueue = readPlayback()?.queue ?? [];
+    const currentQueue = queueRef.current;
+    const allQueueTracks = [...currentQueue, ...persistedQueue];
+    const currentTrack = currentRef.current;
+
+    const isQueuedOrPlayedTrack = (t: Track | null | undefined): boolean => {
+      if (!t || !t.id) return true;
+      if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return true;
+      if (allQueueTracks.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return true;
+      if (history.some((h) => h.id === t.id || isFuzzySameSong(h, t))) return true;
+      if (dislikedIdsRef.current.has(t.id) || dislikes.some((d) => d.id === t.id || isFuzzySameSong(d, t))) return true;
+      return false;
+    };
+
+    const excludeLabels = [
+      ...allQueueTracks.map(trackLabel),
+      ...history.slice(0, 60).map(trackLabel),
+      ...dislikes.slice(0, 30).map(trackLabel),
+      ...(currentTrack ? [trackLabel(currentTrack)] : []),
+    ].filter(Boolean);
+
+    const excludeIds = [
+      ...getRecentlySeenIdentities(),
+      ...allQueueTracks.map((t) => t.id),
+      ...history.map((t) => t.id),
+      ...(currentTrack ? [currentTrack.id] : []),
+    ].filter(Boolean);
+
+    return {
+      allQueueTracks,
+      currentTrack,
+      isQueuedOrPlayedTrack,
+      excludeLabels,
+      excludeIds,
+    };
+  }, [history, dislikes]);
+
+  /**
+   * Scores, balances discovery mix, diversifies by artist/album, and filters out
+   * duplicates against the active section for incremental "Explore more songs" batches.
+   */
+  const analyzeAndRankMoreTracks = useCallback(
+    (pool: Track[], currentSectionTracks: Track[], affinityArtists: string[]): Track[] => {
+      if (pool.length === 0) return [];
+      const sortedByMetadata = [...pool].sort((a, b) => {
+        const aMovie = Boolean(extractTrackMovieOrAlbum(a));
+        const bMovie = Boolean(extractTrackMovieOrAlbum(b));
+        if (aMovie && !bMovie) return -1;
+        if (!aMovie && bMovie) return 1;
+        return 0;
+      });
+      const ranked = thompsonSamplingPolicy.rankCandidates(sortedByMetadata, getSessionContext());
+      const distributed = applyDiscoveryDistribution(ranked, affinityArtists, settings.discovery ?? 40);
+      const trulyNew = distributed.filter(
+        (cand) => !currentSectionTracks.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
+      );
+      let diversifiedBatch = diversifyTrackList(trulyNew, {
+        maxPerArtist: 2,
+        maxPerAlbum: 1,
+        minArtistSpacing: 2,
+        minAlbumSpacing: 3,
+      });
+      if (diversifiedBatch.length === 0 && trulyNew.length > 0) {
+        diversifiedBatch = trulyNew.slice(0, 15);
+      }
+      return diversifiedBatch;
+    },
+    [getSessionContext, settings.discovery],
+  );
+
   const loadMoreRecommendations = useCallback(
     async (mood?: string) => {
       // Synchronous mutex guard against overlapping concurrent triggers
@@ -2370,14 +2450,34 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         const targetPage = moreRecsPageRef.current;
         const currentGen = recsGenerationRef.current;
         const clientHour = new Date().getHours();
-        const affinity = contextEngine.getAffinityWeights(stats);
+        const affinity = contextEngine.getAffinityWeights(stats, {
+          likes,
+          downloads: downloadedTracks,
+          dislikes,
+        });
         const moreCandidates: Track[] = [];
         const baseNonce = Date.now();
         const currentRecs = recsRef.current;
-
         const isNewUser = likes.length === 0 && history.length === 0;
+        const { isQueuedOrPlayedTrack, excludeLabels, excludeIds } = getQueueAndPlaybackExclusionSets();
 
-        // 1. Primary AI / Deep Recommendation with deep pagination
+        const fullExcludeLabels = [...new Set([...currentRecs.map(trackLabel), ...excludeLabels])].slice(0, 150);
+        const fullExcludeIds = [
+          ...new Set([...currentRecs.map((t) => t.id).filter(Boolean), ...excludeIds]),
+        ].slice(0, 300);
+
+        const isEligibleRecCandidate = (t: Track | null | undefined): t is Track => {
+          if (!t || !t.id) return false;
+          if (!isOriginalSong(t) || !hasPlayableDuration(t)) return false;
+          if (isNewUser && isOldEraTrack(t)) return false;
+          if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) return false;
+          if (isQueuedOrPlayedTrack(t)) return false;
+          if (currentRecs.some((existing) => existing.id === t.id || isFuzzySameSong(existing, t))) return false;
+          if (moreCandidates.some((existing) => existing.id === t.id || isFuzzySameSong(existing, t))) return false;
+          return true;
+        };
+
+        // 1. Primary AI / Personalized Recommendation Analysis with deep pagination
         for (let depth = 1; depth <= 3; depth++) {
           try {
             const res = await runRecommend({
@@ -2388,7 +2488,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 disliked: dislikes.slice(0, 15).map(trackLabel),
                 sequence: sequenceBrief(history, stats),
                 skipped: skippedLabels(stats),
-                count: 18,
+                count: 20,
                 page: targetPage + (depth - 1),
                 ...(mood ? { mood } : {}),
                 languages: settings.languages,
@@ -2402,21 +2502,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 affinityArtists: affinity.affinityArtists,
                 penalizedArtists: affinity.penalizedArtists,
                 clientHour,
-                exclude: currentRecs.slice(-30).map(trackLabel),
-                recentSeenIds: currentRecs.slice(-50).map((t) => t.id).filter(Boolean),
+                exclude: fullExcludeLabels,
+                recentSeenIds: fullExcludeIds,
               },
             });
             if (res.tracks && res.tracks.length > 0) {
               for (const t of res.tracks as Track[]) {
-                if (
-                  t &&
-                  isOriginalSong(t) &&
-                  (!isNewUser || !isOldEraTrack(t)) &&
-                  hasPlayableDuration(t) &&
-                  (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
-                  !currentRecs.some((existing) => isFuzzySameSong(existing, t)) &&
-                  !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
-                ) {
+                if (isEligibleRecCandidate(t)) {
                   moreCandidates.push(t);
                 }
               }
@@ -2427,13 +2519,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           }
         }
 
-        // 2. Song Radio Deep Fallback across recent seeds if candidates are sparse
+        // 2. Song Radio Deep Fallback across liked/affinity seeds if candidates are sparse
         if (moreCandidates.length < 8) {
           const seedCandidates: Track[] = [
-            ...currentRecs.slice(-6).reverse(),
             ...likes.slice(0, 6),
+            ...currentRecs.slice(-6).reverse(),
             ...history.slice(0, 6),
-          ].filter((s) => Boolean(s?.id));
+          ].filter((s) => Boolean(s?.id) && !dislikedIdsRef.current.has(s.id));
 
           const pickedSeeds = seedCandidates.slice(0, 3);
           for (const seed of pickedSeeds) {
@@ -2453,18 +2545,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               });
               if (radioRes.tracks && radioRes.tracks.length > 0) {
                 for (const t of radioRes.tracks as Track[]) {
-                  if (
-                    t &&
-                    isOriginalSong(t) &&
-                    hasPlayableDuration(t) &&
-                    (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
-                    !currentRecs.some((existing) => isFuzzySameSong(existing, t)) &&
-                    !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
-                  ) {
+                  if (isEligibleRecCandidate(t)) {
                     moreCandidates.push(t);
                   }
                 }
-                if (moreCandidates.length >= 10) break;
+                if (moreCandidates.length >= 12) break;
               }
             } catch {
               // fall through to next seed
@@ -2486,15 +2571,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (moodRes.tracks && moodRes.tracks.length > 0) {
               for (const t of moodRes.tracks as Track[]) {
-                if (
-                  t &&
-                  isOriginalSong(t) &&
-                  (!isNewUser || !isOldEraTrack(t)) &&
-                  hasPlayableDuration(t) &&
-                  (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
-                  !currentRecs.some((existing) => isFuzzySameSong(existing, t)) &&
-                  !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
-                ) {
+                if (isEligibleRecCandidate(t)) {
                   moreCandidates.push(t);
                 }
               }
@@ -2510,22 +2587,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
-                count: 20,
+                count: 25,
                 page: (targetPage % 5) + 1,
                 clientHour,
                 refreshNonce: `${baseNonce}-trending-more`,
+                recentSeenIds: fullExcludeIds,
               },
             });
             if (trendingRes.tracks && trendingRes.tracks.length > 0) {
               for (const t of trendingRes.tracks as Track[]) {
-                if (
-                  t &&
-                  isOriginalSong(t) &&
-                  hasPlayableDuration(t) &&
-                  (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)) &&
-                  !currentRecs.some((existing) => isFuzzySameSong(existing, t)) &&
-                  !moreCandidates.some((existing) => isFuzzySameSong(existing, t))
-                ) {
+                if (isEligibleRecCandidate(t)) {
                   moreCandidates.push(t);
                 }
               }
@@ -2533,48 +2604,27 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           } catch {}
         }
 
-        // Prioritize tracks with legitimate movie metadata
-        moreCandidates.sort((a, b) => {
-          const aMovie = Boolean(extractTrackMovieOrAlbum(a));
-          const bMovie = Boolean(extractTrackMovieOrAlbum(b));
-          if (aMovie && !bMovie) return -1;
-          if (!aMovie && bMovie) return 1;
-          return 0;
-        });
-
-        // 3. Relaxed Session Freshness Filter:
-        // Strictly enforce:
-        // - never duplicate tracks currently displayed in recs
-        // - never repeat recently played songs (history.slice(0, 50))
-        // - never include disliked tracks
-        // - enforce language consistency, duration, and original song criteria
-        const currentHistory = history.slice(0, 50);
-        const candidatesToRank = moreCandidates.filter(
+        // 3. Strictly exclude queued/played/disliked tracks and prioritize non-overlapping discoveries
+        const cleanPool = moreCandidates.filter(
           (t) =>
             hasPlayableDuration(t) &&
             isOriginalSong(t) &&
-            !trackExistsIn(currentRecs, t as TrackLike) &&
-            !trackExistsIn(currentHistory, t as TrackLike) &&
-            !dislikedIdsRef.current.has(t.id) &&
-            (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages)),
+            !isQueuedOrPlayedTrack(t) &&
+            !currentRecs.some((existing) => existing.id === t.id || isFuzzySameSong(existing, t)),
         );
+        const nonOverlappingDaily = cleanPool.filter(
+          (t) => !dailyMixTracksRef.current.some((d) => d.id === t.id || isFuzzySameSong(d, t)),
+        );
+        const candidatesToRank = nonOverlappingDaily.length >= 6 ? nonOverlappingDaily : cleanPool;
 
-        // 4. Thompson Sampling Ranking & Diversified Batch Append
+        // 4. Thompson Sampling Ranking, Discovery Distribution & Diversified Batch Append
         if (candidatesToRank.length > 0) {
           if (currentGen !== recsGenerationRef.current) return;
-          const ranked = thompsonSamplingPolicy.rankCandidates(candidatesToRank, getSessionContext());
-          const trulyNew = ranked.filter(
-            (cand) => !currentRecs.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
+          const diversifiedBatch = analyzeAndRankMoreTracks(
+            candidatesToRank,
+            currentRecs,
+            affinity.affinityArtists,
           );
-          let diversifiedBatch = diversifyTrackList(trulyNew, {
-            maxPerArtist: 2,
-            maxPerAlbum: 1,
-            minArtistSpacing: 2,
-            minAlbumSpacing: 3,
-          });
-          if (diversifiedBatch.length === 0 && trulyNew.length > 0) {
-            diversifiedBatch = trulyNew.slice(0, 15);
-          }
 
           if (diversifiedBatch.length > 0) {
             setRecs((prev) => {
@@ -2587,16 +2637,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               return updated;
             });
             markFeedDisplayed(diversifiedBatch);
+            recordSeenTrackIdentities(diversifiedBatch);
             setExploreExhausted(false);
-          } else {
-            if (targetPage >= 8) {
-              setExploreExhausted(true);
-            }
-          }
-        } else {
-          if (targetPage >= 8) {
+          } else if (targetPage >= 8) {
             setExploreExhausted(true);
           }
+        } else if (targetPage >= 8) {
+          setExploreExhausted(true);
         }
       } finally {
         isLoadingMoreRecsRef.current = false;
@@ -2610,11 +2657,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       runMoodPicks,
       runTrending,
       likes,
+      downloadedTracks,
       history,
       dislikes,
       stats,
       settings,
-      getSessionContext,
+      getQueueAndPlaybackExclusionSets,
+      analyzeAndRankMoreTracks,
       markFeedDisplayed,
     ],
   );
@@ -2630,48 +2679,101 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const currentTrending = trendingRef.current;
       const currentIds = currentTrending.map((t) => t.id).filter(Boolean);
       const baseNonce = `${Date.now()}-explore-${targetPage}`;
+      const isNewUser = likes.length === 0 && history.length === 0;
+
+      const affinity = contextEngine.getAffinityWeights(stats, {
+        likes,
+        downloads: downloadedTracks,
+        dislikes,
+      });
+      const { isQueuedOrPlayedTrack, excludeLabels, excludeIds } = getQueueAndPlaybackExclusionSets();
+
+      const fullExcludeLabels = [...new Set([...currentTrending.map(trackLabel), ...excludeLabels])].slice(0, 150);
+      const fullExcludeIds = [...new Set([...currentIds, ...excludeIds])].slice(0, 300);
 
       const incomingCandidates: Track[] = [];
+      const isEligibleExploreCandidate = (t: Track | null | undefined): t is Track => {
+        if (!t || !t.id) return false;
+        if (!isOriginalSong(t) || !hasPlayableDuration(t)) return false;
+        if (isNewUser && isOldEraTrack(t)) return false;
+        if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) return false;
+        if (isQueuedOrPlayedTrack(t)) return false;
+        if (currentTrending.some((p) => p.id === t.id || isFuzzySameSong(p, t))) return false;
+        if (incomingCandidates.some((p) => p.id === t.id || isFuzzySameSong(p, t))) return false;
+        return true;
+      };
 
-      // 1. Fetch from runTrending with targetPage and refreshNonce
-      try {
-        const res = await runTrending({
-          data: {
-            languages: settings.languages,
-            primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-            languageWeights: settings.languageWeights,
-            count: 30,
-            page: targetPage,
-            recentSeenIds: currentIds.slice(-40),
-            clientHour,
-            refreshNonce: baseNonce,
-          },
-        });
-        if (res.tracks && res.tracks.length > 0) {
-          for (const t of res.tracks as Track[]) {
-            if (
-              t &&
-              isOriginalSong(t) &&
-              hasPlayableDuration(t) &&
-              (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages))
-            ) {
-              if (
-                !currentTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
-                !incomingCandidates.some((p) => p.id === t.id || sameSong(p, t))
-              ) {
-                incomingCandidates.push(t);
+      // 1. Run personalized recommendation analysis + fresh trending discovery in parallel
+      await Promise.allSettled([
+        (async () => {
+          try {
+            const recRes = await runRecommend({
+              data: {
+                isNewUser,
+                liked: likes.slice(0, 15).map(trackLabel),
+                recent: history.slice(0, 15).map(trackLabel),
+                disliked: dislikes.slice(0, 15).map(trackLabel),
+                sequence: sequenceBrief(history, stats),
+                skipped: skippedLabels(stats),
+                count: 20,
+                page: targetPage,
+                languages: settings.languages,
+                primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                languageWeights: settings.languageWeights,
+                brief: settingsToBrief(settings),
+                artists: topArtists(stats, likes, 12, downloadedTracks),
+                downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
+                refreshNonce: `${baseNonce}-rec`,
+                discovery: settings.discovery ?? 40,
+                affinityArtists: affinity.affinityArtists,
+                penalizedArtists: affinity.penalizedArtists,
+                clientHour,
+                exclude: fullExcludeLabels,
+                recentSeenIds: fullExcludeIds,
+              },
+            });
+            if (recRes.tracks && recRes.tracks.length > 0) {
+              for (const t of recRes.tracks as Track[]) {
+                if (isEligibleExploreCandidate(t)) {
+                  incomingCandidates.push(t);
+                }
               }
             }
+          } catch (err) {
+            console.warn("[loadMoreExploreSongs] runRecommend analysis error:", err);
           }
-        }
-      } catch (err) {
-        console.warn("[loadMoreExploreSongs] runTrending error:", err);
-      }
+        })(),
+        (async () => {
+          try {
+            const res = await runTrending({
+              data: {
+                languages: settings.languages,
+                primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                languageWeights: settings.languageWeights,
+                count: 25,
+                page: targetPage,
+                recentSeenIds: fullExcludeIds,
+                clientHour,
+                refreshNonce: baseNonce,
+              },
+            });
+            if (res.tracks && res.tracks.length > 0) {
+              for (const t of res.tracks as Track[]) {
+                if (isEligibleExploreCandidate(t)) {
+                  incomingCandidates.push(t);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn("[loadMoreExploreSongs] runTrending error:", err);
+          }
+        })(),
+      ]);
 
-      // 2. If incomingCandidates is still < 10, fetch from new releases
-      if (incomingCandidates.length < 10) {
+      // 2. If incomingCandidates is still < 12, fetch from new releases tailored to user artists
+      if (incomingCandidates.length < 12) {
         try {
-          const artistList = topArtists(stats, likes, 8);
+          const artistList = topArtists(stats, likes, 8, downloadedTracks);
           const newSongsRes = await runNewSongs({
             data: {
               artists: artistList,
@@ -2685,18 +2787,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           });
           if (newSongsRes.tracks && newSongsRes.tracks.length > 0) {
             for (const t of newSongsRes.tracks as Track[]) {
-              if (
-                t &&
-                isOriginalSong(t) &&
-                hasPlayableDuration(t) &&
-                (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages))
-              ) {
-                if (
-                  !currentTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
-                  !incomingCandidates.some((p) => p.id === t.id || sameSong(p, t))
-                ) {
-                  incomingCandidates.push(t);
-                }
+              if (isEligibleExploreCandidate(t)) {
+                incomingCandidates.push(t);
               }
             }
           }
@@ -2705,8 +2797,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       }
 
-      // 3. If incomingCandidates is still < 10, fetch from diverse mood picks
-      if (incomingCandidates.length < 10) {
+      // 3. If incomingCandidates is still < 12, fetch from diverse mood picks
+      if (incomingCandidates.length < 12) {
         const exploreMoods = ["Hits", "Trending", "Party", "Melody", "Viral"];
         const pickedMood = exploreMoods[(targetPage - 1) % exploreMoods.length] || "Hits";
         try {
@@ -2719,28 +2811,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           });
           if (moodRes.tracks && moodRes.tracks.length > 0) {
             for (const t of moodRes.tracks as Track[]) {
-              if (
-                t &&
-                isOriginalSong(t) &&
-                hasPlayableDuration(t) &&
-                (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages))
-              ) {
-                if (
-                  !currentTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
-                  !incomingCandidates.some((p) => p.id === t.id || sameSong(p, t))
-                ) {
-                  incomingCandidates.push(t);
-                }
+              if (isEligibleExploreCandidate(t)) {
+                incomingCandidates.push(t);
               }
             }
           }
         } catch {}
       }
 
-      // 4. If incomingCandidates is still < 10, seed radio from existing trending songs
-      if (incomingCandidates.length < 10 && currentTrending.length > 0) {
-        const seedIndex = (targetPage * 3) % currentTrending.length;
-        const seed = currentTrending[seedIndex];
+      // 4. If incomingCandidates is still < 10, seed radio from liked or affinity-matched tracks
+      if (incomingCandidates.length < 10) {
+        const seedPool = [...likes.slice(0, 5), ...currentTrending].filter(
+          (s) => Boolean(s?.id) && !dislikedIdsRef.current.has(s.id),
+        );
+        const seed = seedPool[(targetPage - 1) % Math.max(1, seedPool.length)];
         if (seed?.id) {
           try {
             const radioRes = await getSongRadio({
@@ -2757,18 +2841,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             });
             if (radioRes.tracks && radioRes.tracks.length > 0) {
               for (const t of radioRes.tracks as Track[]) {
-                if (
-                  t &&
-                  isOriginalSong(t) &&
-                  hasPlayableDuration(t) &&
-                  (settings.languages.length === 0 || isLanguageConsistent(t, settings.languages))
-                ) {
-                  if (
-                    !currentTrending.some((p) => p.id === t.id || sameSong(p, t)) &&
-                    !incomingCandidates.some((p) => p.id === t.id || sameSong(p, t))
-                  ) {
-                    incomingCandidates.push(t);
-                  }
+                if (isEligibleExploreCandidate(t)) {
+                  incomingCandidates.push(t);
                 }
               }
             }
@@ -2776,24 +2850,44 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       }
 
-      // Append new tracks to trendingList
-      if (incomingCandidates.length > 0) {
-        const batchToAdd = incomingCandidates.slice(0, 20);
+      // 5. Prioritize tracks NOT overlapping Daily Mix / Home Recs, then score via Thompson Sampling & Discovery Mix
+      const nonCrossSection = incomingCandidates.filter(
+        (t) =>
+          !dailyMixTracksRef.current.some((d) => d.id === t.id || isFuzzySameSong(d, t)) &&
+          !recsRef.current.some((r) => r.id === t.id || isFuzzySameSong(r, t)),
+      );
+      const poolToAnalyze = nonCrossSection.length >= 10 ? nonCrossSection : incomingCandidates;
+      const analyzedBatch = analyzeAndRankMoreTracks(poolToAnalyze, currentTrending, affinity.affinityArtists).slice(
+        0,
+        20,
+      );
+
+      // 6. Insert freshly analyzed tracks immediately at the expanded reveal boundary & prune stale queued tail
+      if (analyzedBatch.length > 0) {
         setTrendingList((prev) => {
-          const trulyNew = batchToAdd.filter(
-            (cand) => !prev.some((p) => p.id === cand.id || sameSong(p, cand)),
+          const visibleFloor = Math.min(prev.length, Math.max(15, (targetPage - 1) * 15));
+          const visibleHead = prev.slice(0, visibleFloor);
+          const cleanUnrevealedTail = prev.slice(visibleFloor).filter((t) => {
+            if (!t || !t.id) return false;
+            if (isQueuedOrPlayedTrack(t)) return false;
+            return !visibleHead.some((v) => v.id === t.id || isFuzzySameSong(v, t));
+          });
+          const trulyNew = analyzedBatch.filter(
+            (cand) => !visibleHead.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
           );
           if (trulyNew.length === 0) return prev;
-          const combined = dedupeTracks([...prev, ...trulyNew]);
+          const remainingTail = cleanUnrevealedTail.filter(
+            (t) => !trulyNew.some((n) => n.id === t.id || isFuzzySameSong(n, t)),
+          );
+          const combined = dedupeTracks([...visibleHead, ...trulyNew, ...remainingTail]);
           writeHomeCache({ trendingList: combined });
+          markFeedDisplayed(trulyNew);
           recordSeenTrackIdentities(trulyNew);
           return combined;
         });
         setExploreExhaustedTrending(false);
-      } else {
-        if (targetPage >= 8) {
-          setExploreExhaustedTrending(true);
-        }
+      } else if (targetPage >= 8) {
+        setExploreExhaustedTrending(true);
       }
     } catch (e) {
       console.error("[loadMoreExploreSongs] error:", e);
@@ -2804,15 +2898,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   }, [
     loadingMoreExplore,
     exploreExhaustedTrending,
+    runRecommend,
     runTrending,
     runNewSongs,
     runMoodPicks,
     getSongRadio,
     stats,
     likes,
-    settings.languages,
-    settings.primaryLanguage,
-    settings.languageWeights,
+    downloadedTracks,
+    history,
+    dislikes,
+    settings,
+    getQueueAndPlaybackExclusionSets,
+    analyzeAndRankMoreTracks,
+    markFeedDisplayed,
   ]);
 
   const extendQueue = useCallback(async (): Promise<Track[]> => {
@@ -4037,8 +4136,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     runStartupMigrations();
 
     const cachedFeed = readHomeCache();
+    const persistedQueue = readPlayback()?.queue ?? [];
     const userLangs = settings.languages || [];
-    const filterCached = (list?: Track[]) => {
+    const filterCached = (list?: Track[], excludeQueue = false) => {
       if (!list) return [];
       return list
         .map((t) => (t ? cleanTrackDisplayMetadata(t) : t))
@@ -4048,13 +4148,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           if (t.source === "deezer" || t.id.startsWith("deezer:")) return false;
           // Strictly enforce language consistency if user has selected languages
           if (userLangs.length > 0 && !isLanguageConsistent(t, userLangs)) return false;
+          // Exclude previous queue songs from cached home & explore feeds
+          if (excludeQueue && persistedQueue.some((q) => q.id === t.id || isFuzzySameSong(q, t))) {
+            return false;
+          }
           return true;
         });
     };
 
     const isNewUser = likes.length === 0 && history.length === 0;
-    const cleanRecs = filterCached(isNewUser ? cachedFeed.recs?.filter((t) => !isOldEraTrack(t)) : cachedFeed.recs);
-    const cleanTrending = filterCached(cachedFeed.trendingList);
+    const cleanRecs = filterCached(isNewUser ? cachedFeed.recs?.filter((t) => !isOldEraTrack(t)) : cachedFeed.recs, true);
+    const cleanTrending = filterCached(cachedFeed.trendingList, true);
     const cleanOldSongs = filterCached(cachedFeed.oldSongsList?.filter(isOldEraTrack));
     const cleanDailyMix = filterCached(isNewUser ? cachedFeed.dailyMixTracks?.filter((t) => !isOldEraTrack(t)) : cachedFeed.dailyMixTracks);
     const cleanMixTracks = cachedFeed.mixTracks
