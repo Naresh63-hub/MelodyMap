@@ -241,7 +241,9 @@ export async function handleAuthCallback(
       if (client?.auth) {
         if (parsed.tokenHash) {
           // Supabase email verifyOtp flow
-          const verifyType = (parsed.type as any) || "signup";
+          const ALLOWED_OTP_TYPES = new Set(["signup", "invite", "magiclink", "recovery", "email_change", "email"]);
+          const rawType = String(parsed.type || "signup").toLowerCase();
+          const verifyType = ALLOWED_OTP_TYPES.has(rawType) ? (rawType as any) : "signup";
           const { error } = await client.auth.verifyOtp({
             token_hash: parsed.tokenHash,
             type: verifyType,
@@ -261,7 +263,17 @@ export async function handleAuthCallback(
           // PKCE code exchange
           const { error } = await client.auth.exchangeCodeForSession(parsed.code);
           if (error) {
-            console.warn("[AuthDeepLink] exchangeCodeForSession notice:", error.message);
+            const sessionRes = await client.auth.getSession?.();
+            if (!sessionRes?.data?.session) {
+              console.warn("[AuthDeepLink] exchangeCodeForSession error:", error.message);
+              const friendly = formatCallbackError(error.message, undefined, error.message);
+              const errObj = new Error(friendly);
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("melodymap:auth-error", { detail: { error: friendly } }));
+              }
+              options?.onError?.(errObj);
+              return { success: false, error: friendly };
+            }
           }
         } else if (parsed.accessToken && parsed.refreshToken) {
           // Direct token session setup
@@ -270,8 +282,20 @@ export async function handleAuthCallback(
             refresh_token: parsed.refreshToken,
           });
           if (error) {
-            console.warn("[AuthDeepLink] setSession notice:", error.message);
+            const sessionRes = await client.auth.getSession?.();
+            if (!sessionRes?.data?.session) {
+              console.warn("[AuthDeepLink] setSession error:", error.message);
+              const friendly = formatCallbackError(error.message, undefined, error.message);
+              const errObj = new Error(friendly);
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("melodymap:auth-error", { detail: { error: friendly } }));
+              }
+              options?.onError?.(errObj);
+              return { success: false, error: friendly };
+            }
           }
+        } else {
+          return { success: false, error: "No authentication credentials found in callback URL" };
         }
       }
 

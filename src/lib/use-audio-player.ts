@@ -44,6 +44,17 @@ export type AudioPlayerErrorDetails = {
   error?: MediaError | null;
 };
 
+function isSaavnCdnUrl(urlStr: string | null | undefined): boolean {
+  if (!urlStr) return false;
+  try {
+    const parsed = new URL(urlStr, typeof window !== "undefined" ? window.location.href : "https://localhost");
+    const host = parsed.hostname.toLowerCase();
+    return host === "saavncdn.com" || host.endsWith(".saavncdn.com");
+  } catch {
+    return false;
+  }
+}
+
 /**
  * HTML5-Audio + Web Audio API backed player with Spotify-like background playback,
  * screen-off & lockscreen continuous playback, 10-band hardware equalizer, sound presets,
@@ -576,7 +587,7 @@ export function useAudioPlayer(options: {
         if (audio.src && audio.src.includes("/api/stream/")) {
           const newUrl = streamUrl(activeId, quality);
           setStream(newUrl, cur);
-        } else if (audio.src && audio.src.includes("saavncdn.com")) {
+        } else if (isSaavnCdnUrl(audio.src)) {
           const targetSuffix =
             quality === "saver" ? "_96.mp4" : quality === "standard" ? "_160.mp4" : "_320.mp4";
           const newUrl = audio.src.replace(/_(?:96|160|320)\.mp4/, targetSuffix);
@@ -1235,7 +1246,7 @@ export function useAudioPlayer(options: {
    */
   const sanitizeDirectUrl = (trackId: string, directUrl?: string): string | undefined => {
     if (!directUrl || !hasFullLengthDirectSource(trackId)) return undefined;
-    if (directUrl.includes("saavncdn.com")) {
+    if (isSaavnCdnUrl(directUrl)) {
       const isLowNet = isLowNetworkModeEnabled();
       const q = isLowNet ? "saver" : (equalizerSettingsRef.current.quality || "high");
       const targetSuffix = q === "saver" ? "_96.mp4" : q === "standard" ? "_160.mp4" : "_320.mp4";

@@ -157,9 +157,15 @@ describe("Native & Web Auth Callback Handler Suite", () => {
       safeStorage.setItem("melodymap.guest_mode", "true");
 
       const onSuccess = vi.fn();
+      const mockClient = {
+        auth: {
+          setSession: vi.fn().mockResolvedValue({ data: { session: {} }, error: null }),
+          getSession: vi.fn().mockResolvedValue({ data: { session: {} }, error: null }),
+        },
+      };
       const res = await handleAuthCallback(
         "com.melodymap.music://auth/callback#access_token=token_abc&refresh_token=token_def",
-        null,
+        mockClient,
         { onSuccess },
       );
 
@@ -187,14 +193,20 @@ describe("Native & Web Auth Callback Handler Suite", () => {
     // Scenario 13: Duplicate callback prevention
     it("Scenario 13: Duplicate callback prevention avoids repeated exchanges", async () => {
       const onSuccess = vi.fn();
+      const mockClient = {
+        auth: {
+          exchangeCodeForSession: vi.fn().mockResolvedValue({ data: { session: {} }, error: null }),
+          getSession: vi.fn().mockResolvedValue({ data: { session: {} }, error: null }),
+        },
+      };
       const url = "com.melodymap.music://auth/callback?code=single-use-code-999";
 
-      const res1 = await handleAuthCallback(url, null, { onSuccess });
+      const res1 = await handleAuthCallback(url, mockClient, { onSuccess });
       expect(res1.success).toBe(true);
       expect(onSuccess).toHaveBeenCalledTimes(1);
 
       // Second attempt with same code
-      const res2 = await handleAuthCallback(url, null, { onSuccess });
+      const res2 = await handleAuthCallback(url, mockClient, { onSuccess });
       expect(res2.success).toBe(true);
       // Callback was NOT processed again
       expect(onSuccess).toHaveBeenCalledTimes(1);
@@ -212,6 +224,13 @@ describe("Native & Web Auth Callback Handler Suite", () => {
         },
       };
 
+      const mockClient = {
+        auth: {
+          setSession: vi.fn().mockResolvedValue({ data: { session: {} }, error: null }),
+          getSession: vi.fn().mockResolvedValue({ data: { session: {} }, error: null }),
+        },
+      };
+
       const originalWin = (globalThis as any).window;
       (globalThis as any).window = fakeWindow;
 
@@ -219,7 +238,7 @@ describe("Native & Web Auth Callback Handler Suite", () => {
         const onSuccess = vi.fn();
         const res = await handleAuthCallback(
           "https://melodymap-pi.vercel.app/#access_token=restored_token&refresh_token=restored_refresh",
-          null,
+          mockClient,
           { onSuccess },
         );
 

@@ -73,10 +73,15 @@ export function getPrimaryArtist(artist: string): string {
 /** Clean and format raw HTML lyrics from JioSaavn into readable lines */
 export function formatSaavnLyrics(raw: string): string {
   if (!raw) return "";
-  return decodeEntities(raw)
+  let text = decodeEntities(raw)
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<[^>]+>/g, "")
+    .replace(/<\/p>/gi, "\n\n");
+  let prev: string;
+  do {
+    prev = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== prev);
+  return text
     .replace(/\r\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

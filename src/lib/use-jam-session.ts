@@ -64,7 +64,11 @@ export function useJamSession(options: UseJamSessionOptions) {
   if (!guestIdRef.current) {
     let stored = safeStorage.getItem("melodymap.jam_guest_id");
     if (!stored) {
-      stored = `guest-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const entropy =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID().slice(0, 8)
+          : `${Date.now()}`;
+      stored = `guest-${entropy}`;
       safeStorage.setItem("melodymap.jam_guest_id", stored);
     }
     guestIdRef.current = stored;
