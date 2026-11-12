@@ -7,8 +7,6 @@ import {
   Search,
   X,
   RefreshCw,
-  HardDrive,
-  Sparkles,
 } from "lucide-react";
 import { Sidebar, type NavTab } from "@/components/music/layout/Sidebar";
 import { MobileNav } from "@/components/music/layout/MobileNav";
@@ -131,7 +129,7 @@ import {
 } from "@/lib/mood-genre-filters";
 import { useAudioPlayer } from "@/lib/use-audio-player";
 import { useMediaSession } from "@/lib/use-media-session";
-import { clearDownloads, listDownloads, removeDownload, saveDownload, hasDownload, getStorageDashboard, cleanupDownloadsOlderThan, formatBytes, type DownloadInfo, type StorageDashboardSummary } from "@/lib/offline";
+import { listDownloads, removeDownload, saveDownload, hasDownload, type DownloadInfo } from "@/lib/offline";
 import { hasFullLengthDirectSource } from "@/lib/track-stream-policy";
 import { cn } from "@/lib/utils";
 import {
@@ -376,47 +374,6 @@ function MusicApp() {
   const [shareTrack, setShareTrack] = useState<Track | null>(null);
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [downloadedTracks, setDownloadedTracks] = useState<Track[]>([]);
-  const [storageStats, setStorageStats] = useState<StorageDashboardSummary | null>(null);
-  const [cleaningStorage, setCleaningStorage] = useState(false);
-
-  const refreshStorageStats = useCallback(async () => {
-    try {
-      const summary = await getStorageDashboard();
-      setStorageStats(summary);
-    } catch (err) {
-      console.warn("Failed to load storage dashboard", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (tab === "downloads") {
-      void refreshStorageStats();
-    }
-  }, [tab, refreshStorageStats]);
-
-  const handleCleanOlderDownloads = useCallback(async () => {
-    if (cleaningStorage) return;
-    setCleaningStorage(true);
-    try {
-      const { removedCount, reclaimedBytes } = await cleanupDownloadsOlderThan(30);
-      await refreshStorageStats();
-      const items = await listDownloads();
-      setDownloadedIds(new Set(items.map((i: DownloadInfo) => i.track.id)));
-      setDownloadedTracks(items.map((i: DownloadInfo) => i.track));
-      if (removedCount > 0) {
-        setMessage(`Cleaned ${removedCount} cached songs older than 30 days (${formatBytes(reclaimedBytes)} reclaimed)`);
-      } else {
-        setMessage("No cached downloads older than 30 days found.");
-      }
-    } catch (err) {
-      console.error("Cleanup failed:", err);
-      setMessage("Failed to clean older downloads");
-    } finally {
-      setCleaningStorage(false);
-      setTimeout(() => setMessage(null), 3500);
-    }
-  }, [cleaningStorage, refreshStorageStats]);
-
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
   const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
   const [deleteConfirmTrack, setDeleteConfirmTrack] = useState<Track | null>(null);
@@ -5031,57 +4988,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     </Button>
                   )}
                 </div>
-
-                {/* Storage Dashboard: displays offline data usage, item count, and >30-day cleanup */}
-                {tab === "downloads" && (
-                  <div className="rounded-2xl border border-hair bg-card/60 p-3.5 space-y-2.5 backdrop-blur-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary border border-primary/20">
-                          <HardDrive className="h-4.5 w-4.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="text-xs sm:text-sm font-semibold text-foreground truncate">
-                            Offline Storage Dashboard
-                          </h3>
-                          <p className="text-[11px] text-muted-foreground truncate">
-                            {storageStats
-                              ? `${storageStats.itemCount} cached songs · ${storageStats.formattedTotalSize}`
-                              : `${downloadedTracks.length} offline songs`}
-                            {storageStats?.quotaBytes
-                              ? ` · Device: ${storageStats.usedBytes ? formatBytes(storageStats.usedBytes) : "0 B"} / ${formatBytes(storageStats.quotaBytes)}`
-                              : ""}
-                          </p>
-                        </div>
-                      </div>
-
-                      {storageStats && (storageStats.itemCount > 0 || storageStats.itemsOlderThan30Days > 0) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={cleaningStorage}
-                          onClick={() => void handleCleanOlderDownloads()}
-                          className="h-8 shrink-0 text-xs font-medium border-primary/30 hover:bg-primary/10 text-foreground"
-                        >
-                          {cleaningStorage ? (
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <Sparkles className="mr-1.5 h-3.5 w-3.5 text-primary" />
-                          )}
-                          Clean &gt;30d {storageStats.itemsOlderThan30Days > 0 ? `(${storageStats.itemsOlderThan30Days})` : ""}
-                        </Button>
-                      )}
-                    </div>
-
-                    {storageStats && storageStats.itemsOlderThan30Days > 0 && (
-                      <div className="flex items-center justify-between text-[11px] text-amber-400/90 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-1.5">
-                        <span>
-                          {storageStats.itemsOlderThan30Days} downloads older than 30 days ({storageStats.formattedOlderSize}) ready for safe cleanup.
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* History in-tab real-time search bar */}
                 {tab === "history" && history.length > 0 && (
