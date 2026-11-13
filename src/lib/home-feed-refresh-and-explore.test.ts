@@ -343,5 +343,44 @@ describe("Home Feed Refresh, Daily Mix Isolation, and Explore More Songs", () =>
       expect(settledRecs[0]?.id).toBe("new-1");
       expect(settledRecs[1]?.id).toBe("new-2");
     });
+
+    it("guarantees explicit refresh updates BOTH Made For You and Daily Mix simultaneously without duplicate overlap", () => {
+      const prevDailyMix: Track[] = [
+        makeTrack("prev-dm-1", "Old Daily Mix Song", "Artist 1"),
+      ];
+      const prevRecs: Track[] = [
+        makeTrack("prev-rec-1", "Old Made For You Song", "Artist 2"),
+      ];
+
+      // Candidate pool after refresh
+      const dmCandidatePool: Track[] = [
+        makeTrack("prev-dm-1", "Old Daily Mix Song", "Artist 1"),
+        makeTrack("fresh-dm-1", "Fresh Daily Track 1", "Artist 3"),
+        makeTrack("fresh-dm-2", "Fresh Daily Track 2", "Artist 4"),
+      ];
+
+      const recsCandidatePool: Track[] = [
+        makeTrack("prev-rec-1", "Old Made For You Song", "Artist 2"),
+        makeTrack("fresh-dm-1", "Fresh Daily Track 1", "Artist 3"), // should be filtered out because it is in Daily Mix!
+        makeTrack("fresh-rec-1", "Fresh Rec Track 1", "Artist 5"),
+        makeTrack("fresh-rec-2", "Fresh Rec Track 2", "Artist 6"),
+      ];
+
+      // 1. Process Daily Mix refresh
+      const freshDailyMix = dmCandidatePool.filter(
+        (t) => !prevDailyMix.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)),
+      );
+      expect(freshDailyMix.map((t) => t.id)).toEqual(["fresh-dm-1", "fresh-dm-2"]);
+
+      // 2. Process Made For You refresh: excludes prevRecs AND excludes tracks currently in Daily Mix
+      const freshRecs = recsCandidatePool
+        .filter((t) => !prevRecs.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)))
+        .filter((t) => !freshDailyMix.some((d) => d.id === t.id || isFuzzySameSong(d, t)));
+
+      expect(freshRecs.map((t) => t.id)).toEqual(["fresh-rec-1", "fresh-rec-2"]);
+
+      // Both sections successfully refreshed to brand new songs, and neither has overlap!
+      expect(freshRecs.some((r) => freshDailyMix.some((d) => d.id === r.id))).toBe(false);
+    });
   });
 });

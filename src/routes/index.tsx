@@ -1986,7 +1986,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       try {
         await Promise.allSettled([
           (async () => {
-            const pureMusic: Track[] = [];
+            try {
+              const pureMusic: Track[] = [];
             let fresh: Track[] = [];
             // Query for a robust initial feed (35-40+ songs)
             const maxDepth = 3;
@@ -2133,53 +2134,37 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 (t) => !isQueued(t) && !freshFromPrev.some((f) => f.id === t.id || isFuzzySameSong(f, t)),
               );
 
-              if (freshFromPrev.length > 0) {
-                // Newly discovered tracks ranked with recommendation algorithm
-                const rankedFresh = thompsonSamplingPolicy.rankCandidates(
-                  dedupeTracks(freshFromPrev),
-                  getSessionContext(),
-                );
-                const distributedFresh = applyDiscoveryDistribution(rankedFresh, affinity.affinityArtists, settings.discovery ?? 40);
-                const diversifiedFresh = diversifyTrackList(distributedFresh, {
-                  maxPerArtist: 2,
-                  maxPerAlbum: 1,
-                  minArtistSpacing: 2,
-                  minAlbumSpacing: 3,
-                });
+              // Avoid duplicates between Made For You and Daily Mix
+              const freshNonDaily = freshFromPrev.filter(
+                (t) => !dailyMixTracksRef.current.some((d) => d.id === t.id || isFuzzySameSong(d, t)),
+              );
+              const viableFresh = freshNonDaily.length >= 8 ? freshNonDaily : freshFromPrev;
 
-                // Backfill tracks ranked separately
-                const rankedBackfill = thompsonSamplingPolicy.rankCandidates(
-                  dedupeTracks(backfill),
-                  getSessionContext(),
-                );
-                const distributedBackfill = applyDiscoveryDistribution(rankedBackfill, affinity.affinityArtists, settings.discovery ?? 40);
-                const diversifiedBackfill = diversifyTrackList(distributedBackfill, {
-                  maxPerArtist: 2,
-                  maxPerAlbum: 1,
-                  minArtistSpacing: 2,
-                  minAlbumSpacing: 3,
-                });
+              // Fresh songs not in previous Made For You are guaranteed at top; backfill only if pool is too small (< 8)
+              const finalRecsPool = viableFresh.length >= 8
+                ? viableFresh
+                : dedupeTracks([...viableFresh, ...backfill]);
 
-                // Fresh discoveries are guaranteed at the top of the feed!
-                cleanFinalRecs = dedupeTracks([...diversifiedFresh, ...diversifiedBackfill]);
-              } else {
-                const nonQueueCandidates = candidatePool.filter((t) => !isQueued(t));
-                const poolToRank = nonQueueCandidates.length >= 10 ? nonQueueCandidates : candidatePool;
-                const ranked = thompsonSamplingPolicy.rankCandidates(
-                  dedupeTracks(poolToRank),
-                  getSessionContext(),
-                );
-                const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
-                cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
-                  maxPerArtist: 2,
-                  maxPerAlbum: 1,
-                  minArtistSpacing: 2,
-                  minAlbumSpacing: 3,
-                }));
-              }
+              const poolToRank = finalRecsPool.length >= 5
+                ? finalRecsPool
+                : candidatePool.filter((t) => !isQueued(t)).length >= 5
+                  ? candidatePool.filter((t) => !isQueued(t))
+                  : candidatePool;
+
+              const ranked = thompsonSamplingPolicy.rankCandidates(
+                dedupeTracks(poolToRank),
+                getSessionContext(),
+              );
+              const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+              cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
+                maxPerArtist: 2,
+                maxPerAlbum: 1,
+                minArtistSpacing: 2,
+                minAlbumSpacing: 3,
+              }));
             } else {
               const nonQueueCandidates = candidatePool.filter((t) => !isQueued(t));
-              const poolToRank = nonQueueCandidates.length >= 10 ? nonQueueCandidates : candidatePool;
+              const poolToRank = nonQueueCandidates.length >= 8 ? nonQueueCandidates : candidatePool;
               const ranked = thompsonSamplingPolicy.rankCandidates(
                 dedupeTracks(poolToRank),
                 getSessionContext(),
@@ -2207,12 +2192,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               ? nonTrendingRecs
               : [...nonTrendingRecs, ...overlappingRecs];
 
-            const settledRecs = dedupeTracks(finalRecs);
-            setRecs(settledRecs);
-            markFeedDisplayed(settledRecs);
-            writeHomeCache({ recs: settledRecs });
-            recordSeenTrackIdentities(settledRecs);
-          })(),
+            const settledRecs = dedupeTracks(finalRecs.length > 0 ? finalRecs : cleanFinalRecs);
+            if (settledRecs.length > 0) {
+              setRecs(settledRecs);
+              markFeedDisplayed(settledRecs);
+              writeHomeCache({ recs: settledRecs });
+              recordSeenTrackIdentities(settledRecs);
+            }
+          } catch (err) {
+            console.warn("[loadHomeFeeds] failed to load fresh recommendations:", err);
+          }
+        })(),
           (async () => {
             await loadDailyMix(nonce);
           })(),
@@ -4649,9 +4639,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                             size="sm"
                             className="rounded-full bg-chip-subtle text-secondary-foreground hover:bg-chip-strong hover:text-foreground border-hair text-xs font-normal button-modern-hover"
                             onClick={() => void loadHomeFeeds(undefined, Date.now())}
-                            disabled={recLoading}
+                            disabled={recLoading || dailyMixLoading}
                           >
-                            {recLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
+                            {recLoading || dailyMixLoading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin text-muted-foreground" /> : null}
                             Refresh
                           </Button>
                         </div>
@@ -4698,6 +4688,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         isPlaying={player.isPlaying}
                         loading={!hydrated || (recLoading && recs.length === 0 && dailyMixTracks.length === 0)}
                         dailyMixLoading={dailyMixLoading}
+                        recLoading={recLoading}
                       />
 
                       {/* Explore More Songs for low-bandwidth incremental discovery */}

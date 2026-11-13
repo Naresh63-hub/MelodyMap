@@ -531,7 +531,7 @@ async function getLocalPicks(data: {
           : 0;
     const refreshShift = nonceNum > 0 ? (nonceNum % 13) + 1 : 0;
     const queryOffset = (page - 1) * 3 + refreshShift;
-    const queryPage = page + Math.floor(refreshShift / 4);
+    const queryPage = Math.max(1, Math.min(3, page));
 
     const rotateQueries = (arr: string[], offset: number) => {
       if (arr.length === 0) return [];
@@ -539,20 +539,31 @@ async function getLocalPicks(data: {
       return [...arr.slice(normalized), ...arr.slice(0, normalized)];
     };
 
-    const pickedNew = rotateQueries(newQueries, queryOffset).slice(0, 4);
-    const pickedPopular = rotateQueries(popularQueries, queryOffset).slice(0, 4);
+    const pickedNew = data.refreshNonce
+      ? shuffleArray(rotateQueries(newQueries, refreshShift)).slice(0, 4)
+      : rotateQueries(newQueries, queryOffset).slice(0, 4);
+    const pickedPopular = data.refreshNonce
+      ? shuffleArray(rotateQueries(popularQueries, refreshShift)).slice(0, 4)
+      : rotateQueries(popularQueries, queryOffset).slice(0, 4);
 
-    const [queryCandidates, newReleasesCandidates] = await Promise.all([
+    const [fetchedQueryCandidates, newReleasesCandidates] = await Promise.all([
       runQueryBatch([...pickedNew, ...pickedPopular], 14, true, bypassCache, queryPage),
       (async () => {
         try {
           const { getSaavnNewReleases } = await import("./providers/saavn");
-          return await getSaavnNewReleases(languages, 25, data.refreshNonce, page);
+          return await getSaavnNewReleases(languages, 25, data.refreshNonce, queryPage);
         } catch {
           return [];
         }
       })(),
     ]);
+
+    let queryCandidates = fetchedQueryCandidates;
+
+    if (queryCandidates.length < 15 && queryPage > 1) {
+      const backfill = await runQueryBatch(rotateQueries([...pickedNew, ...pickedPopular], 2), 14, true, bypassCache, 1);
+      queryCandidates = [...queryCandidates, ...backfill];
+    }
 
     const combined = [
       ...queryCandidates,
@@ -630,7 +641,7 @@ async function getLocalPicks(data: {
         : 0;
   const refreshShift = nonceNum > 0 ? (nonceNum % 13) + 1 : 0;
   const queryOffset = (page - 1) * 3 + refreshShift;
-  const queryPage = page + Math.floor(refreshShift / 4);
+  const queryPage = Math.max(1, Math.min(3, page));
 
   const rotateQueries = (arr: string[], offset: number) => {
     if (arr.length === 0) return [];
@@ -638,13 +649,26 @@ async function getLocalPicks(data: {
     return [...arr.slice(normalized), ...arr.slice(0, normalized)];
   };
 
-  const pickedNew = rotateQueries(newQueries, queryOffset).slice(0, 6);
-  const pickedOld = rotateQueries(oldQueries, queryOffset).slice(0, 6);
+  const pickedNew = data.refreshNonce
+    ? shuffleArray(rotateQueries(newQueries, refreshShift)).slice(0, 6)
+    : rotateQueries(newQueries, queryOffset).slice(0, 6);
+  const pickedOld = data.refreshNonce
+    ? shuffleArray(rotateQueries(oldQueries, refreshShift)).slice(0, 6)
+    : rotateQueries(oldQueries, queryOffset).slice(0, 6);
 
-  const [newCandidates, oldCandidates] = await Promise.all([
+  let [newCandidates, oldCandidates] = await Promise.all([
     runQueryBatch(pickedNew, 14, true, bypassCache, queryPage),
     runQueryBatch(pickedOld, 14, true, bypassCache, queryPage),
   ]);
+
+  if (newCandidates.length < 10 && queryPage > 1) {
+    const backfillNew = await runQueryBatch(pickedNew, 14, true, bypassCache, 1);
+    newCandidates = [...newCandidates, ...backfillNew];
+  }
+  if (oldCandidates.length < 10 && queryPage > 1) {
+    const backfillOld = await runQueryBatch(pickedOld, 14, true, bypassCache, 1);
+    oldCandidates = [...oldCandidates, ...backfillOld];
+  }
 
   const newQuota = Math.ceil(count / 2);
   const oldQuota = count - newQuota;

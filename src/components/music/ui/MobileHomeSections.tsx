@@ -61,6 +61,7 @@ type Props = {
   isPlaying: boolean;
   loading?: boolean | undefined;
   dailyMixLoading?: boolean | undefined;
+  recLoading?: boolean | undefined;
   /** Active genre/mood quick filter ids (state lives in the home route). */
   quickFilterIds?: readonly string[] | undefined;
   onToggleQuickFilter?: ((id: string) => void) | undefined;
@@ -393,6 +394,7 @@ export function MobileHomeSections({
   isPlaying,
   loading = false,
   dailyMixLoading = false,
+  recLoading = false,
   quickFilterIds = [],
   onToggleQuickFilter,
   onClearQuickFilters,
@@ -514,25 +516,39 @@ export function MobileHomeSections({
       )}
 
       {/* 3. Made For You (AI / Personalized Recommendations) */}
-      {visibleRecommended.length > 0 && (
+      {(visibleRecommended.length > 0 || (recLoading && quickFilterIds.length === 0)) && (
         <section className="animate-fade-in">
           <SectionHeader
             title="Made For You"
             subtitle="Based on your taste"
             icon={Music2}
           />
-          <VerticalSongList
-            tracks={visibleRecommended}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onOpenOptions={onOpenOptions}
-            onToggleLike={onToggleLike}
-            likedIds={likedIds}
-            downloadedIds={downloadedIds}
-            downloadingIds={downloadingIds}
-            downloadProgress={downloadProgress}
-          />
+          {visibleRecommended.length > 0 ? (
+            <VerticalSongList
+              tracks={visibleRecommended}
+              currentId={currentId}
+              isPlaying={isPlaying}
+              onPlayTrack={onPlayTrack}
+              onOpenOptions={onOpenOptions}
+              onToggleLike={onToggleLike}
+              likedIds={likedIds}
+              downloadedIds={downloadedIds}
+              downloadingIds={downloadingIds}
+              downloadProgress={downloadProgress}
+            />
+          ) : (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 p-2 rounded-xl bg-card/40 border border-hair animate-pulse">
+                  <div className="h-12 w-12 rounded-lg bg-chip" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-1/2 rounded bg-chip" />
+                    <div className="h-2.5 w-1/3 rounded bg-card" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
     </div>
