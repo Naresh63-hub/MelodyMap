@@ -142,6 +142,56 @@ describe("Home Feed Refresh, Daily Mix Isolation, and Explore More Songs", () =>
   });
 
   describe("2. Daily Mix: Zero overlap with playback queue and Explore page", () => {
+    it("advances Daily Mix page across 1-5 discovery cycles on explicit refresh", () => {
+      let dailyRefreshPage = 1;
+      const getTargetPage = (refreshNonce?: string | number) => {
+        const isExplicitRefresh = Boolean(refreshNonce);
+        if (isExplicitRefresh) {
+          dailyRefreshPage = (dailyRefreshPage % 5) + 1;
+        } else {
+          dailyRefreshPage = 1;
+        }
+        return dailyRefreshPage;
+      };
+
+      // Initial load stays page 1
+      expect(getTargetPage()).toBe(1);
+      expect(getTargetPage()).toBe(1);
+
+      // Explicit refreshes advance through 2 -> 3 -> 4 -> 5 -> 1 -> 2
+      expect(getTargetPage("nonce-1")).toBe(2);
+      expect(getTargetPage("nonce-2")).toBe(3);
+      expect(getTargetPage("nonce-3")).toBe(4);
+      expect(getTargetPage("nonce-4")).toBe(5);
+      expect(getTargetPage("nonce-5")).toBe(1);
+      expect(getTargetPage("nonce-6")).toBe(2);
+    });
+
+    it("filters out previous Daily Mix tracks on explicit refresh to deliver fresh songs", () => {
+      const prevDailyMix: Track[] = [
+        makeTrack("dm-old-1", "Samayama", "Anurag Kulkarni"),
+        makeTrack("dm-old-2", "Inkem Inkem", "Sid Sriram"),
+      ];
+
+      const candidatePool: Track[] = [
+        makeTrack("dm-old-1", "Samayama", "Anurag Kulkarni"), // Previous track
+        makeTrack("dm-fresh-1", "Kurchi Madathapetti", "Thaman S"), // Fresh track
+        makeTrack("dm-fresh-2", "Chuttamalle", "Anirudh Ravichander"), // Fresh track
+      ];
+
+      const isExplicitRefresh = true;
+      let finalMix = candidatePool;
+      if (isExplicitRefresh && prevDailyMix.length > 0) {
+        const freshFromPrev = candidatePool.filter(
+          (t) => !prevDailyMix.some((pr) => pr.id === t.id || sameSong(pr, t)),
+        );
+        finalMix = freshFromPrev;
+      }
+
+      expect(finalMix.some((t) => t.id === "dm-old-1")).toBe(false);
+      expect(finalMix.map((t) => t.id)).toEqual(["dm-fresh-1", "dm-fresh-2"]);
+    });
+
     it("filters out songs in queue, current playing song, and Explore page from Daily Mix", () => {
       const currentTrack = makeTrack("now-playing", "Song Playing", "Artist X");
       const currentQueue = [

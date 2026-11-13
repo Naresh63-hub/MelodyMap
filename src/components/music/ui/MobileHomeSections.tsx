@@ -60,6 +60,7 @@ type Props = {
   currentId?: string | null | undefined;
   isPlaying: boolean;
   loading?: boolean | undefined;
+  dailyMixLoading?: boolean | undefined;
   /** Active genre/mood quick filter ids (state lives in the home route). */
   quickFilterIds?: readonly string[] | undefined;
   onToggleQuickFilter?: ((id: string) => void) | undefined;
@@ -391,6 +392,7 @@ export function MobileHomeSections({
   currentId,
   isPlaying,
   loading = false,
+  dailyMixLoading = false,
   quickFilterIds = [],
   onToggleQuickFilter,
   onClearQuickFilters,
@@ -456,25 +458,37 @@ export function MobileHomeSections({
   return (
     <div className="space-y-7">
       {/* 1. Daily Mix (JioSaavn Square Cards) */}
-      {visibleDailyMix.length > 0 && (
+      {(visibleDailyMix.length > 0 || (dailyMixLoading && quickFilterIds.length === 0)) && (
         <section className="animate-fade-in">
           <SectionHeader
             title="Daily Mix"
             subtitle="Updated today"
             icon={Sparkles}
           />
-          <HorizontalScrollRow
-            tracks={visibleDailyMix}
-            currentId={currentId}
-            isPlaying={isPlaying}
-            onPlayTrack={onPlayTrack}
-            onToggleLike={onToggleLike}
-            onOpenOptions={onOpenOptions}
-            likedIds={likedIds}
-            downloadedIds={downloadedIds}
-            downloadingIds={downloadingIds}
-            downloadProgress={downloadProgress}
-          />
+          {visibleDailyMix.length > 0 ? (
+            <HorizontalScrollRow
+              tracks={visibleDailyMix}
+              currentId={currentId}
+              isPlaying={isPlaying}
+              onPlayTrack={onPlayTrack}
+              onToggleLike={onToggleLike}
+              onOpenOptions={onOpenOptions}
+              likedIds={likedIds}
+              downloadedIds={downloadedIds}
+              downloadingIds={downloadingIds}
+              downloadProgress={downloadProgress}
+            />
+          ) : (
+            <div className="flex gap-3 overflow-hidden -mx-4 px-4 pb-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="w-[138px] shrink-0 space-y-2">
+                  <div className="aspect-square w-full rounded-xl bg-card border border-hair animate-pulse" />
+                  <div className="h-3 w-3/4 rounded bg-chip animate-pulse" />
+                  <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

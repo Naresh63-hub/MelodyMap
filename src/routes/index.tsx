@@ -347,6 +347,8 @@ function MusicApp() {
   >({ discover: [], newrelease: [], explore: [] });
   const [mixLoading, setMixLoading] = useState(false);
   const [dailyMixTracks, setDailyMixTracks] = useState<Track[]>([]);
+  const [dailyMixLoading, setDailyMixLoading] = useState(false);
+  const dailyRefreshPageRef = useRef(1);
   const [quickFilters, setQuickFilters] = useState<string[]>([]);
   const [quickFilterTracks, setQuickFilterTracks] = useState<Track[]>([]);
   const [quickFilterLoading, setQuickFilterLoading] = useState(false);
@@ -1548,10 +1550,21 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
   const loadDailyMix = useCallback(
     async (refreshNonce?: number | string) => {
+      const isExplicitRefresh = Boolean(refreshNonce);
+      if (isExplicitRefresh) {
+        dailyRefreshPageRef.current = (dailyRefreshPageRef.current % 5) + 1;
+      } else {
+        dailyRefreshPageRef.current = 1;
+      }
+      const targetPage = isExplicitRefresh ? dailyRefreshPageRef.current : 1;
       const nonce = refreshNonce ?? Date.now();
       const isNewUser = likes.length === 0 && history.length === 0;
       const currentQueue = queueRef.current;
       const currentTrack = currentRef.current;
+      const prevDailyMix = [...dailyMixTracksRef.current];
+      const prevDailyMixLabels = prevDailyMix.map(trackLabel);
+      const prevDailyMixIds = prevDailyMix.map((t) => t.id).filter(Boolean);
+
       const cached = readHomeCache();
       const cachedExplore = [
         ...(cached.trendingList || []),
@@ -1572,6 +1585,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         ...(currentTrack ? [currentTrack.id, trackLabel(currentTrack)] : []),
         ...currentExplore.map((t) => t.id),
         ...currentExplore.map(trackLabel),
+        ...(isExplicitRefresh ? prevDailyMixLabels : []),
+        ...(isExplicitRefresh ? prevDailyMixIds : []),
       ].filter(Boolean);
 
       const isDuplicateWithQueueOrExplore = (t: Track) => {
@@ -1582,8 +1597,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         return false;
       };
 
+      setDailyMixLoading(true);
       try {
-        const recentSeenIds = getRecentlySeenIdentities();
+        const recentSeenIds = isExplicitRefresh
+          ? [...new Set([...getRecentlySeenIdentities(), ...prevDailyMixIds])]
+          : getRecentlySeenIdentities();
+
         const res = await runDailyMix({
           data: {
             isNewUser,
@@ -1593,6 +1612,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             artists: topArtists(stats, likes, 12, downloadedTracks),
             liked: likes.slice(0, 15).map(trackLabel),
             count: 40,
+            page: targetPage,
             refreshNonce: nonce,
             exclude: excludeLabels,
             recentSeenIds,
@@ -1608,6 +1628,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           // Freshness: fetch MORE candidates instead of re-serving displayed songs.
           let fresh = applyFeedFilters(pureMusic);
           if (fresh.length < 15) {
+            const altPage = (targetPage % 5) + 1;
             const res2 = await runDailyMix({
               data: {
                 isNewUser,
@@ -1617,7 +1638,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 liked: likes.slice(0, 15).map(trackLabel),
                 count: 40,
-                refreshNonce: `${nonce}-2`,
+                page: altPage,
+                refreshNonce: `${nonce}-alt`,
                 exclude: excludeLabels,
                 recentSeenIds,
               },
@@ -1635,7 +1657,27 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           }
           const candidateMix = fresh.length >= 10 ? fresh : pureMusic;
-          const dedupedFresh = dedupeTracks(candidateMix.filter((t) => !isDuplicateWithQueueOrExplore(t)));
+          const nonDupCandidates = candidateMix.filter((t) => !isDuplicateWithQueueOrExplore(t));
+          // If strictly avoiding explore leaves too few songs, fall back to pureMusic to never leave Daily Mix empty!
+          const viablePool = nonDupCandidates.length >= 8 ? nonDupCandidates : pureMusic.length >= 5 ? pureMusic : (res.tracks as Track[]);
+
+          let finalMixPool: Track[];
+          if (isExplicitRefresh && prevDailyMix.length > 0) {
+            // Fresh songs not in previous batch guaranteed at top of Daily Mix
+            const freshFromPrev = viablePool.filter(
+              (t) => !prevDailyMix.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)),
+            );
+            const backfill = viablePool.filter(
+              (t) => !freshFromPrev.some((f) => f.id === t.id || isFuzzySameSong(f, t)),
+            );
+            finalMixPool = freshFromPrev.length >= 8
+              ? freshFromPrev
+              : dedupeTracks([...freshFromPrev, ...backfill]);
+          } else {
+            finalMixPool = viablePool;
+          }
+
+          const dedupedFresh = dedupeTracks(finalMixPool);
           const ranked = thompsonSamplingPolicy.rankCandidates(dedupedFresh, getSessionContext());
           const diversified = diversifyTrackList(ranked, {
             maxPerArtist: 2,
@@ -1644,11 +1686,18 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             minAlbumSpacing: 3,
           });
           const cleanMix = dedupeTracks(diversified);
-          setDailyMixTracks(cleanMix);
-          markFeedDisplayed(cleanMix);
-          writeHomeCache({ dailyMixTracks: cleanMix });
+          if (cleanMix.length > 0) {
+            setDailyMixTracks(cleanMix);
+            markFeedDisplayed(cleanMix);
+            writeHomeCache({ dailyMixTracks: cleanMix });
+            recordSeenTrackIdentities(cleanMix);
+          }
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[loadDailyMix] failed to load fresh daily mix:", err);
+      } finally {
+        setDailyMixLoading(false);
+      }
     },
     [runDailyMix, settings.languages, settings.primaryLanguage, settings.languageWeights, stats, likes, downloadedTracks, history, getSessionContext, applyFeedFilters, markFeedDisplayed],
   );
@@ -4133,7 +4182,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (cleanDailyMix.length) setDailyMixTracks(cleanDailyMix);
 
     // Auto-refresh recommendations on startup if cached feed is empty, lacks clean tracks, or is stale (> 5 mins)
-    const hasCachedHome = cleanRecs.length >= 6;
+    const hasCachedHome = cleanRecs.length >= 6 && cleanDailyMix.length >= 6;
     markFeedDisplayed([
       ...cleanRecs,
       ...cleanDailyMix,
@@ -4171,13 +4220,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       prevLanguagesRef.current = currentLangs;
       // Invalidate in-memory feed pools and history trackers
       recsRef.current = [];
+      dailyMixTracksRef.current = [];
       trendingRef.current = [];
       oldSongsRef.current = [];
       mixTracksRef.current = { explore: [], discover: [], newrelease: [] };
       moreRecsPageRef.current = 1;
       recsGenerationRef.current += 1;
+      homeRefreshPageRef.current = 1;
+      dailyRefreshPageRef.current = 1;
       setExploreExhausted(false);
       setRecs([]);
+      setDailyMixTracks([]);
       setTrendingList([]);
       setOldSongsList([]);
       setMixTracks({ explore: [], discover: [], newrelease: [] });
@@ -4643,7 +4696,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         downloadProgress={downloadProgress}
                         currentId={current?.id ?? null}
                         isPlaying={player.isPlaying}
-                        loading={!hydrated || (recLoading && recs.length === 0)}
+                        loading={!hydrated || (recLoading && recs.length === 0 && dailyMixTracks.length === 0)}
+                        dailyMixLoading={dailyMixLoading}
                       />
 
                       {/* Explore More Songs for low-bandwidth incremental discovery */}

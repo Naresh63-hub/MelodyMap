@@ -1553,9 +1553,11 @@ const DailyMixInput = z.object({
   liked: z.array(z.string()).max(30).default([]),
   dateSeed: z.string().optional(),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
+  page: z.number().min(1).max(50).optional(),
   count: z.number().min(1).max(60).optional(),
   isNewUser: z.boolean().optional(),
-  exclude: z.array(z.string()).max(200).optional(),
+  exclude: z.array(z.string()).max(300).optional(),
+  recentSeenIds: z.array(z.string()).max(300).optional(),
   primaryLanguage: z.string().max(40).optional(),
   languageWeights: z.record(z.string(), z.number()).optional(),
 });
@@ -1581,6 +1583,7 @@ export const getDailyMix = createServerFn({ method: "POST" })
       languageWeights: data.languageWeights,
     });
 
+    const page = data.page ?? 1;
     const nonceNum =
       typeof data.refreshNonce === "number"
         ? Math.abs(data.refreshNonce)
@@ -1589,7 +1592,7 @@ export const getDailyMix = createServerFn({ method: "POST" })
               data.refreshNonce.split("").reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) | 0, 0),
             )
           : 0;
-    const refreshShift = nonceNum > 0 ? (nonceNum % 11) + 1 : 0;
+    const refreshShift = nonceNum > 0 ? (nonceNum % 11) + page : 0;
 
     const rotateQueries = (arr: string[], offset: number) => {
       if (arr.length === 0) return [];
@@ -1637,7 +1640,11 @@ export const getDailyMix = createServerFn({ method: "POST" })
       pickedQueries = [...pickedNew, ...pickedOld, ...pickedArtistMix];
     }
 
-    const queryCandidates = await runQueryBatch(pickedQueries, 12, true, bypassCache);
+    let queryCandidates = await runQueryBatch(pickedQueries, 12, true, bypassCache, page);
+    if (queryCandidates.length < 15 && page > 1) {
+      const backfill = await runQueryBatch(pickedQueries, 12, true, bypassCache, 1);
+      queryCandidates = [...queryCandidates, ...backfill];
+    }
 
     const seenIds = new Set<string>();
     const seenKeys = new Set<string>();
@@ -1649,6 +1656,13 @@ export const getDailyMix = createServerFn({ method: "POST" })
       return norm(t || "");
     }));
     const excludeSet = new Set<string>();
+    for (const rawId of data.recentSeenIds || []) {
+      if (rawId) {
+        const cleanId = rawId.trim();
+        excludeSet.add(cleanId.toLowerCase());
+        excludeSet.add(norm(cleanId));
+      }
+    }
     for (const raw of data.exclude || []) {
       if (!raw) continue;
       const cleanRaw = raw.trim();
