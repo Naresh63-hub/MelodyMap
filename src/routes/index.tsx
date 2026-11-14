@@ -4171,15 +4171,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (cleanMixTracks) setMixTracks(cleanMixTracks);
     if (cleanDailyMix.length) setDailyMixTracks(cleanDailyMix);
 
-    // Auto-refresh recommendations on startup if cached feed is empty, lacks clean tracks, or is stale (> 5 mins)
-    const hasCachedHome = cleanRecs.length >= 6 && cleanDailyMix.length >= 6;
+    // Initial load: Only fetch recommendations on startup if cached feed is completely empty.
+    // Preserves user's songs across app launches without auto-refreshing (refreshes only on manual pull-down or Refresh tap).
+    const hasCachedHome = cleanRecs.length > 0 || cleanDailyMix.length > 0;
     markFeedDisplayed([
       ...cleanRecs,
       ...cleanDailyMix,
     ]);
-    const cacheAge = cachedFeed.timestamp ? Date.now() - cachedFeed.timestamp : Infinity;
-    const isStale = cacheAge > 5 * 60 * 1000;
-    if (!hasCachedHome || isStale) {
+    if (!hasCachedHome) {
       void loadHomeFeeds();
     }
 

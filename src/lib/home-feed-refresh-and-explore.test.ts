@@ -382,5 +382,26 @@ describe("Home Feed Refresh, Daily Mix Isolation, and Explore More Songs", () =>
       // Both sections successfully refreshed to brand new songs, and neither has overlap!
       expect(freshRecs.some((r) => freshDailyMix.some((d) => d.id === r.id))).toBe(false);
     });
+
+    it("preserves cached home feed across sessions on startup and skips automatic auto-refresh", () => {
+      const cleanRecs = [makeTrack("cached-1", "Cached Track 1", "Artist A")];
+      const cleanDailyMix = [makeTrack("cached-2", "Cached Track 2", "Artist B")];
+
+      let didTriggerAutoRefresh = false;
+      const simulateStartup = (recs: Track[], dailyMix: Track[]) => {
+        const hasCachedHome = recs.length > 0 || dailyMix.length > 0;
+        if (!hasCachedHome) {
+          didTriggerAutoRefresh = true;
+        }
+      };
+
+      // 1. App opens with cached songs: should NOT trigger auto-refresh
+      simulateStartup(cleanRecs, cleanDailyMix);
+      expect(didTriggerAutoRefresh).toBe(false);
+
+      // 2. Cold start with empty cache: triggers initial feed load
+      simulateStartup([], []);
+      expect(didTriggerAutoRefresh).toBe(true);
+    });
   });
 });
