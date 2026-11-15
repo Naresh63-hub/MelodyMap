@@ -208,8 +208,8 @@ const RecommendInput = z.object({
   primaryLanguage: z.string().max(40).optional(),
   languageWeights: z.record(z.string(), z.number()).optional(),
   downloadedArtists: z.array(z.string()).max(30).optional(),
-  exclude: z.array(z.string()).max(150).default([]).optional(),
-  recentSeenIds: z.array(z.string()).max(300).default([]).optional(),
+  exclude: z.array(z.string()).max(1000).default([]).optional(),
+  recentSeenIds: z.array(z.string()).max(1000).default([]).optional(),
 });
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -759,7 +759,7 @@ const TrendingInput = z.object({
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   clientHour: z.number().min(0).max(23).optional(),
   page: z.number().min(1).max(50).optional(),
-  recentSeenIds: z.array(z.string()).max(300).optional(),
+  recentSeenIds: z.array(z.string()).max(1000).optional(),
 });
 
 /** Multi-category query pools for REAL-WORLD global and chart-topping trending music */
@@ -899,7 +899,7 @@ const OldSongsInput = z.object({
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   artists: z.array(z.string()).max(20).optional(),
   page: z.number().min(1).max(50).optional(),
-  recentSeenIds: z.array(z.string()).max(300).optional(),
+  recentSeenIds: z.array(z.string()).max(1000).optional(),
 });
 
 /**
@@ -1580,8 +1580,8 @@ const DailyMixInput = z.object({
   page: z.number().min(1).max(50).optional(),
   count: z.number().min(1).max(60).optional(),
   isNewUser: z.boolean().optional(),
-  exclude: z.array(z.string()).max(300).optional(),
-  recentSeenIds: z.array(z.string()).max(300).optional(),
+  exclude: z.array(z.string()).max(1000).optional(),
+  recentSeenIds: z.array(z.string()).max(1000).optional(),
   primaryLanguage: z.string().max(40).optional(),
   languageWeights: z.record(z.string(), z.number()).optional(),
 });
@@ -1761,7 +1761,7 @@ const NewSongsInput = z.object({
   languages: z.array(z.string()).max(30).default([]),
   refreshNonce: z.union([z.string(), z.number()]).optional(),
   page: z.number().min(1).max(50).optional(),
-  recentSeenIds: z.array(z.string()).max(300).optional(),
+  recentSeenIds: z.array(z.string()).max(1000).optional(),
 });
 
 /** Language names from Tune picks → search terms for YouTube queries. */

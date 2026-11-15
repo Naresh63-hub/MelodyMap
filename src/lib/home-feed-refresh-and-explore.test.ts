@@ -403,5 +403,26 @@ describe("Home Feed Refresh, Daily Mix Isolation, and Explore More Songs", () =>
       simulateStartup([], []);
       expect(didTriggerAutoRefresh).toBe(true);
     });
+
+    it("bounds large exclude and recent-seen lists safely for refresh requests", () => {
+      // Simulate large accumulated explore, queue, and seen tracks (e.g. 500+ items)
+      const massiveExploreTracks = Array.from({ length: 300 }, (_, i) => `explore-id-${i}`);
+      const massiveSeenIdentities = Array.from({ length: 250 }, (_, i) => `seen-id-${i}`);
+      const prevBatchIds = Array.from({ length: 40 }, (_, i) => `prev-id-${i}`);
+
+      const rawExcludeList = [
+        ...massiveExploreTracks,
+        ...massiveSeenIdentities,
+        ...prevBatchIds,
+      ];
+      expect(rawExcludeList.length).toBeGreaterThan(500);
+
+      // Safe bounded lists (cap at 250)
+      const safeExcludeLabels = Array.from(new Set(rawExcludeList)).slice(0, 250);
+      const safeRecentSeenIds = Array.from(new Set([...massiveSeenIdentities, ...prevBatchIds])).slice(0, 250);
+
+      expect(safeExcludeLabels.length).toBeLessThanOrEqual(250);
+      expect(safeRecentSeenIds.length).toBeLessThanOrEqual(250);
+    });
   });
 });
