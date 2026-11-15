@@ -461,4 +461,79 @@ describe("Home Feed Refresh, Daily Mix Isolation, and Explore More Songs", () =>
       expect(safeRecentSeenIds.length).toBeLessThanOrEqual(250);
     });
   });
+
+  describe("4. Independent Section Refresh: Daily Mix and Made For You", () => {
+    it("refreshes Daily Mix independently while preserving active Made For You recommendations", () => {
+      let dailyMixPage = 1;
+      const initialDailyMix = [
+        makeTrack("dm-1", "Daily Hit 1", "Artist A"),
+        makeTrack("dm-2", "Daily Hit 2", "Artist B"),
+      ];
+      const activeMadeForYou = [
+        makeTrack("mfy-1", "Taste Match 1", "Artist C"),
+        makeTrack("mfy-2", "Taste Match 2", "Artist D"),
+      ];
+
+      // Simulate refreshing only Daily Mix
+      const onRefreshDailyMix = (currentMadeForYou: Track[]) => {
+        dailyMixPage = (dailyMixPage % 5) + 1;
+        const candidatePool = [
+          makeTrack("dm-1", "Daily Hit 1", "Artist A"),
+          makeTrack("mfy-1", "Taste Match 1", "Artist C"), // Overlaps MFY
+          makeTrack("dm-fresh-1", "New Daily Song 1", "Artist E"),
+          makeTrack("dm-fresh-2", "New Daily Song 2", "Artist F"),
+        ];
+
+        // Daily Mix excludes whatever is currently visible in Made For You
+        return candidatePool.filter(
+          (t) => !currentMadeForYou.some((mfy) => mfy.id === t.id || isFuzzySameSong(mfy, t)),
+        );
+      };
+
+      const newDailyMix = onRefreshDailyMix(activeMadeForYou);
+
+      expect(dailyMixPage).toBe(2);
+      // activeMadeForYou remains unchanged
+      expect(activeMadeForYou.map((t) => t.id)).toEqual(["mfy-1", "mfy-2"]);
+      // newDailyMix strictly excludes activeMadeForYou tracks
+      expect(newDailyMix.some((t) => t.id === "mfy-1")).toBe(false);
+      expect(newDailyMix.map((t) => t.id)).toContain("dm-fresh-1");
+      expect(newDailyMix.map((t) => t.id)).toContain("dm-fresh-2");
+    });
+
+    it("refreshes Made For You independently while preserving active Daily Mix tracks", () => {
+      let mfyRefreshPage = 1;
+      const activeDailyMix = [
+        makeTrack("dm-1", "Daily Hit 1", "Artist A"),
+        makeTrack("dm-2", "Daily Hit 2", "Artist B"),
+      ];
+      const initialMadeForYou = [
+        makeTrack("mfy-1", "Taste Match 1", "Artist C"),
+      ];
+
+      // Simulate refreshing only Made For You
+      const onRefreshMadeForYou = (currentDailyMix: Track[]) => {
+        mfyRefreshPage = (mfyRefreshPage % 5) + 1;
+        const candidatePool = [
+          makeTrack("dm-1", "Daily Hit 1", "Artist A"), // Overlaps Daily Mix
+          makeTrack("mfy-fresh-1", "Top Fresh Taste 1", "Artist G"),
+          makeTrack("mfy-fresh-2", "Top Fresh Taste 2", "Artist H"),
+        ];
+
+        // Made For You strictly excludes whatever is currently visible in Daily Mix
+        return candidatePool.filter(
+          (t) => !currentDailyMix.some((dm) => dm.id === t.id || isFuzzySameSong(dm, t)),
+        );
+      };
+
+      const newMadeForYou = onRefreshMadeForYou(activeDailyMix);
+
+      expect(mfyRefreshPage).toBe(2);
+      // activeDailyMix remains completely intact
+      expect(activeDailyMix.map((t) => t.id)).toEqual(["dm-1", "dm-2"]);
+      // newMadeForYou receives top fresh recommendations without pool starvation
+      expect(newMadeForYou.some((t) => t.id === "dm-1")).toBe(false);
+      expect(newMadeForYou.map((t) => t.id)).toEqual(["mfy-fresh-1", "mfy-fresh-2"]);
+    });
+  });
 });

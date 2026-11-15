@@ -80,8 +80,12 @@ export function MediaCard({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchMove={handleTouchMove}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        onPlay?.();
+      }}
       className={cn(
-        "group/card shrink-0 cursor-pointer p-2.5 sm:p-3 rounded-2xl transition-all duration-200 bg-card hover:bg-card border border-hair hover:border-hair-strong shadow-xs hover:shadow-md hover:-translate-y-0.5",
+        "group/card shrink-0 cursor-pointer p-2.5 sm:p-3 rounded-2xl transition-all duration-200 bg-card hover:bg-card border border-hair hover:border-hair-strong shadow-xs hover:shadow-md hover:-translate-y-0.5 touch-manipulation",
         isLongPressing && "scale-95 opacity-80",
         dims,
         className,

@@ -1,4 +1,4 @@
-import { MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, Users } from "lucide-react";
+import { MoreHorizontal, MoreVertical, Music2, Pause, Play, RotateCw, Sparkles, Users } from "lucide-react";
 import { useRef, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
@@ -62,6 +62,8 @@ type Props = {
   loading?: boolean | undefined;
   dailyMixLoading?: boolean | undefined;
   recLoading?: boolean | undefined;
+  onRefreshDailyMix?: (() => void) | undefined;
+  onRefreshMadeForYou?: (() => void) | undefined;
   /** Active genre/mood quick filter ids (state lives in the home route). */
   quickFilterIds?: readonly string[] | undefined;
   onToggleQuickFilter?: ((id: string) => void) | undefined;
@@ -350,11 +352,15 @@ function SectionHeader({
   title,
   subtitle,
   icon: Icon,
+  onRefresh,
+  refreshing = false,
 }: {
   title: string;
   subtitle?: string;
   icon?: typeof Music2 | typeof Sparkles | typeof Users;
   count?: number;
+  onRefresh?: (() => void) | undefined;
+  refreshing?: boolean | undefined;
 }) {
   return (
     <div className="flex items-center justify-between mb-3 px-0.5">
@@ -362,11 +368,25 @@ function SectionHeader({
         {Icon && <Icon className="h-4 w-4 text-primary" />}
         <h2 className="text-base font-semibold tracking-tight text-foreground">{title}</h2>
       </div>
-      {subtitle && (
-        <span className="text-[11px] font-normal text-muted-foreground">
-          {subtitle}
-        </span>
-      )}
+      <div className="flex items-center gap-2">
+        {subtitle && (
+          <span className="text-[11px] font-normal text-muted-foreground">
+            {subtitle}
+          </span>
+        )}
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label={`Refresh ${title}`}
+            title={`Refresh ${title}`}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-chip-subtle active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <RotateCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin text-primary")} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -395,6 +415,8 @@ export function MobileHomeSections({
   loading = false,
   dailyMixLoading = false,
   recLoading = false,
+  onRefreshDailyMix,
+  onRefreshMadeForYou,
   quickFilterIds = [],
   onToggleQuickFilter,
   onClearQuickFilters,
@@ -466,6 +488,8 @@ export function MobileHomeSections({
             title="Daily Mix"
             subtitle="Updated today"
             icon={Sparkles}
+            onRefresh={onRefreshDailyMix}
+            refreshing={dailyMixLoading}
           />
           {visibleDailyMix.length > 0 ? (
             <HorizontalScrollRow
@@ -522,6 +546,8 @@ export function MobileHomeSections({
             title="Made For You"
             subtitle="Based on your taste"
             icon={Music2}
+            onRefresh={onRefreshMadeForYou}
+            refreshing={recLoading}
           />
           {visibleRecommended.length > 0 ? (
             <VerticalSongList

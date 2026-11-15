@@ -107,6 +107,8 @@ export function MobileDrawer({
               <img
                 src="/brand/app-icon.png"
                 alt="MelodyMap"
+                width={34}
+                height={34}
                 className="h-8.5 w-8.5 object-contain drop-shadow-sm select-none"
               />
             </picture>

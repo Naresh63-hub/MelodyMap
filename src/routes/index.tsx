@@ -1975,7 +1975,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   );
 
   const loadHomeFeeds = useCallback(
-    async (mood?: string, refreshNonce?: number | string) => {
+    async (
+      mood?: string,
+      refreshNonce?: number | string,
+      sectionToRefresh: "all" | "dailyMix" | "madeForYou" = "all",
+    ) => {
+      if (sectionToRefresh === "dailyMix") {
+        await loadDailyMix(refreshNonce ?? Date.now());
+        return;
+      }
+
       moreRecsPageRef.current = 1;
       recsGenerationRef.current += 1;
       setExploreExhausted(false);
@@ -2007,50 +2016,87 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         let dailyTracks: Track[] = [];
         let recTracks: Track[] = [];
 
-        await Promise.allSettled([
-          (async () => {
-            try {
-              dailyTracks = await loadDailyMix(nonce);
-            } catch (err) {
-              console.warn("[loadHomeFeeds] loadDailyMix error:", err);
-            }
-          })(),
-          (async () => {
-            try {
-              const res = await runRecommend({
-                data: {
-                  isNewUser,
-                  liked: likes.slice(0, 15).map(trackLabel),
-                  recent: history.slice(0, 15).map(trackLabel),
-                  disliked: dislikes.slice(0, 15).map(trackLabel),
-                  sequence: sequenceBrief(history, stats),
-                  skipped: skippedLabels(stats),
-                  count: 45,
-                  page: targetPage,
-                  ...(mood ? { mood } : {}),
-                  languages: settings.languages,
-                  primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                  languageWeights: settings.languageWeights,
-                  brief: settingsToBrief(settings),
-                  artists: topArtists(stats, likes, 12, downloadedTracks),
-                  downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
-                  refreshNonce: nonce,
-                  discovery: settings.discovery ?? 40,
-                  affinityArtists: affinity.affinityArtists,
-                  penalizedArtists: affinity.penalizedArtists,
-                  clientHour,
-                  exclude: safePrevRecLabels.length > 0 ? safePrevRecLabels : undefined,
-                  recentSeenIds: safeCombinedExcludeIds,
-                },
-              });
-              if (res.tracks) {
-                recTracks = res.tracks as Track[];
+        if (sectionToRefresh === "all") {
+          await Promise.allSettled([
+            (async () => {
+              try {
+                dailyTracks = await loadDailyMix(nonce);
+              } catch (err) {
+                console.warn("[loadHomeFeeds] loadDailyMix error:", err);
               }
-            } catch (err) {
-              console.warn("[loadHomeFeeds] runRecommend error:", err);
+            })(),
+            (async () => {
+              try {
+                const res = await runRecommend({
+                  data: {
+                    isNewUser,
+                    liked: likes.slice(0, 15).map(trackLabel),
+                    recent: history.slice(0, 15).map(trackLabel),
+                    disliked: dislikes.slice(0, 15).map(trackLabel),
+                    sequence: sequenceBrief(history, stats),
+                    skipped: skippedLabels(stats),
+                    count: 45,
+                    page: targetPage,
+                    ...(mood ? { mood } : {}),
+                    languages: settings.languages,
+                    primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                    languageWeights: settings.languageWeights,
+                    brief: settingsToBrief(settings),
+                    artists: topArtists(stats, likes, 12, downloadedTracks),
+                    downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
+                    refreshNonce: nonce,
+                    discovery: settings.discovery ?? 40,
+                    affinityArtists: affinity.affinityArtists,
+                    penalizedArtists: affinity.penalizedArtists,
+                    clientHour,
+                    exclude: safePrevRecLabels.length > 0 ? safePrevRecLabels : undefined,
+                    recentSeenIds: safeCombinedExcludeIds,
+                  },
+                });
+                if (res.tracks) {
+                  recTracks = res.tracks as Track[];
+                }
+              } catch (err) {
+                console.warn("[loadHomeFeeds] runRecommend error:", err);
+              }
+            })(),
+          ]);
+        } else {
+          // sectionToRefresh === "madeForYou"
+          try {
+            const res = await runRecommend({
+              data: {
+                isNewUser,
+                liked: likes.slice(0, 15).map(trackLabel),
+                recent: history.slice(0, 15).map(trackLabel),
+                disliked: dislikes.slice(0, 15).map(trackLabel),
+                sequence: sequenceBrief(history, stats),
+                skipped: skippedLabels(stats),
+                count: 45,
+                page: targetPage,
+                ...(mood ? { mood } : {}),
+                languages: settings.languages,
+                primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                languageWeights: settings.languageWeights,
+                brief: settingsToBrief(settings),
+                artists: topArtists(stats, likes, 12, downloadedTracks),
+                downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
+                refreshNonce: nonce,
+                discovery: settings.discovery ?? 40,
+                affinityArtists: affinity.affinityArtists,
+                penalizedArtists: affinity.penalizedArtists,
+                clientHour,
+                exclude: safePrevRecLabels.length > 0 ? safePrevRecLabels : undefined,
+                recentSeenIds: safeCombinedExcludeIds,
+              },
+            });
+            if (res.tracks) {
+              recTracks = res.tracks as Track[];
             }
-          })(),
-        ]);
+          } catch (err) {
+            console.warn("[loadHomeFeeds] runRecommend error:", err);
+          }
+        }
 
         const pureMusic: Track[] = [];
         for (const t of recTracks) {
@@ -2247,6 +2293,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     },
     [loadHomeFeeds],
   );
+
+  const handleRefreshDailyMix = useCallback(async () => {
+    await loadDailyMix(Date.now());
+  }, [loadDailyMix]);
+
+  const handleRefreshMadeForYou = useCallback(async () => {
+    await loadHomeFeeds(activeMood ?? undefined, Date.now(), "madeForYou");
+  }, [loadHomeFeeds, activeMood]);
 
   /**
    * Genre & Mood quick filters.
@@ -4692,6 +4746,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         recommended={recs}
                         dailyMixLoading={dailyMixLoading}
                         recLoading={recLoading}
+                        onRefreshDailyMix={handleRefreshDailyMix}
+                        onRefreshMadeForYou={handleRefreshMadeForYou}
                         userLanguages={settings.languages}
                         onArtistClick={(artist: JioSaavnArtist) => {
                           setTab("search");

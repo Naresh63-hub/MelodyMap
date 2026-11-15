@@ -289,6 +289,33 @@ html.light {
     touch-action: auto;
   }
 
+  /* Guarantee immediate touch responsiveness and tap synthesis on all interactive elements */
+  button,
+  a,
+  [role="button"],
+  .cursor-pointer,
+  [type="button"],
+  [type="submit"],
+  [type="reset"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+  }
+
+  /* Smooth momentum touch scrolling for vertical scroll containers */
+  main,
+  [role="main"],
+  .overflow-y-auto {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Smooth momentum touch swiping for horizontal carousels (Moods, Top Artists, etc.) */
+  .overflow-x-auto {
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* Prevent dragging images like a desktop browser */
   img {
     -webkit-user-drag: none;

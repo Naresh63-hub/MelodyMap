@@ -135,6 +135,8 @@ export function Sidebar({
             <img
               src="/brand/app-icon.png"
               alt="MelodyMap"
+              width={36}
+              height={36}
               className="h-9 w-9 object-contain drop-shadow-sm select-none"
             />
           </picture>
