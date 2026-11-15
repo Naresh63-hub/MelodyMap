@@ -383,25 +383,61 @@ describe("Home Feed Refresh, Daily Mix Isolation, and Explore More Songs", () =>
       expect(freshRecs.some((r) => freshDailyMix.some((d) => d.id === r.id))).toBe(false);
     });
 
-    it("preserves cached home feed across sessions on startup and skips automatic auto-refresh", () => {
-      const cleanRecs = [makeTrack("cached-1", "Cached Track 1", "Artist A")];
-      const cleanDailyMix = [makeTrack("cached-2", "Cached Track 2", "Artist B")];
+    it("preserves cached home feed across sessions on startup and skips automatic auto-refresh when both sections are populated", () => {
+      const cleanRecs = Array.from({ length: 6 }, (_, i) => makeTrack(`cached-r-${i}`, `Cached Rec ${i}`, "Artist A"));
+      const cleanDailyMix = Array.from({ length: 6 }, (_, i) => makeTrack(`cached-d-${i}`, `Cached DM ${i}`, "Artist B"));
 
       let didTriggerAutoRefresh = false;
       const simulateStartup = (recs: Track[], dailyMix: Track[]) => {
-        const hasCachedHome = recs.length > 0 || dailyMix.length > 0;
+        const hasCachedHome = recs.length >= 5 && dailyMix.length >= 5;
         if (!hasCachedHome) {
           didTriggerAutoRefresh = true;
         }
       };
 
-      // 1. App opens with cached songs: should NOT trigger auto-refresh
+      // 1. App opens with both cached sections: should NOT trigger auto-refresh
       simulateStartup(cleanRecs, cleanDailyMix);
       expect(didTriggerAutoRefresh).toBe(false);
 
       // 2. Cold start with empty cache: triggers initial feed load
       simulateStartup([], []);
       expect(didTriggerAutoRefresh).toBe(true);
+
+      // 3. One section empty / corrupted: triggers feed load to heal missing section
+      simulateStartup([], cleanDailyMix);
+      expect(didTriggerAutoRefresh).toBe(true);
+      didTriggerAutoRefresh = false;
+      simulateStartup(cleanRecs, []);
+      expect(didTriggerAutoRefresh).toBe(true);
+    });
+
+    it("strictly guarantees 0% duplicate tracks between Daily Mix and Made For You", () => {
+      const dailyMix: Track[] = [
+        makeTrack("dm-1", "Chuttamalle", "Anirudh Ravichander"),
+        makeTrack("dm-2", "Fear Song", "Anirudh Ravichander"),
+        makeTrack("dm-3", "Pushpa Pushpa", "Devi Sri Prasad"),
+      ];
+
+      const rawRecCandidates: Track[] = [
+        makeTrack("dm-1", "Chuttamalle", "Anirudh Ravichander"), // exact same as Daily Mix
+        makeTrack("fuzzy-dm-2", "Fear Song (Telugu)", "Anirudh"), // fuzzy same song as Daily Mix
+        makeTrack("m-1", "Devara Theme", "Anirudh Ravichander"), // distinct
+        makeTrack("m-2", "Sooseki", "Devi Sri Prasad"), // distinct
+        makeTrack("m-3", "Tauba Tauba", "Karan Aujla"), // distinct
+      ];
+
+      const isDailyMixSong = (t: Track) => {
+        if (!t || !t.id) return true;
+        return dailyMix.some((d) => d.id === t.id || isFuzzySameSong(d, t));
+      };
+
+      const finalMadeForYou = rawRecCandidates.filter((t) => !isDailyMixSong(t));
+
+      // Verify no overlap whatsoever
+      expect(finalMadeForYou.map((t) => t.id)).toEqual(["m-1", "m-2", "m-3"]);
+      for (const track of finalMadeForYou) {
+        expect(dailyMix.some((d) => d.id === track.id || isFuzzySameSong(d, track))).toBe(false);
+      }
     });
 
     it("bounds large exclude and recent-seen lists safely for refresh requests", () => {

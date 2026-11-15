@@ -1579,10 +1579,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         ...cachedExplore,
       ];
 
+      const currentRecs = recsRef.current;
       const excludeLabels = [
         ...currentQueue.map((t) => t.id),
         ...currentQueue.map(trackLabel),
         ...(currentTrack ? [currentTrack.id, trackLabel(currentTrack)] : []),
+        ...currentRecs.map((t) => t.id),
+        ...currentRecs.map(trackLabel),
         ...currentExplore.map((t) => t.id),
         ...currentExplore.map(trackLabel),
         ...(isExplicitRefresh ? prevDailyMixLabels : []),
@@ -1594,6 +1597,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (!t) return true;
         if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return true;
         if (currentQueue.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return true;
+        if (currentRecs.some((r) => r.id === t.id || isFuzzySameSong(r, t))) return true;
         if (currentExplore.some((e) => e.id === t.id || isFuzzySameSong(e, t))) return true;
         return false;
       };
@@ -1693,10 +1697,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             markFeedDisplayed(cleanMix);
             writeHomeCache({ dailyMixTracks: cleanMix });
             recordSeenTrackIdentities(cleanMix);
+            return cleanMix;
           }
+          return (res.tracks as Track[]) || dailyMixTracksRef.current;
         }
+        return dailyMixTracksRef.current;
       } catch (err) {
         console.warn("[loadDailyMix] failed to load fresh daily mix:", err);
+        return dailyMixTracksRef.current;
       } finally {
         setDailyMixLoading(false);
       }
@@ -1989,229 +1997,236 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       const safePrevRecLabels = (isExplicitRefresh ? prevRecLabels : []).slice(0, 100);
 
       try {
-        const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 8000));
-        await Promise.race([
-          Promise.allSettled([
-            (async () => {
-              try {
-                const pureMusic: Track[] = [];
-                let fresh: Track[] = [];
+        let dailyTracks: Track[] = [];
+        let recTracks: Track[] = [];
 
-                const res = await runRecommend({
-                  data: {
-                    isNewUser,
-                    liked: likes.slice(0, 15).map(trackLabel),
-                    recent: history.slice(0, 15).map(trackLabel),
-                    disliked: dislikes.slice(0, 15).map(trackLabel),
-                    sequence: sequenceBrief(history, stats),
-                    skipped: skippedLabels(stats),
-                    count: 45,
-                    page: targetPage,
-                    ...(mood ? { mood } : {}),
-                    languages: settings.languages,
-                    primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                    languageWeights: settings.languageWeights,
-                    brief: settingsToBrief(settings),
-                    artists: topArtists(stats, likes, 12, downloadedTracks),
-                    downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
-                    refreshNonce: nonce,
-                    discovery: settings.discovery ?? 40,
-                    affinityArtists: affinity.affinityArtists,
-                    penalizedArtists: affinity.penalizedArtists,
-                    clientHour,
-                    exclude: safePrevRecLabels.length > 0 ? safePrevRecLabels : undefined,
-                    recentSeenIds: safeCombinedExcludeIds,
-                  },
-                });
-                if (res.tracks) {
-                  for (const t of res.tracks as Track[]) {
-                    if (isNewUser && isOldEraTrack(t)) continue;
-                    if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
-                    if (!pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
-                      pureMusic.push(t);
-                    }
-                  }
-                  fresh = applyFeedFilters(pureMusic);
-                }
-
-                // Fallback: for new users, fall back to new drops and trending hits; for returning users, language essentials
-                if (fresh.length < 15 && pureMusic.length < 10) {
-                  if (isNewUser) {
-                    const fallbackRes = await runNewSongs({
-                      data: {
-                        languages: settings.languages,
-                        primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                        languageWeights: settings.languageWeights,
-                        count: 30,
-                        page: targetPage,
-                        refreshNonce: nonce,
-                        recentSeenIds: safeCombinedExcludeIds,
-                      },
-                    });
-                    if (fallbackRes.tracks) {
-                      for (const t of fallbackRes.tracks as Track[]) {
-                        if (!isOldEraTrack(t) && !pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
-                          if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
-                          pureMusic.push(t);
-                        }
-                      }
-                      fresh = applyFeedFilters(pureMusic);
-                    }
-                  } else {
-                    const fallbackRes = await runMoodPicks({
-                      data: {
-                        mood: "Melody",
-                        languages: settings.languages,
-                        language: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                      },
-                    });
-                    if (fallbackRes.tracks) {
-                      for (const t of fallbackRes.tracks as Track[]) {
-                        if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
-                        if (!pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
-                          pureMusic.push(t);
-                        }
-                      }
-                      fresh = applyFeedFilters(pureMusic);
-                    }
-                  }
-                }
-
-                // On explicit refresh, if available fresh tracks not in previous recs is small (< 10) and pureMusic is also small (< 15), query altPage for deep discovery
-                if (isExplicitRefresh && prevRecs.length > 0 && pureMusic.length < 15) {
-                  const freshFromPrevCount = pureMusic.filter(
-                    (t) => !prevRecs.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)),
-                  ).length;
-                  if (freshFromPrevCount < 10) {
-                    const altPage = (targetPage % 5) + 1;
-                    const altRes = await runRecommend({
-                      data: {
-                        isNewUser,
-                        liked: likes.slice(0, 15).map(trackLabel),
-                        recent: history.slice(0, 15).map(trackLabel),
-                        disliked: dislikes.slice(0, 15).map(trackLabel),
-                        count: 35,
-                        page: altPage,
-                        languages: settings.languages,
-                        primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                        languageWeights: settings.languageWeights,
-                        artists: topArtists(stats, likes, 12, downloadedTracks),
-                        refreshNonce: `${nonce}-alt`,
-                        discovery: settings.discovery ?? 40,
-                        clientHour,
-                        exclude: safePrevRecLabels,
-                        recentSeenIds: safeCombinedExcludeIds,
-                      },
-                    });
-                    if (altRes.tracks) {
-                      for (const t of altRes.tracks as Track[]) {
-                        if (isNewUser && isOldEraTrack(t)) continue;
-                        if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
-                        if (!pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
-                          pureMusic.push(t);
-                        }
-                      }
-                      fresh = applyFeedFilters(pureMusic);
-                    }
-                  }
-                }
-
-            // Candidates to rank:
-            // When user explicitly refreshed, prioritize tracks NOT in prevRecs and NOT in queue
-            const candidatePool = fresh.length > 0 ? fresh : pureMusic;
-            const currentQueue = queueRef.current;
-            const currentTrack = currentRef.current;
-            const isQueued = (t: Track) => {
-              if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return true;
-              if (currentQueue.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return true;
-              return false;
-            };
-
-            let cleanFinalRecs: Track[];
-
-            if (isExplicitRefresh && prevRecs.length > 0) {
-              const freshFromPrev = candidatePool.filter(
-                (t) => !isQueued(t) && !prevRecs.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)),
-              );
-              const backfill = candidatePool.filter(
-                (t) => !isQueued(t) && !freshFromPrev.some((f) => f.id === t.id || isFuzzySameSong(f, t)),
-              );
-
-              // Avoid duplicates between Made For You and Daily Mix
-              const freshNonDaily = freshFromPrev.filter(
-                (t) => !dailyMixTracksRef.current.some((d) => d.id === t.id || isFuzzySameSong(d, t)),
-              );
-              const viableFresh = freshNonDaily.length >= 8 ? freshNonDaily : freshFromPrev;
-
-              // Fresh songs not in previous Made For You are guaranteed at top; backfill only if pool is too small (< 8)
-              const finalRecsPool = viableFresh.length >= 8
-                ? viableFresh
-                : dedupeTracks([...viableFresh, ...backfill]);
-
-              const poolToRank = finalRecsPool.length >= 5
-                ? finalRecsPool
-                : candidatePool.filter((t) => !isQueued(t)).length >= 5
-                  ? candidatePool.filter((t) => !isQueued(t))
-                  : candidatePool;
-
-              const ranked = thompsonSamplingPolicy.rankCandidates(
-                dedupeTracks(poolToRank),
-                getSessionContext(),
-              );
-              const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
-              cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
-                maxPerArtist: 2,
-                maxPerAlbum: 1,
-                minArtistSpacing: 2,
-                minAlbumSpacing: 3,
-              }));
-            } else {
-              const nonQueueCandidates = candidatePool.filter((t) => !isQueued(t));
-              const poolToRank = nonQueueCandidates.length >= 8 ? nonQueueCandidates : candidatePool;
-              const ranked = thompsonSamplingPolicy.rankCandidates(
-                dedupeTracks(poolToRank),
-                getSessionContext(),
-              );
-              const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
-              cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
-                maxPerArtist: 2,
-                maxPerAlbum: 1,
-                minArtistSpacing: 2,
-                minAlbumSpacing: 3,
-              }));
-            }
-
-            // Cross-check Home recommendations against current Trending list and deprioritize overlapping tracks
-            const currentTrending = trendingRef.current;
-            const nonTrendingRecs = cleanFinalRecs.filter(
-              (t) => !currentTrending.some((tr) => tr.id === t.id || isFuzzySameSong(tr, t)),
-            );
-            const overlappingRecs = cleanFinalRecs.filter(
-              (t) => currentTrending.some((tr) => tr.id === t.id || isFuzzySameSong(tr, t)),
-            );
-
-            // Prioritize distinct personalized discovery; allow limited overlap only if available pool is too small (< 10)
-            const finalRecs = nonTrendingRecs.length >= 10
-              ? nonTrendingRecs
-              : [...nonTrendingRecs, ...overlappingRecs];
-
-            const settledRecs = dedupeTracks(finalRecs.length > 0 ? finalRecs : cleanFinalRecs);
-            if (settledRecs.length > 0) {
-              setRecs(settledRecs);
-              markFeedDisplayed(settledRecs);
-              writeHomeCache({ recs: settledRecs });
-              recordSeenTrackIdentities(settledRecs);
-            }
-          } catch (err) {
-            console.warn("[loadHomeFeeds] failed to load fresh recommendations:", err);
-          }
-        })(),
+        await Promise.allSettled([
           (async () => {
-            await loadDailyMix(nonce);
+            try {
+              dailyTracks = await loadDailyMix(nonce);
+            } catch (err) {
+              console.warn("[loadHomeFeeds] loadDailyMix error:", err);
+            }
           })(),
-        ]),
-        timeoutPromise,
-      ]);
+          (async () => {
+            try {
+              const res = await runRecommend({
+                data: {
+                  isNewUser,
+                  liked: likes.slice(0, 15).map(trackLabel),
+                  recent: history.slice(0, 15).map(trackLabel),
+                  disliked: dislikes.slice(0, 15).map(trackLabel),
+                  sequence: sequenceBrief(history, stats),
+                  skipped: skippedLabels(stats),
+                  count: 45,
+                  page: targetPage,
+                  ...(mood ? { mood } : {}),
+                  languages: settings.languages,
+                  primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                  languageWeights: settings.languageWeights,
+                  brief: settingsToBrief(settings),
+                  artists: topArtists(stats, likes, 12, downloadedTracks),
+                  downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
+                  refreshNonce: nonce,
+                  discovery: settings.discovery ?? 40,
+                  affinityArtists: affinity.affinityArtists,
+                  penalizedArtists: affinity.penalizedArtists,
+                  clientHour,
+                  exclude: safePrevRecLabels.length > 0 ? safePrevRecLabels : undefined,
+                  recentSeenIds: safeCombinedExcludeIds,
+                },
+              });
+              if (res.tracks) {
+                recTracks = res.tracks as Track[];
+              }
+            } catch (err) {
+              console.warn("[loadHomeFeeds] runRecommend error:", err);
+            }
+          })(),
+        ]);
+
+        const pureMusic: Track[] = [];
+        for (const t of recTracks) {
+          if (isNewUser && isOldEraTrack(t)) continue;
+          if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
+          if (!pureMusic.some((existing) => isFuzzySameSong(existing, t))) {
+            pureMusic.push(t);
+          }
+        }
+        const fresh = applyFeedFilters(pureMusic);
+        const candidatePool = fresh.length >= 10 ? fresh : pureMusic;
+
+        // CRITICAL: ZERO DUPLICATES WITH DAILY MIX!
+        // Made For You strictly excludes any song in the active Daily Mix
+        const activeDailyMix = dailyTracks.length > 0 ? dailyTracks : dailyMixTracksRef.current;
+        const isDailyMixSong = (t: Track) => {
+          if (!t || !t.id) return true;
+          return activeDailyMix.some((d) => d.id === t.id || isFuzzySameSong(d, t));
+        };
+
+        const nonDailyCandidates = candidatePool.filter((t) => !isDailyMixSong(t));
+
+        // If deduplication against Daily Mix left fewer than 15 candidates, fetch supplemental candidates
+        if (nonDailyCandidates.length < 15) {
+          if (isNewUser) {
+            const fallbackRes = await runNewSongs({
+              data: {
+                languages: settings.languages,
+                primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                languageWeights: settings.languageWeights,
+                count: 35,
+                page: targetPage,
+                refreshNonce: nonce,
+                recentSeenIds: safeCombinedExcludeIds,
+              },
+            });
+            if (fallbackRes.tracks) {
+              for (const t of fallbackRes.tracks as Track[]) {
+                if (!isOldEraTrack(t) && !isDailyMixSong(t) && !nonDailyCandidates.some((existing) => isFuzzySameSong(existing, t))) {
+                  if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
+                  nonDailyCandidates.push(t);
+                }
+              }
+            }
+          } else {
+            const fallbackRes = await runMoodPicks({
+              data: {
+                mood: "Melody",
+                languages: settings.languages,
+                language: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+              },
+            });
+            if (fallbackRes.tracks) {
+              for (const t of fallbackRes.tracks as Track[]) {
+                if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
+                if (!isDailyMixSong(t) && !nonDailyCandidates.some((existing) => isFuzzySameSong(existing, t))) {
+                  nonDailyCandidates.push(t);
+                }
+              }
+            }
+          }
+        }
+
+        // On explicit refresh, if available fresh tracks not in previous recs is small (< 12), query altPage
+        if (isExplicitRefresh && prevRecs.length > 0) {
+          const freshFromPrevCount = nonDailyCandidates.filter(
+            (t) => !prevRecs.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)),
+          ).length;
+          if (freshFromPrevCount < 12) {
+            const altPage = (targetPage % 5) + 1;
+            const altRes = await runRecommend({
+              data: {
+                isNewUser,
+                liked: likes.slice(0, 15).map(trackLabel),
+                recent: history.slice(0, 15).map(trackLabel),
+                disliked: dislikes.slice(0, 15).map(trackLabel),
+                count: 35,
+                page: altPage,
+                languages: settings.languages,
+                primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                languageWeights: settings.languageWeights,
+                artists: topArtists(stats, likes, 12, downloadedTracks),
+                refreshNonce: `${nonce}-alt`,
+                discovery: settings.discovery ?? 40,
+                clientHour,
+                exclude: safePrevRecLabels,
+                recentSeenIds: safeCombinedExcludeIds,
+              },
+            });
+            if (altRes.tracks) {
+              for (const t of altRes.tracks as Track[]) {
+                if (isNewUser && isOldEraTrack(t)) continue;
+                if (settings.languages.length > 0 && !isLanguageConsistent(t, settings.languages)) continue;
+                if (!isDailyMixSong(t) && !nonDailyCandidates.some((existing) => isFuzzySameSong(existing, t))) {
+                  nonDailyCandidates.push(t);
+                }
+              }
+            }
+          }
+        }
+
+        // Candidates to rank:
+        const currentQueue = queueRef.current;
+        const currentTrack = currentRef.current;
+        const isQueued = (t: Track) => {
+          if (currentTrack && (t.id === currentTrack.id || isFuzzySameSong(t, currentTrack))) return true;
+          if (currentQueue.some((q) => q.id === t.id || isFuzzySameSong(q, t))) return true;
+          return false;
+        };
+
+        let cleanFinalRecs: Track[];
+
+        if (isExplicitRefresh && prevRecs.length > 0) {
+          const freshFromPrev = nonDailyCandidates.filter(
+            (t) => !isQueued(t) && !prevRecs.some((pr) => pr.id === t.id || isFuzzySameSong(pr, t)),
+          );
+          const backfill = nonDailyCandidates.filter(
+            (t) => !isQueued(t) && !freshFromPrev.some((f) => f.id === t.id || isFuzzySameSong(f, t)),
+          );
+
+          const finalRecsPool = freshFromPrev.length >= 8
+            ? freshFromPrev
+            : dedupeTracks([...freshFromPrev, ...backfill]);
+
+          const poolToRank = finalRecsPool.length >= 5
+            ? finalRecsPool
+            : nonDailyCandidates.filter((t) => !isQueued(t)).length >= 5
+              ? nonDailyCandidates.filter((t) => !isQueued(t))
+              : nonDailyCandidates;
+
+          const ranked = thompsonSamplingPolicy.rankCandidates(
+            dedupeTracks(poolToRank),
+            getSessionContext(),
+          );
+          const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+          cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
+            maxPerArtist: 2,
+            maxPerAlbum: 1,
+            minArtistSpacing: 2,
+            minAlbumSpacing: 3,
+          }));
+        } else {
+          const nonQueueCandidates = nonDailyCandidates.filter((t) => !isQueued(t));
+          const poolToRank = nonQueueCandidates.length >= 8 ? nonQueueCandidates : nonDailyCandidates;
+          const ranked = thompsonSamplingPolicy.rankCandidates(
+            dedupeTracks(poolToRank),
+            getSessionContext(),
+          );
+          const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+          cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
+            maxPerArtist: 2,
+            maxPerAlbum: 1,
+            minArtistSpacing: 2,
+            minAlbumSpacing: 3,
+          }));
+        }
+
+        // Cross-check Home recommendations against current Trending list and deprioritize overlapping tracks
+        const currentTrending = trendingRef.current;
+        const nonTrendingRecs = cleanFinalRecs.filter(
+          (t) => !currentTrending.some((tr) => tr.id === t.id || isFuzzySameSong(tr, t)),
+        );
+        const overlappingRecs = cleanFinalRecs.filter(
+          (t) => currentTrending.some((tr) => tr.id === t.id || isFuzzySameSong(tr, t)),
+        );
+
+        // Prioritize distinct personalized discovery; allow limited overlap only if available pool is too small (< 10)
+        const finalRecs = nonTrendingRecs.length >= 10
+          ? nonTrendingRecs
+          : [...nonTrendingRecs, ...overlappingRecs];
+
+        // GUARANTEE: Filter one more time to enforce 0% overlap with Daily Mix
+        const settledRecs = dedupeTracks(finalRecs.length > 0 ? finalRecs : cleanFinalRecs)
+          .filter((t) => !isDailyMixSong(t));
+
+        if (settledRecs.length > 0) {
+          setRecs(settledRecs);
+          markFeedDisplayed(settledRecs);
+          writeHomeCache({ recs: settledRecs });
+          recordSeenTrackIdentities(settledRecs);
+        }
+      } catch (err) {
+        console.warn("[loadHomeFeeds] failed to load fresh recommendations:", err);
       } finally {
         setRecLoading(false);
       }
@@ -4176,9 +4191,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     if (cleanMixTracks) setMixTracks(cleanMixTracks);
     if (cleanDailyMix.length) setDailyMixTracks(cleanDailyMix);
 
-    // Initial load: Only fetch recommendations on startup if cached feed is completely empty.
+    // Initial load: Only fetch recommendations on startup if cached feed is completely empty or missing a section.
     // Preserves user's songs across app launches without auto-refreshing (refreshes only on manual pull-down or Refresh tap).
-    const hasCachedHome = cleanRecs.length > 0 || cleanDailyMix.length > 0;
+    const hasCachedHome = cleanRecs.length >= 5 && cleanDailyMix.length >= 5;
     markFeedDisplayed([
       ...cleanRecs,
       ...cleanDailyMix,
@@ -4663,6 +4678,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       <MobileHomeSections
                         dailyMix={dailyMixTracks}
                         recommended={recs}
+                        dailyMixLoading={dailyMixLoading}
+                        recLoading={recLoading}
                         userLanguages={settings.languages}
                         onArtistClick={(artist: JioSaavnArtist) => {
                           setTab("search");
@@ -4691,8 +4708,6 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         currentId={current?.id ?? null}
                         isPlaying={player.isPlaying}
                         loading={!hydrated || (recLoading && recs.length === 0 && dailyMixTracks.length === 0)}
-                        dailyMixLoading={dailyMixLoading}
-                        recLoading={recLoading}
                       />
 
                       {/* Explore More Songs for low-bandwidth incremental discovery */}

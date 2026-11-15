@@ -488,11 +488,11 @@ async function getLocalPicks(data: {
   );
 
   // Filter out any excluded / recently played / liked / penalized / cross-language tracks
-  const isCandidateValid = (t: Track, relaxRecentSeen = false) => {
+  const isCandidateValid = (t: Track, relaxRecentSeen = false, relaxExclusions = false) => {
     if (!t || !t.id) return false;
     if (!relaxRecentSeen && recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase().trim())) return false;
-    if (matchesExclusionSet(t.title, t.artist, t.id, excludeSet)) return false;
-    if (matchesExclusionSet(t.title, t.artist, t.id, likedSet)) return false;
+    if (!relaxExclusions && matchesExclusionSet(t.title, t.artist, t.id, excludeSet)) return false;
+    if (!relaxExclusions && matchesExclusionSet(t.title, t.artist, t.id, likedSet)) return false;
     const artKey = norm(t.artist);
     if (penalizedSet.has(artKey) || penalizedSet.has(normalizeArtistAlias(t.artist))) return false;
     if (languages.length > 0 && !isLanguageConsistent(t, languages)) return false;
@@ -676,10 +676,16 @@ async function getLocalPicks(data: {
   let filteredNew = newCandidates.filter((t) => isCandidateValid(t, false));
   let filteredOld = oldCandidates.filter((t) => isCandidateValid(t, false));
 
-  // If recentSeenSet over-filtered candidates, gracefully relax recentSeenSet so user gets songs
-  if (filteredNew.length + filteredOld.length < count && recentSeenSet.size > 0) {
-    filteredNew = newCandidates.filter((t) => isCandidateValid(t, true));
-    filteredOld = oldCandidates.filter((t) => isCandidateValid(t, true));
+  // If recentSeenSet or exclusion lists over-filtered candidates, gracefully relax so user always gets songs
+  if (filteredNew.length + filteredOld.length < count) {
+    if (recentSeenSet.size > 0) {
+      filteredNew = newCandidates.filter((t) => isCandidateValid(t, true, false));
+      filteredOld = oldCandidates.filter((t) => isCandidateValid(t, true, false));
+    }
+    if (filteredNew.length + filteredOld.length < 15) {
+      filteredNew = newCandidates.filter((t) => isCandidateValid(t, true, true));
+      filteredOld = oldCandidates.filter((t) => isCandidateValid(t, true, true));
+    }
   }
 
   // Prioritize primary language candidates in recommendations
