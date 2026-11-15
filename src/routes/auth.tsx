@@ -412,10 +412,11 @@ function AuthPage() {
 
   return (
     <div
-      className="min-h-screen w-full bg-[#F8F5FF] dark:bg-[#0D0819] text-[#211536] dark:text-[#FFFFFF] selection:bg-[#F3EEFF] dark:selection:bg-[#2E1065] selection:text-[#8B5CF6] dark:selection:text-[#C084FC] transition-colors duration-300 relative overflow-x-hidden overflow-y-auto flex flex-col justify-between"
+      className="fixed inset-0 h-dvh max-h-dvh w-full bg-[#F8F5FF] dark:bg-[#0D0819] text-[#211536] dark:text-[#FFFFFF] selection:bg-[#F3EEFF] dark:selection:bg-[#2E1065] selection:text-[#8B5CF6] dark:selection:text-[#C084FC] transition-colors duration-300 overflow-x-hidden overflow-y-auto flex flex-col justify-between"
       style={{
         WebkitOverflowScrolling: "touch",
         touchAction: "pan-y",
+        overscrollBehaviorY: "contain",
       }}
     >
       {/* Soft Ambient Background Blooms & Floating Musical Notes matching screenshot */}
@@ -446,7 +447,7 @@ function AuthPage() {
       <header
         className="w-full flex items-center justify-between px-4 sm:px-8 lg:px-12 pb-2 sm:pb-4 lg:py-6 relative z-20 max-w-7xl mx-auto shrink-0 header-safe-top"
         style={{
-          paddingTop: "max(calc(var(--mm-inset-top, 0px) + 1.25rem), 3.75rem)",
+          paddingTop: "max(calc(var(--mm-inset-top, 0px) + 0.75rem), 1rem)",
         }}
       >
         {/* Left: Official MelodyMap Logo + Wordmark */}
@@ -462,6 +463,8 @@ function AuthPage() {
               <img
                 src="/brand/app-icon.png"
                 alt="MelodyMap"
+                width={36}
+                height={36}
                 className="relative w-9 h-9 sm:w-11 sm:h-11 object-contain drop-shadow-sm select-none"
               />
             </picture>
@@ -572,7 +575,7 @@ function AuthPage() {
 
           {/* RIGHT COLUMN: Premium Floating Authentication Card */}
           <div className="lg:col-span-5 xl:col-span-5 flex justify-center w-full">
-            <div className="w-full max-w-[420px] rounded-[28px] sm:rounded-[32px] bg-white dark:bg-[#1B132E] border border-[#E9D8FF] dark:border-purple-800/40 p-5 sm:p-8 shadow-[0_20px_50px_-10px_rgba(139,92,246,0.12)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl space-y-3.5 sm:space-y-4 relative">
+            <div className="w-full max-w-[420px] rounded-[28px] sm:rounded-[32px] bg-white dark:bg-[#1B132E] border border-[#E9D8FF] dark:border-purple-800/40 p-4 sm:p-8 shadow-[0_20px_50px_-10px_rgba(139,92,246,0.12)] dark:shadow-[0_24px_60px_-12px_rgba(0,0,0,0.6)] backdrop-blur-2xl space-y-3 sm:space-y-4 relative">
               {/* Card Top Logo with Glowing Halo */}
               <div className="flex justify-center -mt-1">
                 <div className="relative">
@@ -582,6 +585,8 @@ function AuthPage() {
                     <img
                       src="/brand/app-icon.png"
                       alt="MelodyMap"
+                      width={48}
+                      height={48}
                       className="relative w-12 h-12 object-contain drop-shadow-sm select-none"
                     />
                   </picture>
@@ -1025,9 +1030,9 @@ function AuthPage() {
 
       {/* FOOTER: Minimal copyright & compliance info matching screenshot */}
       <footer
-        className="w-full px-6 py-3 relative z-10 text-center shrink-0"
+        className="w-full px-6 py-4 relative z-10 text-center shrink-0"
         style={{
-          paddingBottom: "max(calc(var(--mm-inset-bottom, 0px) + 0.5rem), 0.75rem)",
+          paddingBottom: "max(calc(var(--mm-inset-bottom, 0px) + 1.25rem), 2rem)",
         }}
       >
         <p className="text-[11px] text-[#746A85]/70 dark:text-[#948BA8]/70">
