@@ -13,9 +13,11 @@ import {
   Search,
   Settings2,
   Sparkles,
+  Smartphone,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CURRENT_APP_VERSION } from "@/lib/app-update";
 import type { NavTab } from "./Sidebar";
 
 type Props = {
@@ -26,6 +28,7 @@ type Props = {
   onOpenSettings: () => void;
   onManageAccount?: () => void;
   onOpenJam?: () => void;
+  onOpenInstallApp?: () => void;
   jamActive?: boolean;
   jamParticipantsCount?: number;
   isSynced: boolean;
@@ -45,6 +48,7 @@ export function MobileDrawer({
   onOpenSettings,
   onManageAccount,
   onOpenJam,
+  onOpenInstallApp,
   jamActive = false,
   jamParticipantsCount = 1,
   isSynced,
@@ -229,7 +233,26 @@ export function MobileDrawer({
         </div>
 
         {/* Bottom Actions */}
-        <div className="p-3 border-t border-hair-strong space-y-1">
+        <div className="p-3 border-t border-hair-strong space-y-1.5">
+          {onOpenInstallApp && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenInstallApp();
+              }}
+              className="flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-left transition-all bg-primary/10 border border-primary/25 text-primary hover:bg-primary/20 cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <Smartphone className="h-4 w-4 text-primary" />
+                <span>Install App & APK</span>
+              </div>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/20 text-primary">
+                v{CURRENT_APP_VERSION}
+              </span>
+            </button>
+          )}
+
           {onOpenJam && (
             <button
               type="button"

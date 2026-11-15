@@ -85,6 +85,7 @@ type Props = {
   onSignIn?: () => void;
   onSignOut?: () => Promise<void> | void;
   onOpenSettings?: () => void;
+  onOpenInstallApp?: () => void;
   onOpenJam?: () => void;
   jamActive?: boolean;
   jamParticipantsCount?: number;
@@ -108,6 +109,7 @@ export function Sidebar({
   onSignIn,
   onSignOut,
   onOpenSettings,
+  onOpenInstallApp,
   onOpenJam,
   jamActive = false,
   jamParticipantsCount = 1,
@@ -364,6 +366,17 @@ export function Sidebar({
         {/* Footer controls: settings + collapse toggle */}
         <div className={cn("flex items-center", collapsed ? "flex-col gap-2 justify-center" : "justify-between")}>
           <div className="flex items-center gap-1">
+            {onOpenInstallApp && (
+              <button
+                type="button"
+                onClick={onOpenInstallApp}
+                aria-label="Install app and APK"
+                title="Install App & APK"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-foreground/40 transition-all duration-200 hover:bg-chip hover:text-foreground button-press focus-ring-neon"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+            )}
             {onOpenSettings && (
               <button
                 type="button"

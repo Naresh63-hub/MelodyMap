@@ -60,6 +60,7 @@ import {
   getCurrentAppVersion,
   type AppRelease,
   CURRENT_APP_VERSION,
+  getDirectApkRelease,
 } from "@/lib/app-update";
 
 const PRESET_AVATARS = [
@@ -1174,6 +1175,15 @@ export function SettingsModal({
                 <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
                 <span className="font-semibold text-foreground/80">MelodyMap v{appVersion}</span>
               </div>
+              <span className="text-muted-foreground/40 hidden sm:inline">·</span>
+              <button
+                type="button"
+                onClick={() => onOpenUpdateModal?.(updateAvailableRelease || getDirectApkRelease())}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-violet-600/10 hover:bg-violet-600/20 text-violet-600 dark:text-violet-400 font-semibold transition-all active:scale-95 cursor-pointer"
+              >
+                <Download className="w-3 h-3" />
+                <span>Install App & APK</span>
+              </button>
               <span className="text-muted-foreground/40 hidden sm:inline">·</span>
               <button
                 type="button"

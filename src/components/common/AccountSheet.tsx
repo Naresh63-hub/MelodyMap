@@ -35,6 +35,7 @@ interface AccountSheetProps {
   onOpenJam?: () => void;
   onOpenSleepTimer?: () => void;
   onOpenLanguages?: () => void;
+  onOpenInstallApp?: () => void;
   onSignIn?: () => void;
   onSignOut?: () => void;
   jamActive?: boolean;
@@ -49,6 +50,7 @@ export function AccountSheet({
   onOpenJam,
   onOpenSleepTimer,
   onOpenLanguages,
+  onOpenInstallApp,
   onSignIn,
   onSignOut,
   jamActive = false,
@@ -206,6 +208,31 @@ export function AccountSheet({
               </button>
             </div>
           </div>
+          {/* Install App & APK */}
+          {onOpenInstallApp && (
+            <button
+              type="button"
+              onClick={() => handleAction(onOpenInstallApp)}
+              className="w-full flex items-center justify-between px-3.5 py-3 rounded-xl hover:bg-chip transition-all active:scale-[0.99] group text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-primary/15 group-hover:bg-primary/25 border border-primary/30 flex items-center justify-center transition-colors">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-semibold text-foreground">Install App & APK</p>
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-primary/20 text-primary border border-primary/30">
+                      v{CURRENT_APP_VERSION}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">Download Android APK or install to home screen</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+            </button>
+          )}
+
           {/* Settings & Preferences */}
           <button
             type="button"

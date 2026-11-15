@@ -8,6 +8,7 @@ import {
   checkForAppUpdate,
   dismissUpdate,
   startDownloadAndInstall,
+  getDirectApkRelease,
   CURRENT_APP_VERSION,
 } from "./app-update";
 import { safeStorage } from "./safe-storage";
@@ -23,6 +24,7 @@ type WindowMock = {
   __melodymap_update_complete?: () => void;
   __melodymap_update_error?: (error: string) => void;
   __melodymap_update_permission_needed?: () => void;
+  location?: Partial<Location>;
 };
 
 let originalWindow: any;
@@ -318,6 +320,29 @@ describe("In-App Update Engine (app-update.ts)", () => {
       expect(onProgress).toHaveBeenCalledWith(50, "Downloading update...");
 
       (globalThis as unknown as { document?: unknown }).document = undefined;
+    });
+
+    it("correctly resolves relative URLs to absolute URLs for native Android bridge", () => {
+      const mockDownload = vi.fn();
+      setGlobalWindow({
+        AndroidUpdate: {
+          downloadAndInstall: mockDownload,
+        },
+        location: { origin: "https://melodymap-pi.vercel.app" } as unknown as Location,
+      });
+
+      startDownloadAndInstall("/MelodyMap-latest.apk", "1.3.10");
+      expect(mockDownload).toHaveBeenCalledWith("https://melodymap-pi.vercel.app/MelodyMap-latest.apk", "1.3.10");
+    });
+  });
+
+  describe("getDirectApkRelease", () => {
+    it("returns valid AppRelease targeting latest direct APK", () => {
+      const rel = getDirectApkRelease();
+      expect(rel.version).toBe(CURRENT_APP_VERSION);
+      expect(rel.apkAsset.name).toContain(".apk");
+      expect(rel.apkAsset.downloadUrl).toContain("MelodyMap-latest.apk");
+      expect(rel.apkAsset.size).toBeGreaterThan(0);
     });
   });
 });

@@ -272,5 +272,12 @@ describe("Manage Account Authentication & Navigation Suite", () => {
       expect(drawerSource).toContain("<span>Sign Out</span>");
       expect(drawerSource).toContain("<span>Sign In</span>");
     });
+
+    it("drawer and account sheet provide in-app built-in Install App & APK entry points", () => {
+      expect(drawerSource).toContain("onOpenInstallApp");
+      expect(drawerSource).toContain("Install App & APK");
+      expect(accountSheetSource).toContain("onOpenInstallApp");
+      expect(accountSheetSource).toContain("Install App & APK");
+    });
   });
 });

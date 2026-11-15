@@ -59,6 +59,7 @@ test-ytdlp.cjs
 android/local.properties
 android/.gradle
 *.apk
+!public/MelodyMap-latest.apk
 *.keystore
 *.jks
 key.properties

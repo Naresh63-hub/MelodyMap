@@ -26,6 +26,7 @@ interface ProfilePanelProps {
   onSignIn?: () => void;
   isCloudAuth?: boolean;
   onCheckForUpdates?: () => void;
+  onOpenInstallApp?: () => void;
 }
 
 /**
@@ -43,6 +44,7 @@ export const ProfilePanel = memo(function ProfilePanel({
   onSignIn,
   isCloudAuth = false,
   onCheckForUpdates,
+  onOpenInstallApp,
 }: ProfilePanelProps) {
   const [appVersion, setAppVersion] = useState(CURRENT_APP_VERSION);
 
@@ -186,6 +188,28 @@ export const ProfilePanel = memo(function ProfilePanel({
           </button>
         ))}
       </div>
+
+      {/* Install App & APK */}
+      {onOpenInstallApp && (
+        <button
+          type="button"
+          onClick={onOpenInstallApp}
+          className="flex w-full items-center justify-between p-3.5 rounded-2xl bg-primary/10 border border-primary/25 hover:bg-primary/15 transition-all text-left cursor-pointer active:scale-[0.99] shadow-xs"
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center text-primary">
+              <Download className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-foreground">Install App & APK</p>
+              <p className="text-[11px] text-muted-foreground">Download latest APK or install to home screen</p>
+            </div>
+          </div>
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-primary text-primary-foreground shadow-xs">
+            Install
+          </span>
+        </button>
+      )}
 
       {/* Sign In / Sign Out Button */}
       <div className="pt-1">

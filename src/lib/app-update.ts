@@ -15,6 +15,38 @@ import { App } from "@capacitor/app";
 import { safeStorage } from "@/lib/safe-storage";
 
 export const CURRENT_APP_VERSION = "1.3.10";
+export const LATEST_DIRECT_APK_URL = "/MelodyMap-latest.apk";
+
+/**
+ * Returns the built-in direct APK release details hosted by MelodyMap.
+ */
+export function getDirectApkRelease(): AppRelease {
+  let downloadUrl = "https://melodymap-pi.vercel.app/MelodyMap-latest.apk";
+  if (typeof window !== "undefined" && window.location?.origin) {
+    try {
+      downloadUrl = new URL(LATEST_DIRECT_APK_URL, window.location.origin).href;
+    } catch {}
+  }
+
+  return {
+    version: CURRENT_APP_VERSION,
+    tagName: `v${CURRENT_APP_VERSION}`,
+    name: `MelodyMap v${CURRENT_APP_VERSION} (Latest APK)`,
+    notes: [
+      "Zero song overlap: Daily Mix and Made For You are strictly mutually exclusive",
+      "Fresh candidate engine: dynamically balances fresh tracks on every refresh",
+      "Spotify-style background playback & native lock-screen Like controls",
+      "Offline caching & high-speed audio streaming with fallback recovery",
+      "In-app built-in APK installer with real-time download and package handoff",
+    ].join("\n"),
+    publishedAt: new Date().toISOString(),
+    apkAsset: {
+      name: `MelodyMap-v${CURRENT_APP_VERSION}.apk`,
+      size: 21171295,
+      downloadUrl,
+    },
+  };
+}
 
 const GITHUB_REPO = "Naresh63-hub/MelodyMap";
 const GITHUB_RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=10`;
@@ -305,6 +337,14 @@ export function startDownloadAndInstall(
 ): void {
   if (typeof window === "undefined") return;
 
+  // Ensure absolute URL for Android Java HttpURLConnection
+  let absoluteUrl = apkUrl;
+  if (!absoluteUrl.startsWith("http://") && !absoluteUrl.startsWith("https://")) {
+    try {
+      absoluteUrl = new URL(apkUrl, window.location.origin).href;
+    } catch {}
+  }
+
   if (window.AndroidUpdate?.downloadAndInstall) {
     // Native Option B flow
     window.__melodymap_update_progress = (progress, status) => {
@@ -323,14 +363,14 @@ export function startDownloadAndInstall(
       callbacks.onError?.(error);
     };
 
-    window.AndroidUpdate.downloadAndInstall(apkUrl, versionName);
+    window.AndroidUpdate.downloadAndInstall(absoluteUrl, versionName);
   } else {
     // Web / Legacy fallback flow
     callbacks.onProgress?.(50, "Downloading update...");
     try {
       const link = document.createElement("a");
-      link.href = apkUrl;
-      link.download = `MelodyMap-${versionName}.apk`;
+      link.href = absoluteUrl;
+      link.download = `MelodyMap-${versionName || "latest"}.apk`;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       document.body.appendChild(link);

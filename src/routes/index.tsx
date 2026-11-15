@@ -84,6 +84,7 @@ import {
   getCurrentAppVersion,
   type AppRelease,
   CURRENT_APP_VERSION,
+  getDirectApkRelease,
 } from "@/lib/app-update";
 
 import { useAuth } from "@/lib/auth";
@@ -439,6 +440,12 @@ function MusicApp() {
       clearTimeout(timer);
     };
   }, []);
+
+  const handleOpenInstallApp = useCallback(() => {
+    const rel = updateRelease || getDirectApkRelease();
+    setUpdateRelease(rel);
+    setShowUpdateModal(true);
+  }, [updateRelease]);
 
   // Refresh downloads on mount & hydrate context engine
   useEffect(() => {
@@ -4384,6 +4391,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             setTimeout(() => setMessage(null), 3000);
           }}
           onOpenSettings={() => setShowSettings(true)}
+          onOpenInstallApp={handleOpenInstallApp}
           onOpenJam={() => setShowJamModal(true)}
           jamActive={!!jam.session}
           jamParticipantsCount={jam.participants.length}
@@ -4403,6 +4411,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         onManageAccount={() => {
           setDrawerOpen(false);
           setShowAccountSheet(true);
+        }}
+        onOpenInstallApp={() => {
+          setDrawerOpen(false);
+          handleOpenInstallApp();
         }}
         onOpenJam={() => {
           setDrawerOpen(false);
@@ -5005,6 +5017,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     setTimeout(() => setMessage(null), 3000);
                   }}
                   isCloudAuth={auth.isCloudAuth}
+                  onOpenInstallApp={handleOpenInstallApp}
                   onCheckForUpdates={async () => {
                     setMessage("Checking for updates...");
                     const res = await checkForAppUpdate({ force: true });
@@ -5422,6 +5435,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onOpenJam={() => setShowJamModal(true)}
           onOpenSleepTimer={() => setShowSleepTimer(true)}
           onOpenLanguages={() => setTab("languages")}
+          onOpenInstallApp={handleOpenInstallApp}
           onSignIn={() => {
             setAuthModalMode("signin");
             setShowAuthModal(true);
