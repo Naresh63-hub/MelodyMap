@@ -5,7 +5,6 @@ import type { Track } from "@/lib/library";
 import { isPodcastTrack } from "@/lib/track-filters";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { triggerHaptic } from "@/lib/haptics";
-import { useSwipeGestures } from "@/hooks/use-gesture-controls";
 
 type Props = {
   track: Track | undefined;
@@ -64,14 +63,78 @@ export function MiniPlayer({
     if (thumbError) setThumbError(false);
   }
 
-  // Swipe up anywhere on the dock expands the full-screen player
-  // Swipe gestures: swipe left for next, right for previous, up to expand
-  const swipeProps = useSwipeGestures({
-    onSwipeUp: onOpenPlayer,
-    onSwipeLeft: onNext,
-    onSwipeRight: onPrevious,
-    threshold: 48,
-  });
+  const [dragX, setDragX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartPos = useRef<{ x: number; y: number; time: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    if (t) {
+      touchStartPos.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+      setIsDragging(false);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPos.current) return;
+    const t = e.touches[0];
+    if (!t) return;
+    const dx = t.clientX - touchStartPos.current.x;
+    const dy = t.clientY - touchStartPos.current.y;
+
+    if (Math.abs(dx) > Math.abs(dy) * 1.15 && Math.abs(dx) > 8) {
+      setIsDragging(true);
+      setDragX(dx * 0.42);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartPos.current;
+    touchStartPos.current = null;
+    if (!start) {
+      setDragX(0);
+      setIsDragging(false);
+      return;
+    }
+
+    const t = e.changedTouches[0];
+    if (!t) {
+      setDragX(0);
+      setIsDragging(false);
+      return;
+    }
+
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const dt = Date.now() - start.time;
+
+    // Swipe Up -> Expand Full Player
+    if (dy < -38 && Math.abs(dy) > Math.abs(dx) * 1.25) {
+      triggerHaptic("medium");
+      onOpenPlayer();
+      setDragX(0);
+      setIsDragging(false);
+      return;
+    }
+
+    // Horizontal Swipe -> Next / Previous with haptic feedback
+    const threshold = 45;
+    const isQuickFlick = dt < 300 && Math.abs(dx) > 25;
+    if (Math.abs(dx) >= threshold || isQuickFlick) {
+      if (dx < 0) {
+        // Swipe Left -> Next Track
+        triggerHaptic("medium");
+        onNext();
+      } else if (dx > 0 && onPrevious) {
+        // Swipe Right -> Previous Track
+        triggerHaptic("medium");
+        onPrevious();
+      }
+    }
+
+    setDragX(0);
+    setTimeout(() => setIsDragging(false), 200);
+  };
 
   const progressPct =
     duration > 0 ? Math.min(100, Math.max(0, (position / duration) * 100)) : 0;
@@ -86,10 +149,16 @@ export function MiniPlayer({
 
   return (
     <div
-      {...swipeProps}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       className={cn(
-        "fixed z-40 border-t border-hair-strong bg-surface shadow-lg h-14 sm:h-16 flex flex-col justify-between bottom-[calc(var(--mobile-nav-height,56px)+var(--mm-inset-bottom,0px))] lg:bottom-0 left-0 right-0 transition-all duration-300",
-        sidebarCollapsed ? "lg:left-[72px]" : "lg:left-[260px]"
+        "fixed z-40 h-14 sm:h-16 flex flex-col justify-between transition-all duration-300",
+        "bottom-[calc(70px+var(--mm-inset-bottom,0px))] lg:bottom-0",
+        "mx-2.5 sm:mx-4 max-w-lg left-0 right-0 sm:mx-auto lg:max-w-none lg:mx-0",
+        "rounded-2xl lg:rounded-none border border-purple-300/40 dark:border-purple-500/30 lg:border-x-0 lg:border-b-0 lg:border-t lg:border-hair-strong",
+        "bg-white/90 dark:bg-[#150d24]/90 backdrop-blur-xl shadow-xl shadow-purple-900/10 dark:shadow-black/60",
+        sidebarCollapsed ? "lg:left-[72px]" : "lg:left-[260px]",
       )}
     >
       {/* 2.5px Progress Indicator at Top */}
@@ -113,16 +182,40 @@ export function MiniPlayer({
       </div>
 
       {/* Main Track Row */}
-      <div className="flex-1 flex items-center justify-between px-3 gap-2.5">
+      <div className="relative flex-1 flex items-center justify-between px-3 gap-2.5 overflow-hidden">
+        {/* Swipe Feedback Cues */}
+        {dragX < -15 && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-bold text-primary dark:text-purple-300 pointer-events-none animate-fade-in z-20 bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 backdrop-blur-sm">
+            <span>Next</span>
+            <SkipForward className="h-3.5 w-3.5" />
+          </div>
+        )}
+        {dragX > 15 && onPrevious && (
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-bold text-primary dark:text-purple-300 pointer-events-none animate-fade-in z-20 bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20 backdrop-blur-sm">
+            <SkipBack className="h-3.5 w-3.5" />
+            <span>Prev</span>
+          </div>
+        )}
+
         {/* Artwork + Title/Artist -> tap anywhere to expand to Full Player */}
         <div
           role="button"
           tabIndex={0}
-          onClick={onOpenPlayer}
+          onClick={(e) => {
+            if (isDragging) {
+              e.preventDefault();
+              return;
+            }
+            onOpenPlayer();
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") onOpenPlayer();
           }}
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left cursor-pointer"
+          style={{
+            transform: `translateX(${dragX}px)`,
+            transition: isDragging ? "none" : "transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)",
+          }}
           aria-label={`Open player for ${track?.title ?? "current track"}`}
         >
           {/* Circular rotating vinyl disc artwork */}

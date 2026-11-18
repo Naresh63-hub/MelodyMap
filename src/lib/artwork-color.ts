@@ -96,7 +96,7 @@ export function buildArtworkColorTheme(rgb: RGB): ArtworkColorTheme {
     accent: `rgb(${r}, ${g}, ${b})`,
     primary: `rgba(${r}, ${g}, ${b}, 0.95)`,
     borderAccent: `rgba(${r}, ${g}, ${b}, 0.35)`,
-    ambientGlow: `radial-gradient(circle at 50% 30%, rgba(${r}, ${g}, ${b}, 0.28) 0%, rgba(139, 92, 246, 0.14) 55%, rgba(9, 6, 20, 0.98) 100%)`,
+    ambientGlow: `radial-gradient(circle at 50% 40%, rgba(${r}, ${g}, ${b}, 0.38) 0%, rgba(139, 92, 246, 0.18) 55%, transparent 75%)`,
     rgb: blended,
   };
 }

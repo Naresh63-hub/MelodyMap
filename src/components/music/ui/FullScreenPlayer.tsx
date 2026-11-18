@@ -36,6 +36,7 @@ import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import AudioVisualizer from "./AudioVisualizer";
 import { useTrackLyrics, findActiveLyricIndex } from "@/lib/use-track-lyrics";
 import { extractArtworkColor, estimateArtworkColor, type ArtworkColorTheme } from "@/lib/artwork-color";
+import { triggerHaptic } from "@/lib/haptics";
 import { isPodcastTrack } from "@/lib/track-filters";
 
 type Props = {
@@ -332,20 +333,20 @@ export function FullScreenPlayer({
         className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0"
         aria-hidden="true"
       >
-        {/* Soft Animated Light Wave 1 (Top-Left) */}
+        {/* Soft Dynamic Artwork Light Wave 1 (Top-Left) */}
         <div
-          className="absolute -top-[25%] -left-[20%] w-[140%] h-[80%] rounded-full blur-3xl pointer-events-none mm-wave-1 transition-opacity duration-1000"
+          className="absolute -top-[25%] -left-[20%] w-[140%] h-[80%] rounded-full blur-3xl pointer-events-none mm-wave-1 transition-all duration-1000"
           style={{
-            background: "radial-gradient(ellipse at center, rgba(139, 92, 246, 0.16) 0%, rgba(196, 181, 253, 0.08) 50%, transparent 75%)",
+            background: `radial-gradient(ellipse at center, rgba(${artworkTheme.rgb.r}, ${artworkTheme.rgb.g}, ${artworkTheme.rgb.b}, 0.24) 0%, rgba(139, 92, 246, 0.12) 50%, transparent 75%)`,
             animationPlayState: isPlaying ? "running" : "paused",
             opacity: isPlaying ? 1 : 0.45,
           }}
         />
-        {/* Soft Animated Light Wave 2 (Bottom-Right) */}
+        {/* Soft Dynamic Artwork Light Wave 2 (Bottom-Right) */}
         <div
-          className="absolute -bottom-[20%] -right-[15%] w-[130%] h-[75%] rounded-full blur-3xl pointer-events-none mm-wave-2 transition-opacity duration-1000"
+          className="absolute -bottom-[20%] -right-[15%] w-[130%] h-[75%] rounded-full blur-3xl pointer-events-none mm-wave-2 transition-all duration-1000"
           style={{
-            background: "radial-gradient(ellipse at center, rgba(167, 139, 250, 0.14) 0%, rgba(221, 214, 254, 0.06) 55%, transparent 75%)",
+            background: `radial-gradient(ellipse at center, rgba(${artworkTheme.rgb.r}, ${artworkTheme.rgb.g}, ${artworkTheme.rgb.b}, 0.20) 0%, rgba(167, 139, 250, 0.10) 55%, transparent 75%)`,
             animationPlayState: isPlaying ? "running" : "paused",
             opacity: isPlaying ? 1 : 0.45,
           }}
@@ -355,13 +356,14 @@ export function FullScreenPlayer({
         {GLOWING_PARTICLES.map((particle, idx) => (
           <span
             key={`particle-${idx}`}
-            className="absolute rounded-full bg-[#8B5CF6] dark:bg-[#A78BFA] mm-glowing-particle"
+            className="absolute rounded-full mm-glowing-particle"
             style={{
               left: particle.left,
               top: particle.top,
               width: `${particle.size}px`,
               height: `${particle.size}px`,
-              boxShadow: "0 0 10px rgba(139, 92, 246, 0.75), 0 0 4px rgba(167, 139, 250, 0.9)",
+              backgroundColor: artworkTheme.accent || "#8B5CF6",
+              boxShadow: `0 0 10px rgba(${artworkTheme.rgb.r}, ${artworkTheme.rgb.g}, ${artworkTheme.rgb.b}, 0.75), 0 0 4px rgba(167, 139, 250, 0.9)`,
               animationPlayState: isPlaying ? "running" : "paused",
               "--particle-delay": particle.delay,
               "--particle-duration": particle.duration,
@@ -557,7 +559,7 @@ export function FullScreenPlayer({
                     <p className="text-xs text-[#746A85] dark:text-muted-foreground">Lyrics not available for this track.</p>
                   </div>
                 ) : lyricsState.isSynced ? (
-                  <div className="space-y-3 py-6">
+                  <div className="space-y-4 py-8 px-2">
                     {lyricsState.syncedLyrics.map((line, idx) => {
                       const isActive = idx === currentLyricIndex;
                       return (
@@ -567,15 +569,25 @@ export function FullScreenPlayer({
                           ref={(el) => {
                             lyricLineRefs.current[idx] = el;
                           }}
-                          onClick={() => onSeek(line.time)}
+                          onClick={() => {
+                            triggerHaptic("selection");
+                            onSeek(line.time);
+                          }}
                           className={cn(
-                            "w-full text-center transition-all duration-300 py-1.5 px-3 rounded-lg cursor-pointer",
+                            "w-full text-center transition-all duration-300 rounded-2xl cursor-pointer block select-none",
                             isActive
-                              ? "text-[#8B5CF6] dark:text-foreground font-bold text-base sm:text-lg scale-105"
-                              : "text-[#746A85]/60 dark:text-muted-foreground/45 text-sm hover:text-[#211536] dark:hover:text-foreground/80",
+                              ? "py-2.5 px-4 font-black text-lg sm:text-xl scale-[1.04] bg-white/70 dark:bg-white/10 backdrop-blur-md border border-[#8B5CF6]/30 shadow-lg shadow-purple-900/10 dark:shadow-[0_0_24px_rgba(139,92,246,0.3)] text-[#6D28D9] dark:text-white"
+                              : "py-1.5 px-3 text-sm sm:text-base font-medium opacity-35 blur-[0.25px] hover:opacity-80 hover:blur-none text-[#746A85] dark:text-muted-foreground transition-all duration-300",
                           )}
                         >
-                          {line.text}
+                          <span
+                            className={cn(
+                              isActive &&
+                                "bg-gradient-to-r from-purple-700 via-violet-600 to-pink-600 dark:from-white dark:via-purple-100 dark:to-pink-200 bg-clip-text text-transparent drop-shadow-sm dark:drop-shadow-[0_0_12px_rgba(168,85,247,0.7)]",
+                            )}
+                          >
+                            {line.text}
+                          </span>
                         </button>
                       );
                     })}
