@@ -16,8 +16,9 @@ import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 import { LANGUAGES, type Track } from "@/lib/library";
 import { Equalizer } from "@/components/music/NowPlayingViz";
 import { DownloadThumbnailOverlay, DownloadStatusBadge } from "@/components/music/ui/DownloadAnimation";
-import { trackSubtitle, getTrackDisplayDuration } from "@/lib/track-metadata";
+import { trackSubtitle, getTrackDisplayDuration, cleanSongTitle } from "@/lib/track-metadata";
 import { useSearchHistory, type RecentSearchItem } from "@/lib/search-history";
+import { isTrackLiked } from "@/lib/track-dedup";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
 import { TOP_JIOSAAVN_ARTISTS } from "@/lib/artists-data";
@@ -316,7 +317,7 @@ export function SearchResults(props: Props) {
               See all ({LANGUAGES.length})
             </button>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1 snap-x">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1 overscroll-x-contain">
             {LANGUAGES.map((lang) => {
               const isUserLang = userLanguages?.includes(lang);
               return (
@@ -325,7 +326,7 @@ export function SearchResults(props: Props) {
                   type="button"
                   onClick={() => onSearch?.(`top ${lang.toLowerCase()} hits songs`, "songs")}
                   className={cn(
-                    "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs font-medium transition-all active:scale-95 whitespace-nowrap border",
+                    "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all active:scale-95 whitespace-nowrap border",
                     isUserLang
                       ? "bg-primary/15 border-primary/40 text-primary font-semibold shadow-xs"
                       : "bg-card border-hair text-secondary-foreground hover:bg-chip-strong hover:text-foreground hover:border-hair-strong"
@@ -345,7 +346,7 @@ export function SearchResults(props: Props) {
     <div className="space-y-4 animate-fade-in pt-1">
       {languagePickerDialog}
       {/* Category Pills Header */}
-      <div className="flex max-w-full gap-2 overflow-x-auto py-2.5 px-1 scrollbar-hide snap-x scroll-px-4">
+      <div className="flex max-w-full gap-2 overflow-x-auto py-2.5 px-1 scrollbar-hide overscroll-x-contain">
         {filterOptions.map((opt) => {
           const active = filter === opt.value;
           return (
@@ -357,7 +358,7 @@ export function SearchResults(props: Props) {
                 onFilterChange?.(opt.value);
               }}
               className={cn(
-                "shrink-0 snap-start rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 button-press whitespace-nowrap",
+                "shrink-0 rounded-full px-3.5 py-1.5 text-xs transition-all active:scale-95 button-press whitespace-nowrap",
                 active
                   ? "border border-primary bg-primary font-semibold text-primary-foreground shadow-sm shadow-primary/25"
                   : "border border-hair bg-card font-medium text-secondary-foreground hover:bg-chip-strong hover:text-foreground hover:border-hair-strong"
@@ -480,7 +481,7 @@ export function SearchResults(props: Props) {
                     active ? "text-primary" : "text-foreground"
                   )}
                 >
-                  {track.title}
+                  {cleanSongTitle(track.title) || track.title}
                 </p>
                 <p className="truncate text-xs text-secondary-foreground leading-tight mt-1 font-normal">
                   {trackSubtitle(track)}
@@ -488,7 +489,7 @@ export function SearchResults(props: Props) {
               </button>
 
               {/* Song duration time & like button matching reference image */}
-              <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <DownloadStatusBadge
                   isDownloading={Boolean(downloadingIds?.has(track.id))}
                   isDownloaded={Boolean(downloadedIds?.has(track.id))}
@@ -498,9 +499,9 @@ export function SearchResults(props: Props) {
                   {getTrackDisplayDuration(track)}
                 </span>
                 <HeartLikeButton
-                  liked={likedIds.has(track.id)}
+                  liked={isTrackLiked(track, likedIds, props.userLikes)}
                   onToggle={() => onToggleLike(track)}
-                  size="md"
+                  size="sm"
                 />
               </div>
 
@@ -510,7 +511,7 @@ export function SearchResults(props: Props) {
                   type="button"
                   onClick={() => onOpenOptions(track)}
                   aria-label="Options"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-foreground/40 hover:text-foreground hover:bg-chip active:scale-90 transition-all"
+                  className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-foreground/40 hover:text-foreground hover:bg-chip active:scale-90 transition-all shrink-0"
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>

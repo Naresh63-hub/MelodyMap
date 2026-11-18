@@ -62,7 +62,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Static assets (scripts, styles, images, fonts) — Network-first with cache fallback
+  // Static hashed build assets (/assets/*) — Cache-first (immutable content hash saves data & battery)
+  if (url.pathname.startsWith("/assets/")) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((res) => {
+          if (res.ok && request.method === "GET") {
+            const clone = res.clone();
+            caches.open(SHELL_CACHE).then((cache) => cache.put(request, clone));
+          }
+          return res;
+        });
+      }),
+    );
+    return;
+  }
+
+  // Other static assets (images, fonts, icons) — Network-first with cache fallback
   event.respondWith(
     fetch(request)
       .then((res) => {

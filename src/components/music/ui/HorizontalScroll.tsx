@@ -60,7 +60,7 @@ export function HorizontalScroll({ children, className, title, subtitle }: Props
       <div
         ref={ref}
         onScroll={updateArrows}
-        className="scrollbar-hide flex gap-3 overflow-x-auto pb-1 pt-0.5 scroll-smooth"
+        className="scrollbar-hide flex gap-3 overflow-x-auto pb-1 pt-0.5 overscroll-x-contain"
       >
         {children}
       </div>

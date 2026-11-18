@@ -252,9 +252,18 @@ export function getTrackIdentity(track: TrackLike): string {
   return `meta:${norm(cleanTitle)}|${normalizeArtistAlias(track.artist)}|${version}|${durBucket}`;
 }
 
+/** Extracts the clean movie or album name for a track to group soundtrack songs */
+export function extractTrackMovieOrAlbum(track?: { album?: string | undefined; title?: string | undefined } | null | undefined): string {
+  if (!track) return "";
+  const movie = cleanMovieName(track.album, track.title);
+  if (movie) return norm(movie);
+  if (track.album) return norm(track.album);
+  return "";
+}
+
 /**
  * Multi-factor similarity score between two tracks (0.0 to 1.0).
- * Weighted across Title, Artist, Version signature, and Duration.
+ * Weighted across Title, Artist, Version signature, Duration, and Movie/Album.
  */
 export function calculateTrackSimilarity(a: TrackLike, b: TrackLike): number {
   // 1. Exact or canonical ID match
@@ -270,9 +279,14 @@ export function calculateTrackSimilarity(a: TrackLike, b: TrackLike): number {
     return 0.1;
   }
 
+  const rawTitleA = a.title || "";
+  const rawTitleB = b.title || "";
+  const cleanA = cleanSongTitle(rawTitleA) || rawTitleA;
+  const cleanB = cleanSongTitle(rawTitleB) || rawTitleB;
+
   const titleScore = Math.max(
-    stringSimilarity(a.title, b.title),
-    stringSimilarity(cleanSongTitle(a.title), cleanSongTitle(b.title)),
+    stringSimilarity(rawTitleA, rawTitleB),
+    stringSimilarity(cleanA, cleanB),
   );
 
   const normArtA = normalizeArtistAlias(a.artist);
@@ -283,30 +297,64 @@ export function calculateTrackSimilarity(a: TrackLike, b: TrackLike): number {
 
   const durA = durationSec(a.duration);
   const durB = durationSec(b.duration);
+  const hasBothDurations = durA > 0 && durB > 0;
+  const durationDiff = hasBothDurations ? Math.abs(durA - durB) : -1;
 
-  // Same song re-uploaded by a different label channel (e.g. Sony Music India vs Aditya Music):
-  // near-identical title AND duration => same song if one artist is a label/channel or artists match
+  // 3. Movie/album soundtrack matching:
+  const movieA = extractTrackMovieOrAlbum(a);
+  const movieB = extractTrackMovieOrAlbum(b);
+  const movieMatches = Boolean(
+    movieA &&
+      movieB &&
+      (movieA === movieB ||
+        stringSimilarity(movieA, movieB) >= 0.8 ||
+        movieA.includes(movieB) ||
+        movieB.includes(movieA)),
+  );
+
+  // Case A: Identical or near-identical movie soundtrack song:
+  // e.g. "Rambai Neemeeda Narayana" from "Raju Weds Rambai"
+  // even if one lists playback singer and one lists composer, same movie + song title + length => duplicate!
   if (
-    titleScore >= 0.92 &&
-    durA > 0 &&
-    durB > 0 &&
-    Math.abs(durA - durB) <= 3 &&
-    (isChannelOrLabelName(a.artist) || isChannelOrLabelName(b.artist) || artistScore >= 0.6)
+    movieMatches &&
+    titleScore >= 0.82 &&
+    (durationDiff === -1 || durationDiff <= 4)
   ) {
-    return 0.95; // >= 0.88 threshold => duplicate
+    return 0.95;
+  }
+
+  // Case B: Re-uploaded by different channel/label or matching artist tokens
+  if (
+    titleScore >= 0.90 &&
+    hasBothDurations &&
+    durationDiff <= 3 &&
+    (isChannelOrLabelName(a.artist) ||
+      isChannelOrLabelName(b.artist) ||
+      artistScore >= 0.5 ||
+      (normArtA && normArtB && (normArtA.includes(normArtB) || normArtB.includes(normArtA))))
+  ) {
+    return 0.95;
+  }
+
+  // Case C: Exact/near-exact title and duration match (e.g. 3:24 vs 3:24)
+  if (titleScore >= 0.94 && hasBothDurations && durationDiff <= 2) {
+    return 0.95;
   }
 
   let durationScore = 0.85; // neutral when duration is unknown
 
-  if (durA > 0 && durB > 0) {
-    const diff = Math.abs(durA - durB);
-    if (diff <= 3) durationScore = 1.0;
-    else if (diff <= DURATION_TOLERANCE) durationScore = 0.8;
-    else if (diff > 45) return 0.2; // Likely radio vs extended or completely different
-    else durationScore = Math.max(0.1, 1.0 - diff / 30);
+  if (hasBothDurations) {
+    if (durationDiff <= 3) durationScore = 1.0;
+    else if (durationDiff <= DURATION_TOLERANCE) durationScore = 0.8;
+    else if (durationDiff > 45) return 0.2; // Likely radio vs extended or completely different
+    else durationScore = Math.max(0.1, 1.0 - durationDiff / 30);
   }
 
-  return titleScore * 0.45 + artistScore * 0.4 + durationScore * 0.15;
+  const baseScore = titleScore * 0.45 + artistScore * 0.4 + durationScore * 0.15;
+  if (movieMatches && titleScore >= 0.75) {
+    return Math.max(baseScore, 0.90);
+  }
+  return baseScore;
 }
 
 /**
@@ -322,11 +370,21 @@ export function areSameTrack(a: TrackLike, b: TrackLike): boolean {
 
 // ─── Deduplication ─────────────────────────────────────────────────
 
+export interface DedupeTracksOptions {
+  likedIds?: Set<string> | undefined;
+  likedTracks?: TrackLike[] | undefined;
+  downloadedIds?: Set<string> | undefined;
+}
+
 /**
  * Remove duplicate tracks from an array using multi-factor fuzzy clustering.
  * Preserves first occurrence and retains highest-fidelity metadata.
+ * Prioritizes liked and downloaded track entries so user favorite status is preserved.
  */
-export function dedupeTracks<T extends TrackLike>(tracks: T[]): T[] {
+export function dedupeTracks<T extends TrackLike>(
+  tracks: T[],
+  options?: DedupeTracksOptions,
+): T[] {
   const out: T[] = [];
 
   for (const candidate of tracks) {
@@ -335,29 +393,61 @@ export function dedupeTracks<T extends TrackLike>(tracks: T[]): T[] {
     if (existingIndex === -1) {
       out.push(candidate);
     } else {
-      // Merge metadata: retain highest-fidelity metadata
       const existing = out[existingIndex]!;
-      const existingHasBetterArtist = existing.artist && !isChannelOrLabelName(existing.artist);
-      const candidateHasBetterArtist = candidate.artist && !isChannelOrLabelName(candidate.artist);
-      const chosenArtist = existingHasBetterArtist
-        ? existing.artist
-        : candidateHasBetterArtist
-          ? candidate.artist
-          : existing.artist || candidate.artist;
+      const existingIsLiked =
+        Boolean(options?.likedIds?.has(existing.id)) ||
+        Boolean(options?.likedTracks?.some((t) => areSameTrack(t, existing)));
+      const candidateIsLiked =
+        Boolean(options?.likedIds?.has(candidate.id)) ||
+        Boolean(options?.likedTracks?.some((t) => areSameTrack(t, candidate)));
+
+      const existingIsDownloaded = Boolean(options?.downloadedIds?.has(existing.id));
+      const candidateIsDownloaded = Boolean(options?.downloadedIds?.has(candidate.id));
+
+      const candidatePriority =
+        (candidateIsLiked ? 2 : 0) + (candidateIsDownloaded ? 1 : 0);
+      const existingPriority =
+        (existingIsLiked ? 2 : 0) + (existingIsDownloaded ? 1 : 0);
+
+      const preferred = candidatePriority > existingPriority ? candidate : existing;
+      const secondary = preferred === candidate ? existing : candidate;
+
+      const preferredHasBetterArtist = preferred.artist && !isChannelOrLabelName(preferred.artist);
+      const secondaryHasBetterArtist = secondary.artist && !isChannelOrLabelName(secondary.artist);
+      const chosenArtist = preferredHasBetterArtist
+        ? preferred.artist
+        : secondaryHasBetterArtist
+          ? secondary.artist
+          : preferred.artist || secondary.artist;
 
       const merged: T = {
-        ...candidate,
-        ...existing,
+        ...secondary,
+        ...preferred,
         artist: chosenArtist,
-        album: existing.album || candidate.album,
-        duration: existing.duration || candidate.duration,
-        thumbnail: existing.thumbnail || candidate.thumbnail,
-        previewUrl: existing.previewUrl || candidate.previewUrl,
+        album: preferred.album || secondary.album,
+        duration: preferred.duration || secondary.duration,
+        thumbnail: preferred.thumbnail || secondary.thumbnail,
+        previewUrl: preferred.previewUrl || secondary.previewUrl,
       };
       out[existingIndex] = merged;
     }
   }
   return out;
+}
+
+/**
+ * Check if a track is liked, matching either by exact ID or by logical identity (same movie + title + duration)
+ * across alternate releases.
+ */
+export function isTrackLiked(
+  track?: TrackLike | null,
+  likedIds?: Set<string>,
+  likedTracks?: TrackLike[],
+): boolean {
+  if (!track) return false;
+  if (track.id && likedIds?.has(track.id)) return true;
+  if (!likedTracks || likedTracks.length === 0) return false;
+  return likedTracks.some((liked) => areSameTrack(liked, track));
 }
 
 /**
@@ -380,15 +470,6 @@ export function extractPrimaryArtist(rawArtist?: string | null | undefined): str
   if (!rawArtist) return "";
   const firstPart = rawArtist.split(/[,&/|]|\b(?:feat|ft|featuring|with|and)\b/i)[0] || "";
   return norm(firstPart);
-}
-
-/** Extracts the clean movie or album name for a track to group soundtrack songs */
-export function extractTrackMovieOrAlbum(track?: { album?: string | undefined; title?: string | undefined } | null | undefined): string {
-  if (!track) return "";
-  const movie = cleanMovieName(track.album, track.title);
-  if (movie) return norm(movie);
-  if (track.album) return norm(track.album);
-  return "";
 }
 
 export interface DiversifyOptions {

@@ -7,6 +7,7 @@ import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
+import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
     private static MainActivity instance;
@@ -124,11 +125,8 @@ public class MainActivity extends BridgeActivity {
         if (webView == null) return false;
         runOnUiThread(() -> {
             try {
-                String escaped = command
-                        .replace("\\", "\\\\")
-                        .replace("'", "\\'");
                 webView.evaluateJavascript(
-                        "if (window.__melodymap_media_command) { window.__melodymap_media_command('" + escaped + "'); }",
+                        "if (window.__melodymap_media_command) { window.__melodymap_media_command(" + JSONObject.quote(command) + "); }",
                         null);
             } catch (Exception ignored) {}
         });
@@ -241,7 +239,7 @@ public class MainActivity extends BridgeActivity {
                         WebView webView = getBridge().getWebView();
                         if (webView != null) {
                             webView.evaluateJavascript(
-                                "if (window.__melodymap_handle_auth_callback) { window.__melodymap_handle_auth_callback('" + url.replace("'", "\\'") + "'); }",
+                                "if (window.__melodymap_handle_auth_callback) { window.__melodymap_handle_auth_callback(" + JSONObject.quote(url) + "); }",
                                 null
                             );
                         }

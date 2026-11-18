@@ -74,6 +74,14 @@ describe("Network Mode & Bandwidth Adaptation", () => {
     );
   });
 
+  it("optimizes JioSaavn thumbnails when Low Network Mode is active", () => {
+    const saavnHigh = "https://c.saavncdn.com/123/Song-Title-500x500.jpg";
+    expect(getOptimizedThumbnailUrl(saavnHigh, false)).toBe(saavnHigh);
+    expect(getOptimizedThumbnailUrl(saavnHigh, true)).toBe(
+      "https://c.saavncdn.com/123/Song-Title-150x150.jpg",
+    );
+  });
+
   it("handles undefined or empty URLs safely", () => {
     expect(getOptimizedThumbnailUrl(undefined)).toBe("");
     expect(getOptimizedThumbnailUrl("")).toBe("");

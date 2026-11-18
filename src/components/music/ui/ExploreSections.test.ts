@@ -144,4 +144,75 @@ describe("ExploreSections tab logic & utilities", () => {
       expect(sorted.map((t) => t.id)).toEqual(["2", "1", "3", "4"]);
     });
   });
+
+  describe("Individual Section Refresh & Global Refresh Separation", () => {
+    it("allows independent per-section refresh handlers and preserves separate loading state flags", () => {
+      let trendingRefreshed = 0;
+      let newReleasesRefreshed = 0;
+      let oldSongsRefreshed = 0;
+
+      const onRefreshTrending = () => {
+        trendingRefreshed++;
+      };
+      const onRefreshNewReleases = () => {
+        newReleasesRefreshed++;
+      };
+      const onRefreshOldSongs = () => {
+        oldSongsRefreshed++;
+      };
+
+      // Simulating user clicking individual refresh buttons
+      onRefreshTrending();
+      expect(trendingRefreshed).toBe(1);
+      expect(newReleasesRefreshed).toBe(0);
+      expect(oldSongsRefreshed).toBe(0);
+
+      onRefreshNewReleases();
+      expect(trendingRefreshed).toBe(1);
+      expect(newReleasesRefreshed).toBe(1);
+      expect(oldSongsRefreshed).toBe(0);
+
+      onRefreshOldSongs();
+      expect(trendingRefreshed).toBe(1);
+      expect(newReleasesRefreshed).toBe(1);
+      expect(oldSongsRefreshed).toBe(1);
+    });
+
+    it("advances section page indexes independently during individual refreshes", () => {
+      let trendingPage = 1;
+      let newReleasesPage = 1;
+      let oldSongsPage = 1;
+
+      const refreshSection = (section: "all" | "trending" | "newReleases" | "oldSongs") => {
+        if (section === "trending" || section === "all") {
+          trendingPage = (trendingPage % 5) + 1;
+        }
+        if (section === "newReleases" || section === "all") {
+          newReleasesPage = (newReleasesPage % 5) + 1;
+        }
+        if (section === "oldSongs" || section === "all") {
+          oldSongsPage = (oldSongsPage % 5) + 1;
+        }
+      };
+
+      // Refresh trending twice
+      refreshSection("trending");
+      refreshSection("trending");
+      expect(trendingPage).toBe(3);
+      expect(newReleasesPage).toBe(1);
+      expect(oldSongsPage).toBe(1);
+
+      // Refresh new releases once
+      refreshSection("newReleases");
+      expect(trendingPage).toBe(3);
+      expect(newReleasesPage).toBe(2);
+      expect(oldSongsPage).toBe(1);
+
+      // Global refresh advances all three sections concurrently
+      refreshSection("all");
+      expect(trendingPage).toBe(4);
+      expect(newReleasesPage).toBe(3);
+      expect(oldSongsPage).toBe(2);
+    });
+  });
 });

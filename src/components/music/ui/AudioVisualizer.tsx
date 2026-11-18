@@ -66,6 +66,10 @@ export default function AudioVisualizer({ getAnalyser, active, barCount = 28, cl
 
     const draw = () => {
       if (!running) return;
+      if (typeof document !== "undefined" && document.hidden) {
+        // Conserve CPU and battery: pause rAF loop when screen is locked or tab is hidden
+        return;
+      }
       const analyser = getAnalyser?.();
       if (!analyser) {
         rafRef.current = requestAnimationFrame(draw);
@@ -118,10 +122,22 @@ export default function AudioVisualizer({ getAnalyser, active, barCount = 28, cl
       rafRef.current = requestAnimationFrame(draw);
     };
 
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined" && !document.hidden && running) {
+        rafRef.current = requestAnimationFrame(draw);
+      }
+    };
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibilityChange);
+    }
+
     // Settle bars to zero once inactive
     rafRef.current = requestAnimationFrame(draw);
     return () => {
       running = false;
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+      }
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       bars.fill(0);
       const c = canvasRef.current;

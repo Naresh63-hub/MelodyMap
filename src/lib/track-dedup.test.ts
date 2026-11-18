@@ -9,6 +9,7 @@ import {
   extractPrimaryArtist,
   extractTrackMovieOrAlbum,
   diversifyTrackList,
+  isTrackLiked,
 } from "./track-dedup";
 
 describe("norm", () => {
@@ -59,6 +60,24 @@ describe("areSameTrack", () => {
     const b = { id: "v2", title: "A Completely Different Song", artist: "Same Artist", duration: "5:45" };
     expect(areSameTrack(a, b)).toBe(false);
   });
+
+  it("matches identical soundtrack songs when one lists singer and one lists composer", () => {
+    const a = {
+      id: "track_single_1",
+      title: "Rambai Neemeeda Narayana",
+      album: "Raju Weds Rambai",
+      artist: "Mittapalli Surendar",
+      duration: "3:24",
+    };
+    const b = {
+      id: "track_ost_2",
+      title: "Rambai Neemeeda Narayana",
+      album: "Raju Weds Rambai",
+      artist: "Suresh Bobbili",
+      duration: "3:24",
+    };
+    expect(areSameTrack(a, b)).toBe(true);
+  });
 });
 
 describe("dedupeTracks", () => {
@@ -72,6 +91,52 @@ describe("dedupeTracks", () => {
     expect(deduped).toHaveLength(2);
     expect(deduped[0]?.id).toBe("1");
     expect(deduped[1]?.id).toBe("3");
+  });
+
+  it("preserves liked candidate track ID when candidate is liked and existing is not", () => {
+    const tracks = [
+      { id: "unliked_release", title: "Rambai Neemeeda Narayana", album: "Raju Weds Rambai", artist: "Mittapalli Surendar", duration: "3:24" },
+      { id: "liked_release", title: "Rambai Neemeeda Narayana", album: "Raju Weds Rambai", artist: "Suresh Bobbili", duration: "3:24" },
+    ];
+    const deduped = dedupeTracks(tracks, { likedIds: new Set(["liked_release"]) });
+    expect(deduped).toHaveLength(1);
+    expect(deduped[0]?.id).toBe("liked_release");
+  });
+});
+
+describe("isTrackLiked", () => {
+  const likedTrack = {
+    id: "ost_123",
+    title: "Rambai Neemeeda Narayana",
+    album: "Raju Weds Rambai",
+    artist: "Mittapalli Surendar",
+    duration: "3:24",
+  };
+  const likedIds = new Set(["ost_123"]);
+
+  it("returns true for exact id match", () => {
+    expect(isTrackLiked(likedTrack, likedIds)).toBe(true);
+  });
+
+  it("returns true for alternate release with different id matching logical identity", () => {
+    const alternateRelease = {
+      id: "single_456",
+      title: "Rambai Neemeeda Narayana",
+      album: "Raju Weds Rambai",
+      artist: "Suresh Bobbili",
+      duration: "3:24",
+    };
+    expect(isTrackLiked(alternateRelease, likedIds, [likedTrack])).toBe(true);
+  });
+
+  it("returns false for a completely different song", () => {
+    const otherTrack = {
+      id: "other_789",
+      title: "Different Song",
+      artist: "Someone Else",
+      duration: "3:30",
+    };
+    expect(isTrackLiked(otherTrack, likedIds, [likedTrack])).toBe(false);
   });
 });
 

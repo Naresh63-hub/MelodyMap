@@ -107,7 +107,7 @@ function HorizontalScrollRow({
   return (
     <div
       ref={scrollRef}
-      className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x snap-mandatory"
+      className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 overscroll-x-contain"
     >
       {tracks.map((track, i) => {
         const active = currentId === track.id;
@@ -117,7 +117,7 @@ function HorizontalScrollRow({
         return (
           <div
             key={track.id}
-            className="group/card relative w-[140px] sm:w-[158px] shrink-0 snap-start text-left p-2 rounded-2xl transition-all duration-200 bg-card hover:bg-card border border-hair hover:border-hair-strong hover:-translate-y-0.5 hover:shadow-md"
+            className="group/card relative w-[140px] sm:w-[158px] shrink-0 text-left p-2 rounded-2xl transition-all duration-200 bg-card hover:bg-card border border-hair hover:border-hair-strong hover:-translate-y-0.5 hover:shadow-md"
           >
             {/* JioSaavn Square Artwork Container */}
             <div
@@ -526,7 +526,7 @@ export function MobileHomeSections({
             subtitle="Popular right now"
             icon={Users}
           />
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x snap-mandatory">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 overscroll-x-contain">
             {topArtists.map((artist) => (
               <ArtistCard
                 key={artist.id}

@@ -739,13 +739,13 @@ export function PodcastsPanel({
             </button>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 overscroll-x-contain">
             {podcastHistory.slice(0, 10).map((ep, idx) => {
               const isCurrent = currentTrackId === ep.id;
               return (
                 <div
                   key={ep.id}
-                  className="w-36 shrink-0 snap-start text-left group p-2 rounded-xl bg-chip-subtle hover:bg-chip border border-hair transition-colors flex flex-col justify-between"
+                  className="w-36 shrink-0 text-left group p-2 rounded-xl bg-chip-subtle hover:bg-chip border border-hair transition-colors flex flex-col justify-between"
                 >
                   <button
                     type="button"

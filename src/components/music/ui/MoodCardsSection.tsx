@@ -205,7 +205,7 @@ export function MoodCardsSection({
 
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x snap-mandatory"
+        className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 overscroll-x-contain"
       >
         {orderedItems.map((item) => {
           const isActive = activeMood === item.key;
@@ -226,7 +226,7 @@ export function MoodCardsSection({
                   : undefined
               }
               className={cn(
-                "group/mood relative shrink-0 snap-start rounded-2xl border p-3.5 text-left transition-all duration-200 active:scale-[0.97]",
+                "group/mood relative shrink-0 rounded-2xl border p-3.5 text-left transition-all duration-200 active:scale-[0.97]",
                 "w-[144px] sm:w-[164px] h-[96px] sm:h-[104px] flex flex-col justify-between overflow-hidden",
                 "bg-gradient-to-br",
                 item.gradient,

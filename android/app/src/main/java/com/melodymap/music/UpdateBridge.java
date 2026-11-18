@@ -13,6 +13,7 @@ import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import androidx.core.content.FileProvider;
+import org.json.JSONObject;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -103,10 +104,16 @@ public class UpdateBridge {
 
                 // Connect and follow redirects (GitHub releases redirect to S3/CDN)
                 String currentUrl = apkUrl;
+                if (currentUrl == null) {
+                    throw new IllegalArgumentException("APK URL cannot be null");
+                }
                 HttpURLConnection connection = null;
                 int redirects = 0;
                 while (redirects < 6) {
                     URL url = new URL(currentUrl);
+                    if (!"https".equalsIgnoreCase(url.getProtocol())) {
+                        throw new SecurityException("Insecure download protocol: HTTPS is strictly required for APK updates (" + url.getProtocol() + ")");
+                    }
                     connection = (HttpURLConnection) url.openConnection();
                     connection.setInstanceFollowRedirects(true);
                     connection.setRequestProperty("User-Agent", "MelodyMap-AppUpdate/1.0");
@@ -120,6 +127,9 @@ public class UpdateBridge {
                         responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
                         responseCode == 307 || responseCode == 308) {
                         currentUrl = connection.getHeaderField("Location");
+                        if (currentUrl == null || currentUrl.trim().isEmpty()) {
+                            throw new Exception("Redirect missing Location header");
+                        }
                         redirects++;
                         connection.disconnect();
                     } else if (responseCode == HttpURLConnection.HTTP_OK) {
@@ -242,7 +252,7 @@ public class UpdateBridge {
     }
 
     private String quote(String text) {
-        if (text == null) return "''";
-        return "'" + text.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "") + "'";
+        if (text == null) return "\"\"";
+        return JSONObject.quote(text);
     }
 }

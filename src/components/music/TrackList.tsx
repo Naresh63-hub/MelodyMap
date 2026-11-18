@@ -43,6 +43,7 @@ type Props = {
   onDownload?: ((track: Track) => void) | undefined;
   onRemoveDownload?: ((track: Track) => void) | undefined;
   onOpenOptions?: ((track: Track) => void) | undefined;
+  variant?: "standard" | "minimal";
 };
 
 export function TrackList({
@@ -66,6 +67,7 @@ export function TrackList({
   onDownload,
   onRemoveDownload,
   onOpenOptions,
+  variant = "standard",
 }: Props) {
 
 
@@ -167,54 +169,58 @@ export function TrackList({
               );
             })()}
 
-              {/* Song duration time & like button matching reference image */}
-              <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-                <DownloadStatusBadge
-                  isDownloading={isDownloading}
-                  isDownloaded={isDownloaded}
-                  progress={progress}
-                />
-                <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium">
-                  {getTrackDisplayDuration(track)}
-                </span>
-                <HeartLikeButton
-                  liked={liked}
-                  onToggle={() => onToggleLike(track)}
-                  size="md"
-                />
-              </div>
+              {variant !== "minimal" ? (
+                <>
+                  {/* Song duration time & like button matching reference image */}
+                  <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                    <DownloadStatusBadge
+                      isDownloading={isDownloading}
+                      isDownloaded={isDownloaded}
+                      progress={progress}
+                    />
+                    <span className="text-xs sm:text-sm tabular-nums text-muted-foreground font-medium">
+                      {getTrackDisplayDuration(track)}
+                    </span>
+                    <HeartLikeButton
+                      liked={liked}
+                      onToggle={() => onToggleLike(track)}
+                      size="md"
+                    />
+                  </div>
 
-              {/* Direct Delete Download Button when track is downloaded */}
-              {isDownloaded && onRemoveDownload && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveDownload(track);
-                  }}
-                  title="Delete downloaded song"
-                  aria-label={`Delete downloaded song ${track.title}`}
-                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-red-400 hover:bg-red-500/10 active:scale-95"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+                  {/* Direct Delete Download Button when track is downloaded */}
+                  {isDownloaded && onRemoveDownload && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveDownload(track);
+                      }}
+                      title="Delete downloaded song"
+                      aria-label={`Delete downloaded song ${track.title}`}
+                      className="rounded-full p-2 text-foreground/40 transition-colors hover:text-red-400 hover:bg-red-500/10 active:scale-95"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
 
-              {onToggleDislike && (
-                <button
-                  type="button"
-                  onClick={() => onToggleDislike(track)}
-                  aria-label="Not for me"
-                  className="hidden sm:inline-flex rounded-full p-2 text-foreground/40 transition-colors hover:text-red-400 active:scale-95"
-                >
-                  <ThumbsDown
-                    className={cn(
-                      "h-4 w-4 transition-colors",
-                      dislikedIds?.has(track.id) && "fill-red-500 text-red-500",
-                    )}
-                  />
-                </button>
-              )}
+                  {onToggleDislike && (
+                    <button
+                      type="button"
+                      onClick={() => onToggleDislike(track)}
+                      aria-label="Not for me"
+                      className="hidden sm:inline-flex rounded-full p-2 text-foreground/40 transition-colors hover:text-red-400 active:scale-95"
+                    >
+                      <ThumbsDown
+                        className={cn(
+                          "h-4 w-4 transition-colors",
+                          dislikedIds?.has(track.id) && "fill-red-500 text-red-500",
+                        )}
+                      />
+                    </button>
+                  )}
+                </>
+              ) : null}
 
               {onOpenOptions ? (
                 <button
@@ -225,7 +231,7 @@ export function TrackList({
                   }}
                   title="Track options"
                   aria-label="Track options"
-                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-foreground hover:bg-chip-strong active:scale-95"
+                  className="rounded-full p-2 text-foreground/40 transition-colors hover:text-foreground hover:bg-chip-strong active:scale-95 shrink-0"
                 >
                   <MoreVertical className="h-4 w-4" />
                 </button>

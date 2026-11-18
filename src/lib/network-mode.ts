@@ -67,6 +67,12 @@ export function getOptimizedThumbnailUrl(originalUrl: string | undefined, isLowN
     if ((host === "dzcdn.net" || host.endsWith(".dzcdn.net")) && originalUrl.includes("1000x1000")) {
       return originalUrl.replace("1000x1000", "250x250");
     }
+
+    // JioSaavn thumbnail optimization:
+    // Replace 500x500 (~90KB) with 150x150 (~12KB) in Low Network Mode
+    if ((host === "saavncdn.com" || host.endsWith(".saavncdn.com")) && originalUrl.includes("500x500")) {
+      return originalUrl.replace(/500x500/g, "150x150");
+    }
   } catch {
     return originalUrl;
   }

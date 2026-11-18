@@ -25,7 +25,7 @@ export const ArtistCard = memo(function ArtistCard({ artist, onClick, className 
         }
       }}
       className={cn(
-        "group relative flex w-[116px] sm:w-[136px] shrink-0 snap-start flex-col items-center text-center cursor-pointer p-2 rounded-xl transition-all duration-200 hover:bg-chip/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+        "group relative flex w-[116px] sm:w-[136px] shrink-0 flex-col items-center text-center cursor-pointer p-2 rounded-xl transition-all duration-200 hover:bg-chip/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         className,
       )}
     >

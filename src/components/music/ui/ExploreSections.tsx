@@ -1,4 +1,4 @@
-import { Calendar, Disc3, Flame, Loader2, MoreHorizontal, MoreVertical, Music2, Pause, Play, Sparkles, TrendingUp, Trophy } from "lucide-react";
+import { Calendar, Disc3, Flame, Loader2, MoreHorizontal, MoreVertical, Music2, Pause, Play, RotateCw, Sparkles, TrendingUp, Trophy } from "lucide-react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Equalizer } from "@/components/music/NowPlayingViz";
 import { DownloadThumbnailOverlay, DownloadStatusBadge } from "@/components/music/ui/DownloadAnimation";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { trackSubtitle, getTrackDisplayDuration } from "@/lib/track-metadata";
+import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
 
 export type ExploreTabId = "all" | "trending" | "releases" | "popular";
 
@@ -28,6 +29,12 @@ type Props = {
   onLoadMoreTrending?: () => void;
   loadingMoreTrending?: boolean;
   exploreExhaustedTrending?: boolean;
+  onRefreshTrending?: (() => void) | undefined;
+  trendingLoading?: boolean | undefined;
+  onRefreshNewReleases?: (() => void) | undefined;
+  newReleasesLoading?: boolean | undefined;
+  onRefreshOldSongs?: (() => void) | undefined;
+  oldSongsLoading?: boolean | undefined;
 };
 
 /**
@@ -121,7 +128,7 @@ function HorizontalScrollRow({
   return (
     <div
       ref={scrollRef}
-      className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 snap-x snap-mandatory"
+      className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 overscroll-x-contain"
     >
       {tracks.map((track, i) => {
         const active = currentId === track.id;
@@ -131,7 +138,7 @@ function HorizontalScrollRow({
         return (
           <div
             key={track.id}
-            className="group/card relative w-[138px] sm:w-[156px] shrink-0 snap-start text-left p-1.5 rounded-xl transition-all hover:bg-chip/50"
+            className="group/card relative w-[138px] sm:w-[156px] shrink-0 text-left p-1.5 rounded-xl transition-all hover:bg-chip/50"
           >
             {/* JioSaavn Square Artwork Container */}
             <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-xl bg-card border border-hair">
@@ -142,10 +149,11 @@ function HorizontalScrollRow({
               >
                 {track.thumbnail ? (
                   <img
-                    src={track.thumbnail}
+                    src={getOptimizedThumbnailUrl(track.thumbnail)}
                     alt=""
                     className="h-full w-full object-cover transition-transform duration-300 group-hover/card:scale-105"
                     loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-muted-foreground">
@@ -293,9 +301,11 @@ function VerticalSongList({
               className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-card border border-hair"
             >
               <img
-                src={track.thumbnail}
+                src={getOptimizedThumbnailUrl(track.thumbnail)}
                 alt=""
                 className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
               {active && isPlaying && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -379,11 +389,15 @@ function SectionHeader({
   icon: Icon,
   subtitle,
   count,
+  onRefresh,
+  refreshing = false,
 }: {
   title: string;
   icon?: typeof TrendingUp | typeof Flame | typeof Disc3 | typeof Trophy | typeof Sparkles;
   subtitle?: string;
   count?: number;
+  onRefresh?: (() => void) | undefined;
+  refreshing?: boolean | undefined;
 }) {
   return (
     <div className="flex items-center justify-between mb-3 px-0.5">
@@ -394,11 +408,25 @@ function SectionHeader({
           <span className="text-xs text-muted-foreground font-medium">({count})</span>
         )}
       </div>
-      {subtitle && (
-        <span className="text-[11px] font-normal text-muted-foreground">
-          {subtitle}
-        </span>
-      )}
+      <div className="flex items-center gap-2">
+        {subtitle && (
+          <span className="text-[11px] font-normal text-muted-foreground">
+            {subtitle}
+          </span>
+        )}
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label={`Refresh ${title}`}
+            title={`Refresh ${title}`}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-chip-subtle active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <RotateCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin text-primary")} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -437,6 +465,12 @@ export function ExploreSections({
   onLoadMoreTrending,
   loadingMoreTrending = false,
   exploreExhaustedTrending = false,
+  onRefreshTrending,
+  trendingLoading = false,
+  onRefreshNewReleases,
+  newReleasesLoading = false,
+  onRefreshOldSongs,
+  oldSongsLoading = false,
 }: Props) {
   const [activeFilter, setActiveFilter] = useState<ExploreTabId>("all");
   const [visibleTrendingLimit, setVisibleTrendingLimit] = useState(15);
@@ -564,6 +598,8 @@ export function ExploreSections({
                 count={allTrending.length}
                 icon={TrendingUp}
                 subtitle="Top charts in your language"
+                onRefresh={onRefreshTrending}
+                refreshing={trendingLoading}
               />
               <VerticalSongList
                 tracks={allTrending}
@@ -610,6 +646,8 @@ export function ExploreSections({
                 count={allNewReleases.length}
                 icon={Flame}
                 subtitle="Fresh official drops"
+                onRefresh={onRefreshNewReleases}
+                refreshing={newReleasesLoading}
               />
               <HorizontalScrollRow
                 tracks={allNewReleases}
@@ -658,6 +696,8 @@ export function ExploreSections({
                 count={allOldSongs.length}
                 icon={Disc3}
                 subtitle="2000s Hits & Nostalgia"
+                onRefresh={onRefreshOldSongs}
+                refreshing={oldSongsLoading}
               />
               <HorizontalScrollRow
                 tracks={allOldSongs}
@@ -684,6 +724,8 @@ export function ExploreSections({
             count={trendingTracks.length}
             icon={TrendingUp}
             subtitle="Top charts in your language"
+            onRefresh={onRefreshTrending}
+            refreshing={trendingLoading}
           />
           {trendingTracks.length > 0 ? (
             <>
@@ -736,6 +778,8 @@ export function ExploreSections({
             count={sortedNewReleases.length}
             icon={Flame}
             subtitle="Sorted by actual release date (newest first)"
+            onRefresh={onRefreshNewReleases}
+            refreshing={newReleasesLoading}
           />
           {sortedNewReleases.length > 0 ? (
             <div className="space-y-4">

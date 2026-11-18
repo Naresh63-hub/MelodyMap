@@ -280,6 +280,8 @@ export function useAudioPlayer(options: {
 
   const acquireWakeLock = useCallback(async () => {
     if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    // When Data/Battery Saver mode is active, do not prevent device screen sleep
+    if (isLowNetworkModeEnabled()) return;
     try {
       if (!wakeLockRef.current) {
         wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
