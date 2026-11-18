@@ -1475,7 +1475,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     async (_refreshNonce?: number | string) => {
       setMixLoading(true);
       try {
-        const artistList = topArtists(stats, likes);
+        const artistList = topArtists(stats, likes, 12, downloadedTracks);
         const res = await runNewSongs({
           data: { artists: artistList, languages: settings.languages,
                   primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
@@ -1500,7 +1500,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         setMixLoading(false);
       }
     },
-    [runNewSongs, stats, likes, settings.languages, getSessionContext, applyExploreFilters],
+    [runNewSongs, stats, likes, downloadedTracks, settings.languages, getSessionContext, applyExploreFilters],
   );
 
   const loadMix = useCallback(
@@ -1885,7 +1885,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       if (sectionToRefresh === "all" || sectionToRefresh === "newReleases") {
         tasks.push((async () => {
           try {
-            const artistList = topArtists(stats, likes);
+            const artistList = topArtists(stats, likes, 12, downloadedTracks);
             const res = await runNewSongs({
               data: {
                 artists: artistList,
