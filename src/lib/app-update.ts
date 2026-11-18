@@ -14,7 +14,7 @@
 import { App } from "@capacitor/app";
 import { safeStorage } from "@/lib/safe-storage";
 
-export const CURRENT_APP_VERSION = "1.3.10";
+export const CURRENT_APP_VERSION = "1.3.11";
 export const LATEST_DIRECT_APK_URL = "/MelodyMap-latest.apk";
 
 /**
@@ -33,16 +33,16 @@ export function getDirectApkRelease(): AppRelease {
     tagName: `v${CURRENT_APP_VERSION}`,
     name: `MelodyMap v${CURRENT_APP_VERSION} (Latest APK)`,
     notes: [
-      "Zero song overlap: Daily Mix and Made For You are strictly mutually exclusive",
-      "Fresh candidate engine: dynamically balances fresh tracks on every refresh",
-      "Spotify-style background playback & native lock-screen Like controls",
-      "Offline caching & high-speed audio streaming with fallback recovery",
-      "In-app built-in APK installer with real-time download and package handoff",
+      "Separate Explore refresh: independently refresh Trending, New Releases, or Old Songs",
+      "Separate Home refresh: independently refresh Daily Mix and Made For You",
+      "Optimized touch scrolling: perfectly fluid touch movement and gestures",
+      "Slim app size: 66% lighter package size (10.8 MB)",
+      "Dynamic artwork ambient glow, miniplayer gestures, and karaoke lyrics",
     ].join("\n"),
     publishedAt: new Date().toISOString(),
     apkAsset: {
       name: `MelodyMap-v${CURRENT_APP_VERSION}.apk`,
-      size: 21171295,
+      size: 10831923,
       downloadUrl,
     },
   };
@@ -250,7 +250,20 @@ export async function checkForAppUpdate(options: { force?: boolean } = {}): Prom
   }
 
   try {
-    const latestRelease = await fetchLatestApkRelease();
+    let latestRelease: AppRelease | null = null;
+    try {
+      latestRelease = await fetchLatestApkRelease();
+    } catch {
+      latestRelease = null;
+    }
+
+    if (!latestRelease) {
+      const direct = getDirectApkRelease();
+      if (compareSemver(direct.version, currentVersion) > 0) {
+        latestRelease = direct;
+      }
+    }
+
     safeStorage.setItem(STORAGE_KEY_LAST_CHECK, String(Date.now()));
 
     if (!latestRelease) {

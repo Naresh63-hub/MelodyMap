@@ -45,10 +45,10 @@ public class UpdateBridge {
         try {
             PackageManager pm = activity.getPackageManager();
             PackageInfo pi = pm.getPackageInfo(activity.getPackageName(), 0);
-            return pi.versionName != null ? pi.versionName : "1.3.10";
+            return pi.versionName != null ? pi.versionName : "1.3.11";
         } catch (Exception e) {
             Log.e(TAG, "Error getting installed version", e);
-            return "1.3.10";
+            return "1.3.11";
         }
     }
 

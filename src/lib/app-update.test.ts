@@ -344,5 +344,25 @@ describe("In-App Update Engine (app-update.ts)", () => {
       expect(rel.apkAsset.downloadUrl).toContain("MelodyMap-latest.apk");
       expect(rel.apkAsset.size).toBeGreaterThan(0);
     });
+
+    it("falls back to direct APK release when GitHub API has no published releases", async () => {
+      // Mock installed version to older 1.3.10
+      setGlobalWindow({
+        AndroidUpdate: {
+          getInstalledVersion: () => "1.3.10",
+        },
+      });
+
+      // GitHub returns empty array
+      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => [],
+      } as Response);
+
+      const res = await checkForAppUpdate({ force: true });
+      expect(res.isUpdateAvailable).toBe(true);
+      expect(res.latestRelease?.version).toBe(CURRENT_APP_VERSION);
+      expect(res.latestRelease?.apkAsset.downloadUrl).toContain("MelodyMap-latest.apk");
+    });
   });
 });
