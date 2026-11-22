@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { safeStorage } from "./safe-storage";
 import type { PlaybackSource } from "@/lib/providers/types";
-import { inferLanguageFromArtists } from "./language-artists";
+import { inferLanguageFromArtists, getTrackLanguage } from "./language-artists";
+export { getTrackLanguage } from "./language-artists";
 
 export type Track = {
   id: string;
@@ -10,6 +11,7 @@ export type Track = {
   duration: string;
   thumbnail: string;
   reason?: string | undefined;
+  recommendationReason?: string | undefined;
   /** Direct audio URL (e.g. Audius stream, Jamendo MP3, Archive, podcast) — bypasses stream proxy. */
   previewUrl?: string | undefined;
   /** Source provider */

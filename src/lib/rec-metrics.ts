@@ -1,5 +1,6 @@
 import { safeStorage } from "./safe-storage";
 import { telemetry, type PlaybackTelemetryEvent } from "./telemetry";
+import { recordArtistTelemetryEvent } from "./artist-recent";
 
 /**
  * Lightweight on-device outcome counters, bucketed by day and by recommendation
@@ -122,9 +123,70 @@ export function summarizeMetrics(
 export function resetRecMetrics(): void {
   try {
     safeStorage.removeItem(STORAGE_KEY);
+    safeStorage.removeItem(LANG_STD_STORAGE_KEY);
   } catch {
     // best-effort
   }
+}
+
+export interface LanguageFeatureStdSummary {
+  batches: number;
+  mean: number;
+}
+
+const LANG_STD_STORAGE_KEY = "melodymap.rec_lang_std.v1";
+
+export function recordLanguageFeatureStd(std: number): void {
+  try {
+    const raw = safeStorage.getItem(LANG_STD_STORAGE_KEY);
+    let current: LanguageFeatureStdSummary = { batches: 0, mean: 0 };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.batches === "number" && typeof parsed.mean === "number") {
+        current = parsed;
+      }
+    }
+    const newBatches = current.batches + 1;
+    const newMean = current.batches === 0
+      ? std
+      : (current.mean * current.batches + std) / newBatches;
+    safeStorage.setItem(LANG_STD_STORAGE_KEY, JSON.stringify({ batches: newBatches, mean: newMean }));
+  } catch {
+    // best-effort
+  }
+}
+
+export function getLanguageFeatureStd(): LanguageFeatureStdSummary {
+  try {
+    const raw = safeStorage.getItem(LANG_STD_STORAGE_KEY);
+    if (!raw) return { batches: 0, mean: 0 };
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.batches === "number" && typeof parsed.mean === "number") {
+      return parsed;
+    }
+    return { batches: 0, mean: 0 };
+  } catch {
+    return { batches: 0, mean: 0 };
+  }
+}
+
+/**
+ * Computes the sample standard deviation of coordinate 5 (language feature)
+ * across candidate tracks for an AutoDJ batch.
+ */
+export function computeBatchLanguageStd(
+  candidates: { title?: string | undefined; artist?: string | undefined; languageCode?: string | undefined; [key: string]: any }[],
+  ctx: any,
+  policy: { extractFeatureVector: (c: any, ctx: any) => number[] },
+): number {
+  if (!candidates || candidates.length === 0) return 0;
+  const values = candidates.map((c) => {
+    const v = policy.extractFeatureVector(c, ctx);
+    return typeof v[5] === "number" ? v[5] : 0;
+  });
+  const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
+  return Math.sqrt(variance);
 }
 
 let unsubscribe: (() => void) | null = null;
@@ -132,7 +194,10 @@ let unsubscribe: (() => void) | null = null;
 /** Call once at app start. Safe to call again (e.g. HMR); returns a stop function. */
 export function initRecMetrics(): () => void {
   if (!unsubscribe) {
-    unsubscribe = telemetry.subscribe((e) => recordMetricsEvent(e));
+    unsubscribe = telemetry.subscribe((e) => {
+      recordMetricsEvent(e);
+      recordArtistTelemetryEvent(e);
+    });
   }
   return () => {
     unsubscribe?.();

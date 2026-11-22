@@ -5,11 +5,21 @@ import {
   setDiscountGamma,
   getDiscountGamma,
   DISCOUNT_GAMMA_STORAGE_KEY,
+  buildTrainingContext,
+  setBanditRngSource,
+  X5_RESET_KEY,
+  sortByScoreWithMovieTieBreaker,
+  BANDIT_STORAGE_KEY,
+  BANDIT_STORAGE_KEY_V1,
+  BANDIT_STORAGE_KEY_V2,
+  BANDIT_BACKUP6_STORAGE_KEY,
+  restoreBackup6,
   type SessionContext,
   type BanditModelState,
 } from "./bandit-policy";
+import { recordArtistTerminalOutcome, clearArtistRecentStore } from "./artist-recent";
 import { safeStorage } from "./safe-storage";
-import { setRecFlag, getRecConfigChangedAt } from "./rec-flags";
+import { setRecFlag, getRecFlag, getRecConfigChangedAt } from "./rec-flags";
 import type { PlaybackTelemetryEvent } from "./telemetry";
 import type { TrackLike } from "./track-dedup";
 
@@ -486,6 +496,629 @@ describe("ThompsonSamplingPolicy Recommender", () => {
         extractSpy.mockRestore();
         setRecFlag("trainOnFullTrack", true);
       }
+    });
+  });
+
+  describe("Leak-free training context (flag: leakFreeTrainingContext)", () => {
+    it("rewinds currentTrack to predecessorTrack and strips post-event mutations in buildTrainingContext", () => {
+      const predTrack: TrackLike = { id: "track-pred", title: "Pred Song", artist: "Pred Artist" };
+      const eventTrack: TrackLike = { id: "track-ev", title: "Event Song", artist: "Event Artist" };
+
+      const ctx: SessionContext = {
+        currentTrack: eventTrack,
+        predecessorTrack: predTrack,
+        recentHistory: [eventTrack, predTrack],
+        likedIds: new Set(["track-ev", "other-1"]),
+        likedTracks: [eventTrack, { id: "other-1", title: "Other", artist: "Other" }],
+        downloadedIds: new Set(["track-ev"]),
+        downloadedTracks: [eventTrack],
+        dislikedIds: new Set(["track-ev"]),
+        dislikedTracks: [eventTrack],
+        stats: {
+          "track-ev": {
+            plays: 2,
+            completions: 1,
+            skips: 1,
+            track: eventTrack,
+          } as any,
+        },
+      };
+
+      // 1. Completion event
+      const compEv: PlaybackTelemetryEvent = {
+        id: "ev-c",
+        trackId: "track-ev",
+        title: "Event Song",
+        artist: "Event Artist",
+        eventType: "COMPLETED",
+        positionSeconds: 200,
+        durationSeconds: 200,
+        fractionPlayed: 1.0,
+        timestamp: Date.now(),
+      };
+      const cleanedComp = buildTrainingContext(compEv, ctx);
+      expect(cleanedComp.currentTrack?.id).toBe("track-pred");
+      expect(cleanedComp.stats?.["track-ev"]?.plays).toBe(1);
+      expect(cleanedComp.stats?.["track-ev"]?.completions).toBe(0);
+
+      // 2. Liked event
+      const likeEv: PlaybackTelemetryEvent = {
+        ...compEv,
+        id: "ev-l",
+        eventType: "LIKED",
+      };
+      const cleanedLike = buildTrainingContext(likeEv, ctx);
+      expect(cleanedLike.likedIds?.has("track-ev")).toBe(false);
+      expect(cleanedLike.likedTracks?.some((t) => t.id === "track-ev")).toBe(false);
+
+      // 3. Downloaded event
+      const dlEv: PlaybackTelemetryEvent = {
+        ...compEv,
+        id: "ev-d",
+        eventType: "DOWNLOADED",
+      };
+      const cleanedDl = buildTrainingContext(dlEv, ctx);
+      expect(cleanedDl.downloadedIds?.has("track-ev")).toBe(false);
+      expect(cleanedDl.downloadedTracks?.some((t) => t.id === "track-ev")).toBe(false);
+
+      // 4. Disliked event
+      const disEv: PlaybackTelemetryEvent = {
+        ...compEv,
+        id: "ev-dis",
+        eventType: "DISLIKED",
+      };
+      const cleanedDis = buildTrainingContext(disEv, ctx);
+      expect(cleanedDis.dislikedIds?.has("track-ev")).toBe(false);
+      expect(cleanedDis.dislikedTracks?.some((t) => t.id === "track-ev")).toBe(false);
+    });
+
+    it("with flag ON, training feature vector matches pre-event ranker context", () => {
+      setRecFlag("leakFreeTrainingContext", true);
+      const extractSpy = vi.spyOn(policy, "extractFeatureVector");
+      try {
+        const predTrack: TrackLike = { id: "pred", title: "P", artist: "PA" };
+        const eventTrack: TrackLike = { id: "cand", title: "C", artist: "CA" };
+
+        // Post-event context as produced at onEnd:
+        // currentTrack was set to eventTrack, and eventTrack was added to likedIds
+        const postEventCtx: SessionContext = {
+          currentTrack: eventTrack,
+          predecessorTrack: predTrack,
+          likedIds: new Set(["cand"]),
+          likedTracks: [eventTrack],
+        };
+
+        const event: PlaybackTelemetryEvent = {
+          id: "ev-like-test",
+          trackId: "cand",
+          title: "C",
+          artist: "CA",
+          eventType: "LIKED",
+          positionSeconds: 10,
+          durationSeconds: 100,
+          fractionPlayed: 0.1,
+          timestamp: Date.now(),
+        };
+
+        policy.recordFeedback(event, postEventCtx);
+
+        // Pre-event context as the ranker saw it before the track played and was liked:
+        const preEventCtx: SessionContext = {
+          currentTrack: predTrack,
+          predecessorTrack: predTrack,
+          likedIds: new Set([]),
+          likedTracks: [],
+        };
+        const expectedX = policy.extractFeatureVector(eventTrack, preEventCtx);
+
+        // extractSpy was called with cleaned context
+        const trainedContext = extractSpy.mock.calls[0]?.[1];
+        expect(trainedContext?.currentTrack?.id).toBe("pred");
+        expect(trainedContext?.likedIds?.has("cand")).toBe(false);
+
+        const trainedX = extractSpy.mock.results[0]?.value;
+        expect(trainedX).toEqual(expectedX);
+      } finally {
+        extractSpy.mockRestore();
+        setRecFlag("leakFreeTrainingContext", false);
+      }
+    });
+
+    it("with flag OFF (default), recordFeedback uses raw context unchanged", () => {
+      expect(getRecFlag("leakFreeTrainingContext")).toBe(false);
+      const extractSpy = vi.spyOn(policy, "extractFeatureVector");
+      try {
+        const eventTrack: TrackLike = { id: "cand", title: "C", artist: "CA" };
+        const rawCtx: SessionContext = {
+          currentTrack: eventTrack,
+          likedIds: new Set(["cand"]),
+        };
+        const event: PlaybackTelemetryEvent = {
+          id: "ev-default-off",
+          trackId: "cand",
+          title: "C",
+          artist: "CA",
+          eventType: "LIKED",
+          positionSeconds: 10,
+          durationSeconds: 100,
+          fractionPlayed: 0.1,
+          timestamp: Date.now(),
+        };
+
+        policy.recordFeedback(event, rawCtx);
+
+        const usedContext = extractSpy.mock.calls[0]?.[1];
+        expect(usedContext?.currentTrack?.id).toBe("cand");
+        expect(usedContext?.likedIds?.has("cand")).toBe(true);
+      } finally {
+        extractSpy.mockRestore();
+      }
+    });
+
+    describe("Task 5: Leak-free context removes event's own outcome from x3 inputs", () => {
+      const sampleTrack: TrackLike = { id: "track-100", title: "Target Track", artist: "Target Artist" };
+
+      it("removes event's own outcome from x3 for LIKED", () => {
+        const postCtx: SessionContext = {
+          likedIds: new Set([sampleTrack.id]),
+          likedTracks: [sampleTrack],
+        };
+        const likeEvent: PlaybackTelemetryEvent = {
+          id: "ev-like-100",
+          trackId: sampleTrack.id,
+          title: sampleTrack.title,
+          artist: sampleTrack.artist,
+          eventType: "LIKED",
+          positionSeconds: 20,
+          durationSeconds: 180,
+          fractionPlayed: 0.11,
+          timestamp: Date.now(),
+        };
+
+        // Before buildTrainingContext: x3 sees isLikedArtist = true (liked artist prior: 0.70)
+        const xBefore = policy.extractFeatureVector(sampleTrack, postCtx);
+        expect(xBefore[3]).toBe(0.70);
+
+        // After buildTrainingContext: track is removed from likedTracks and likedIds
+        const cleanCtx = buildTrainingContext(likeEvent, postCtx);
+        expect(cleanCtx.likedIds?.has(sampleTrack.id)).toBe(false);
+        expect(cleanCtx.likedTracks?.length).toBe(0);
+
+        // x3 sees unplayed neutral prior (0.35) — event's own like is completely absent
+        const xAfter = policy.extractFeatureVector(sampleTrack, cleanCtx);
+        expect(xAfter[3]).toBe(0.35);
+      });
+
+      it("removes event's own outcome from x3 for DISLIKED", () => {
+        const postCtx: SessionContext = {
+          dislikedIds: new Set([sampleTrack.id]),
+          dislikedTracks: [sampleTrack],
+        };
+        const dislikeEvent: PlaybackTelemetryEvent = {
+          id: "ev-dis-100",
+          trackId: sampleTrack.id,
+          title: sampleTrack.title,
+          artist: sampleTrack.artist,
+          eventType: "DISLIKED",
+          positionSeconds: 5,
+          durationSeconds: 180,
+          fractionPlayed: 0.03,
+          timestamp: Date.now(),
+        };
+
+        // Before buildTrainingContext: x3 sees isDisliked = true (severe penalty: 0.02)
+        const xBefore = policy.extractFeatureVector(sampleTrack, postCtx);
+        expect(xBefore[3]).toBe(0.02);
+
+        // After buildTrainingContext: track is removed from dislikedTracks and dislikedIds
+        const cleanCtx = buildTrainingContext(dislikeEvent, postCtx);
+        expect(cleanCtx.dislikedIds?.has(sampleTrack.id)).toBe(false);
+        expect(cleanCtx.dislikedTracks?.length).toBe(0);
+
+        // x3 sees unplayed neutral prior (0.35) — event's own dislike is absent
+        const xAfter = policy.extractFeatureVector(sampleTrack, cleanCtx);
+        expect(xAfter[3]).toBe(0.35);
+      });
+
+      it("removes event's own outcome from x3 for DOWNLOADED", () => {
+        const postCtx: SessionContext = {
+          downloadedIds: new Set([sampleTrack.id]),
+          downloadedTracks: [sampleTrack],
+        };
+        const downloadEvent: PlaybackTelemetryEvent = {
+          id: "ev-dl-100",
+          trackId: sampleTrack.id,
+          title: sampleTrack.title,
+          artist: sampleTrack.artist,
+          eventType: "DOWNLOADED",
+          positionSeconds: 0,
+          durationSeconds: 180,
+          fractionPlayed: 0.0,
+          timestamp: Date.now(),
+        };
+
+        // Before buildTrainingContext: x3 sees isDownloadedArtist = true (downloaded artist prior: 0.75)
+        const xBefore = policy.extractFeatureVector(sampleTrack, postCtx);
+        expect(xBefore[3]).toBe(0.75);
+
+        // After buildTrainingContext: track is removed from downloadedTracks and downloadedIds
+        const cleanCtx = buildTrainingContext(downloadEvent, postCtx);
+        expect(cleanCtx.downloadedIds?.has(sampleTrack.id)).toBe(false);
+        expect(cleanCtx.downloadedTracks?.length).toBe(0);
+
+        // x3 sees unplayed neutral prior (0.35) — event's own download is absent
+        const xAfter = policy.extractFeatureVector(sampleTrack, cleanCtx);
+        expect(xAfter[3]).toBe(0.35);
+      });
+
+      it("removes event's own outcome from x3 for SKIPPED", () => {
+        const postCtx: SessionContext = {
+          stats: {
+            [sampleTrack.id]: {
+              plays: 2,
+              completions: 1,
+              skips: 1,
+              track: sampleTrack,
+            } as any,
+          },
+        };
+        const skipEvent: PlaybackTelemetryEvent = {
+          id: "ev-skip-100",
+          trackId: sampleTrack.id,
+          title: sampleTrack.title,
+          artist: sampleTrack.artist,
+          eventType: "SKIPPED",
+          positionSeconds: 6,
+          durationSeconds: 180,
+          fractionPlayed: 0.033,
+          timestamp: Date.now(),
+        };
+
+        // Before buildTrainingContext: skips = 1 -> negativeMass = 2 + 1*2 + 1 = 5, ratio = 1.5 / 5 = 0.30
+        const xBefore = policy.extractFeatureVector(sampleTrack, postCtx);
+        expect(xBefore[3]).toBeCloseTo(0.30, 2);
+
+        // After buildTrainingContext: skips decremented from 1 to 0
+        const cleanCtx = buildTrainingContext(skipEvent, postCtx);
+        expect(cleanCtx.stats?.[sampleTrack.id]?.skips).toBe(0);
+
+        // x3 sees 0 skips from this event -> replays = 1, ratio = 3.5 / 3 = 1.167 (clamped to 1.0)
+        const xAfter = policy.extractFeatureVector(sampleTrack, cleanCtx);
+        expect(xAfter[3]).toBe(1.0);
+        expect(xAfter[3]).toBeGreaterThan(xBefore[3]!);
+      });
+    });
+  });
+
+  describe("Task 4: 8-dimensional model, features x5-x7 and state migration", () => {
+    it("FEATURE_DIM is 8 and default model initializes to 8 dimensions", () => {
+      expect(FEATURE_DIM).toBe(8);
+      const state = policy.getModelState();
+      expect(state.dimension).toBe(8);
+      expect(state.version).toBe(2);
+      expect(state.mu).toHaveLength(8);
+      expect(state.f).toHaveLength(8);
+      expect(state.B).toHaveLength(8);
+      expect(state.B_inv).toHaveLength(8);
+    });
+
+    it("loading a saved 6-dim state migrates to 8-dim, preserves mu[0..4], and pads coordinates at prior", () => {
+      // Construct a valid 6-dimensional model state
+      const sixDimB: number[][] = Array.from({ length: 6 }, (_, i) =>
+        Array.from({ length: 6 }, (_, j) => (i === j ? 2.0 : 0.1)),
+      );
+      const sixDimMu = [0.25, 0.6, 0.45, 0.55, 0.15, 0.35];
+      // Compute f = B * mu
+      const sixDimF = sixDimB.map((row) =>
+        row.reduce((sum, val, idx) => sum + val * (sixDimMu[idx] ?? 0), 0),
+      );
+
+      const legacyState: BanditModelState = {
+        version: 1,
+        dimension: 6,
+        B: sixDimB,
+        B_inv: sixDimB, // dummy, will be recomputed on migration
+        f: sixDimF,
+        mu: sixDimMu,
+        totalUpdates: 42,
+        lastUpdated: 12345678,
+      };
+
+      policy.setModelState(legacyState);
+
+      const migrated = policy.getModelState();
+      expect(migrated.dimension).toBe(8);
+      expect(migrated.version).toBe(2);
+      expect(migrated.totalUpdates).toBe(42);
+
+      // Preserves original mu[0..4] (within floating precision)
+      for (let i = 0; i < 5; i++) {
+        expect(migrated.mu[i]).toBeCloseTo(sixDimMu[i]!, 3);
+      }
+
+      // Padded coordinates sit at the prior: x6 = 0.3, x7 = 0.2
+      expect(migrated.mu[6]).toBeCloseTo(0.3, 4);
+      expect(migrated.mu[7]).toBeCloseTo(0.2, 4);
+
+      // Padded matrix blocks have lambda on diagonal and 0 cross terms
+      expect(migrated.B[6]![6]).toBe(1.0);
+      expect(migrated.B[7]![7]).toBe(1.0);
+      expect(migrated.B[6]![0]).toBe(0.0);
+      expect(migrated.B[7]![1]).toBe(0.0);
+    });
+
+    it("Rollback-safe state: fresh install, migrated install, and v1 left byte-identical", () => {
+      const original6: BanditModelState = {
+        version: 1,
+        dimension: 6,
+        B: Array.from({ length: 6 }, (_, i) =>
+          Array.from({ length: 6 }, (_, j) => (i === j ? 1.0 : 0.0)),
+        ),
+        B_inv: Array.from({ length: 6 }, (_, i) =>
+          Array.from({ length: 6 }, (_, j) => (i === j ? 1.0 : 0.0)),
+        ),
+        f: [0.5, 0.4, 0.6, 0.5, 0.3, 0.5],
+        mu: [0.5, 0.4, 0.6, 0.5, 0.3, 0.5],
+        totalUpdates: 42,
+        lastUpdated: 123456789,
+      };
+      const v1RawExpected = JSON.stringify(original6);
+
+      try {
+        // 1. Fresh install: neither v1 nor v2 exists
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V1);
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V2);
+        safeStorage.removeItem(BANDIT_BACKUP6_STORAGE_KEY);
+
+        const freshPolicy = new ThompsonSamplingPolicy();
+        freshPolicy.loadFromStorage(true);
+        expect(freshPolicy.getModelState().dimension).toBe(8);
+        expect(freshPolicy.getModelState().totalUpdates).toBe(0);
+
+        freshPolicy.saveToStorage(true);
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY_V2)).toBeTruthy();
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY_V1)).toBeNull(); // v1 must never be created or touched!
+
+        // 2. Migrated install: v1 exists, v2 does not
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V2);
+        safeStorage.setItem(BANDIT_STORAGE_KEY_V1, v1RawExpected);
+
+        const migratingPolicy = new ThompsonSamplingPolicy();
+        migratingPolicy.loadFromStorage(true);
+
+        expect(migratingPolicy.getModelState().dimension).toBe(8);
+        expect(migratingPolicy.getModelState().totalUpdates).toBe(42);
+
+        // v2 was written with migrated 8-dim state
+        const v2Raw = safeStorage.getItem(BANDIT_STORAGE_KEY_V2);
+        expect(v2Raw).toBeTruthy();
+        expect(JSON.parse(v2Raw!).dimension).toBe(8);
+
+        // CRITICAL: v1 is left strictly byte-identical!
+        const v1RawAfterMigration = safeStorage.getItem(BANDIT_STORAGE_KEY_V1);
+        expect(v1RawAfterMigration).toBe(v1RawExpected);
+
+        // 3. Subsequent load: v2 exists, loads from v2 without touching v1
+        const loadedPolicy = new ThompsonSamplingPolicy();
+        loadedPolicy.loadFromStorage(true);
+        expect(loadedPolicy.getModelState().dimension).toBe(8);
+        expect(loadedPolicy.getModelState().totalUpdates).toBe(42);
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY_V1)).toBe(v1RawExpected);
+
+        // 4. restoreBackup6: restores 6-dim content into v2 as 6->8 migration, leaves v1 byte-identical
+        const restored = restoreBackup6();
+        expect(restored).toEqual(original6);
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY_V1)).toBe(v1RawExpected); // v1 untouched
+        const v2AfterRestore = JSON.parse(safeStorage.getItem(BANDIT_STORAGE_KEY_V2)!);
+        expect(v2AfterRestore.dimension).toBe(8);
+        expect(v2AfterRestore.totalUpdates).toBe(42);
+      } finally {
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V1);
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V2);
+        safeStorage.removeItem(BANDIT_BACKUP6_STORAGE_KEY);
+      }
+    });
+
+    it("flags-off regression: with flags OFF, x6 and x7 are 0 and rankings are regression-safe", () => {
+      expect(getRecFlag("languageFeature")).toBe(false);
+      expect(getRecFlag("artistRecentSkipFeature")).toBe(false);
+      expect(getRecFlag("noveltyMomentumFeature")).toBe(false);
+
+      const testTrack: TrackLike = {
+        id: "reg-1",
+        title: "Test Song",
+        artist: "Test Artist",
+      };
+      const testCtx: SessionContext = {
+        hourOfDay: 12,
+        discoveryPercent: 40,
+        sessionCompletions: 3,
+        sessionSkips: 1,
+      };
+
+      const x = policy.extractFeatureVector(testTrack, testCtx);
+      expect(x).toHaveLength(8);
+      expect(x[6]).toBe(0.0);
+      expect(x[7]).toBe(0.0);
+
+      // Deterministic ranking under a fixed RNG seed
+      let seed = 12345;
+      const seededRng = () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      };
+      setBanditRngSource(seededRng);
+
+      try {
+        const pool: TrackLike[] = [
+          { id: "p1", title: "Track One", artist: "Artist A" },
+          { id: "p2", title: "Track Two", artist: "Artist B" },
+          { id: "p3", title: "Track Three", artist: "Artist C" },
+        ];
+        const ranked = policy.rankCandidates(pool, testCtx);
+        expect(ranked).toHaveLength(3);
+        expect(ranked.map((t) => t.id)).toBeDefined();
+      } finally {
+        setBanditRngSource(null);
+      }
+    });
+
+    it("evaluates x5, x6, x7 correctly for hand-built examples when flags are ON", () => {
+      setRecFlag("languageFeature", true);
+      setRecFlag("artistRecentSkipFeature", true);
+      setRecFlag("noveltyMomentumFeature", true);
+
+      try {
+        clearArtistRecentStore();
+        // Record 2 skips for "Skip Artist"
+        recordArtistTerminalOutcome("Skip Artist", true);
+        recordArtistTerminalOutcome("Skip Artist", true);
+
+        const ctx: SessionContext = {
+          hourOfDay: 15,
+          discoveryPercent: 50,
+          preferredLanguages: ["Telugu"],
+          sessionCompletions: 3,
+          sessionSkips: 1, // momentum = 3 / (4 + 1) = 0.6
+          familiarArtists: new Set(["familiar"]),
+        };
+
+        // 1. Matching language track with unknown artist
+        const matchTrack: TrackLike = {
+          id: "tel-1",
+          title: "Samajavaragamana",
+          artist: "Anurag Kulkarni", // Known Telugu artist
+        };
+        const xMatch = policy.extractFeatureVector(matchTrack, ctx);
+        expect(xMatch[5]).toBe(1.0); // match
+        expect(xMatch[6]).toBe(1.0); // unknown artist -> 1.0 health
+        expect(xMatch[7]).toBeCloseTo(0.6, 4); // unfamiliar -> 1.0 * 0.6 momentum
+
+        // 2. Untagged track
+        const untaggedTrack: TrackLike = {
+          id: "un-1",
+          title: "Acoustic Melody",
+          artist: "Brand New Indie Singer",
+        };
+        const xUntagged = policy.extractFeatureVector(untaggedTrack, ctx);
+        expect(xUntagged[5]).toBe(0.5); // untagged -> 0.5
+
+        // 3. Non-selected language track by Skip Artist
+        const nonSelTrack: TrackLike = {
+          id: "hi-1",
+          title: "Kesariya (Hindi)",
+          artist: "Skip Artist",
+        };
+        const xNonSel = policy.extractFeatureVector(nonSelTrack, ctx);
+        expect(xNonSel[5]).toBe(0.05); // non-selected language -> 0.05
+        // Skip Artist: 2 skips, 2 plays -> 1 - 2 / (2 + 1) = 1/3 ≈ 0.3333
+        expect(xNonSel[6]).toBeCloseTo(1 / 3, 4);
+
+        // 4. Familiar track: x7 must be 0.0
+        const familiarTrack: TrackLike = {
+          id: "fam-1",
+          title: "Familiar Song",
+          artist: "familiar",
+        };
+        const xFam = policy.extractFeatureVector(familiarTrack, ctx);
+        expect(xFam[7]).toBe(0.0);
+      } finally {
+        setRecFlag("languageFeature", false);
+        setRecFlag("artistRecentSkipFeature", false);
+        setRecFlag("noveltyMomentumFeature", false);
+        clearArtistRecentStore();
+      }
+    });
+
+    it("marker prevents repeated coordinate 5 reset", () => {
+      safeStorage.removeItem(X5_RESET_KEY);
+      setRecFlag("languageFeature", true);
+
+      try {
+        // First call resets coordinate 5 and sets marker
+        policy.checkLanguageFeatureCoordinateReset();
+        expect(safeStorage.getItem(X5_RESET_KEY)).toBe("true");
+
+        // Learn something on coordinate 5: mutate mu[5]
+        const state = policy.getModelState();
+        state.mu[5] = 0.99;
+        state.f[5] = 5.0;
+        policy.setModelState(state);
+        expect(policy.getModelState().mu[5]).toBeCloseTo(0.99, 4);
+
+        // Calling checkLanguageFeatureCoordinateReset again must be a NO-OP
+        policy.checkLanguageFeatureCoordinateReset();
+        expect(policy.getModelState().mu[5]).toBeCloseTo(0.99, 4);
+      } finally {
+        setRecFlag("languageFeature", false);
+        safeStorage.removeItem(X5_RESET_KEY);
+      }
+    });
+  });
+
+  describe("Task 6: Movie-first tie-breaker behind flag (movieTieBreaker)", () => {
+    it("rankCandidatesWithScores returns track and numeric score matching rankCandidates ordering", () => {
+      const candidates: TrackLike[] = [
+        { id: "s1", title: "Song 1", artist: "Artist 1" },
+        { id: "s2", title: "Song 2", artist: "Artist 2" },
+        { id: "s3", title: "Song 3", artist: "Artist 3" },
+      ];
+      const ctx: SessionContext = { hourOfDay: 14, discoveryPercent: 40 };
+
+      // Fixed seed
+      setBanditRngSource(() => 0.5);
+      const rankedNormal = policy.rankCandidates(candidates, ctx);
+
+      setBanditRngSource(() => 0.5);
+      const rankedWithScores = policy.rankCandidatesWithScores(candidates, ctx);
+      setBanditRngSource(null);
+
+      expect(rankedWithScores).toHaveLength(3);
+      expect(rankedWithScores.map((s) => s.track.id)).toEqual(rankedNormal.map((t) => t.id));
+      for (const item of rankedWithScores) {
+        expect(typeof item.score).toBe("number");
+        expect(Number.isFinite(item.score)).toBe(true);
+      }
+    });
+
+    it("prefers movie track only when score is within 10% of batch range", () => {
+      const tA: TrackLike = { id: "tA", title: "Indie Acoustic", artist: "Artist A" };
+      const tB: TrackLike = { id: "tB", title: "Film Soundtrack Song", artist: "Artist B", album: "Blockbuster Movie" };
+      const tC: TrackLike = { id: "tC", title: "Pop Song", artist: "Artist C" };
+      const tD: TrackLike = { id: "tD", title: "Cinema Score", artist: "Artist D", album: "Old Movie" };
+
+      // Batch score range: min = 1.0 (tD), max = 2.0 (tA). Range = 1.0. 10% threshold = 0.10.
+      const scoredFixtures = [
+        { track: tA, score: 2.0 }, // Non-movie
+        { track: tB, score: 1.95 }, // Movie: diff from tA is 0.05 <= 0.10 -> tB should tie-break above tA!
+        { track: tC, score: 1.5 }, // Non-movie
+        { track: tD, score: 1.0 }, // Movie: diff from tC is 0.50 > 0.10 -> tC must remain ahead of tD!
+      ];
+
+      const isMovie = (t: TrackLike) => Boolean(t.album && t.album.includes("Movie"));
+      const sorted = sortByScoreWithMovieTieBreaker(scoredFixtures, isMovie);
+
+      expect(sorted.map((t) => t.id)).toEqual(["tB", "tA", "tC", "tD"]);
+    });
+
+    it("falls back cleanly to score when no tracks are movies or score range is 0", () => {
+      const t1: TrackLike = { id: "t1", title: "Song 1", artist: "Artist 1" };
+      const t2: TrackLike = { id: "t2", title: "Song 2", artist: "Artist 2" };
+
+      const fixtures = [
+        { track: t1, score: 0.8 },
+        { track: t2, score: 0.4 },
+      ];
+      const sorted = sortByScoreWithMovieTieBreaker(fixtures, () => false);
+      expect(sorted.map((t) => t.id)).toEqual(["t1", "t2"]);
+
+      // Equal scores
+      const equalFixtures = [
+        { track: t1, score: 0.5 },
+        { track: t2, score: 0.5 },
+      ];
+      const sortedEqual = sortByScoreWithMovieTieBreaker(equalFixtures, (t) => t.id === "t2");
+      expect(sortedEqual.map((t) => t.id)).toEqual(["t2", "t1"]);
     });
   });
 });

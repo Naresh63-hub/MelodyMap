@@ -169,7 +169,11 @@ import {
 } from "@/lib/context-engine";
 import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { tagTrackSource, getTrackSource } from "@/lib/rec-source";
-import { initRecMetrics } from "@/lib/rec-metrics";
+import { initRecMetrics, recordLanguageFeatureStd, computeBatchLanguageStd } from "@/lib/rec-metrics";
+import { sortByScoreWithMovieTieBreaker } from "@/lib/bandit-policy";
+import { extractTasteArtists, interleaveTasteTracks } from "@/lib/autodj-taste-mix";
+import { explainPick } from "@/lib/rec-reasons";
+import { buildOfflineMix } from "@/lib/offline-mix";
 import { getRecFlag } from "@/lib/rec-flags";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
@@ -314,6 +318,7 @@ function MusicApp() {
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [recs, setRecs] = useState<Track[]>([]);
+  const [offlineMix, setOfflineMix] = useState<Track[]>([]);
   const [trendingList, setTrendingList] = useState<Track[]>([]);
   const [oldSongsList, setOldSongsList] = useState<Track[]>([]);
   const [historyQuery, setHistoryQuery] = useState("");
@@ -955,6 +960,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const getSessionContext = useCallback((): SessionContext => {
     return {
       currentTrack: currentRef.current,
+      predecessorTrack: previousTrackRef.current,
       hourOfDay: new Date().getHours(),
       discoveryPercent: settings.discovery ?? 40,
       recentHistory: history.slice(0, 15),
@@ -1197,7 +1203,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           undoRef.current = {
             timeout: setTimeout(() => setUndoLabel(null), 8000),
             restore: () => {
-              if (track) playSong(track, queueRef.current);
+              if (track) playSong(track, queueRef.current, getTrackSource(track.id));
             },
           };
         }
@@ -1472,7 +1478,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           (t) => t.id !== track.id && isOriginalSong(t) && hasPlayableDuration(t),
         );
         const newQueue = [track, ...filteredRadio];
-        startQueue(newQueue, 0, "radio");
+        startQueue(newQueue, 0, "autodj-radio");
         setMessage(`Started Radio for "${track.title}" (${newQueue.length} songs)`);
       } catch (err) {
         console.error("Failed to start song radio:", err);
@@ -1501,7 +1507,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     });
   }, []);
 
-  const enqueue = useCallback((tracks: Track[]) => {
+  const enqueue = useCallback((tracks: Track[], source?: string) => {
+    if (source) {
+      tagTrackSource(tracks, source);
+    }
     setQueue((prev) => {
       const batch = dedupeTracks(tracks);
       const newTracks = batch.filter((t) => !trackExistsIn(prev, t as TrackLike));
@@ -1532,7 +1541,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         const res = await runNewSongs({
           data: { artists: artistList, languages: settings.languages,
                   primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
-                  languageWeights: settings.languageWeights, count: 24 },
+                  languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"), count: 24 },
         });
         if (res.tracks && res.tracks.length > 0) {
           const pool = (res.tracks as Track[]).filter(
@@ -1543,6 +1553,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           let fresh = applyExploreFilters(pool);
           if (fresh.length === 0) fresh = pool;
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+          tagTrackSource(ranked, "new-releases");
           setMixTracks((prev) => {
             const next = { ...prev, newrelease: ranked };
             writeHomeCache({ mixTracks: next });
@@ -1577,6 +1588,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             languages: settings.languages,
                   primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                   languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
             brief: settingsToBrief(settings),
             count: 14,
           },
@@ -1600,6 +1612,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                   primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                   languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 brief: settingsToBrief(settings),
                 count: 14,
                 refreshNonce: `${Date.now()}-2`,
@@ -1616,6 +1629,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           }
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+          tagTrackSource(ranked, "mix");
           setMixTracks((prev) => ({ ...prev, [kind]: ranked }));
           markFeedDisplayed(ranked);
         }
@@ -1693,6 +1707,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             languages: settings.languages,
             primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
             languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
             artists: topArtists(stats, likes, 12, downloadedTracks),
             liked: likes.slice(0, 15).map(trackLabel),
             count: 40,
@@ -1719,6 +1734,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 liked: likes.slice(0, 15).map(trackLabel),
                 count: 40,
@@ -1875,6 +1891,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 count: 50,
                 refreshNonce: nonce,
                 clientHour,
@@ -1898,6 +1915,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       languages: settings.languages,
                       primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                       languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                       count: 50,
                       refreshNonce: `${nonce}-alt`,
                       clientHour,
@@ -1947,6 +1965,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 count: 40,
                 refreshNonce: nonce,
                 page: newReleasesTargetPage,
@@ -1969,6 +1988,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       languages: settings.languages,
                       primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                       languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                       count: 40,
                       refreshNonce: `${nonce}-alt`,
                       page: altPage,
@@ -2023,6 +2043,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 count: 40,
                 refreshNonce: nonce,
                 artists: topArtists(stats, likes, 12, downloadedTracks),
@@ -2047,6 +2068,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       languages: settings.languages,
                       primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                       languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                       count: 40,
                       refreshNonce: `${nonce}-alt`,
                       artists: topArtists(stats, likes, 12, downloadedTracks),
@@ -2121,6 +2143,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       recsGenerationRef.current += 1;
       setExploreExhausted(false);
       setRecLoading(true);
+
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        try {
+          const mix = await buildOfflineMix({
+            history,
+            ctx: getSessionContext(),
+          });
+          setOfflineMix(mix);
+        } finally {
+          setRecLoading(false);
+        }
+        return;
+      }
       const isExplicitRefresh = Boolean(refreshNonce);
       if (isExplicitRefresh) {
         homeRefreshPageRef.current = (homeRefreshPageRef.current % 5) + 1;
@@ -2173,6 +2208,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     languages: settings.languages,
                     primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                     languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                     brief: settingsToBrief(settings),
                     artists: topArtists(stats, likes, 12, downloadedTracks),
                     downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
@@ -2210,6 +2246,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 brief: settingsToBrief(settings),
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
@@ -2259,6 +2296,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 count: 35,
                 page: targetPage,
                 refreshNonce: nonce,
@@ -2310,6 +2348,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 refreshNonce: `${nonce}-alt`,
                 discovery: settings.discovery ?? 40,
@@ -2406,13 +2445,27 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
         if (settledRecs.length > 0) {
           tagTrackSource(settledRecs, "made-for-you");
-          setRecs(settledRecs);
-          markFeedDisplayed(settledRecs);
-          writeHomeCache({ recs: settledRecs });
-          recordSeenTrackIdentities(settledRecs);
+          const sessionCtx = getSessionContext();
+          const recsWithReasons = settledRecs.map((t) => ({
+            ...t,
+            recommendationReason: explainPick(t, sessionCtx, "made-for-you"),
+          }));
+          setRecs(recsWithReasons);
+          markFeedDisplayed(recsWithReasons);
+          writeHomeCache({ recs: recsWithReasons });
+          recordSeenTrackIdentities(recsWithReasons);
         }
       } catch (err) {
         console.warn("[loadHomeFeeds] failed to load fresh recommendations:", err);
+        try {
+          const mix = await buildOfflineMix({
+            history,
+            ctx: getSessionContext(),
+          });
+          if (mix.length > 0) {
+            setOfflineMix(mix);
+          }
+        } catch {}
       } finally {
         setRecLoading(false);
       }
@@ -2545,6 +2598,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           }
         }
 
+        tagTrackSource(tracks, "mood");
         setMoodTracks(tracks);
 
         if (tracks.length > 0) {
@@ -2716,6 +2770,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 brief: settingsToBrief(settings),
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
@@ -2761,6 +2816,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   languages: settings.languages,
                   primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                   languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                   limit: 15,
                   page: targetPage,
                 },
@@ -2809,6 +2865,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 count: 25,
                 page: (targetPage % 5) + 1,
                 clientHour,
@@ -2850,8 +2907,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
           if (diversifiedBatch.length > 0) {
             tagTrackSource(diversifiedBatch, "made-for-you");
+            const sessionCtx = getSessionContext();
+            const batchWithReasons = diversifiedBatch.map((t) => ({
+              ...t,
+              recommendationReason: explainPick(t, sessionCtx, "made-for-you"),
+            }));
             setRecs((prev) => {
-              const batchToAdd = diversifiedBatch.filter(
+              const batchToAdd = batchWithReasons.filter(
                 (cand) => !prev.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
               );
               if (batchToAdd.length === 0) return prev;
@@ -2859,8 +2921,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               writeHomeCache({ recs: updated });
               return updated;
             });
-            markFeedDisplayed(diversifiedBatch);
-            recordSeenTrackIdentities(diversifiedBatch);
+            markFeedDisplayed(batchWithReasons);
+            recordSeenTrackIdentities(batchWithReasons);
             setExploreExhausted(false);
           } else if (targetPage >= 8) {
             setExploreExhausted(true);
@@ -2943,6 +3005,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 brief: settingsToBrief(settings),
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
@@ -2973,6 +3036,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                 primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                 languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 count: 25,
                 page: targetPage,
                 recentSeenIds: fullExcludeIds,
@@ -3006,6 +3070,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               refreshNonce: `${baseNonce}-new`,
               primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
               languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
             },
           });
           if (newSongsRes.tracks && newSongsRes.tracks.length > 0) {
@@ -3087,6 +3152,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       // 6. Insert freshly analyzed tracks immediately at the expanded reveal boundary & prune stale queued tail
       if (analyzedBatch.length > 0) {
+        tagTrackSource(analyzedBatch, "trending");
         setTrendingList((prev) => {
           const visibleFloor = Math.min(prev.length, Math.max(15, (targetPage - 1) * 15));
           const visibleHead = prev.slice(0, visibleFloor);
@@ -3210,6 +3276,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 languages: settings.languages,
                   primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                   languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
                 limit: 15,
                 page: pageOffset,
                 continuation: radioContinuationRef.current,
@@ -3220,6 +3287,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
             if (radioRes.tracks && radioRes.tracks.length > 0) {
               const fresh = applyFeedFilters(radioRes.tracks as Track[]);
+              if (!singlePassRanking && fresh.length > 0) {
+                recordLanguageFeatureStd(computeBatchLanguageStd(fresh, getSessionContext(), thompsonSamplingPolicy));
+              }
               const candidatesForPage = singlePassRanking
                 ? fresh.filter((t) => isCandidateAcceptable(t as TrackLike, candidateTracks))
                 : thompsonSamplingPolicy
@@ -3236,6 +3306,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
 
       if (singlePassRanking && candidateTracks.length > 0) {
+        recordLanguageFeatureStd(computeBatchLanguageStd(candidateTracks, getSessionContext(), thompsonSamplingPolicy));
         candidateTracks = thompsonSamplingPolicy.rankCandidates(candidateTracks, getSessionContext());
       }
 
@@ -3260,6 +3331,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             languages: settings.languages,
                   primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
                   languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
             brief: settingsToBrief(settings),
             artists: topArtists(stats, likes, 12, downloadedTracks),
             downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
@@ -3272,7 +3344,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks && res.tracks.length > 0) {
-          const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(res.tracks as Track[]), getSessionContext());
+          const fresh = applyFeedFilters(res.tracks as Track[]);
+          if (fresh.length > 0) {
+            recordLanguageFeatureStd(computeBatchLanguageStd(fresh, getSessionContext(), thompsonSamplingPolicy));
+          }
+          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           candidateTracks = ranked.filter((t) => isCandidateAcceptable(t as TrackLike));
         }
       }
@@ -3292,12 +3368,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               languages: settings.languages,
               primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
               languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
               limit: 15,
               page: (curPage % 5) + 2,
             },
           });
           if (deepRadioRes.tracks && deepRadioRes.tracks.length > 0) {
-            const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(deepRadioRes.tracks as Track[]), getSessionContext());
+            const fresh = applyFeedFilters(deepRadioRes.tracks as Track[]);
+            if (fresh.length > 0) {
+              recordLanguageFeatureStd(computeBatchLanguageStd(fresh, getSessionContext(), thompsonSamplingPolicy));
+            }
+            const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
             candidateTracks = ranked.filter((t) => isCandidateAcceptable(t as TrackLike));
           }
         } catch {
@@ -3309,15 +3390,71 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         // Advance AutoDJ pagination depth for the next cycle
         autoDjPageRef.current = (curPage % 5) + 1;
 
-        const deduped = dedupeTracks(candidateTracks);
-        // Prioritize tracks that belong to movies/soundtrack albums so proper movie holder is displayed
-        deduped.sort((a, b) => {
-          const aMovie = Boolean(extractTrackMovieOrAlbum(a));
-          const bMovie = Boolean(extractTrackMovieOrAlbum(b));
-          if (aMovie && !bMovie) return -1;
-          if (!aMovie && bMovie) return 1;
-          return 0;
-        });
+        const tasteTrackIds = new Set<string>();
+        if (getRecFlag("tasteArtistMix")) {
+          const tasteArtists = extractTasteArtists(downloadedTracks, likes, affinity.affinityArtists);
+          if (tasteArtists.length > 0) {
+            const tasteArtistIndex = (autoDjPageRef.current - 1) % tasteArtists.length;
+            const targetArtist = tasteArtists[tasteArtistIndex];
+            if (targetArtist) {
+              try {
+                const tasteRes = await getSongRadio({
+                  data: {
+                    artist: targetArtist,
+                    languages: settings.languages,
+                    primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                    languageWeights: settings.languageWeights,
+            languageQuotas: getRecFlag("languageQuotas"),
+                    limit: 15,
+                    page: (curPage % 5) + 1,
+                  },
+                });
+                if (tasteRes.tracks && tasteRes.tracks.length > 0) {
+                  const freshTaste = applyFeedFilters(tasteRes.tracks as Track[]);
+                  const acceptableTaste = freshTaste.filter((t) => isCandidateAcceptable(t as TrackLike, candidateTracks));
+                  if (acceptableTaste.length > 0) {
+                    for (const t of acceptableTaste) {
+                      tasteTrackIds.add(t.id);
+                    }
+                    // Rank similar pool and taste pool TOGETHER with a single posterior sample
+                    const combinedPool = [...candidateTracks, ...acceptableTaste];
+                    const scoredCombined = thompsonSamplingPolicy.rankCandidatesWithScores(combinedPool, getSessionContext());
+                    const scoreMap = new Map<string, number>();
+                    for (const sc of scoredCombined) {
+                      scoreMap.set(sc.track.id, sc.score);
+                    }
+                    candidateTracks.sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
+                    acceptableTaste.sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
+
+                    candidateTracks = interleaveTasteTracks(
+                      candidateTracks,
+                      acceptableTaste,
+                      settings.discovery ?? 40,
+                      15,
+                    );
+                  }
+                }
+              } catch {
+                // Silently fall back to current behavior
+              }
+            }
+          }
+        }
+
+        let deduped = dedupeTracks(candidateTracks);
+        if (getRecFlag("movieTieBreaker")) {
+          const scored = thompsonSamplingPolicy.rankCandidatesWithScores(deduped, getSessionContext());
+          deduped = sortByScoreWithMovieTieBreaker(scored, (t) => Boolean(extractTrackMovieOrAlbum(t)));
+        } else {
+          // Prioritize tracks that belong to movies/soundtrack albums so proper movie holder is displayed
+          deduped.sort((a, b) => {
+            const aMovie = Boolean(extractTrackMovieOrAlbum(a));
+            const bMovie = Boolean(extractTrackMovieOrAlbum(b));
+            if (aMovie && !bMovie) return -1;
+            if (!aMovie && bMovie) return 1;
+            return 0;
+          });
+        }
         // Diversify to guarantee no more than 2 tracks per artist, 1 per movie, and spaced out
         const diversifiedBatch = diversifyTrackList(deduped, {
           maxPerArtist: 2,
@@ -3355,7 +3492,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
 
         const finalBatch = diversifiedBatch.slice(0, 15);
-        tagTrackSource(finalBatch, queueSource);
+        for (const t of finalBatch) {
+          tagTrackSource([t], tasteTrackIds.has(t.id) ? "autodj-taste" : queueSource);
+        }
         markFeedDisplayed(finalBatch);
         setQueue((prev) => [...prev, ...finalBatch]);
         return finalBatch;
@@ -3433,6 +3572,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               }
             }
           }
+          tagTrackSource(filtered, t === "podcasts" ? "podcasts" : "search");
           setResults(
             dedupeTracks(filtered, {
               likedIds: likedIdsRef.current,
@@ -3523,6 +3663,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           }
         }
+        tagTrackSource(incoming, "search");
         setResults((prev) =>
           dedupeTracks([...prev, ...incoming], {
             likedIds: likedIdsRef.current,
@@ -4048,14 +4189,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     (ep: PodcastEpisode, allEpisodes: PodcastEpisode[], idx: number) => {
       const tracks = allEpisodes.map(episodeToTrack);
       const target = tracks[idx] || episodeToTrack(ep);
-      playSong(target, tracks);
+      playSong(target, tracks, "podcasts");
     },
     [playSong],
   );
 
   const handlePlayPodcastHistory = useCallback(
     (track: Track, allHistory: Track[]) => {
-      playSong(track, allHistory);
+      playSong(track, allHistory, "podcasts");
     },
     [playSong],
   );
@@ -4438,11 +4579,28 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       : undefined;
 
-    if (cleanRecs.length) setRecs(cleanRecs);
-    if (cleanTrending.length) setTrendingList(cleanTrending);
-    if (cleanOldSongs.length) setOldSongsList(cleanOldSongs);
-    if (cleanMixTracks) setMixTracks(cleanMixTracks);
-    if (cleanDailyMix.length) setDailyMixTracks(cleanDailyMix);
+    if (cleanRecs.length) {
+      tagTrackSource(cleanRecs, "made-for-you");
+      setRecs(cleanRecs);
+    }
+    if (cleanTrending.length) {
+      tagTrackSource(cleanTrending, "trending");
+      setTrendingList(cleanTrending);
+    }
+    if (cleanOldSongs.length) {
+      tagTrackSource(cleanOldSongs, "old-songs");
+      setOldSongsList(cleanOldSongs);
+    }
+    if (cleanMixTracks) {
+      if (cleanMixTracks.discover) tagTrackSource(cleanMixTracks.discover, "mix");
+      if (cleanMixTracks.newrelease) tagTrackSource(cleanMixTracks.newrelease, "new-releases");
+      if (cleanMixTracks.explore) tagTrackSource(cleanMixTracks.explore, "mix");
+      setMixTracks(cleanMixTracks);
+    }
+    if (cleanDailyMix.length) {
+      tagTrackSource(cleanDailyMix, "daily-mix");
+      setDailyMixTracks(cleanDailyMix);
+    }
 
     // Initial load: Only fetch recommendations on startup if cached feed is completely empty or missing a section.
     // Preserves user's songs across app launches without auto-refreshing (refreshes only on manual pull-down or Refresh tap).
@@ -4603,7 +4761,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     currentTrack: current,
     playbackPosition: player.position,
     isPlaying: player.isPlaying,
-    onPlaySong: (track) => playSong(track),
+    onPlaySong: (track) => playSong(track, undefined, "jam"),
     onSeek: (seconds) => player.seek(seconds),
     onPause: () => player.pause(),
     onResume: () => player.play(),
@@ -4936,6 +5094,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       <MobileHomeSections
                         dailyMix={dailyMixTracks}
                         recommended={recs}
+                        offlineMix={offlineMix}
                         dailyMixLoading={dailyMixLoading}
                         recLoading={recLoading}
                         onRefreshDailyMix={handleRefreshDailyMix}
@@ -4957,7 +5116,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                             }
                             return;
                           }
-                          startQueue(sectionTracks, i);
+                          const source = getTrackSource(track.id) ?? (sectionTracks === dailyMixTracks ? "daily-mix" : "made-for-you");
+                          startQueue(sectionTracks, i, source);
                         }}
                         onToggleLike={handleToggleLike}
                         onOpenOptions={(t) => setOptionsTrack(t)}
@@ -5041,7 +5201,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       }
                       return;
                     }
-                    startQueue(sectionTracks, i);
+                    const source =
+                      getTrackSource(track.id) ??
+                      (sectionTracks === trendingList
+                        ? "trending"
+                        : sectionTracks === oldSongsList
+                          ? "old-songs"
+                          : "new-releases");
+                    startQueue(sectionTracks, i, source);
                   }}
                   onOpenOptions={(t) => setOptionsTrack(t)}
                   onToggleLike={handleToggleLike}
@@ -5133,7 +5300,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onRefresh={() => {
                   if (mix !== "replay") void loadMix(mix);
                 }}
-                onPlayAll={() => startQueue(visibleMix, 0, mix ? `mix-${mix}` : "mix")}
+                onPlayAll={() => startQueue(visibleMix, 0, "mix")}
                 onPlay={(track, i) => {
                   if (current?.id === track.id) {
                     if (player.isPlaying) {
@@ -5143,13 +5310,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     }
                     return;
                   }
-                  startQueue(visibleMix, i, mix ? `mix-${mix}` : "mix");
+                  startQueue(visibleMix, i, "mix");
                 }}
                 onToggleLike={handleToggleLike}
                 onToggleDislike={handleToggleDislike}
                 onArtistClick={openArtist}
                 onAddToPlaylist={handleAddToPlaylist}
-                onAddToQueue={(track) => enqueue([track])}
+                onAddToQueue={(track) => enqueue([track], "mix")}
                 onCreatePlaylistWith={(track) => {
                   setCreatePlaylistTrack(track);
                 }}
@@ -5247,7 +5414,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     }
                     return;
                   }
-                  startQueue(tracks, i, "library");
+                  startQueue(tracks, i, tracks === history ? "history" : "library");
                 }}
               />
               </div>
@@ -5536,11 +5703,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onDownload={(t) =>
             downloadedIds.has(t.id) ? setDeleteConfirmTrack(t) : void handleDownload(t)
           }
-          onAddToQueue={(t) => enqueue([t])}
+          onAddToQueue={(t) => enqueue([t], getTrackSource(t.id))}
           onStartRadio={(t) => void handleStartSongRadio(t)}
           onOpenLyrics={(t) => {
             if (!current || current.id !== t.id) {
-              playSong(t);
+              playSong(t, undefined, getTrackSource(t.id));
             }
             setShowLyrics(true);
           }}

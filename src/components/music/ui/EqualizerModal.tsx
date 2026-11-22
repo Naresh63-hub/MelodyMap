@@ -206,7 +206,7 @@ export function EqualizerModal({
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Fades out the ending song and fades in the next song for smooth DJ transitions.
+                Fades out the ending song and fades in the next song for smooth transitions. Note: Single-player fade (fades track out and in sequentially; true simultaneous track overlap requires dual playback engines).
               </p>
               <input
                 type="range"

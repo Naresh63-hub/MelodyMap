@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import {
   Sliders,
   Sparkles,
@@ -45,8 +45,14 @@ import {
   importLibraryData,
   type RecSettings,
 } from "@/lib/library";
-import { summarizeMetrics, resetRecMetrics } from "@/lib/rec-metrics";
-import { getDiscountGamma, setDiscountGamma } from "@/lib/bandit-policy";
+import { summarizeMetrics, resetRecMetrics, getLanguageFeatureStd } from "@/lib/rec-metrics";
+import { buildMetricsExport } from "@/lib/rec-metrics-export";
+import {
+  getDiscountGamma,
+  setDiscountGamma,
+  restoreBackup6,
+  thompsonSamplingPolicy,
+} from "@/lib/bandit-policy";
 import {
   getRecFlag,
   setRecFlag,
@@ -54,6 +60,8 @@ import {
   getRecConfigChangedAt,
   isDevModeEnabled,
   setDevModeEnabled,
+  REC_FLAG_DEFS,
+  type RecFlagName,
 } from "@/lib/rec-flags";
 import {
   getSponsorBlockEnabled,
@@ -164,8 +172,7 @@ export function SettingsModal({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Recommendation Experiments State
-  const [singlePassRankingOn, setSinglePassRankingOn] = useState(() => getRecFlag("singlePassRanking"));
-  const [trainOnFullTrackOn, setTrainOnFullTrackOn] = useState(() => getRecFlag("trainOnFullTrack"));
+  const [flagsState, setFlagsState] = useState<Record<RecFlagName, boolean>>(() => getAllRecFlags());
   const [gammaValue, setGammaValue] = useState(() => getDiscountGamma());
   const [devMode, setDevMode] = useState(() => isDevModeEnabled());
   const [versionTapCount, setVersionTapCount] = useState(0);
@@ -336,20 +343,8 @@ export function SettingsModal({
 
   const handleExportRecMetrics = () => {
     try {
-      const summary7 = summarizeMetrics(7);
-      const summary30 = summarizeMetrics(30);
-      const discountGamma = getDiscountGamma();
-      const flags = getAllRecFlags();
-      const configChangedAt = getRecConfigChangedAt();
-      const data = JSON.stringify({
-        summary7,
-        summary30,
-        discountGamma,
-        flags,
-        configChangedAt,
-        appVersion,
-        exportedAt: new Date().toISOString()
-      }, null, 2);
+      const exportPayload = buildMetricsExport({ appVersion });
+      const data = JSON.stringify(exportPayload, null, 2);
       const blob = new Blob([data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -963,45 +958,29 @@ export function SettingsModal({
                   </div>
 
                   <div className="space-y-3.5 pt-1">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <Label htmlFor="flag-single-pass" className="text-sm font-semibold text-foreground cursor-pointer">
-                          Single-Pass Ranking
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Rank full candidate pool once after seed collection instead of per-page
-                        </p>
-                      </div>
-                      <Switch
-                        id="flag-single-pass"
-                        checked={singlePassRankingOn}
-                        onCheckedChange={(val) => {
-                          setSinglePassRankingOn(val);
-                          setRecFlag("singlePassRanking", val);
-                        }}
-                      />
-                    </div>
-
-                    <div className="h-px bg-chip" />
-
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <Label htmlFor="flag-full-track" className="text-sm font-semibold text-foreground cursor-pointer">
-                          Train on Full Track
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Use full track metadata from playback cache for bandit training instead of stubs
-                        </p>
-                      </div>
-                      <Switch
-                        id="flag-full-track"
-                        checked={trainOnFullTrackOn}
-                        onCheckedChange={(val) => {
-                          setTrainOnFullTrackOn(val);
-                          setRecFlag("trainOnFullTrack", val);
-                        }}
-                      />
-                    </div>
+                    {REC_FLAG_DEFS.map((def, idx) => (
+                      <Fragment key={def.name}>
+                        {idx > 0 && <div className="h-px bg-chip" />}
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <Label htmlFor={`flag-${def.name}`} className="text-sm font-semibold text-foreground cursor-pointer">
+                              {def.label}
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {def.description}
+                            </p>
+                          </div>
+                          <Switch
+                            id={`flag-${def.name}`}
+                            checked={flagsState[def.name]}
+                            onCheckedChange={(val) => {
+                              setFlagsState((prev) => ({ ...prev, [def.name]: val }));
+                              setRecFlag(def.name, val);
+                            }}
+                          />
+                        </div>
+                      </Fragment>
+                    ))}
 
                     <div className="h-px bg-chip" />
 
@@ -1044,6 +1023,36 @@ export function SettingsModal({
                           1.0 (Uniform)
                         </button>
                       </div>
+                    </div>
+
+                    <div className="h-px bg-chip" />
+
+                    <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Pre-Migration Model</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Restore saved 6-dimension state prior to 8-dimension migration
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (window.confirm("Restore pre-migration 6-dimension recommendation model?")) {
+                            const restored = restoreBackup6();
+                            if (restored) {
+                              thompsonSamplingPolicy.loadFromStorage();
+                              alert("Pre-migration model restored.");
+                            } else {
+                              alert("No pre-migration model backup found.");
+                            }
+                          }
+                        }}
+                        className="rounded-full text-xs font-semibold px-3 cursor-pointer shrink-0"
+                      >
+                        Restore pre-migration model
+                      </Button>
                     </div>
                   </div>
 
