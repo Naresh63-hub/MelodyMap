@@ -26,6 +26,7 @@ import {
   Moon,
   Laptop,
   RefreshCw,
+  RotateCcw,
 } from "lucide-react";
 import { loadEqualizerSettings, saveEqualizerSettings } from "@/lib/equalizer";
 import { useNavigate } from "@tanstack/react-router";
@@ -43,7 +44,7 @@ import {
   importLibraryData,
   type RecSettings,
 } from "@/lib/library";
-import { summarizeMetrics } from "@/lib/rec-metrics";
+import { summarizeMetrics, resetRecMetrics } from "@/lib/rec-metrics";
 import { getDiscountGamma } from "@/lib/bandit-policy";
 import {
   getSponsorBlockEnabled,
@@ -317,6 +318,17 @@ export function SettingsModal({
     } catch {
       setBackupStatus("Failed to export metrics.");
       setTimeout(() => setBackupStatus(null), 4000);
+    }
+  };
+
+  const handleResetRecMetrics = () => {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm("Clear on-device recommendation metrics? This does not touch your library.");
+      if (ok) {
+        resetRecMetrics();
+        setBackupStatus("Recommendation metrics reset successfully!");
+        setTimeout(() => setBackupStatus(null), 4000);
+      }
     }
   };
 
@@ -858,6 +870,15 @@ export function SettingsModal({
                   >
                     <Activity className="mr-1.5 h-3.5 w-3.5" />
                     Export Rec Metrics JSON
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResetRecMetrics}
+                    className="w-full xs:w-auto rounded-xl border-border bg-surface-hover text-rose-400 hover:text-rose-300 hover:bg-surface-hover-strong text-xs font-semibold cursor-pointer min-h-[38px]"
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                    Reset Rec Metrics
                   </Button>
                   <input
                     ref={fileInputRef}

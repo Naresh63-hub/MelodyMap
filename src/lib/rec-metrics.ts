@@ -119,6 +119,14 @@ export function summarizeMetrics(
   return out;
 }
 
+export function resetRecMetrics(): void {
+  try {
+    safeStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // best-effort
+  }
+}
+
 let unsubscribe: (() => void) | null = null;
 
 /** Call once at app start. Safe to call again (e.g. HMR); returns a stop function. */

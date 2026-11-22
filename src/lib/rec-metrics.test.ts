@@ -14,7 +14,7 @@ vi.mock("./safe-storage", () => ({
   },
 }));
 
-import { recordMetricsEvent, summarizeMetrics } from "./rec-metrics";
+import { recordMetricsEvent, summarizeMetrics, resetRecMetrics } from "./rec-metrics";
 import type { PlaybackTelemetryEvent, TelemetryEventType } from "./telemetry";
 
 function ev(
@@ -86,5 +86,12 @@ describe("rec-metrics", () => {
     recordMetricsEvent(ev("PLAY_START", 0, "x"), now);
     expect(summarizeMetrics(7, now)["x"]?.starts).toBe(1);
     expect(summarizeMetrics(30, now)["x"]?.starts).toBe(2);
+  });
+
+  it("resets metrics via resetRecMetrics", () => {
+    recordMetricsEvent(ev("PLAY_START", 0, "taste-artist"), now);
+    expect(summarizeMetrics(7, now)["taste-artist"]?.starts).toBe(1);
+    resetRecMetrics();
+    expect(summarizeMetrics(7, now)).toEqual({});
   });
 });
