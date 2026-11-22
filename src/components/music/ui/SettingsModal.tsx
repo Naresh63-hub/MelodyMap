@@ -46,6 +46,7 @@ import {
   type RecSettings,
 } from "@/lib/library";
 import { summarizeMetrics, resetRecMetrics, getLanguageFeatureStd } from "@/lib/rec-metrics";
+import { buildMetricsExport } from "@/lib/rec-metrics-export";
 import { getDiscountGamma, setDiscountGamma } from "@/lib/bandit-policy";
 import {
   getRecFlag,
@@ -337,22 +338,8 @@ export function SettingsModal({
 
   const handleExportRecMetrics = () => {
     try {
-      const summary7 = summarizeMetrics(7);
-      const summary30 = summarizeMetrics(30);
-      const discountGamma = getDiscountGamma();
-      const flags = getAllRecFlags();
-      const configChangedAt = getRecConfigChangedAt();
-      const languageFeatureStd = getLanguageFeatureStd();
-      const data = JSON.stringify({
-        summary7,
-        summary30,
-        discountGamma,
-        flags,
-        configChangedAt,
-        languageFeatureStd,
-        appVersion,
-        exportedAt: new Date().toISOString()
-      }, null, 2);
+      const exportPayload = buildMetricsExport({ appVersion });
+      const data = JSON.stringify(exportPayload, null, 2);
       const blob = new Blob([data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
