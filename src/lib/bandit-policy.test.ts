@@ -652,6 +652,140 @@ describe("ThompsonSamplingPolicy Recommender", () => {
         extractSpy.mockRestore();
       }
     });
+
+    describe("Task 5: Leak-free context removes event's own outcome from x3 inputs", () => {
+      const sampleTrack: TrackLike = { id: "track-100", title: "Target Track", artist: "Target Artist" };
+
+      it("removes event's own outcome from x3 for LIKED", () => {
+        const postCtx: SessionContext = {
+          likedIds: new Set([sampleTrack.id]),
+          likedTracks: [sampleTrack],
+        };
+        const likeEvent: PlaybackTelemetryEvent = {
+          id: "ev-like-100",
+          trackId: sampleTrack.id,
+          title: sampleTrack.title,
+          artist: sampleTrack.artist,
+          eventType: "LIKED",
+          positionSeconds: 20,
+          durationSeconds: 180,
+          fractionPlayed: 0.11,
+          timestamp: Date.now(),
+        };
+
+        // Before buildTrainingContext: x3 sees isLikedArtist = true (liked artist prior: 0.70)
+        const xBefore = policy.extractFeatureVector(sampleTrack, postCtx);
+        expect(xBefore[3]).toBe(0.70);
+
+        // After buildTrainingContext: track is removed from likedTracks and likedIds
+        const cleanCtx = buildTrainingContext(likeEvent, postCtx);
+        expect(cleanCtx.likedIds?.has(sampleTrack.id)).toBe(false);
+        expect(cleanCtx.likedTracks?.length).toBe(0);
+
+        // x3 sees unplayed neutral prior (0.35) — event's own like is completely absent
+        const xAfter = policy.extractFeatureVector(sampleTrack, cleanCtx);
+        expect(xAfter[3]).toBe(0.35);
+      });
+
+      it("removes event's own outcome from x3 for DISLIKED", () => {
+        const postCtx: SessionContext = {
+          dislikedIds: new Set([sampleTrack.id]),
+          dislikedTracks: [sampleTrack],
+        };
+        const dislikeEvent: PlaybackTelemetryEvent = {
+          id: "ev-dis-100",
+          trackId: sampleTrack.id,
+          title: sampleTrack.title,
+          artist: sampleTrack.artist,
+          eventType: "DISLIKED",
+          positionSeconds: 5,
+          durationSeconds: 180,
+          fractionPlayed: 0.03,
+          timestamp: Date.now(),
+        };
+
+        // Before buildTrainingContext: x3 sees isDisliked = true (severe penalty: 0.02)
+        const xBefore = policy.extractFeatureVector(sampleTrack, postCtx);
+        expect(xBefore[3]).toBe(0.02);
+
+        // After buildTrainingContext: track is removed from dislikedTracks and dislikedIds
+        const cleanCtx = buildTrainingContext(dislikeEvent, postCtx);
+        expect(cleanCtx.dislikedIds?.has(sampleTrack.id)).toBe(false);
+        expect(cleanCtx.dislikedTracks?.length).toBe(0);
+
+        // x3 sees unplayed neutral prior (0.35) — event's own dislike is absent
+        const xAfter = policy.extractFeatureVector(sampleTrack, cleanCtx);
+        expect(xAfter[3]).toBe(0.35);
+      });
+
+      it("removes event's own outcome from x3 for DOWNLOADED", () => {
+        const postCtx: SessionContext = {
+          downloadedIds: new Set([sampleTrack.id]),
+          downloadedTracks: [sampleTrack],
+        };
+        const downloadEvent: PlaybackTelemetryEvent = {
+          id: "ev-dl-100",
+          trackId: sampleTrack.id,
+          title: sampleTrack.title,
+          artist: sampleTrack.artist,
+          eventType: "DOWNLOADED",
+          positionSeconds: 0,
+          durationSeconds: 180,
+          fractionPlayed: 0.0,
+          timestamp: Date.now(),
+        };
+
+        // Before buildTrainingContext: x3 sees isDownloadedArtist = true (downloaded artist prior: 0.75)
+        const xBefore = policy.extractFeatureVector(sampleTrack, postCtx);
+        expect(xBefore[3]).toBe(0.75);
+
+        // After buildTrainingContext: track is removed from downloadedTracks and downloadedIds
+        const cleanCtx = buildTrainingContext(downloadEvent, postCtx);
+        expect(cleanCtx.downloadedIds?.has(sampleTrack.id)).toBe(false);
+        expect(cleanCtx.downloadedTracks?.length).toBe(0);
+
+        // x3 sees unplayed neutral prior (0.35) — event's own download is absent
+        const xAfter = policy.extractFeatureVector(sampleTrack, cleanCtx);
+        expect(xAfter[3]).toBe(0.35);
+      });
+
+      it("removes event's own outcome from x3 for SKIPPED", () => {
+        const postCtx: SessionContext = {
+          stats: {
+            [sampleTrack.id]: {
+              plays: 2,
+              completions: 1,
+              skips: 1,
+              track: sampleTrack,
+            } as any,
+          },
+        };
+        const skipEvent: PlaybackTelemetryEvent = {
+          id: "ev-skip-100",
+          trackId: sampleTrack.id,
+          title: sampleTrack.title,
+          artist: sampleTrack.artist,
+          eventType: "SKIPPED",
+          positionSeconds: 6,
+          durationSeconds: 180,
+          fractionPlayed: 0.033,
+          timestamp: Date.now(),
+        };
+
+        // Before buildTrainingContext: skips = 1 -> negativeMass = 2 + 1*2 + 1 = 5, ratio = 1.5 / 5 = 0.30
+        const xBefore = policy.extractFeatureVector(sampleTrack, postCtx);
+        expect(xBefore[3]).toBeCloseTo(0.30, 2);
+
+        // After buildTrainingContext: skips decremented from 1 to 0
+        const cleanCtx = buildTrainingContext(skipEvent, postCtx);
+        expect(cleanCtx.stats?.[sampleTrack.id]?.skips).toBe(0);
+
+        // x3 sees 0 skips from this event -> replays = 1, ratio = 3.5 / 3 = 1.167 (clamped to 1.0)
+        const xAfter = policy.extractFeatureVector(sampleTrack, cleanCtx);
+        expect(xAfter[3]).toBe(1.0);
+        expect(xAfter[3]).toBeGreaterThan(xBefore[3]!);
+      });
+    });
   });
 
   describe("Task 4: 8-dimensional model, features x5-x7 and state migration", () => {
