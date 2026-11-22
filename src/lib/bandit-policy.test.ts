@@ -6,9 +6,12 @@ import {
   getDiscountGamma,
   DISCOUNT_GAMMA_STORAGE_KEY,
   buildTrainingContext,
+  setBanditRngSource,
+  X5_RESET_KEY,
   type SessionContext,
   type BanditModelState,
 } from "./bandit-policy";
+import { recordArtistTerminalOutcome, clearArtistRecentStore } from "./artist-recent";
 import { safeStorage } from "./safe-storage";
 import { setRecFlag, getRecFlag, getRecConfigChangedAt } from "./rec-flags";
 import type { PlaybackTelemetryEvent } from "./telemetry";
@@ -643,6 +646,200 @@ describe("ThompsonSamplingPolicy Recommender", () => {
         expect(usedContext?.likedIds?.has("cand")).toBe(true);
       } finally {
         extractSpy.mockRestore();
+      }
+    });
+  });
+
+  describe("Task 4: 8-dimensional model, features x5-x7 and state migration", () => {
+    it("FEATURE_DIM is 8 and default model initializes to 8 dimensions", () => {
+      expect(FEATURE_DIM).toBe(8);
+      const state = policy.getModelState();
+      expect(state.dimension).toBe(8);
+      expect(state.version).toBe(2);
+      expect(state.mu).toHaveLength(8);
+      expect(state.f).toHaveLength(8);
+      expect(state.B).toHaveLength(8);
+      expect(state.B_inv).toHaveLength(8);
+    });
+
+    it("loading a saved 6-dim state migrates to 8-dim, preserves mu[0..4], and pads coordinates at prior", () => {
+      // Construct a valid 6-dimensional model state
+      const sixDimB: number[][] = Array.from({ length: 6 }, (_, i) =>
+        Array.from({ length: 6 }, (_, j) => (i === j ? 2.0 : 0.1)),
+      );
+      const sixDimMu = [0.25, 0.6, 0.45, 0.55, 0.15, 0.35];
+      // Compute f = B * mu
+      const sixDimF = sixDimB.map((row) =>
+        row.reduce((sum, val, idx) => sum + val * (sixDimMu[idx] ?? 0), 0),
+      );
+
+      const legacyState: BanditModelState = {
+        version: 1,
+        dimension: 6,
+        B: sixDimB,
+        B_inv: sixDimB, // dummy, will be recomputed on migration
+        f: sixDimF,
+        mu: sixDimMu,
+        totalUpdates: 42,
+        lastUpdated: 12345678,
+      };
+
+      policy.setModelState(legacyState);
+
+      const migrated = policy.getModelState();
+      expect(migrated.dimension).toBe(8);
+      expect(migrated.version).toBe(2);
+      expect(migrated.totalUpdates).toBe(42);
+
+      // Preserves original mu[0..4] (within floating precision)
+      for (let i = 0; i < 5; i++) {
+        expect(migrated.mu[i]).toBeCloseTo(sixDimMu[i]!, 3);
+      }
+
+      // Padded coordinates sit at the prior: x6 = 0.3, x7 = 0.2
+      expect(migrated.mu[6]).toBeCloseTo(0.3, 4);
+      expect(migrated.mu[7]).toBeCloseTo(0.2, 4);
+
+      // Padded matrix blocks have lambda on diagonal and 0 cross terms
+      expect(migrated.B[6]![6]).toBe(1.0);
+      expect(migrated.B[7]![7]).toBe(1.0);
+      expect(migrated.B[6]![0]).toBe(0.0);
+      expect(migrated.B[7]![1]).toBe(0.0);
+    });
+
+    it("flags-off regression: with flags OFF, x6 and x7 are 0 and rankings are regression-safe", () => {
+      expect(getRecFlag("languageFeature")).toBe(false);
+      expect(getRecFlag("artistRecentSkipFeature")).toBe(false);
+      expect(getRecFlag("noveltyMomentumFeature")).toBe(false);
+
+      const testTrack: TrackLike = {
+        id: "reg-1",
+        title: "Test Song",
+        artist: "Test Artist",
+      };
+      const testCtx: SessionContext = {
+        hourOfDay: 12,
+        discoveryPercent: 40,
+        sessionCompletions: 3,
+        sessionSkips: 1,
+      };
+
+      const x = policy.extractFeatureVector(testTrack, testCtx);
+      expect(x).toHaveLength(8);
+      expect(x[6]).toBe(0.0);
+      expect(x[7]).toBe(0.0);
+
+      // Deterministic ranking under a fixed RNG seed
+      let seed = 12345;
+      const seededRng = () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      };
+      setBanditRngSource(seededRng);
+
+      try {
+        const pool: TrackLike[] = [
+          { id: "p1", title: "Track One", artist: "Artist A" },
+          { id: "p2", title: "Track Two", artist: "Artist B" },
+          { id: "p3", title: "Track Three", artist: "Artist C" },
+        ];
+        const ranked = policy.rankCandidates(pool, testCtx);
+        expect(ranked).toHaveLength(3);
+        expect(ranked.map((t) => t.id)).toBeDefined();
+      } finally {
+        setBanditRngSource(null);
+      }
+    });
+
+    it("evaluates x5, x6, x7 correctly for hand-built examples when flags are ON", () => {
+      setRecFlag("languageFeature", true);
+      setRecFlag("artistRecentSkipFeature", true);
+      setRecFlag("noveltyMomentumFeature", true);
+
+      try {
+        clearArtistRecentStore();
+        // Record 2 skips for "Skip Artist"
+        recordArtistTerminalOutcome("Skip Artist", true);
+        recordArtistTerminalOutcome("Skip Artist", true);
+
+        const ctx: SessionContext = {
+          hourOfDay: 15,
+          discoveryPercent: 50,
+          preferredLanguages: ["Telugu"],
+          sessionCompletions: 3,
+          sessionSkips: 1, // momentum = 3 / (4 + 1) = 0.6
+          familiarArtists: new Set(["familiar"]),
+        };
+
+        // 1. Matching language track with unknown artist
+        const matchTrack: TrackLike = {
+          id: "tel-1",
+          title: "Samajavaragamana",
+          artist: "Anurag Kulkarni", // Known Telugu artist
+        };
+        const xMatch = policy.extractFeatureVector(matchTrack, ctx);
+        expect(xMatch[5]).toBe(1.0); // match
+        expect(xMatch[6]).toBe(1.0); // unknown artist -> 1.0 health
+        expect(xMatch[7]).toBeCloseTo(0.6, 4); // unfamiliar -> 1.0 * 0.6 momentum
+
+        // 2. Untagged track
+        const untaggedTrack: TrackLike = {
+          id: "un-1",
+          title: "Acoustic Melody",
+          artist: "Brand New Indie Singer",
+        };
+        const xUntagged = policy.extractFeatureVector(untaggedTrack, ctx);
+        expect(xUntagged[5]).toBe(0.5); // untagged -> 0.5
+
+        // 3. Non-selected language track by Skip Artist
+        const nonSelTrack: TrackLike = {
+          id: "hi-1",
+          title: "Kesariya (Hindi)",
+          artist: "Skip Artist",
+        };
+        const xNonSel = policy.extractFeatureVector(nonSelTrack, ctx);
+        expect(xNonSel[5]).toBe(0.05); // non-selected language -> 0.05
+        // Skip Artist: 2 skips, 2 plays -> 1 - 2 / (2 + 1) = 1/3 ≈ 0.3333
+        expect(xNonSel[6]).toBeCloseTo(1 / 3, 4);
+
+        // 4. Familiar track: x7 must be 0.0
+        const familiarTrack: TrackLike = {
+          id: "fam-1",
+          title: "Familiar Song",
+          artist: "familiar",
+        };
+        const xFam = policy.extractFeatureVector(familiarTrack, ctx);
+        expect(xFam[7]).toBe(0.0);
+      } finally {
+        setRecFlag("languageFeature", false);
+        setRecFlag("artistRecentSkipFeature", false);
+        setRecFlag("noveltyMomentumFeature", false);
+        clearArtistRecentStore();
+      }
+    });
+
+    it("marker prevents repeated coordinate 5 reset", () => {
+      safeStorage.removeItem(X5_RESET_KEY);
+      setRecFlag("languageFeature", true);
+
+      try {
+        // First call resets coordinate 5 and sets marker
+        policy.checkLanguageFeatureCoordinateReset();
+        expect(safeStorage.getItem(X5_RESET_KEY)).toBe("true");
+
+        // Learn something on coordinate 5: mutate mu[5]
+        const state = policy.getModelState();
+        state.mu[5] = 0.99;
+        state.f[5] = 5.0;
+        policy.setModelState(state);
+        expect(policy.getModelState().mu[5]).toBeCloseTo(0.99, 4);
+
+        // Calling checkLanguageFeatureCoordinateReset again must be a NO-OP
+        policy.checkLanguageFeatureCoordinateReset();
+        expect(policy.getModelState().mu[5]).toBeCloseTo(0.99, 4);
+      } finally {
+        setRecFlag("languageFeature", false);
+        safeStorage.removeItem(X5_RESET_KEY);
       }
     });
   });

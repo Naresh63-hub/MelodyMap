@@ -1,5 +1,6 @@
 import { safeStorage } from "./safe-storage";
 import { telemetry, type PlaybackTelemetryEvent } from "./telemetry";
+import { recordArtistTelemetryEvent } from "./artist-recent";
 
 /**
  * Lightweight on-device outcome counters, bucketed by day and by recommendation
@@ -193,7 +194,10 @@ let unsubscribe: (() => void) | null = null;
 /** Call once at app start. Safe to call again (e.g. HMR); returns a stop function. */
 export function initRecMetrics(): () => void {
   if (!unsubscribe) {
-    unsubscribe = telemetry.subscribe((e) => recordMetricsEvent(e));
+    unsubscribe = telemetry.subscribe((e) => {
+      recordMetricsEvent(e);
+      recordArtistTelemetryEvent(e);
+    });
   }
   return () => {
     unsubscribe?.();

@@ -3,7 +3,10 @@ import { safeStorage } from "./safe-storage";
 export type RecFlagName =
   | "singlePassRanking"
   | "trainOnFullTrack"
-  | "leakFreeTrainingContext";
+  | "leakFreeTrainingContext"
+  | "languageFeature"
+  | "artistRecentSkipFeature"
+  | "noveltyMomentumFeature";
 
 export interface RecFlagDef {
   name: RecFlagName;
@@ -29,6 +32,24 @@ export const REC_FLAG_DEFS: RecFlagDef[] = [
     name: "leakFreeTrainingContext",
     label: "Leak-Free Training Context",
     description: "Rewind predecessor track and strip post-event mutations during bandit training",
+    defaultValue: false,
+  },
+  {
+    name: "languageFeature",
+    label: "Language Feature (x5)",
+    description: "Pure language coherence for candidate ranking via getTrackLanguage (coordinate 5)",
+    defaultValue: false,
+  },
+  {
+    name: "artistRecentSkipFeature",
+    label: "Artist Recent Skip Feature (x6)",
+    description: "Artist recent skip health signal over last 10 plays (coordinate 6)",
+    defaultValue: false,
+  },
+  {
+    name: "noveltyMomentumFeature",
+    label: "Novelty Momentum Feature (x7)",
+    description: "Unfamiliarity interaction with session momentum (coordinate 7)",
     defaultValue: false,
   },
 ];

@@ -2,6 +2,8 @@ import type { TrackLike } from "./track-dedup";
 import { normalizeArtistAlias, areSameTrack } from "./track-dedup";
 import { safeStorage } from "./safe-storage";
 import { getRecFlag, touchRecConfigChangedAt } from "./rec-flags";
+import { getTrackLanguage } from "./language-artists";
+import { getArtistRecentSkipHealth } from "./artist-recent";
 import {
   detectTrackEnergy,
   calculateEnergyCompatibility,
@@ -58,9 +60,10 @@ export interface RecommendationPolicy {
   setModelState(state: BanditModelState): void;
 }
 
-export const FEATURE_DIM = 6;
+export const FEATURE_DIM = 8;
 const BANDIT_STORAGE_KEY = "melodymap.bandit_state.v1";
 export const DISCOUNT_GAMMA_STORAGE_KEY = "melodymap.discount_gamma";
+export const X5_RESET_KEY = "melodymap.rec_x5_reset_done.v1";
 const REGULARIZATION_LAMBDA = 1.0;
 const EXPLORATION_VARIANCE_V = 0.5;
 /** Per-update forgetting factor. Effective memory is about 1/(1-γ) updates (0.99 -> ~100). */
@@ -209,7 +212,7 @@ function matVecMul(M: number[][], v: number[]): number[] {
   return M.map((row) => dot(row, v));
 }
 
-const PRIOR_MU: number[] = [0.1, 0.5, 0.5, 0.5, 0.2, 0.3];
+const PRIOR_MU: number[] = [0.1, 0.5, 0.5, 0.5, 0.2, 0.3, 0.3, 0.2];
 
 /**
  * Strips post-event mutations and rewinds `currentTrack` to the predecessor track
@@ -451,23 +454,63 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     const noveltyVal = isFamiliar ? 0.0 : 1.0;
     x[4] = Math.max(0.0, Math.min(1.0, noveltyVal * discoveryRatio + (1.0 - noveltyVal) * (1.0 - discoveryRatio)));
 
-    // x5: Session state, momentum & language coherence
     const sessionComp = context.sessionCompletions ?? 0;
     const sessionSkips = context.sessionSkips ?? 0;
     const totalSessionActions = sessionComp + sessionSkips;
     const momentum = totalSessionActions > 0 ? sessionComp / (totalSessionActions + 1) : 0.5;
 
-    // Check language coherence if preferred languages are present
-    let langCoherence = 1.0;
-    if (context.preferredLanguages && context.preferredLanguages.length > 0) {
-      const candidateLang = ((candidate as any).language || (candidate as any).languageCode || "").toLowerCase().trim();
-      if (candidateLang) {
-        const matches = context.preferredLanguages.some((pl) => pl.toLowerCase().trim() === candidateLang);
-        langCoherence = matches ? 1.0 : 0.25;
+    // x5: Language coherence
+    if (getRecFlag("languageFeature")) {
+      this.checkLanguageFeatureCoordinateReset();
+      let langScore = 1.0;
+      if (context.preferredLanguages && context.preferredLanguages.length > 0) {
+        const detected = getTrackLanguage(candidate);
+        if (!detected) {
+          langScore = 0.5;
+        } else {
+          const prefMatch = context.preferredLanguages.some(
+            (pl) => pl.toLowerCase().trim() === detected.toLowerCase().trim(),
+          );
+          const primaryMatch =
+            context.primaryLanguage &&
+            context.primaryLanguage.toLowerCase().trim() === detected.toLowerCase().trim();
+          langScore = prefMatch || primaryMatch ? 1.0 : 0.05;
+        }
       }
+      x[5] = langScore;
+    } else {
+      // Flags OFF formula: 0.7 * momentum + 0.3 * langCoherence
+      let langCoherence = 1.0;
+      if (context.preferredLanguages && context.preferredLanguages.length > 0) {
+        const candidateLang = (
+          (candidate as any).language ||
+          (candidate as any).languageCode ||
+          ""
+        ).toLowerCase().trim();
+        if (candidateLang) {
+          const matches = context.preferredLanguages.some(
+            (pl) => pl.toLowerCase().trim() === candidateLang,
+          );
+          langCoherence = matches ? 1.0 : 0.25;
+        }
+      }
+      x[5] = Math.max(0.0, Math.min(1.0, 0.7 * momentum + 0.3 * langCoherence));
     }
 
-    x[5] = Math.max(0.0, Math.min(1.0, 0.7 * momentum + 0.3 * langCoherence));
+    // x6: Artist recent skip health
+    if (getRecFlag("artistRecentSkipFeature")) {
+      x[6] = getArtistRecentSkipHealth(candidate.artist);
+    } else {
+      x[6] = 0.0;
+    }
+
+    // x7: Novelty-momentum interaction
+    if (getRecFlag("noveltyMomentumFeature")) {
+      const isUnfamiliar = isFamiliar ? 0.0 : 1.0;
+      x[7] = Math.max(0.0, Math.min(1.0, isUnfamiliar * momentum));
+    } else {
+      x[7] = 0.0;
+    }
 
     return x;
   }
@@ -613,7 +656,7 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
 
   public getModelState(): BanditModelState {
     return {
-      version: 1,
+      version: 2,
       dimension: this.dimension,
       B: this.B.map((r) => [...r]),
       B_inv: this.B_inv.map((r) => [...r]),
@@ -625,7 +668,35 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
   }
 
   public setModelState(state: BanditModelState): void {
-    if (!state || state.dimension !== this.dimension) return;
+    if (!state || !Array.isArray(state.B)) return;
+
+    // Dimension 6 -> 8 migration:
+    if (state.dimension === 6) {
+      const migratedB: number[][] = Array.from({ length: FEATURE_DIM }, (_, i) =>
+        Array.from({ length: FEATURE_DIM }, (_, j) => {
+          if (i < 6 && j < 6) return state.B[i]?.[j] ?? (i === j ? REGULARIZATION_LAMBDA : 0.0);
+          return i === j ? REGULARIZATION_LAMBDA : 0.0;
+        }),
+      );
+      const migratedF: number[] = Array.from({ length: FEATURE_DIM }, (_, i) => {
+        if (i < 6) return state.f[i] ?? REGULARIZATION_LAMBDA * PRIOR_MU[i]!;
+        return REGULARIZATION_LAMBDA * PRIOR_MU[i]!;
+      });
+      const migratedB_inv = invertMatrix(migratedB);
+      const migratedMu = matVecMul(migratedB_inv, migratedF);
+
+      this.dimension = FEATURE_DIM;
+      this.B = migratedB;
+      this.B_inv = migratedB_inv;
+      this.f = migratedF;
+      this.mu = migratedMu;
+      this.totalUpdates = state.totalUpdates || 0;
+      this.lastUpdated = state.lastUpdated || Date.now();
+      this.saveToStorage();
+      return;
+    }
+
+    if (state.dimension !== this.dimension) return;
     this.B = state.B.map((r) => [...r]);
     this.B_inv = state.B_inv.map((r) => [...r]);
     this.f = [...state.f];
@@ -633,6 +704,26 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     this.totalUpdates = state.totalUpdates || 0;
     this.lastUpdated = state.lastUpdated || Date.now();
     this.saveToStorage();
+  }
+
+  public checkLanguageFeatureCoordinateReset(): void {
+    if (!getRecFlag("languageFeature")) return;
+    try {
+      const marker = safeStorage.getItem(X5_RESET_KEY);
+      if (marker === "true") return;
+    } catch {}
+
+    for (let j = 0; j < this.dimension; j++) {
+      this.B[5]![j] = j === 5 ? REGULARIZATION_LAMBDA : 0.0;
+      this.B[j]![5] = j === 5 ? REGULARIZATION_LAMBDA : 0.0;
+    }
+    this.f[5] = REGULARIZATION_LAMBDA * PRIOR_MU[5]!;
+    this.B_inv = invertMatrix(this.B);
+    this.mu = matVecMul(this.B_inv, this.f);
+    this.saveToStorage();
+    try {
+      safeStorage.setItem(X5_RESET_KEY, "true");
+    } catch {}
   }
 
   public resetModel(): void {
@@ -680,8 +771,11 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
       const raw = safeStorage.getItem(BANDIT_STORAGE_KEY);
       if (!raw) return;
       const state = JSON.parse(raw) as BanditModelState;
-      if (state && state.dimension === this.dimension && Array.isArray(state.B)) {
+      if (state && (state.dimension === this.dimension || state.dimension === 6) && Array.isArray(state.B)) {
         this.setModelState(state);
+      }
+      if (getRecFlag("languageFeature")) {
+        this.checkLanguageFeatureCoordinateReset();
       }
     } catch {}
   }

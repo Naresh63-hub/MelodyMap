@@ -59,6 +59,9 @@ describe("rec-flags", () => {
       singlePassRanking: true,
       trainOnFullTrack: false,
       leakFreeTrainingContext: false,
+      languageFeature: false,
+      artistRecentSkipFeature: false,
+      noveltyMomentumFeature: false,
     });
   });
 
