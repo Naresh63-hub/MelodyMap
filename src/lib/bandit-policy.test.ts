@@ -10,6 +10,8 @@ import {
   X5_RESET_KEY,
   sortByScoreWithMovieTieBreaker,
   BANDIT_STORAGE_KEY,
+  BANDIT_STORAGE_KEY_V1,
+  BANDIT_STORAGE_KEY_V2,
   BANDIT_BACKUP6_STORAGE_KEY,
   restoreBackup6,
   type SessionContext,
@@ -845,7 +847,7 @@ describe("ThompsonSamplingPolicy Recommender", () => {
       expect(migrated.B[7]![1]).toBe(0.0);
     });
 
-    it("Task 2: backs up pre-migration 6-dim model state and restoreBackup6 returns exact original", () => {
+    it("Rollback-safe state: fresh install, migrated install, and v1 left byte-identical", () => {
       const original6: BanditModelState = {
         version: 1,
         dimension: 6,
@@ -860,35 +862,59 @@ describe("ThompsonSamplingPolicy Recommender", () => {
         totalUpdates: 42,
         lastUpdated: 123456789,
       };
+      const v1RawExpected = JSON.stringify(original6);
 
       try {
-        safeStorage.removeItem(BANDIT_STORAGE_KEY);
+        // 1. Fresh install: neither v1 nor v2 exists
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V1);
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V2);
         safeStorage.removeItem(BANDIT_BACKUP6_STORAGE_KEY);
-        safeStorage.setItem(BANDIT_STORAGE_KEY, JSON.stringify(original6));
 
-        // When a policy loads from storage, it migrates 6 -> 8
-        const testPolicy = new ThompsonSamplingPolicy();
-        testPolicy.loadFromStorage(true);
+        const freshPolicy = new ThompsonSamplingPolicy();
+        freshPolicy.loadFromStorage(true);
+        expect(freshPolicy.getModelState().dimension).toBe(8);
+        expect(freshPolicy.getModelState().totalUpdates).toBe(0);
 
-        expect(testPolicy.getModelState().dimension).toBe(8);
-        expect(testPolicy.getModelState().totalUpdates).toBe(42);
+        freshPolicy.saveToStorage(true);
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY_V2)).toBeTruthy();
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY_V1)).toBeNull(); // v1 must never be created or touched!
 
-        // The pre-migration backup must exist
-        const backupRaw = safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY);
-        expect(backupRaw).toBeTruthy();
-        expect(JSON.parse(backupRaw!).dimension).toBe(6);
+        // 2. Migrated install: v1 exists, v2 does not
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V2);
+        safeStorage.setItem(BANDIT_STORAGE_KEY_V1, v1RawExpected);
 
-        // restoreBackup6() restores it and returns the exact original state
+        const migratingPolicy = new ThompsonSamplingPolicy();
+        migratingPolicy.loadFromStorage(true);
+
+        expect(migratingPolicy.getModelState().dimension).toBe(8);
+        expect(migratingPolicy.getModelState().totalUpdates).toBe(42);
+
+        // v2 was written with migrated 8-dim state
+        const v2Raw = safeStorage.getItem(BANDIT_STORAGE_KEY_V2);
+        expect(v2Raw).toBeTruthy();
+        expect(JSON.parse(v2Raw!).dimension).toBe(8);
+
+        // CRITICAL: v1 is left strictly byte-identical!
+        const v1RawAfterMigration = safeStorage.getItem(BANDIT_STORAGE_KEY_V1);
+        expect(v1RawAfterMigration).toBe(v1RawExpected);
+
+        // 3. Subsequent load: v2 exists, loads from v2 without touching v1
+        const loadedPolicy = new ThompsonSamplingPolicy();
+        loadedPolicy.loadFromStorage(true);
+        expect(loadedPolicy.getModelState().dimension).toBe(8);
+        expect(loadedPolicy.getModelState().totalUpdates).toBe(42);
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY_V1)).toBe(v1RawExpected);
+
+        // 4. restoreBackup6: restores 6-dim content into v2 as 6->8 migration, leaves v1 byte-identical
         const restored = restoreBackup6();
         expect(restored).toEqual(original6);
-        expect(safeStorage.getItem(BANDIT_STORAGE_KEY)).toBe(JSON.stringify(original6));
-
-        // Backup is idempotent: does not overwrite existing backup if another 6-dim load occurs
-        safeStorage.setItem(BANDIT_STORAGE_KEY, JSON.stringify({ ...original6, totalUpdates: 999 }));
-        testPolicy.loadFromStorage(true);
-        expect(JSON.parse(safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY)!).totalUpdates).toBe(42);
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY_V1)).toBe(v1RawExpected); // v1 untouched
+        const v2AfterRestore = JSON.parse(safeStorage.getItem(BANDIT_STORAGE_KEY_V2)!);
+        expect(v2AfterRestore.dimension).toBe(8);
+        expect(v2AfterRestore.totalUpdates).toBe(42);
       } finally {
-        safeStorage.removeItem(BANDIT_STORAGE_KEY);
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V1);
+        safeStorage.removeItem(BANDIT_STORAGE_KEY_V2);
         safeStorage.removeItem(BANDIT_BACKUP6_STORAGE_KEY);
       }
     });

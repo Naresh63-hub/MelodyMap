@@ -61,7 +61,9 @@ export interface RecommendationPolicy {
 }
 
 export const FEATURE_DIM = 8;
-export const BANDIT_STORAGE_KEY = "melodymap.bandit_state.v1";
+export const BANDIT_STORAGE_KEY_V1 = "melodymap.bandit_state.v1";
+export const BANDIT_STORAGE_KEY_V2 = "melodymap.bandit_state.v2";
+export const BANDIT_STORAGE_KEY = BANDIT_STORAGE_KEY_V2;
 export const BANDIT_BACKUP6_STORAGE_KEY = "melodymap.bandit_state.v1.backup6";
 export const DISCOUNT_GAMMA_STORAGE_KEY = "melodymap.discount_gamma";
 export const X5_RESET_KEY = "melodymap.rec_x5_reset_done.v1";
@@ -804,22 +806,38 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
   public loadFromStorage(force = false): void {
     if (typeof window === "undefined" && !force) return;
     try {
-      const raw = safeStorage.getItem(BANDIT_STORAGE_KEY);
-      if (!raw) return;
-      const state = JSON.parse(raw) as BanditModelState;
-      if (state && (state.dimension === this.dimension || state.dimension === 6) && Array.isArray(state.B)) {
-        if (state.dimension === 6) {
+      // 1. If v2 exists, use it directly (never touches v1)
+      const rawV2 = safeStorage.getItem(BANDIT_STORAGE_KEY_V2);
+      if (rawV2) {
+        const stateV2 = JSON.parse(rawV2) as BanditModelState;
+        if (stateV2 && stateV2.dimension === this.dimension && Array.isArray(stateV2.B)) {
+          this.setModelState(stateV2);
+          if (getRecFlag("languageFeature")) {
+            this.checkLanguageFeatureCoordinateReset();
+          }
+          return;
+        }
+      }
+
+      // 2. Else if v1 (6-dim) exists, migrate it into v2 while leaving v1 untouched
+      const rawV1 = safeStorage.getItem(BANDIT_STORAGE_KEY_V1);
+      if (rawV1) {
+        const stateV1 = JSON.parse(rawV1) as BanditModelState;
+        if (stateV1 && Array.isArray(stateV1.B)) {
           try {
             const existingBackup = safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY);
             if (!existingBackup) {
-              safeStorage.setItem(BANDIT_BACKUP6_STORAGE_KEY, raw);
+              safeStorage.setItem(BANDIT_BACKUP6_STORAGE_KEY, rawV1);
             }
           } catch {}
+
+          // setModelState performs 6 -> 8 migration and saves exclusively to v2
+          this.setModelState(stateV1);
+          this.saveToStorage(force);
+          if (getRecFlag("languageFeature")) {
+            this.checkLanguageFeatureCoordinateReset();
+          }
         }
-        this.setModelState(state);
-      }
-      if (getRecFlag("languageFeature")) {
-        this.checkLanguageFeatureCoordinateReset();
       }
     } catch {}
   }
@@ -828,7 +846,8 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     if (typeof window === "undefined" && !force) return;
     try {
       const state = this.getModelState();
-      safeStorage.setItem(BANDIT_STORAGE_KEY, JSON.stringify(state));
+      // Write exclusively to v2; never modify v1
+      safeStorage.setItem(BANDIT_STORAGE_KEY_V2, JSON.stringify(state));
     } catch {}
   }
 }
@@ -836,17 +855,22 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
 export const thompsonSamplingPolicy = new ThompsonSamplingPolicy();
 
 /**
- * Restores the raw pre-migration 6-dimension bandit model state from the backup
- * storage key into the active bandit model storage key.
+ * Restores the pre-migration 6-dimension bandit model state by migrating it
+ * into the active v2 key ("melodymap.bandit_state.v2"), leaving v1 completely untouched.
  * Returns the exact original 6-dimension state, or null if no backup exists.
  */
 export function restoreBackup6(): BanditModelState | null {
   try {
-    const raw = safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY);
+    const raw =
+      safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY) ||
+      safeStorage.getItem(BANDIT_STORAGE_KEY_V1);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as BanditModelState;
     if (!parsed || !Array.isArray(parsed.B)) return null;
-    safeStorage.setItem(BANDIT_STORAGE_KEY, raw);
+
+    // Migrate the original 6-dim state into v2 via setModelState
+    thompsonSamplingPolicy.setModelState(parsed);
+    thompsonSamplingPolicy.saveToStorage(true);
     try {
       safeStorage.removeItem(X5_RESET_KEY);
     } catch {}
