@@ -170,6 +170,7 @@ import {
 import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { tagTrackSource, getTrackSource } from "@/lib/rec-source";
 import { initRecMetrics } from "@/lib/rec-metrics";
+import { getRecFlag } from "@/lib/rec-flags";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
 import { GuestSignInPromptModal } from "@/components/music/ui/GuestSignInPromptModal";
@@ -3193,6 +3194,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       };
 
       let queueSource = "autodj-radio";
+      const singlePassRanking = getRecFlag("singlePassRanking");
 
       // 1. Try Song Radio across recent seeds with deep pagination (delving into discographies)
       for (const seed of seedTracks) {
@@ -3217,10 +3219,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               radioContinuationRef.current = radioRes.continuation;
             }
             if (radioRes.tracks && radioRes.tracks.length > 0) {
-              const fresh = applyFeedFilters(radioRes.tracks as Track[]).filter((t) =>
-                isCandidateAcceptable(t as TrackLike, candidateTracks),
-              );
-              candidateTracks.push(...fresh);
+              const fresh = applyFeedFilters(radioRes.tracks as Track[]);
+              const candidatesForPage = singlePassRanking
+                ? fresh.filter((t) => isCandidateAcceptable(t as TrackLike, candidateTracks))
+                : thompsonSamplingPolicy
+                    .rankCandidates(fresh, getSessionContext())
+                    .filter((t) => isCandidateAcceptable(t as TrackLike, candidateTracks));
+              candidateTracks.push(...candidatesForPage);
               if (candidateTracks.length >= 12) break;
             }
           } catch {
@@ -3230,7 +3235,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (candidateTracks.length >= 12) break;
       }
 
-      if (candidateTracks.length > 0) {
+      if (singlePassRanking && candidateTracks.length > 0) {
         candidateTracks = thompsonSamplingPolicy.rankCandidates(candidateTracks, getSessionContext());
       }
 
