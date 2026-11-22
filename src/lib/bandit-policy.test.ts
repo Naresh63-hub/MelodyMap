@@ -9,7 +9,7 @@ import {
   type BanditModelState,
 } from "./bandit-policy";
 import { safeStorage } from "./safe-storage";
-import { setRecFlag } from "./rec-flags";
+import { setRecFlag, getRecConfigChangedAt } from "./rec-flags";
 import type { PlaybackTelemetryEvent } from "./telemetry";
 import type { TrackLike } from "./track-dedup";
 
@@ -391,6 +391,43 @@ describe("ThompsonSamplingPolicy Recommender", () => {
         expect(getDiscountGamma()).toBe(0.95);
         expect(safeStorage.getItem(DISCOUNT_GAMMA_STORAGE_KEY)).toBe("0.95");
       } finally {
+        delete (globalThis as any).window;
+        safeStorage.resetProbeForTest();
+        setDiscountGamma(0.99);
+      }
+    });
+
+    it("updates configChangedAt when discount gamma actually changes, but not when set to the same value", () => {
+      const store: Record<string, string> = {};
+      const winMock = {
+        localStorage: {
+          getItem: (k: string) => store[k] ?? null,
+          setItem: (k: string, v: string) => { store[k] = String(v); },
+          removeItem: (k: string) => { delete store[k]; },
+          clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
+        },
+      };
+      (globalThis as any).window = winMock;
+      safeStorage.resetProbeForTest();
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date("2026-11-22T10:00:00.000Z"));
+        setDiscountGamma(1.0);
+        const t1 = getRecConfigChangedAt();
+        expect(t1).toBe("2026-11-22T10:00:00.000Z");
+
+        // Calling with same gamma (1.0) must not change the timestamp even if time passes
+        vi.setSystemTime(new Date("2026-11-22T10:01:00.000Z"));
+        setDiscountGamma(1.0);
+        expect(getRecConfigChangedAt()).toBe(t1);
+
+        // Calling with different gamma (0.95) must update the timestamp
+        setDiscountGamma(0.95);
+        const t2 = getRecConfigChangedAt();
+        expect(t2).toBe("2026-11-22T10:01:00.000Z");
+        expect(t2).not.toBe(t1);
+      } finally {
+        vi.useRealTimers();
         delete (globalThis as any).window;
         safeStorage.resetProbeForTest();
         setDiscountGamma(0.99);

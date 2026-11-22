@@ -14,7 +14,18 @@ vi.mock("./safe-storage", () => ({
   },
 }));
 
-import { DEFAULT_FLAGS, getAllRecFlags, getRecFlag, setRecFlag } from "./rec-flags";
+import {
+  DEFAULT_FLAGS,
+  getAllRecFlags,
+  getRecFlag,
+  setRecFlag,
+  getRecConfigChangedAt,
+  touchRecConfigChangedAt,
+  isDevModeEnabled,
+  setDevModeEnabled,
+  REC_CONFIG_CHANGED_AT_KEY,
+  DEV_MODE_STORAGE_KEY,
+} from "./rec-flags";
 
 describe("rec-flags", () => {
   beforeEach(() => {
@@ -45,6 +56,58 @@ describe("rec-flags", () => {
     expect(flags).toEqual({
       singlePassRanking: true,
       trainOnFullTrack: false,
+    });
+  });
+
+  describe("configChangedAt timestamp tracking", () => {
+    it("returns null when no config has changed", () => {
+      expect(getRecConfigChangedAt()).toBeNull();
+    });
+
+    it("updates configChangedAt when a flag value actually changes", () => {
+      expect(getRecConfigChangedAt()).toBeNull();
+      setRecFlag("singlePassRanking", false);
+      const changedAt = getRecConfigChangedAt();
+      expect(changedAt).toBeTruthy();
+      expect(typeof changedAt).toBe("string");
+      expect(new Date(changedAt!).toString()).not.toBe("Invalid Date");
+    });
+
+    it("does not update configChangedAt when setRecFlag is called with identical value", () => {
+      // Default is true; calling setRecFlag(..., true) should not update timestamp
+      setRecFlag("singlePassRanking", true);
+      expect(getRecConfigChangedAt()).toBeNull();
+
+      // Change it once
+      setRecFlag("singlePassRanking", false);
+      const firstTimestamp = getRecConfigChangedAt();
+      expect(firstTimestamp).toBeTruthy();
+
+      // Call again with false (identical value)
+      setRecFlag("singlePassRanking", false);
+      expect(getRecConfigChangedAt()).toBe(firstTimestamp);
+    });
+
+    it("touchRecConfigChangedAt writes current ISO string and returns it", () => {
+      const touched = touchRecConfigChangedAt();
+      expect(touched).toBeTruthy();
+      expect(getRecConfigChangedAt()).toBe(touched);
+    });
+  });
+
+  describe("developer mode toggle", () => {
+    it("defaults to false", () => {
+      expect(isDevModeEnabled()).toBe(false);
+    });
+
+    it("enables and disables developer mode in safeStorage", () => {
+      setDevModeEnabled(true);
+      expect(isDevModeEnabled()).toBe(true);
+      expect(memory.get(DEV_MODE_STORAGE_KEY)).toBe("1");
+
+      setDevModeEnabled(false);
+      expect(isDevModeEnabled()).toBe(false);
+      expect(memory.has(DEV_MODE_STORAGE_KEY)).toBe(false);
     });
   });
 });

@@ -1,7 +1,7 @@
 import type { TrackLike } from "./track-dedup";
 import { normalizeArtistAlias, areSameTrack } from "./track-dedup";
 import { safeStorage } from "./safe-storage";
-import { getRecFlag } from "./rec-flags";
+import { getRecFlag, touchRecConfigChangedAt } from "./rec-flags";
 import {
   detectTrackEnergy,
   calculateEnergyCompatibility,
@@ -83,12 +83,15 @@ function initDiscountGamma(): number {
 let activeDiscountGamma = initDiscountGamma();
 
 export function setDiscountGamma(gamma: number): void {
-  activeDiscountGamma = Math.max(0.5, Math.min(1.0, gamma));
+  const clamped = Math.max(0.5, Math.min(1.0, gamma));
+  if (clamped === activeDiscountGamma) return;
+  activeDiscountGamma = clamped;
   if (typeof window !== "undefined") {
     try {
       safeStorage.setItem(DISCOUNT_GAMMA_STORAGE_KEY, String(activeDiscountGamma));
     } catch {}
   }
+  touchRecConfigChangedAt();
 }
 
 export function getDiscountGamma(): number {

@@ -47,7 +47,14 @@ import {
 } from "@/lib/library";
 import { summarizeMetrics, resetRecMetrics } from "@/lib/rec-metrics";
 import { getDiscountGamma, setDiscountGamma } from "@/lib/bandit-policy";
-import { getRecFlag, setRecFlag, getAllRecFlags } from "@/lib/rec-flags";
+import {
+  getRecFlag,
+  setRecFlag,
+  getAllRecFlags,
+  getRecConfigChangedAt,
+  isDevModeEnabled,
+  setDevModeEnabled,
+} from "@/lib/rec-flags";
 import {
   getSponsorBlockEnabled,
   setSponsorBlockEnabled,
@@ -160,6 +167,26 @@ export function SettingsModal({
   const [singlePassRankingOn, setSinglePassRankingOn] = useState(() => getRecFlag("singlePassRanking"));
   const [trainOnFullTrackOn, setTrainOnFullTrackOn] = useState(() => getRecFlag("trainOnFullTrack"));
   const [gammaValue, setGammaValue] = useState(() => getDiscountGamma());
+  const [devMode, setDevMode] = useState(() => isDevModeEnabled());
+  const [versionTapCount, setVersionTapCount] = useState(0);
+
+  const handleVersionTap = () => {
+    const nextCount = versionTapCount + 1;
+    if (nextCount >= 7) {
+      const nextState = !devMode;
+      setDevMode(nextState);
+      setDevModeEnabled(nextState);
+      setVersionTapCount(0);
+      setBackupStatus(nextState ? "Developer mode enabled! Experiments unlocked." : "Developer mode disabled.");
+      setTimeout(() => setBackupStatus(null), 3000);
+    } else {
+      setVersionTapCount(nextCount);
+      if (nextCount >= 4) {
+        setBackupStatus(`${7 - nextCount} taps away from developer options`);
+        setTimeout(() => setBackupStatus(null), 1500);
+      }
+    }
+  };
 
   // App Update State
   const [appVersion, setAppVersion] = useState(CURRENT_APP_VERSION);
@@ -313,11 +340,13 @@ export function SettingsModal({
       const summary30 = summarizeMetrics(30);
       const discountGamma = getDiscountGamma();
       const flags = getAllRecFlags();
+      const configChangedAt = getRecConfigChangedAt();
       const data = JSON.stringify({
         summary7,
         summary30,
         discountGamma,
         flags,
+        configChangedAt,
         appVersion,
         exportedAt: new Date().toISOString()
       }, null, 2);
@@ -920,111 +949,119 @@ export function SettingsModal({
                 )}
               </div>
 
-              {/* Recommendation Experiments Card */}
-              <div className="rounded-2xl sm:rounded-3xl border border-border bg-card p-4 sm:p-5 space-y-4 shadow-xs">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-400">
-                    <FlaskConical className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-semibold text-foreground">Recommendation Experiments</h4>
-                    <p className="text-xs text-muted-foreground">A/B test controls for the on-device bandit and ranking engine</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3.5 pt-1">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <Label htmlFor="flag-single-pass" className="text-sm font-semibold text-foreground cursor-pointer">
-                        Single-Pass Ranking
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Rank full candidate pool once after seed collection instead of per-page
-                      </p>
+              {/* Recommendation Experiments Card (Gated behind Developer Mode) */}
+              {devMode && (
+                <div className="rounded-2xl sm:rounded-3xl border border-border bg-card p-4 sm:p-5 space-y-4 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-500/20 text-purple-400">
+                      <FlaskConical className="h-4 w-4" />
                     </div>
-                    <Switch
-                      id="flag-single-pass"
-                      checked={singlePassRankingOn}
-                      onCheckedChange={(val) => {
-                        setSinglePassRankingOn(val);
-                        setRecFlag("singlePassRanking", val);
-                      }}
-                    />
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground">Recommendation Experiments</h4>
+                      <p className="text-xs text-muted-foreground">A/B test controls for the on-device bandit and ranking engine</p>
+                    </div>
                   </div>
 
-                  <div className="h-px bg-chip" />
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <Label htmlFor="flag-full-track" className="text-sm font-semibold text-foreground cursor-pointer">
-                        Train on Full Track
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Use full track metadata from playback cache for bandit training instead of stubs
-                      </p>
-                    </div>
-                    <Switch
-                      id="flag-full-track"
-                      checked={trainOnFullTrackOn}
-                      onCheckedChange={(val) => {
-                        setTrainOnFullTrackOn(val);
-                        setRecFlag("trainOnFullTrack", val);
-                      }}
-                    />
-                  </div>
-
-                  <div className="h-px bg-chip" />
-
-                  <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground">Discount Factor (γ)</h4>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        History discount rate (0.99 recency-weighted, 1.0 cumulative)
-                      </p>
-                    </div>
-                    <div className="flex items-center rounded-xl bg-chip p-1 border border-border shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDiscountGamma(0.99);
-                          setGammaValue(0.99);
+                  <div className="space-y-3.5 pt-1">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="flag-single-pass" className="text-sm font-semibold text-foreground cursor-pointer">
+                          Single-Pass Ranking
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Rank full candidate pool once after seed collection instead of per-page
+                        </p>
+                      </div>
+                      <Switch
+                        id="flag-single-pass"
+                        checked={singlePassRankingOn}
+                        onCheckedChange={(val) => {
+                          setSinglePassRankingOn(val);
+                          setRecFlag("singlePassRanking", val);
                         }}
-                        className={cn(
-                          "rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer",
-                          gammaValue === 0.99
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        0.99 (Recency)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDiscountGamma(1.0);
-                          setGammaValue(1.0);
+                      />
+                    </div>
+
+                    <div className="h-px bg-chip" />
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <Label htmlFor="flag-full-track" className="text-sm font-semibold text-foreground cursor-pointer">
+                          Train on Full Track
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Use full track metadata from playback cache for bandit training instead of stubs
+                        </p>
+                      </div>
+                      <Switch
+                        id="flag-full-track"
+                        checked={trainOnFullTrackOn}
+                        onCheckedChange={(val) => {
+                          setTrainOnFullTrackOn(val);
+                          setRecFlag("trainOnFullTrack", val);
                         }}
-                        className={cn(
-                          "rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer",
-                          gammaValue === 1.0
-                            ? "bg-primary text-primary-foreground shadow-xs"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        1.0 (Uniform)
-                      </button>
+                      />
+                    </div>
+
+                    <div className="h-px bg-chip" />
+
+                    <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Discount Factor (γ)</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          History discount rate (0.99 recency-weighted, 1.0 cumulative)
+                        </p>
+                      </div>
+                      <div className="flex items-center rounded-xl bg-chip p-1 border border-border shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDiscountGamma(0.99);
+                            setGammaValue(0.99);
+                          }}
+                          className={cn(
+                            "rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer",
+                            gammaValue === 0.99
+                              ? "bg-primary text-primary-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          0.99 (Recency)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDiscountGamma(1.0);
+                            setGammaValue(1.0);
+                          }}
+                          className={cn(
+                            "rounded-lg px-3 py-1 text-xs font-semibold transition-colors cursor-pointer",
+                            gammaValue === 1.0
+                              ? "bg-primary text-primary-foreground shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          1.0 (Uniform)
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <p className="text-[11px] text-muted-foreground">
-                  For testing only. Changes apply to new recommendations. Keep these fixed during a measurement week.
-                </p>
-              </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    For testing only. Changes apply to new recommendations. Keep these fixed during a measurement week.
+                  </p>
+                </div>
+              )}
 
               {/* Footer Session Action */}
               <div className="flex items-center justify-between pt-2 px-1">
-                <span className="text-xs text-foreground/30 font-mono">MelodyMap Native v2.0</span>
+                <span
+                  onClick={handleVersionTap}
+                  className="text-xs text-foreground/30 font-mono cursor-pointer select-none"
+                  title="MelodyMap version"
+                >
+                  MelodyMap Native v2.0
+                </span>
                 {userId && onSignOut ? (
                   <Button
                     variant="destructive"
@@ -1347,7 +1384,13 @@ export function SettingsModal({
             <div className="flex flex-wrap items-center justify-center gap-2 text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <img src="/brand/app-icon.png" alt="MelodyMap" className="h-4.5 w-4.5 object-contain" />
-                <span className="font-semibold text-foreground/80">MelodyMap v{appVersion}</span>
+                <span
+                  onClick={handleVersionTap}
+                  className="font-semibold text-foreground/80 cursor-pointer select-none"
+                  title="MelodyMap version"
+                >
+                  MelodyMap v{appVersion}
+                </span>
               </div>
               <span className="text-muted-foreground/40 hidden sm:inline">·</span>
               <button
