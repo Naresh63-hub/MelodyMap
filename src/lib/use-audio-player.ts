@@ -22,6 +22,8 @@ import {
   computeEffectiveVolume,
   rampAudioVolume,
 } from "@/lib/audio-leveling";
+import { getRecFlag } from "@/lib/rec-flags";
+import { isSourceWebAudioEligible, getEffectiveBiquadGains, EQUALIZER_SPECS } from "@/lib/web-audio-equalizer";
 
 export type NextTrackInfo = {
   id: string;
@@ -72,6 +74,9 @@ export function useAudioPlayer(options: {
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const filterNodesRef = useRef<BiquadFilterNode[]>([]);
+  const mediaElementSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const preampGainRef = useRef<GainNode | null>(null);
+  const isCurrentSourceEligibleRef = useRef<boolean>(true);
 
   const isSeekingRef = useRef<boolean>(false);
   const seekCooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -314,20 +319,63 @@ export function useAudioPlayer(options: {
   };
 
   const initWebAudio = useCallback(() => {
-    // Direct hardware audio output is used for all media playback.
-    // We intentionally avoid calling createMediaElementSource(audio) on the main
-    // <audio> element because:
-    // 1. External streaming CDNs (e.g. JioSaavn aac.saavncdn.com) do not return
-    //    CORS headers. Routing a cross-origin media element into createMediaElementSource
-    //    forces Chromium / WebKit to output PURE SILENCE under W3C security rules.
-    // 2. Direct HTML5 <audio> plays natively to the OS audio subsystem (speakers,
-    //    headphones, bluetooth) with zero CORS restrictions, full hardware volume,
-    //    no autoplay suspension, and reliable continuous background playback.
     if (typeof window === "undefined") return;
     const audio = audioRef.current;
     if (audio) {
       audio.muted = false;
       if (audio.volume === 0) audio.volume = 1;
+    }
+
+    if (!getRecFlag("webAudioEq")) {
+      return;
+    }
+
+    try {
+      if (!audioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        audioCtxRef.current = new AudioCtx();
+      }
+
+      const ctx = audioCtxRef.current;
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {});
+      }
+
+      if (audio && !mediaElementSourceRef.current) {
+        const source = ctx.createMediaElementSource(audio);
+        mediaElementSourceRef.current = source;
+
+        const preamp = ctx.createGain();
+        preamp.gain.value = 1.0;
+        preampGainRef.current = preamp;
+
+        let prevNode: AudioNode = source;
+        prevNode.connect(preamp);
+        prevNode = preamp;
+
+        const filters: BiquadFilterNode[] = [];
+        for (const spec of EQUALIZER_SPECS) {
+          const filter = ctx.createBiquadFilter();
+          filter.type = spec.type;
+          filter.frequency.value = spec.frequency;
+          filter.gain.value = 0;
+          filter.Q.value = 1.0;
+          prevNode.connect(filter);
+          prevNode = filter;
+          filters.push(filter);
+        }
+        filterNodesRef.current = filters;
+
+        const mainGain = ctx.createGain();
+        mainGain.gain.value = 1.0;
+        mainGainRef.current = mainGain;
+
+        prevNode.connect(mainGain);
+        mainGain.connect(ctx.destination);
+      }
+    } catch (err) {
+      console.warn("[useAudioPlayer] Web Audio chain initialization error:", err);
     }
   }, []);
 
@@ -346,14 +394,32 @@ export function useAudioPlayer(options: {
     };
   }, []);
 
+  // Background playback resume on Android WebView / tab visibility change
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const onVisibilityChange = () => {
+      const ctx = audioCtxRef.current;
+      if (ctx && ctx.state === "suspended" && wantPlayRef.current) {
+        ctx.resume().catch((err) => {
+          console.warn("[WebAudioEq] AudioContext resume on visibilitychange:", err);
+        });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
   // Update physical filter gains when equalizer settings change
   useEffect(() => {
     const filters = filterNodesRef.current;
     if (!filters || filters.length === 0) return;
+    const isBypassed = !isCurrentSourceEligibleRef.current || !equalizerSettings.enabled;
+    const targetGains = getEffectiveBiquadGains(equalizerSettings, isBypassed);
     filters.forEach((filter, idx) => {
-      const targetGain = equalizerSettings.enabled ? (equalizerSettings.gains[idx] ?? 0) : 0;
       try {
-        filter.gain.value = targetGain;
+        filter.gain.value = targetGains[idx] ?? 0;
       } catch {}
     });
   }, [equalizerSettings]);
@@ -365,10 +431,11 @@ export function useAudioPlayer(options: {
       initWebAudio();
       const filters = filterNodesRef.current;
       if (filters && filters.length > 0) {
+        const isBypassed = !isCurrentSourceEligibleRef.current || !settings.enabled;
+        const targetGains = getEffectiveBiquadGains(settings, isBypassed);
         filters.forEach((filter, idx) => {
-          const targetGain = settings.enabled ? (settings.gains[idx] ?? 0) : 0;
           try {
-            filter.gain.value = targetGain;
+            filter.gain.value = targetGains[idx] ?? 0;
           } catch {}
         });
       }
@@ -449,6 +516,30 @@ export function useAudioPlayer(options: {
       }
 
       initWebAudio();
+
+      if (getRecFlag("webAudioEq")) {
+        const isEligible = isSourceWebAudioEligible(url);
+        isCurrentSourceEligibleRef.current = isEligible;
+        if (!isEligible) {
+          options.onError?.("Equalizer unavailable for this source", {
+            code: "NETWORK_ERROR",
+            isOffline: false,
+          });
+        }
+        const filters = filterNodesRef.current;
+        if (filters && filters.length > 0) {
+          const targetGains = getEffectiveBiquadGains(
+            equalizerSettingsRef.current,
+            !isEligible || !equalizerSettingsRef.current.enabled,
+          );
+          filters.forEach((filter, idx) => {
+            try {
+              filter.gain.value = targetGains[idx] ?? 0;
+            } catch {}
+          });
+        }
+      }
+
       setIsLoading(true);
       clearPendingTimers();
       isRetryingRef.current = false;
@@ -1397,6 +1488,11 @@ export function useAudioPlayer(options: {
   const play = useCallback(() => {
     wantPlayRef.current = true;
     initWebAudio();
+    if (getRecFlag("webAudioEq") && audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+      audioCtxRef.current.resume().catch((err) => {
+        console.warn("[WebAudioEq] AudioContext resume on play:", err);
+      });
+    }
     const audio = audioRef.current;
     if (!audio) return;
 

@@ -9,7 +9,8 @@ export type RecFlagName =
   | "noveltyMomentumFeature"
   | "movieTieBreaker"
   | "tasteArtistMix"
-  | "languageQuotas";
+  | "languageQuotas"
+  | "webAudioEq";
 
 export interface RecFlagDef {
   name: RecFlagName;
@@ -71,6 +72,12 @@ export const REC_FLAG_DEFS: RecFlagDef[] = [
     name: "languageQuotas",
     label: "Language Ratio Quotas",
     description: "Scale candidate quotas proportionally to language weights using largest-remainder allocation",
+    defaultValue: false,
+  },
+  {
+    name: "webAudioEq",
+    label: "Web Audio Equalizer & Crossfade",
+    description: "Enable 10-band biquad filter audio graph and gain crossfading for HTML5 audio",
     defaultValue: false,
   },
 ];

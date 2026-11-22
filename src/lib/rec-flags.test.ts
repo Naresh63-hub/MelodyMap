@@ -65,6 +65,7 @@ describe("rec-flags", () => {
       movieTieBreaker: false,
       tasteArtistMix: false,
       languageQuotas: false,
+      webAudioEq: false,
     });
   });
 
