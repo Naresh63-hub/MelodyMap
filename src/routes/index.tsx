@@ -171,6 +171,7 @@ import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { tagTrackSource, getTrackSource } from "@/lib/rec-source";
 import { initRecMetrics, recordLanguageFeatureStd, computeBatchLanguageStd } from "@/lib/rec-metrics";
 import { sortByScoreWithMovieTieBreaker } from "@/lib/bandit-policy";
+import { extractTasteArtists, interleaveTasteTracks } from "@/lib/autodj-taste-mix";
 import { getRecFlag } from "@/lib/rec-flags";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
@@ -3330,6 +3331,56 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         // Advance AutoDJ pagination depth for the next cycle
         autoDjPageRef.current = (curPage % 5) + 1;
 
+        const tasteTrackIds = new Set<string>();
+        if (getRecFlag("tasteArtistMix")) {
+          const tasteArtists = extractTasteArtists(downloadedTracks, likes, affinity.affinityArtists);
+          if (tasteArtists.length > 0) {
+            const tasteArtistIndex = (autoDjPageRef.current - 1) % tasteArtists.length;
+            const targetArtist = tasteArtists[tasteArtistIndex];
+            if (targetArtist) {
+              try {
+                const tasteRes = await getSongRadio({
+                  data: {
+                    artist: targetArtist,
+                    languages: settings.languages,
+                    primaryLanguage: settings.primaryLanguage || (settings.languages.length > 0 ? settings.languages[0] : undefined),
+                    languageWeights: settings.languageWeights,
+                    limit: 15,
+                    page: (curPage % 5) + 1,
+                  },
+                });
+                if (tasteRes.tracks && tasteRes.tracks.length > 0) {
+                  const freshTaste = applyFeedFilters(tasteRes.tracks as Track[]);
+                  const acceptableTaste = freshTaste.filter((t) => isCandidateAcceptable(t as TrackLike, candidateTracks));
+                  if (acceptableTaste.length > 0) {
+                    for (const t of acceptableTaste) {
+                      tasteTrackIds.add(t.id);
+                    }
+                    // Rank similar pool and taste pool TOGETHER with a single posterior sample
+                    const combinedPool = [...candidateTracks, ...acceptableTaste];
+                    const scoredCombined = thompsonSamplingPolicy.rankCandidatesWithScores(combinedPool, getSessionContext());
+                    const scoreMap = new Map<string, number>();
+                    for (const sc of scoredCombined) {
+                      scoreMap.set(sc.track.id, sc.score);
+                    }
+                    candidateTracks.sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
+                    acceptableTaste.sort((a, b) => (scoreMap.get(b.id) ?? 0) - (scoreMap.get(a.id) ?? 0));
+
+                    candidateTracks = interleaveTasteTracks(
+                      candidateTracks,
+                      acceptableTaste,
+                      settings.discovery ?? 40,
+                      15,
+                    );
+                  }
+                }
+              } catch {
+                // Silently fall back to current behavior
+              }
+            }
+          }
+        }
+
         let deduped = dedupeTracks(candidateTracks);
         if (getRecFlag("movieTieBreaker")) {
           const scored = thompsonSamplingPolicy.rankCandidatesWithScores(deduped, getSessionContext());
@@ -3381,7 +3432,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
 
         const finalBatch = diversifiedBatch.slice(0, 15);
-        tagTrackSource(finalBatch, queueSource);
+        for (const t of finalBatch) {
+          tagTrackSource([t], tasteTrackIds.has(t.id) ? "autodj-taste" : queueSource);
+        }
         markFeedDisplayed(finalBatch);
         setQueue((prev) => [...prev, ...finalBatch]);
         return finalBatch;

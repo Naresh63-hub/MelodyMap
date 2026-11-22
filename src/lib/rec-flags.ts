@@ -7,7 +7,8 @@ export type RecFlagName =
   | "languageFeature"
   | "artistRecentSkipFeature"
   | "noveltyMomentumFeature"
-  | "movieTieBreaker";
+  | "movieTieBreaker"
+  | "tasteArtistMix";
 
 export interface RecFlagDef {
   name: RecFlagName;
@@ -57,6 +58,12 @@ export const REC_FLAG_DEFS: RecFlagDef[] = [
     name: "movieTieBreaker",
     label: "Movie Preference Tie-Breaker",
     description: "Prefer movie/soundtrack tracks only within 10% of score range instead of absolute priority",
+    defaultValue: false,
+  },
+  {
+    name: "tasteArtistMix",
+    label: "Taste-Artist AutoDJ Mix",
+    description: "Interleave top taste-artist radio tracks into AutoDJ queue based on discovery ratio",
     defaultValue: false,
   },
 ];

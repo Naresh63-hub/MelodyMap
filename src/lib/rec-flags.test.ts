@@ -63,6 +63,7 @@ describe("rec-flags", () => {
       artistRecentSkipFeature: false,
       noveltyMomentumFeature: false,
       movieTieBreaker: false,
+      tasteArtistMix: false,
     });
   });
 
