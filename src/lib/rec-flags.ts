@@ -8,7 +8,8 @@ export type RecFlagName =
   | "artistRecentSkipFeature"
   | "noveltyMomentumFeature"
   | "movieTieBreaker"
-  | "tasteArtistMix";
+  | "tasteArtistMix"
+  | "languageQuotas";
 
 export interface RecFlagDef {
   name: RecFlagName;
@@ -64,6 +65,12 @@ export const REC_FLAG_DEFS: RecFlagDef[] = [
     name: "tasteArtistMix",
     label: "Taste-Artist AutoDJ Mix",
     description: "Interleave top taste-artist radio tracks into AutoDJ queue based on discovery ratio",
+    defaultValue: false,
+  },
+  {
+    name: "languageQuotas",
+    label: "Language Ratio Quotas",
+    description: "Scale candidate quotas proportionally to language weights using largest-remainder allocation",
     defaultValue: false,
   },
 ];

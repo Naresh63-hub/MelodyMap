@@ -9,6 +9,8 @@ import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext, MOOD_ENVELOPES } from "./context-engine";
 import { isLanguageConsistent, isOldEraTrack } from "./library";
 import { isOriginalSong } from "./track-filters";
+import { allocateLanguageQuotas, enforceLanguageQuotas } from "./language-quotas";
+import { getRecFlag } from "./rec-flags";
 
 /** Normalizes user-provided strings for AI context inclusion while preserving real song/artist names */
 export function sanitizePromptInput(str: string | undefined): string {
@@ -207,6 +209,7 @@ const RecommendInput = z.object({
   isNewUser: z.boolean().optional(),
   primaryLanguage: z.string().max(40).optional(),
   languageWeights: z.record(z.string(), z.number()).optional(),
+  languageQuotas: z.boolean().optional(),
   downloadedArtists: z.array(z.string()).max(30).optional(),
   exclude: z.array(z.string()).max(1000).default([]).optional(),
   recentSeenIds: z.array(z.string()).max(1000).default([]).optional(),
@@ -238,6 +241,7 @@ function getDynamicQueries(
     mood?: string | undefined;
     primaryLanguage?: string | undefined;
     languageWeights?: Record<string, number> | undefined;
+    languageQuotas?: boolean | undefined;
   },
 ): { newQueries: string[]; oldQueries: string[] } {
   let langs = languages.map((l) => l.trim()).filter(Boolean);
@@ -319,16 +323,26 @@ function getDynamicQueries(
   const normMood = (options?.mood || "").toLowerCase().trim();
   const moodEnvelope = normMood ? MOOD_ENVELOPES[normMood] : undefined;
 
+  const flagQuotasOn = options?.languageQuotas ?? getRecFlag("languageQuotas");
+  const queryLangs: string[] = [];
+  if (flagQuotasOn && options?.languageWeights && Object.keys(options.languageWeights).length > 0) {
+    const allocated = allocateLanguageQuotas(langs, options.languageWeights, Math.max(langs.length, 6));
+    for (const [lang, slots] of Object.entries(allocated)) {
+      if (slots > 0) queryLangs.push(lang);
+    }
+  }
+  const effectiveQueryLangs = queryLangs.length > 0 ? queryLangs : langs.slice(0, 3);
+
   if (moodEnvelope && moodEnvelope.queryThemes.length > 0) {
     for (const theme of moodEnvelope.queryThemes) {
-      for (const lang of langs.slice(0, 3)) {
+      for (const lang of effectiveQueryLangs) {
         generalNewQ.push(`${lang} ${theme}`);
       }
     }
   } else {
     const temporalCtx = getTemporalContext(options?.clientHour);
     for (const theme of temporalCtx.queryThemes) {
-      for (const lang of langs.slice(0, 2)) {
+      for (const lang of effectiveQueryLangs.slice(0, 2)) {
         generalNewQ.push(`${lang} ${theme}`);
       }
     }
@@ -336,7 +350,7 @@ function getDynamicQueries(
 
   // 4. Supplementary queries across active languages (pure artist & soundtrack searches)
   const otherArtists = shuffleArray(langArtistPool.filter((a) => !priorityArtists.includes(a)));
-  for (const lang of langs.slice(0, 3)) {
+  for (const lang of effectiveQueryLangs) {
     const langPrefix = `${lang} `;
     for (const art of otherArtists.slice(0, 3)) {
       generalNewQ.push(`${langPrefix}${art} movie songs`);
@@ -472,6 +486,7 @@ async function getLocalPicks(data: {
   mood?: string | undefined;
   primaryLanguage?: string | undefined;
   languageWeights?: Record<string, number> | undefined;
+  languageQuotas?: boolean | undefined;
   recentSeenIds?: string[] | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
@@ -506,6 +521,9 @@ async function getLocalPicks(data: {
       discovery: data.discovery,
       clientHour: data.clientHour,
       mood: data.mood,
+      primaryLanguage: data.primaryLanguage,
+      languageWeights: data.languageWeights,
+      languageQuotas: data.languageQuotas,
     });
 
     const popularQueries: string[] = [];
@@ -604,6 +622,12 @@ async function getLocalPicks(data: {
       minAlbumSpacing: 3,
     });
 
+    const useLanguageQuotas = data.languageQuotas ?? getRecFlag("languageQuotas");
+    if (useLanguageQuotas && data.languageWeights && languages.length > 0) {
+      const quotas = allocateLanguageQuotas(languages, data.languageWeights, count);
+      return enforceLanguageQuotas(diversified, quotas, count);
+    }
+
     return diversified.slice(0, count);
   }
 
@@ -629,6 +653,7 @@ async function getLocalPicks(data: {
     mood: data.mood,
     primaryLanguage: data.primaryLanguage,
     languageWeights: data.languageWeights,
+    languageQuotas: data.languageQuotas,
   });
 
   const nonceNum =
@@ -754,6 +779,12 @@ async function getLocalPicks(data: {
     minArtistSpacing: 2,
     minAlbumSpacing: 3,
   });
+
+  const useLanguageQuotas = data.languageQuotas ?? getRecFlag("languageQuotas");
+  if (useLanguageQuotas && data.languageWeights && languages.length > 0) {
+    const quotas = allocateLanguageQuotas(languages, data.languageWeights, count);
+    return enforceLanguageQuotas(diversified, quotas, count);
+  }
 
   return diversified.slice(0, count);
 }
@@ -1071,6 +1102,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         mood: data.mood,
         primaryLanguage: data.primaryLanguage,
         languageWeights: data.languageWeights,
+        languageQuotas: data.languageQuotas,
       });
       return { tracks, error: null };
     }
@@ -1171,6 +1203,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
         mood: data.mood,
         primaryLanguage: data.primaryLanguage,
         languageWeights: data.languageWeights,
+        languageQuotas: data.languageQuotas,
       });
       return { tracks, error: null };
     };
@@ -1590,6 +1623,7 @@ const DailyMixInput = z.object({
   recentSeenIds: z.array(z.string()).max(1000).optional(),
   primaryLanguage: z.string().max(40).optional(),
   languageWeights: z.record(z.string(), z.number()).optional(),
+  languageQuotas: z.boolean().optional(),
 });
 
 /**
@@ -1611,6 +1645,7 @@ export const getDailyMix = createServerFn({ method: "POST" })
     const { newQueries, oldQueries } = getDynamicQueries(languages, artists, {
       primaryLanguage: data.primaryLanguage,
       languageWeights: data.languageWeights,
+      languageQuotas: data.languageQuotas,
     });
 
     const page = data.page ?? 1;
@@ -1756,6 +1791,11 @@ export const getDailyMix = createServerFn({ method: "POST" })
       minArtistSpacing: 2,
       minAlbumSpacing: 3,
     });
+    const useLanguageQuotas = data.languageQuotas ?? getRecFlag("languageQuotas");
+    if (useLanguageQuotas && data.languageWeights && languages.length > 0) {
+      const quotas = allocateLanguageQuotas(languages, data.languageWeights, count);
+      return { tracks: enforceLanguageQuotas(diversified, quotas, count), dateSeed, error: null };
+    }
     return { tracks: diversified.slice(0, count), dateSeed, error: null };
   });
 
