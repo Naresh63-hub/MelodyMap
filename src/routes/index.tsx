@@ -169,7 +169,7 @@ import {
 } from "@/lib/context-engine";
 import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { tagTrackSource, getTrackSource } from "@/lib/rec-source";
-import { initRecMetrics } from "@/lib/rec-metrics";
+import { initRecMetrics, recordLanguageFeatureStd, computeBatchLanguageStd } from "@/lib/rec-metrics";
 import { getRecFlag } from "@/lib/rec-flags";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
@@ -3228,6 +3228,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
             if (radioRes.tracks && radioRes.tracks.length > 0) {
               const fresh = applyFeedFilters(radioRes.tracks as Track[]);
+              if (!singlePassRanking && fresh.length > 0) {
+                recordLanguageFeatureStd(computeBatchLanguageStd(fresh, getSessionContext(), thompsonSamplingPolicy));
+              }
               const candidatesForPage = singlePassRanking
                 ? fresh.filter((t) => isCandidateAcceptable(t as TrackLike, candidateTracks))
                 : thompsonSamplingPolicy
@@ -3244,6 +3247,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       }
 
       if (singlePassRanking && candidateTracks.length > 0) {
+        recordLanguageFeatureStd(computeBatchLanguageStd(candidateTracks, getSessionContext(), thompsonSamplingPolicy));
         candidateTracks = thompsonSamplingPolicy.rankCandidates(candidateTracks, getSessionContext());
       }
 
@@ -3280,7 +3284,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           },
         });
         if (res.tracks && res.tracks.length > 0) {
-          const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(res.tracks as Track[]), getSessionContext());
+          const fresh = applyFeedFilters(res.tracks as Track[]);
+          if (fresh.length > 0) {
+            recordLanguageFeatureStd(computeBatchLanguageStd(fresh, getSessionContext(), thompsonSamplingPolicy));
+          }
+          const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
           candidateTracks = ranked.filter((t) => isCandidateAcceptable(t as TrackLike));
         }
       }
@@ -3305,7 +3313,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             },
           });
           if (deepRadioRes.tracks && deepRadioRes.tracks.length > 0) {
-            const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(deepRadioRes.tracks as Track[]), getSessionContext());
+            const fresh = applyFeedFilters(deepRadioRes.tracks as Track[]);
+            if (fresh.length > 0) {
+              recordLanguageFeatureStd(computeBatchLanguageStd(fresh, getSessionContext(), thompsonSamplingPolicy));
+            }
+            const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
             candidateTracks = ranked.filter((t) => isCandidateAcceptable(t as TrackLike));
           }
         } catch {

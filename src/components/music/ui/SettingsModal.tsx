@@ -45,7 +45,7 @@ import {
   importLibraryData,
   type RecSettings,
 } from "@/lib/library";
-import { summarizeMetrics, resetRecMetrics } from "@/lib/rec-metrics";
+import { summarizeMetrics, resetRecMetrics, getLanguageFeatureStd } from "@/lib/rec-metrics";
 import { getDiscountGamma, setDiscountGamma } from "@/lib/bandit-policy";
 import {
   getRecFlag,
@@ -342,12 +342,14 @@ export function SettingsModal({
       const discountGamma = getDiscountGamma();
       const flags = getAllRecFlags();
       const configChangedAt = getRecConfigChangedAt();
+      const languageFeatureStd = getLanguageFeatureStd();
       const data = JSON.stringify({
         summary7,
         summary30,
         discountGamma,
         flags,
         configChangedAt,
+        languageFeatureStd,
         appVersion,
         exportedAt: new Date().toISOString()
       }, null, 2);

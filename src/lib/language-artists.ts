@@ -109,3 +109,167 @@ export function inferLanguageFromArtists(artist: string | null | undefined): str
   }
   return verdict;
 }
+
+export const ISO_LANG_MAP: Record<string, string> = {
+  te: "Telugu",
+  tel: "Telugu",
+  hi: "Hindi",
+  hin: "Hindi",
+  ta: "Tamil",
+  tam: "Tamil",
+  en: "English",
+  eng: "English",
+  pa: "Punjabi",
+  pan: "Punjabi",
+  ml: "Malayalam",
+  mal: "Malayalam",
+  kn: "Kannada",
+  kan: "Kannada",
+  bn: "Bengali",
+  ben: "Bengali",
+  mr: "Marathi",
+  mar: "Marathi",
+  gu: "Gujarati",
+  guj: "Gujarati",
+  bho: "Bhojpuri",
+  ur: "Urdu",
+  urd: "Urdu",
+  ja: "Japanese",
+  jpn: "Japanese",
+  ko: "Korean",
+  kor: "Korean",
+  es: "Spanish",
+  spa: "Spanish",
+  ar: "Arabic",
+  ara: "Arabic",
+};
+
+const LANGUAGE_SCRIPTS: Record<string, RegExp> = {
+  Telugu: /[\u0C00-\u0C7F]/,
+  Tamil: /[\u0B80-\u0BFF]/,
+  Malayalam: /[\u0D00-\u0D7F]/,
+  Kannada: /[\u0C80-\u0CFF]/,
+  Punjabi: /[\u0A00-\u0A7F]/,
+  Bengali: /[\u0980-\u09FF]/,
+  Korean: /[\uAC00-\uD7AF\u1100-\u11FF]/,
+  Arabic: /[\u0600-\u06FF]/,
+  Japanese: /[\u3040-\u309F\u30A0-\u30FF]/,
+  Devanagari: /[\u0900-\u097F]/,
+};
+
+const INDUSTRY_MAP: Record<string, string> = {
+  tollywood: "Telugu",
+  kollywood: "Tamil",
+  bollywood: "Hindi",
+  mollywood: "Malayalam",
+  sandalwood: "Kannada",
+  pollywood: "Punjabi",
+  kpop: "Korean",
+  "k-pop": "Korean",
+};
+
+export const SUPPORTED_LANGUAGES = [
+  "Telugu",
+  "Hindi",
+  "Tamil",
+  "English",
+  "Malayalam",
+  "Kannada",
+  "Punjabi",
+  "Bengali",
+  "Marathi",
+  "Gujarati",
+  "Bhojpuri",
+  "Urdu",
+  "Japanese",
+  "Korean",
+  "Spanish",
+  "Arabic",
+] as const;
+
+/**
+ * Single source of truth for determining a track's language across all signals:
+ * languageCode/language field, bracketed/delimited tags, explicit title phrases,
+ * regional industry keywords, Unicode scripts, and unambiguous artist association.
+ */
+export function getTrackLanguage(
+  track?: {
+    title?: string | undefined;
+    artist?: string | undefined;
+    album?: string | undefined;
+    languageCode?: string | undefined;
+    language?: string | undefined;
+  } | null,
+): string | undefined {
+  if (!track) return undefined;
+
+  // 1. Explicit languageCode or language field
+  const rawCode = (track.languageCode || track.language || "").trim().toLowerCase();
+  if (rawCode && rawCode !== "und" && rawCode !== "zxx") {
+    if (ISO_LANG_MAP[rawCode]) {
+      return ISO_LANG_MAP[rawCode];
+    }
+    const match = SUPPORTED_LANGUAGES.find((l) => l.toLowerCase() === rawCode);
+    if (match) return match;
+    const prefixMatch = SUPPORTED_LANGUAGES.find((l) => rawCode.startsWith(l.toLowerCase().slice(0, 3)));
+    if (prefixMatch) return prefixMatch;
+  }
+
+  const rawTitle = track.title || "";
+  const rawArtist = track.artist || "";
+  const rawAlbum = track.album || "";
+  const combined = `${rawTitle} ${rawAlbum}`;
+  const text = combined.toLowerCase();
+
+  // 2. Explicit bracket tags, delimited tags, and phrases
+  for (const lang of SUPPORTED_LANGUAGES) {
+    const l = lang.toLowerCase();
+    const bracketPattern = new RegExp(`[\\(\\[][^\\)\\]]*\\b${l}\\b[^\\)\\]]*[\\)\\]]`, "i");
+    if (bracketPattern.test(combined)) {
+      return lang;
+    }
+    const delimiterPattern = new RegExp(`[\\|\\-\\/\u2013\u2014]\\s*${l}\\s*[\\|\\-\\/\u2013\u2014]`, "i");
+    if (delimiterPattern.test(combined)) {
+      return lang;
+    }
+    const phrasePattern = new RegExp(
+      `\\b(${l}\\s+(song|songs|hits|version|dub|audio|video|jukebox|remix|mashup|lyric|lyrics|lyrical|mp3|movie|cinema)|in\\s+${l})\\b`,
+      "i",
+    );
+    if (phrasePattern.test(combined)) {
+      return lang;
+    }
+  }
+
+  // 3. Known industry tags (e.g. "Tollywood", "Bollywood")
+  for (const [industry, lang] of Object.entries(INDUSTRY_MAP)) {
+    const indPattern = new RegExp(`\\b${industry}\\b`, "i");
+    if (indPattern.test(text)) {
+      return lang;
+    }
+  }
+
+  // 4. Unicode scripts
+  const textForScript = `${rawTitle} ${rawArtist} ${rawAlbum}`;
+  for (const [lang, regex] of Object.entries(LANGUAGE_SCRIPTS)) {
+    if (lang === "Devanagari") continue;
+    if (regex.test(textForScript)) {
+      return lang;
+    }
+  }
+  const devanagariRegex = LANGUAGE_SCRIPTS["Devanagari"];
+  if (devanagariRegex && devanagariRegex.test(textForScript)) {
+    const marathiArtist = inferLanguageFromArtists(rawArtist) === "Marathi";
+    const marathiKeywords = /\b(marathi|abhang|lavani|natyageet)\b/i.test(text);
+    return marathiArtist || marathiKeywords ? "Marathi" : "Hindi";
+  }
+
+  // 5. Unambiguous artist-based inference
+  const artistLang = inferLanguageFromArtists(rawArtist);
+  if (artistLang) {
+    return artistLang;
+  }
+
+  return undefined;
+}
+

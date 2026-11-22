@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { safeStorage } from "./safe-storage";
 import type { PlaybackSource } from "@/lib/providers/types";
-import { inferLanguageFromArtists } from "./language-artists";
+import { inferLanguageFromArtists, getTrackLanguage } from "./language-artists";
+export { getTrackLanguage } from "./language-artists";
 
 export type Track = {
   id: string;
