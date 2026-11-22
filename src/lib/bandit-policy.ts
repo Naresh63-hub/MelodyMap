@@ -56,10 +56,43 @@ export interface RecommendationPolicy {
   setModelState(state: BanditModelState): void;
 }
 
-const FEATURE_DIM = 6;
+export const FEATURE_DIM = 6;
 const BANDIT_STORAGE_KEY = "melodymap.bandit_state.v1";
+export const DISCOUNT_GAMMA_STORAGE_KEY = "melodymap.discount_gamma";
 const REGULARIZATION_LAMBDA = 1.0;
 const EXPLORATION_VARIANCE_V = 0.5;
+/** Per-update forgetting factor. Effective memory is about 1/(1-γ) updates (0.99 -> ~100). */
+export const DEFAULT_DISCOUNT_GAMMA = 0.99;
+export const DISCOUNT_GAMMA = DEFAULT_DISCOUNT_GAMMA;
+
+function initDiscountGamma(): number {
+  if (typeof window === "undefined") return DEFAULT_DISCOUNT_GAMMA;
+  try {
+    const raw = safeStorage.getItem(DISCOUNT_GAMMA_STORAGE_KEY);
+    if (raw) {
+      const val = parseFloat(raw);
+      if (!Number.isNaN(val) && val >= 0.5 && val <= 1.0) {
+        return val;
+      }
+    }
+  } catch {}
+  return DEFAULT_DISCOUNT_GAMMA;
+}
+
+let activeDiscountGamma = initDiscountGamma();
+
+export function setDiscountGamma(gamma: number): void {
+  activeDiscountGamma = Math.max(0.5, Math.min(1.0, gamma));
+  if (typeof window !== "undefined") {
+    try {
+      safeStorage.setItem(DISCOUNT_GAMMA_STORAGE_KEY, String(activeDiscountGamma));
+    } catch {}
+  }
+}
+
+export function getDiscountGamma(): number {
+  return activeDiscountGamma;
+}
 
 /**
  * Swappable RNG source for the bandit's stochastic steps (posterior sampling and
@@ -461,17 +494,22 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
       discoveryPercent: event.context?.discoverySetting ?? 40,
     };
 
-    const x = this.extractFeatureVector(dummyTrack, ctx);
+    // stats holds the full Track (language, album, ...). The stub only has id/title/artist.
+    const fullTrack = ctx.stats?.[event.trackId]?.track as TrackLike | undefined;
+    const x = this.extractFeatureVector(fullTrack ?? dummyTrack, ctx);
 
-    // Online Bayesian Linear Regression:
-    // B <- B + x * x^T
-    // f <- f + r * x
+    // Discounted Bayesian linear regression, decaying toward the prior (not toward zero):
+    // B <- γB + (1-γ)λI + x x^T      f <- γf + (1-γ)λμ0 + r x
+    // With no data this is a fixed point, and B stays >= λI, so it is always invertible.
     const n = this.dimension;
+    const g = activeDiscountGamma;
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
-        this.B[i]![j] = this.B[i]![j]! + x[i]! * x[j]!;
+        const prior = i === j ? REGULARIZATION_LAMBDA : 0.0;
+        this.B[i]![j] = g * this.B[i]![j]! + (1 - g) * prior + x[i]! * x[j]!;
       }
-      this.f[i] = this.f[i]! + reward * x[i]!;
+      this.f[i] =
+        g * this.f[i]! + (1 - g) * REGULARIZATION_LAMBDA * PRIOR_MU[i]! + reward * x[i]!;
     }
 
     // Update B_inv and mu = B_inv * f
