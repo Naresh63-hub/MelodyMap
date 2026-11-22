@@ -6,7 +6,8 @@ export type RecFlagName =
   | "leakFreeTrainingContext"
   | "languageFeature"
   | "artistRecentSkipFeature"
-  | "noveltyMomentumFeature";
+  | "noveltyMomentumFeature"
+  | "movieTieBreaker";
 
 export interface RecFlagDef {
   name: RecFlagName;
@@ -50,6 +51,12 @@ export const REC_FLAG_DEFS: RecFlagDef[] = [
     name: "noveltyMomentumFeature",
     label: "Novelty Momentum Feature (x7)",
     description: "Unfamiliarity interaction with session momentum (coordinate 7)",
+    defaultValue: false,
+  },
+  {
+    name: "movieTieBreaker",
+    label: "Movie Preference Tie-Breaker",
+    description: "Prefer movie/soundtrack tracks only within 10% of score range instead of absolute priority",
     defaultValue: false,
   },
 ];

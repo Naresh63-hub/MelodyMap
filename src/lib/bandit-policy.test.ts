@@ -8,6 +8,7 @@ import {
   buildTrainingContext,
   setBanditRngSource,
   X5_RESET_KEY,
+  sortByScoreWithMovieTieBreaker,
   type SessionContext,
   type BanditModelState,
 } from "./bandit-policy";
@@ -841,6 +842,72 @@ describe("ThompsonSamplingPolicy Recommender", () => {
         setRecFlag("languageFeature", false);
         safeStorage.removeItem(X5_RESET_KEY);
       }
+    });
+  });
+
+  describe("Task 6: Movie-first tie-breaker behind flag (movieTieBreaker)", () => {
+    it("rankCandidatesWithScores returns track and numeric score matching rankCandidates ordering", () => {
+      const candidates: TrackLike[] = [
+        { id: "s1", title: "Song 1", artist: "Artist 1" },
+        { id: "s2", title: "Song 2", artist: "Artist 2" },
+        { id: "s3", title: "Song 3", artist: "Artist 3" },
+      ];
+      const ctx: SessionContext = { hourOfDay: 14, discoveryPercent: 40 };
+
+      // Fixed seed
+      setBanditRngSource(() => 0.5);
+      const rankedNormal = policy.rankCandidates(candidates, ctx);
+
+      setBanditRngSource(() => 0.5);
+      const rankedWithScores = policy.rankCandidatesWithScores(candidates, ctx);
+      setBanditRngSource(null);
+
+      expect(rankedWithScores).toHaveLength(3);
+      expect(rankedWithScores.map((s) => s.track.id)).toEqual(rankedNormal.map((t) => t.id));
+      for (const item of rankedWithScores) {
+        expect(typeof item.score).toBe("number");
+        expect(Number.isFinite(item.score)).toBe(true);
+      }
+    });
+
+    it("prefers movie track only when score is within 10% of batch range", () => {
+      const tA: TrackLike = { id: "tA", title: "Indie Acoustic", artist: "Artist A" };
+      const tB: TrackLike = { id: "tB", title: "Film Soundtrack Song", artist: "Artist B", album: "Blockbuster Movie" };
+      const tC: TrackLike = { id: "tC", title: "Pop Song", artist: "Artist C" };
+      const tD: TrackLike = { id: "tD", title: "Cinema Score", artist: "Artist D", album: "Old Movie" };
+
+      // Batch score range: min = 1.0 (tD), max = 2.0 (tA). Range = 1.0. 10% threshold = 0.10.
+      const scoredFixtures = [
+        { track: tA, score: 2.0 }, // Non-movie
+        { track: tB, score: 1.95 }, // Movie: diff from tA is 0.05 <= 0.10 -> tB should tie-break above tA!
+        { track: tC, score: 1.5 }, // Non-movie
+        { track: tD, score: 1.0 }, // Movie: diff from tC is 0.50 > 0.10 -> tC must remain ahead of tD!
+      ];
+
+      const isMovie = (t: TrackLike) => Boolean(t.album && t.album.includes("Movie"));
+      const sorted = sortByScoreWithMovieTieBreaker(scoredFixtures, isMovie);
+
+      expect(sorted.map((t) => t.id)).toEqual(["tB", "tA", "tC", "tD"]);
+    });
+
+    it("falls back cleanly to score when no tracks are movies or score range is 0", () => {
+      const t1: TrackLike = { id: "t1", title: "Song 1", artist: "Artist 1" };
+      const t2: TrackLike = { id: "t2", title: "Song 2", artist: "Artist 2" };
+
+      const fixtures = [
+        { track: t1, score: 0.8 },
+        { track: t2, score: 0.4 },
+      ];
+      const sorted = sortByScoreWithMovieTieBreaker(fixtures, () => false);
+      expect(sorted.map((t) => t.id)).toEqual(["t1", "t2"]);
+
+      // Equal scores
+      const equalFixtures = [
+        { track: t1, score: 0.5 },
+        { track: t2, score: 0.5 },
+      ];
+      const sortedEqual = sortByScoreWithMovieTieBreaker(equalFixtures, (t) => t.id === "t2");
+      expect(sortedEqual.map((t) => t.id)).toEqual(["t2", "t1"]);
     });
   });
 });

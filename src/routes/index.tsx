@@ -170,6 +170,7 @@ import {
 import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
 import { tagTrackSource, getTrackSource } from "@/lib/rec-source";
 import { initRecMetrics, recordLanguageFeatureStd, computeBatchLanguageStd } from "@/lib/rec-metrics";
+import { sortByScoreWithMovieTieBreaker } from "@/lib/bandit-policy";
 import { getRecFlag } from "@/lib/rec-flags";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
@@ -3329,15 +3330,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         // Advance AutoDJ pagination depth for the next cycle
         autoDjPageRef.current = (curPage % 5) + 1;
 
-        const deduped = dedupeTracks(candidateTracks);
-        // Prioritize tracks that belong to movies/soundtrack albums so proper movie holder is displayed
-        deduped.sort((a, b) => {
-          const aMovie = Boolean(extractTrackMovieOrAlbum(a));
-          const bMovie = Boolean(extractTrackMovieOrAlbum(b));
-          if (aMovie && !bMovie) return -1;
-          if (!aMovie && bMovie) return 1;
-          return 0;
-        });
+        let deduped = dedupeTracks(candidateTracks);
+        if (getRecFlag("movieTieBreaker")) {
+          const scored = thompsonSamplingPolicy.rankCandidatesWithScores(deduped, getSessionContext());
+          deduped = sortByScoreWithMovieTieBreaker(scored, (t) => Boolean(extractTrackMovieOrAlbum(t)));
+        } else {
+          // Prioritize tracks that belong to movies/soundtrack albums so proper movie holder is displayed
+          deduped.sort((a, b) => {
+            const aMovie = Boolean(extractTrackMovieOrAlbum(a));
+            const bMovie = Boolean(extractTrackMovieOrAlbum(b));
+            if (aMovie && !bMovie) return -1;
+            if (!aMovie && bMovie) return 1;
+            return 0;
+          });
+        }
         // Diversify to guarantee no more than 2 tracks per artist, 1 per movie, and spaced out
         const diversifiedBatch = diversifyTrackList(deduped, {
           maxPerArtist: 2,

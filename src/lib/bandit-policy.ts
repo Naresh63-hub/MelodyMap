@@ -533,12 +533,17 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
   }
 
   /**
-   * Rank candidate tracks descending by their Thompson-sampled expected reward.
+   * Rank candidate tracks descending by their Thompson-sampled expected reward,
+   * returning each candidate paired with its sampled score.
    */
-  public rankCandidates<T extends TrackLike>(candidates: T[], context: SessionContext): T[] {
-    if (candidates.length <= 1) return candidates;
+  public rankCandidatesWithScores<T extends TrackLike>(
+    candidates: T[],
+    context: SessionContext,
+  ): { track: T; score: number }[] {
+    if (candidates.length === 0) return [];
+    if (candidates.length === 1) return [{ track: candidates[0]!, score: 0 }];
 
-    // Draw parameter sample w* from posterior
+    // Draw single parameter sample w* from posterior
     const sampledW = this.sampleWeights();
 
     const scored = candidates.map((track, originalIndex) => {
@@ -553,8 +558,18 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
       if (Math.abs(diff) > 1e-7) return diff;
       return rngSource() - 0.5;
     });
-    return scored.map((s) => s.track);
+
+    return scored.map((s) => ({ track: s.track, score: s.score }));
   }
+
+  /**
+   * Rank candidate tracks descending by their Thompson-sampled expected reward.
+   */
+  public rankCandidates<T extends TrackLike>(candidates: T[], context: SessionContext): T[] {
+    return this.rankCandidatesWithScores(candidates, context).map((s) => s.track);
+  }
+
+  /**
 
   /**
    * Select a single top candidate from candidate pool.
@@ -790,3 +805,41 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
 }
 
 export const thompsonSamplingPolicy = new ThompsonSamplingPolicy();
+
+/**
+ * Sort candidates by score, using movie/soundtrack album presence as a tie-breaker
+ * ONLY for candidates whose scores are within 10% of the batch's score range.
+ */
+export function sortByScoreWithMovieTieBreaker<T extends TrackLike>(
+  scored: { track: T; score: number }[],
+  isMovieFn: (track: T) => boolean,
+): T[] {
+  if (scored.length <= 1) return scored.map((s) => s.track);
+
+  let minScore = Infinity;
+  let maxScore = -Infinity;
+  for (const s of scored) {
+    if (s.score < minScore) minScore = s.score;
+    if (s.score > maxScore) maxScore = s.score;
+  }
+  const scoreRange = maxScore - minScore;
+  const threshold = scoreRange > 1e-7 ? 0.1 * scoreRange : 0;
+
+  const withBoost = scored.map((item) => {
+    const isMovie = isMovieFn(item.track);
+    return {
+      ...item,
+      isMovie,
+      effectiveScore: item.score + (isMovie ? threshold : 0),
+    };
+  });
+
+  withBoost.sort((a, b) => {
+    const diff = b.effectiveScore - a.effectiveScore;
+    if (Math.abs(diff) > 1e-7) return diff;
+    if (a.isMovie !== b.isMovie) return a.isMovie ? -1 : 1;
+    return b.score - a.score;
+  });
+
+  return withBoost.map((item) => item.track);
+}
