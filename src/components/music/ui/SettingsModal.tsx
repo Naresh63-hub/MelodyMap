@@ -43,6 +43,8 @@ import {
   importLibraryData,
   type RecSettings,
 } from "@/lib/library";
+import { summarizeMetrics } from "@/lib/rec-metrics";
+import { getDiscountGamma } from "@/lib/bandit-policy";
 import {
   getSponsorBlockEnabled,
   setSponsorBlockEnabled,
@@ -293,6 +295,27 @@ export function SettingsModal({
       setTimeout(() => setBackupStatus(null), 4000);
     } catch {
       setBackupStatus("Failed to create backup.");
+      setTimeout(() => setBackupStatus(null), 4000);
+    }
+  };
+
+  const handleExportRecMetrics = () => {
+    try {
+      const summary7 = summarizeMetrics(7);
+      const summary30 = summarizeMetrics(30);
+      const discountGamma = getDiscountGamma();
+      const data = JSON.stringify({ summary7, summary30, discountGamma, exportedAt: new Date().toISOString() }, null, 2);
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `melodymap-rec-metrics-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBackupStatus("Recommendation metrics exported successfully!");
+      setTimeout(() => setBackupStatus(null), 4000);
+    } catch {
+      setBackupStatus("Failed to export metrics.");
       setTimeout(() => setBackupStatus(null), 4000);
     }
   };
@@ -827,6 +850,15 @@ export function SettingsModal({
                     <Upload className="mr-1.5 h-3.5 w-3.5" />
                     Import Backup JSON
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportRecMetrics}
+                    className="w-full xs:w-auto rounded-xl border-border bg-surface-hover text-foreground hover:bg-surface-hover-strong text-xs font-semibold cursor-pointer min-h-[38px]"
+                  >
+                    <Activity className="mr-1.5 h-3.5 w-3.5" />
+                    Export Rec Metrics JSON
+                  </Button>
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -835,6 +867,10 @@ export function SettingsModal({
                     className="hidden"
                   />
                 </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Exports aggregate play counts only. No song titles or IDs are included.
+                </p>
 
                 {backupStatus && (
                   <div className="flex items-center gap-2 rounded-xl bg-chip px-3.5 py-2 text-xs text-primary animate-in fade-in">
