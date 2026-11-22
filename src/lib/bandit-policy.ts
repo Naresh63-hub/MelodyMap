@@ -1,6 +1,7 @@
 import type { TrackLike } from "./track-dedup";
 import { normalizeArtistAlias, areSameTrack } from "./track-dedup";
 import { safeStorage } from "./safe-storage";
+import { getRecFlag } from "./rec-flags";
 import {
   detectTrackEnergy,
   calculateEnergyCompatibility,
@@ -495,7 +496,10 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     };
 
     // stats holds the full Track (language, album, ...). The stub only has id/title/artist.
-    const fullTrack = ctx.stats?.[event.trackId]?.track as TrackLike | undefined;
+    const useFullTrack = getRecFlag("trainOnFullTrack");
+    const fullTrack = useFullTrack
+      ? (ctx.stats?.[event.trackId]?.track as TrackLike | undefined)
+      : undefined;
     const x = this.extractFeatureVector(fullTrack ?? dummyTrack, ctx);
 
     // Discounted Bayesian linear regression, decaying toward the prior (not toward zero):

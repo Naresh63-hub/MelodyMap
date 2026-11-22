@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ThompsonSamplingPolicy,
   FEATURE_DIM,
@@ -9,6 +9,7 @@ import {
   type BanditModelState,
 } from "./bandit-policy";
 import { safeStorage } from "./safe-storage";
+import { setRecFlag } from "./rec-flags";
 import type { PlaybackTelemetryEvent } from "./telemetry";
 import type { TrackLike } from "./track-dedup";
 
@@ -393,6 +394,60 @@ describe("ThompsonSamplingPolicy Recommender", () => {
         delete (globalThis as any).window;
         safeStorage.resetProbeForTest();
         setDiscountGamma(0.99);
+      }
+    });
+  });
+
+  describe("Training on full track flag", () => {
+    it("uses the id/title/artist stub when trainOnFullTrack is toggled off", () => {
+      setRecFlag("trainOnFullTrack", false);
+      const extractSpy = vi.spyOn(policy, "extractFeatureVector");
+      try {
+        const fullTrackData: TrackLike = {
+          id: "track-123",
+          title: "Full Title",
+          artist: "Full Artist",
+          album: "Full Album",
+        };
+        const ctx: SessionContext = {
+          hourOfDay: 14,
+          discoveryPercent: 40,
+          stats: {
+            "track-123": {
+              track: fullTrackData,
+              plays: 1,
+              skips: 0,
+              completions: 1,
+            } as any,
+          },
+        };
+
+        policy.recordFeedback(
+          {
+            id: "ev-1",
+            trackId: "track-123",
+            title: "Stub Title",
+            artist: "Stub Artist",
+            eventType: "COMPLETED",
+            positionSeconds: 200,
+            durationSeconds: 200,
+            fractionPlayed: 1.0,
+            timestamp: Date.now(),
+          },
+          ctx,
+        );
+
+        expect(extractSpy).toHaveBeenCalled();
+        const calledTrack = extractSpy.mock.calls[0]?.[0];
+        expect(calledTrack).toEqual({
+          id: "track-123",
+          title: "Stub Title",
+          artist: "Stub Artist",
+        });
+        expect((calledTrack as any).album).toBeUndefined();
+      } finally {
+        extractSpy.mockRestore();
+        setRecFlag("trainOnFullTrack", true);
       }
     });
   });
