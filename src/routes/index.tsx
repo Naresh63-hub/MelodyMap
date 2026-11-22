@@ -168,6 +168,8 @@ import {
   type SessionContext,
 } from "@/lib/context-engine";
 import { telemetry, TrackProgressTracker } from "@/lib/telemetry";
+import { tagTrackSource, getTrackSource } from "@/lib/rec-source";
+import { initRecMetrics } from "@/lib/rec-metrics";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
 import { GuestSignInPromptModal } from "@/components/music/ui/GuestSignInPromptModal";
@@ -245,6 +247,10 @@ function MusicApp() {
 
   const auth = useAuth();
 
+  useEffect(() => {
+    initRecMetrics();
+  }, []);
+
   // Require login first: redirect to /auth if not signed in and not explicitly in guest mode
   useEffect(() => {
     if (!auth.ready) return;
@@ -291,6 +297,8 @@ function MusicApp() {
 
   // Initial feed & settings states — always empty/default on SSR to prevent hydration mismatches
   const [tab, setTab] = useState<NavTab>("foryou");
+  const tabRef = useRef<NavTab>(tab);
+  tabRef.current = tab;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const prevTabRef = useRef<NavTab>("foryou");
   const [tabDirection, setTabDirection] = useState<'left' | 'right'>('right');
@@ -696,7 +704,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           durationSeconds: parseDurationSeconds(track.duration),
           fractionPlayed: 1.0,
           timestamp: Date.now(),
-          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+          context: {
+            hourOfDay: ctx.hourOfDay,
+            discoverySetting: ctx.discoveryPercent,
+            source: getTrackSource(track.id),
+          },
         });
         thompsonSamplingPolicy.recordFeedback(event, ctx);
       }
@@ -1035,7 +1047,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             durationSeconds: player.duration || player.position,
             fractionPlayed: 1.0,
             timestamp: Date.now(),
-            context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+            context: {
+            hourOfDay: ctx.hourOfDay,
+            discoverySetting: ctx.discoveryPercent,
+            source: getTrackSource(track.id),
+          },
           });
           thompsonSamplingPolicy.recordFeedback(event, ctx);
         }
@@ -1054,7 +1070,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             durationSeconds: player.duration,
             fractionPlayed: 0,
             timestamp: Date.now(),
-            context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+            context: {
+            hourOfDay: ctx.hourOfDay,
+            discoverySetting: ctx.discoveryPercent,
+            source: getTrackSource(track.id),
+          },
           });
           thompsonSamplingPolicy.recordFeedback(replayEv, ctx);
         }
@@ -1273,6 +1293,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           context: {
             hourOfDay: ctx.hourOfDay,
             discoverySetting: ctx.discoveryPercent,
+            source: getTrackSource(track.id),
           },
         });
         thompsonSamplingPolicy.recordFeedback(event, ctx);
@@ -1326,10 +1347,38 @@ function savePodcastResumePosition(trackId: string, pos: number) {
    * and loads & plays only that track.
    */
   const playSong = useCallback(
-    (track: Track, surroundingQueue?: Track[]) => {
+    (track: Track, surroundingQueue?: Track[], source?: string) => {
       if (!track?.id) return;
       sleepTimerHaltedRef.current = false;
       sleepTimerService.resetExpired();
+
+      if (source) {
+        tagTrackSource([track], source);
+        if (surroundingQueue && surroundingQueue.length > 0) {
+          tagTrackSource(surroundingQueue, source);
+        }
+      } else if (!getTrackSource(track.id)) {
+        const curTab = tabRef.current;
+        const fallbackSource =
+          curTab === "search"
+            ? "search"
+            : curTab === "library" || curTab === "likes" || curTab === "downloads"
+              ? "library"
+              : curTab === "history"
+                ? "history"
+                : curTab === "playlists"
+                  ? "playlist"
+                  : curTab === "languages"
+                    ? "languages"
+                    : undefined;
+        if (fallbackSource) {
+          tagTrackSource([track], fallbackSource);
+          if (surroundingQueue && surroundingQueue.length > 0) {
+            tagTrackSource(surroundingQueue, fallbackSource);
+          }
+        }
+      }
+
       // Hard rule: music tracks need a known duration <= 600s to enter playback.
       if (!isPodcastTrack(track) && !hasPlayableDuration(track)) {
         setMessage("Track duration exceeds 10 minutes or is unplayable");
@@ -1390,11 +1439,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   );
 
   const startQueue = useCallback(
-    (tracks: Track[], startIndex = 0) => {
+    (tracks: Track[], startIndex = 0, source?: string) => {
       if (tracks.length === 0) return;
       const target = tracks[startIndex] || tracks[0];
       if (target) {
-        playSong(target, tracks);
+        if (source) {
+          tagTrackSource(tracks, source);
+        }
+        playSong(target, tracks, source);
       }
     },
     [playSong],
@@ -1419,7 +1471,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           (t) => t.id !== track.id && isOriginalSong(t) && hasPlayableDuration(t),
         );
         const newQueue = [track, ...filteredRadio];
-        startQueue(newQueue, 0);
+        startQueue(newQueue, 0, "radio");
         setMessage(`Started Radio for "${track.title}" (${newQueue.length} songs)`);
       } catch (err) {
         console.error("Failed to start song radio:", err);
@@ -1718,6 +1770,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           });
           const cleanMix = dedupeTracks(diversified);
           if (cleanMix.length > 0) {
+            tagTrackSource(cleanMix, "daily-mix");
             setDailyMixTracks(cleanMix);
             markFeedDisplayed(cleanMix);
             writeHomeCache({ dailyMixTracks: cleanMix });
@@ -1868,6 +1921,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               }
               // Preserve official chart ordering directly without applying Thompson Sampling
               if (fresh.length > 0) {
+                tagTrackSource(fresh, "trending");
                 setTrendingList(fresh);
                 markFeedDisplayed(fresh);
                 writeHomeCache({ trendingList: fresh });
@@ -1942,6 +1996,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   minArtistSpacing: 2,
                   minAlbumSpacing: 3,
                 });
+                tagTrackSource(diversified, "new-releases");
                 setMixTracks((prev) => {
                   const next = { ...prev, newrelease: diversified };
                   writeHomeCache({ mixTracks: next });
@@ -2022,6 +2077,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                   minArtistSpacing: 2,
                   minAlbumSpacing: 3,
                 });
+                tagTrackSource(diversified, "old-songs");
                 setOldSongsList(diversified);
                 markFeedDisplayed(diversified);
                 writeHomeCache({ oldSongsList: diversified });
@@ -2348,6 +2404,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           .filter((t) => !isDailyMixSong(t));
 
         if (settledRecs.length > 0) {
+          tagTrackSource(settledRecs, "made-for-you");
           setRecs(settledRecs);
           markFeedDisplayed(settledRecs);
           writeHomeCache({ recs: settledRecs });
@@ -2491,7 +2548,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
         if (tracks.length > 0) {
           if (autoPlay) {
-            startQueue(tracks, 0);
+            startQueue(tracks, 0, "mood");
             const langLabel = userLanguages.length > 0 ? ` (${userLanguages.join(", ")})` : "";
             setMessage(`Playing ${item.label} vibe${langLabel}`);
             setTimeout(() => setMessage(null), 3500);
@@ -2791,6 +2848,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           );
 
           if (diversifiedBatch.length > 0) {
+            tagTrackSource(diversifiedBatch, "made-for-you");
             setRecs((prev) => {
               const batchToAdd = diversifiedBatch.filter(
                 (cand) => !prev.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
@@ -3134,6 +3192,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         return true;
       };
 
+      let queueSource = "autodj-radio";
+
       // 1. Try Song Radio across recent seeds with deep pagination (delving into discographies)
       for (const seed of seedTracks) {
         if (!seed.id) continue;
@@ -3157,8 +3217,9 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               radioContinuationRef.current = radioRes.continuation;
             }
             if (radioRes.tracks && radioRes.tracks.length > 0) {
-              const ranked = thompsonSamplingPolicy.rankCandidates(applyFeedFilters(radioRes.tracks as Track[]), getSessionContext());
-              const fresh = ranked.filter((t) => isCandidateAcceptable(t as TrackLike, candidateTracks));
+              const fresh = applyFeedFilters(radioRes.tracks as Track[]).filter((t) =>
+                isCandidateAcceptable(t as TrackLike, candidateTracks),
+              );
               candidateTracks.push(...fresh);
               if (candidateTracks.length >= 12) break;
             }
@@ -3169,6 +3230,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         if (candidateTracks.length >= 12) break;
       }
 
+      if (candidateTracks.length > 0) {
+        candidateTracks = thompsonSamplingPolicy.rankCandidates(candidateTracks, getSessionContext());
+      }
+
       // Guard against stale asynchronous resolution if user navigated away during fetch
       if (currentRef.current?.id !== startingTrackId) {
         return [];
@@ -3176,6 +3241,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       // 2. Fallback to recommendation engine with circadian, affinity, mood anchor, and discovery context
       if (candidateTracks.length === 0) {
+        queueSource = "autodj-recommend";
         const nonce = `${Date.now()}-${safeUUID()}`;
         const clientHour = new Date().getHours();
         const res = await runRecommend({
@@ -3213,6 +3279,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       // 3. Deep discovery fallback: query artist discography radio instead of recycling displayed feed tracks
       if (candidateTracks.length === 0 && seedTracks[0]?.artist) {
+        queueSource = "autodj-discography";
         try {
           const deepRadioRes = await getSongRadio({
             data: {
@@ -3283,6 +3350,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
 
         const finalBatch = diversifiedBatch.slice(0, 15);
+        tagTrackSource(finalBatch, queueSource);
         markFeedDisplayed(finalBatch);
         setQueue((prev) => [...prev, ...finalBatch]);
         return finalBatch;
@@ -3510,7 +3578,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         durationSeconds: player.duration,
         fractionPlayed: frac,
         timestamp: Date.now(),
-        context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+        context: {
+          hourOfDay: ctx.hourOfDay,
+          discoverySetting: ctx.discoveryPercent,
+          source: getTrackSource(currentTrack.id),
+        },
       });
       thompsonSamplingPolicy.recordFeedback(event, ctx);
       previousTrackRef.current = currentTrack;
@@ -3643,7 +3715,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           fractionPlayed:
             track.id === currentRef.current?.id && player.duration > 0 ? player.position / player.duration : 0,
           timestamp: Date.now(),
-          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+          context: {
+            hourOfDay: ctx.hourOfDay,
+            discoverySetting: ctx.discoveryPercent,
+            source: getTrackSource(track.id),
+          },
         });
         thompsonSamplingPolicy.recordFeedback(event, ctx);
       }
@@ -3667,7 +3743,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           fractionPlayed:
             track.id === currentRef.current?.id && player.duration > 0 ? player.position / player.duration : 0,
           timestamp: Date.now(),
-          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+          context: {
+            hourOfDay: ctx.hourOfDay,
+            discoverySetting: ctx.discoveryPercent,
+            source: getTrackSource(track.id),
+          },
         });
         thompsonSamplingPolicy.recordFeedback(event, ctx);
       }
@@ -3689,7 +3769,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           durationSeconds: 0,
           fractionPlayed: 0,
           timestamp: Date.now(),
-          context: { hourOfDay: ctx.hourOfDay, discoverySetting: ctx.discoveryPercent },
+          context: {
+            hourOfDay: ctx.hourOfDay,
+            discoverySetting: ctx.discoveryPercent,
+            source: getTrackSource(track.id),
+          },
         });
         thompsonSamplingPolicy.recordFeedback(event, ctx);
       }
@@ -4772,14 +4856,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                           } else if (current && moodTracks.some((t) => t.id === current?.id)) {
                             play();
                           } else {
-                            startQueue(moodTracks, 0);
+                            startQueue(moodTracks, 0, "mood");
                           }
                         }
                       }}
                       onShuffle={() => {
                         if (moodTracks.length > 0) {
                           const shuffled = [...moodTracks].sort(() => Math.random() - 0.5);
-                          startQueue(shuffled, 0);
+                          startQueue(shuffled, 0, "mood");
                         }
                       }}
                       onPlayTrack={(track, i) => {
@@ -4791,7 +4875,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                           }
                           return;
                         }
-                        startQueue(moodTracks, i);
+                        startQueue(moodTracks, i, "mood");
                       }}
                       onToggleLike={handleToggleLike}
                       onToggleDislike={handleToggleDislike}
@@ -4996,7 +5080,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     }
                     return;
                   }
-                  startQueue(results, i);
+                  startQueue(results, i, "search");
                 }}
                 onToggleLike={handleToggleLike}
                 onOpenOptions={(t) => setOptionsTrack(t)}
@@ -5043,7 +5127,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onRefresh={() => {
                   if (mix !== "replay") void loadMix(mix);
                 }}
-                onPlayAll={() => startQueue(visibleMix, 0)}
+                onPlayAll={() => startQueue(visibleMix, 0, mix ? `mix-${mix}` : "mix")}
                 onPlay={(track, i) => {
                   if (current?.id === track.id) {
                     if (player.isPlaying) {
@@ -5053,7 +5137,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     }
                     return;
                   }
-                  startQueue(visibleMix, i);
+                  startQueue(visibleMix, i, mix ? `mix-${mix}` : "mix");
                 }}
                 onToggleLike={handleToggleLike}
                 onToggleDislike={handleToggleDislike}
@@ -5102,7 +5186,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onMoveMany={moveTracksToPlaylist}
                 onAddToQueue={enqueue}
                 onReorder={reorderPlaylist}
-                onPlay={(tracks, i) => startQueue(tracks, i)}
+                onPlay={(tracks, i) => startQueue(tracks, i, "playlist")}
               />
               </div>
             )}
@@ -5113,7 +5197,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 <LanguagesPanel
                 settings={settings}
                 onChangeSettings={updateSettings}
-                onPlay={(tracks, i) => startQueue(tracks, i)}
+                onPlay={(tracks, i) => startQueue(tracks, i, "languages")}
                 currentId={current?.id}
                 isPlaying={player.isPlaying}
                 likedIds={likedIds}
@@ -5157,7 +5241,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     }
                     return;
                   }
-                  startQueue(tracks, i);
+                  startQueue(tracks, i, "library");
                 }}
               />
               </div>
@@ -5278,7 +5362,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       }
                       return;
                     }
-                    startQueue(visible, i);
+                    startQueue(visible, i, tab === "history" ? "history" : "library");
                   }}
                   onToggleLike={handleToggleLike}
                   onToggleDislike={(track) => {
