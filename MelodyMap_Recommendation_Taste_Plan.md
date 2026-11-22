@@ -114,10 +114,12 @@ The Thompson Sampling linear bandit operates over an 8-dimensional feature vecto
 
 ### Web Audio Equalizer & Crossfade (`webAudioEq`)
 - **Implementation Highlights**:
+  - The equalizer works only for same-origin (stream proxy `/api/stream/*`), offline (IndexedDB `blob:*`), and CORS-enabled sources (`Access-Control-Allow-Origin: *` like Audius). Unproxied external sources lacking CORS headers bypass the Web Audio graph and play directly through HTML5 audio to prevent browser silence.
+  - Safe, ordered CORS initialization: `setAudioElementSource` guarantees `audio.crossOrigin = 'anonymous'` is configured strictly BEFORE `audio.src` is assigned whenever the graph is used, preventing Chromium/WebKit from tainting the media stream.
   - 10 BiquadFilter bands (31Hz lowshelf, 62Hz–8kHz peaking, 16kHz highshelf) connected in series with a preamp gain node.
   - Safe, permanent `MediaElementAudioSourceNode` connection created exactly once to prevent browser IllegalState exceptions.
   - Neutral bypass: When disabled or flat, gains are set to 0.0 dB and preamp gain to 1.0 (neutral pass-through without tearing down audio nodes).
-  - CORS Detection: `isSourceWebAudioEligible` detects unproxied Saavn CDN streams (`*.saavncdn.com`). Because Saavn lacks CORS headers, routing through Web Audio would cause silence. The engine cleanly bypasses Web Audio, retains HTML5 playback, and raises a non-blocking toast.
+  - CORS Detection: `isSourceWebAudioEligible` evaluates CDN sources against measured CORS results (`Origin: https://melodymap-pi.vercel.app`, checked 2026-11-22). If an unproxied source lacks CORS headers (e.g. `*.saavncdn.com`), the engine cleanly bypasses Web Audio, retains HTML5 playback, and raises a non-blocking toast.
   - Android WebView Resilience: A `visibilitychange` listener ensures suspended `AudioContext` instances automatically resume when returning from the background.
 - **Human Verification Requirements**:
   - [ ] **Android WebView Playback**: Verify that enabling the equalizer produces active sound without silence on real Android devices.

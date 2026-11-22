@@ -21,10 +21,11 @@ export const EQUALIZER_SPECS: readonly BiquadFilterSpec[] = [
 
 /**
  * Measured CORS results for provider CDN hosts.
- * Date Checked: 2026-11-22 (measured via scripts/check-cdn-cors.mjs against real media URLs)
+ * Date Checked: 2026-11-22T22:33:00+05:30 (re-measured via scripts/check-cdn-cors.mjs)
  *
- * Headers measured with Origin: https://melodymap.app:
- * - JioSaavn (aac.saavncdn.com, c.saavncdn.com): Access-Control-Allow-Origin: none (NO) -> false
+ * Headers measured with Origin: https://melodymap-pi.vercel.app:
+ * - JioSaavn (aac.saavncdn.com): Access-Control-Allow-Origin: none (NO) -> false
+ * - JioSaavn (c.saavncdn.com): Access-Control-Allow-Origin: * (YES, static assets; audio disabled) -> false
  * - Jamendo (prod-1.storage.jamendo.com, mp3d.jamendo.com): Access-Control-Allow-Origin: none (NO) -> false
  * - Internet Archive (archive.org, *.us.archive.org): Access-Control-Allow-Origin: none (NO) -> false
  * - Audius (audius.co, creatornode.audius.co): Access-Control-Allow-Origin: * (YES) -> true
@@ -184,3 +185,26 @@ export function createWebAudioChain(
     fadeNode,
   };
 }
+
+/**
+ * Sets the audio source on an HTMLAudioElement while guaranteeing that
+ * audio.crossOrigin = "anonymous" is configured BEFORE audio.src is assigned
+ * whenever the Web Audio graph is used with a CORS-eligible audio source.
+ *
+ * In Chromium / WebKit, assigning audio.src before audio.crossOrigin = "anonymous"
+ * begins the network request in tainted mode without sending the Origin header,
+ * which causes MediaElementAudioSourceNode to output pure silence.
+ */
+export function setAudioElementSource(
+  audio: HTMLAudioElement,
+  url: string,
+  isGraphUsed: boolean = false,
+): void {
+  if (isGraphUsed && isSourceWebAudioEligible(url)) {
+    audio.crossOrigin = "anonymous";
+  } else {
+    audio.removeAttribute("crossorigin");
+  }
+  audio.src = url;
+}
+

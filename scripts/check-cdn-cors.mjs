@@ -3,17 +3,7 @@
  * Run with: node scripts/check-cdn-cors.mjs
  */
 
-export interface HostCorsResult {
-  provider: string;
-  host: string;
-  sampleUrl: string;
-  hasCors: boolean;
-  corsHeader: string;
-  eligible: boolean;
-  notes: string;
-}
-
-export const MEASURED_CDN_CORS_RESULTS: HostCorsResult[] = [
+export const MEASURED_CDN_CORS_RESULTS = [
   {
     provider: "JioSaavn",
     host: "aac.saavncdn.com",
@@ -89,8 +79,10 @@ export const MEASURED_CDN_CORS_RESULTS: HostCorsResult[] = [
 ];
 
 async function checkCdnCors() {
+  const origin = "https://melodymap-pi.vercel.app";
   console.log("=== Checking CDN CORS Eligibility ===");
-  console.log("Date Checked: 2026-11-22T22:12:00+05:30");
+  console.log(`Origin: ${origin}`);
+  console.log("Date Checked: 2026-11-22T22:33:00+05:30");
   console.log("--------------------------------------------------------------------------------");
   for (const item of MEASURED_CDN_CORS_RESULTS) {
     if (item.sampleUrl.startsWith("/")) {
@@ -100,11 +92,11 @@ async function checkCdnCors() {
     try {
       const res = await fetch(item.sampleUrl, {
         method: "HEAD",
-        headers: { Origin: "https://melodymap.app" },
+        headers: { Origin: origin },
         redirect: "follow",
       });
       const cors = res.headers.get("access-control-allow-origin");
-      const hasCors = cors === "*" || cors === "https://melodymap.app";
+      const hasCors = cors === "*" || cors === origin;
       console.log(`[${hasCors ? "CORS YES" : "CORS NO "}] ${item.provider.padEnd(20)} Host: ${item.host.padEnd(30)} Header: ${cors || "none"} (Eligible: ${hasCors})`);
     } catch (e) {
       console.log(`[CORS NO ] ${item.provider.padEnd(20)} Host: ${item.host.padEnd(30)} Header: none (Fetch error: ${e.message})`);

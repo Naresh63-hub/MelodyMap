@@ -5,6 +5,7 @@ import {
   computeFadeCurve,
   isSourceWebAudioEligible,
   CDN_CORS_ELIGIBILITY_MAP,
+  setAudioElementSource,
 } from "./web-audio-equalizer";
 import { EQUALIZER_PRESETS, type EqualizerSettings } from "./equalizer";
 
@@ -169,6 +170,115 @@ describe("web-audio-equalizer (Task 11)", () => {
 
     it("rejects empty or invalid URLs", () => {
       expect(isSourceWebAudioEligible("")).toBe(false);
+    });
+  });
+
+  describe("setAudioElementSource & crossOrigin ordering", () => {
+    it("confirms audio.crossOrigin = 'anonymous' is set BEFORE src is assigned whenever the graph is used with eligible source", () => {
+      const order: string[] = [];
+      let crossOriginAtSrcAssignment: string | null = null;
+      let currentCrossOrigin: string | null = null;
+
+      const mockAudio = {
+        get crossOrigin() {
+          return currentCrossOrigin;
+        },
+        set crossOrigin(val: string | null) {
+          currentCrossOrigin = val;
+          order.push(`set:crossOrigin=${val}`);
+        },
+        removeAttribute(attr: string) {
+          if (attr.toLowerCase() === "crossorigin") {
+            currentCrossOrigin = null;
+            order.push("removeAttribute:crossorigin");
+          }
+        },
+        set src(val: string) {
+          crossOriginAtSrcAssignment = currentCrossOrigin;
+          order.push(`set:src=${val}`);
+        },
+      } as unknown as HTMLAudioElement;
+
+      // Audius is CORS-eligible with Access-Control-Allow-Origin: *
+      const eligibleUrl = "https://audius.co/tracks/123/stream";
+      setAudioElementSource(mockAudio, eligibleUrl, true);
+
+      expect(order).toEqual([
+        "set:crossOrigin=anonymous",
+        `set:src=${eligibleUrl}`,
+      ]);
+      expect(crossOriginAtSrcAssignment).toBe("anonymous");
+    });
+
+    it("removes crossOrigin attribute when graph is NOT used", () => {
+      const order: string[] = [];
+      let crossOriginAtSrcAssignment: string | null = "anonymous";
+      let currentCrossOrigin: string | null = "anonymous";
+
+      const mockAudio = {
+        get crossOrigin() {
+          return currentCrossOrigin;
+        },
+        set crossOrigin(val: string | null) {
+          currentCrossOrigin = val;
+          order.push(`set:crossOrigin=${val}`);
+        },
+        removeAttribute(attr: string) {
+          if (attr.toLowerCase() === "crossorigin") {
+            currentCrossOrigin = null;
+            order.push("removeAttribute:crossorigin");
+          }
+        },
+        set src(val: string) {
+          crossOriginAtSrcAssignment = currentCrossOrigin;
+          order.push(`set:src=${val}`);
+        },
+      } as unknown as HTMLAudioElement;
+
+      const url = "https://audius.co/tracks/123/stream";
+      setAudioElementSource(mockAudio, url, false);
+
+      expect(order).toEqual([
+        "removeAttribute:crossorigin",
+        `set:src=${url}`,
+      ]);
+      expect(crossOriginAtSrcAssignment).toBeNull();
+    });
+
+    it("removes crossOrigin attribute for ineligible non-CORS sources even when graph is requested", () => {
+      const order: string[] = [];
+      let crossOriginAtSrcAssignment: string | null = "anonymous";
+      let currentCrossOrigin: string | null = "anonymous";
+
+      const mockAudio = {
+        get crossOrigin() {
+          return currentCrossOrigin;
+        },
+        set crossOrigin(val: string | null) {
+          currentCrossOrigin = val;
+          order.push(`set:crossOrigin=${val}`);
+        },
+        removeAttribute(attr: string) {
+          if (attr.toLowerCase() === "crossorigin") {
+            currentCrossOrigin = null;
+            order.push("removeAttribute:crossorigin");
+          }
+        },
+        set src(val: string) {
+          crossOriginAtSrcAssignment = currentCrossOrigin;
+          order.push(`set:src=${val}`);
+        },
+      } as unknown as HTMLAudioElement;
+
+      // JioSaavn CDN lacks CORS headers
+      const saavnUrl = "https://aac.saavncdn.com/274/track_320.mp4";
+      setAudioElementSource(mockAudio, saavnUrl, true);
+
+      expect(order).toEqual([
+        "removeAttribute:crossorigin",
+        `set:src=${saavnUrl}`,
+      ]);
+      expect(crossOriginAtSrcAssignment).toBeNull();
     });
   });
 });

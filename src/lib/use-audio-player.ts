@@ -23,7 +23,12 @@ import {
   rampAudioVolume,
 } from "@/lib/audio-leveling";
 import { getRecFlag } from "@/lib/rec-flags";
-import { isSourceWebAudioEligible, getEffectiveBiquadGains, EQUALIZER_SPECS } from "@/lib/web-audio-equalizer";
+import {
+  isSourceWebAudioEligible,
+  getEffectiveBiquadGains,
+  EQUALIZER_SPECS,
+  setAudioElementSource,
+} from "@/lib/web-audio-equalizer";
 
 export type NextTrackInfo = {
   id: string;
@@ -582,13 +587,9 @@ export function useAudioPlayer(options: {
         }
       }
 
-      // Direct HTML5 <audio> plays natively to OS audio subsystem with full volume
-      // and zero CORS restrictions. Omit crossorigin so streams never fail CORS.
-      audio.removeAttribute("crossorigin");
-
       audio.loop = false;
       audio.muted = false;
-      audio.src = url;
+      setAudioElementSource(audio, url, getRecFlag("webAudioEq"));
       const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
       audio.playbackRate = validSpeed;
       applySafeVolumeLeveling({ id: currentTrackIdRef.current ?? undefined }, false);
@@ -1042,7 +1043,7 @@ export function useAudioPlayer(options: {
           prewarmed ||
           currentDirectUrlRef.current ||
           streamUrl(nextTrack.id, equalizerSettingsRef.current.quality, nextTrack.title, nextTrack.artist);
-        audio.src = nextUrl;
+        setAudioElementSource(audio, nextUrl, getRecFlag("webAudioEq"));
         const validSpeed = Number.isFinite(playbackSpeedRef.current) && playbackSpeedRef.current > 0 ? playbackSpeedRef.current : 1;
         audio.playbackRate = validSpeed;
         applySafeVolumeLeveling(nextTrack, true);
@@ -1535,7 +1536,7 @@ export function useAudioPlayer(options: {
 
       if (targetUrl) {
         setIsLoading(true);
-        audio.src = targetUrl;
+        setAudioElementSource(audio, targetUrl, getRecFlag("webAudioEq"));
         if (resumePos > 0) {
           pendingSeekRef.current = resumePos;
         }

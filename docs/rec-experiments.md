@@ -170,12 +170,13 @@ All recommendation experiments are managed on-device via `src/lib/rec-flags.ts` 
 ### 10. `webAudioEq`
 * **Default Value**: `false`
 * **Storage Key**: `melodymap.flag.webAudioEq`
-* **Description**: Routes playback through a 10-band Web Audio `BiquadFilterNode` equalizer graph and implements gain crossfading on HTML5 audio.
+* **Description**: Routes playback through a 10-band Web Audio `BiquadFilterNode` equalizer graph and implements gain crossfading on HTML5 audio. The equalizer works only for same-origin (e.g. stream proxy `/api/stream/*`), offline (`blob:*`), and CORS-enabled sources (`Access-Control-Allow-Origin: *` like Audius). Sources lacking CORS headers bypass the Web Audio graph and play directly through HTML5 audio to prevent browser silence.
 * **What It Changes**:
   - Located in `src/lib/web-audio-equalizer.ts`, `src/hooks/use-audio-player.ts`, and `src/components/music/EqualizerModal.tsx`.
   - When `true`:
+    - Ensures `audio.crossOrigin = "anonymous"` is configured strictly before `audio.src` is assigned whenever the graph is used.
     - Connects `<audio>` element to a 10-band filter cascade (31Hz lowshelf, 62Hz–8kHz peaking, 16kHz highshelf) plus preamp gain.
-    - Inspects CDN source origin with `isSourceWebAudioEligible`. If unproxied Saavn CDN lacks CORS headers, cleanly bypasses the Web Audio graph to prevent silence while raising a user notice.
+    - Inspects CDN source origin with `isSourceWebAudioEligible` against measured CORS results (checked against `Origin: https://melodymap-pi.vercel.app`). If an unproxied source lacks CORS headers, cleanly bypasses the Web Audio graph to prevent silence while raising a user notice.
     - Permanent `MediaElementAudioSourceNode` creation prevents browser IllegalState errors.
     - Android WebView `visibilitychange` listener resumes suspended `AudioContext` on app foregrounding.
     - Applies equal-power gain curves for track start fade-in and track end fade-out.
