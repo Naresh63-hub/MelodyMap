@@ -9,7 +9,11 @@ import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext, MOOD_ENVELOPES } from "./context-engine";
 import { isLanguageConsistent, isOldEraTrack } from "./library";
 import { isOriginalSong } from "./track-filters";
-import { allocateLanguageQuotas, enforceLanguageQuotas } from "./language-quotas";
+import {
+  allocateLanguageQuotas,
+  enforceLanguageQuotas,
+  selectTracksWithLanguageQuotas,
+} from "./language-quotas";
 import { getRecFlag } from "./rec-flags";
 
 /** Normalizes user-provided strings for AI context inclusion while preserving real song/artist names */
@@ -229,7 +233,7 @@ const DIVERSE_THEMES = [
   `classics`,
 ];
 
-function getDynamicQueries(
+export function getDynamicQueries(
   languages: string[],
   userArtists: string[],
   options?: {
@@ -622,13 +626,13 @@ async function getLocalPicks(data: {
       minAlbumSpacing: 3,
     });
 
-    const useLanguageQuotas = data.languageQuotas ?? getRecFlag("languageQuotas");
-    if (useLanguageQuotas && data.languageWeights && languages.length > 0) {
-      const quotas = allocateLanguageQuotas(languages, data.languageWeights, count);
-      return enforceLanguageQuotas(diversified, quotas, count);
-    }
-
-    return diversified.slice(0, count);
+    return selectTracksWithLanguageQuotas(
+      diversified,
+      count,
+      languages,
+      data.languageWeights,
+      data.languageQuotas,
+    );
   }
 
   // Expand with related artists via Deezer
@@ -780,13 +784,13 @@ async function getLocalPicks(data: {
     minAlbumSpacing: 3,
   });
 
-  const useLanguageQuotas = data.languageQuotas ?? getRecFlag("languageQuotas");
-  if (useLanguageQuotas && data.languageWeights && languages.length > 0) {
-    const quotas = allocateLanguageQuotas(languages, data.languageWeights, count);
-    return enforceLanguageQuotas(diversified, quotas, count);
-  }
-
-  return diversified.slice(0, count);
+  return selectTracksWithLanguageQuotas(
+    diversified,
+    count,
+    languages,
+    data.languageWeights,
+    data.languageQuotas,
+  );
 }
 
 
@@ -1791,12 +1795,14 @@ export const getDailyMix = createServerFn({ method: "POST" })
       minArtistSpacing: 2,
       minAlbumSpacing: 3,
     });
-    const useLanguageQuotas = data.languageQuotas ?? getRecFlag("languageQuotas");
-    if (useLanguageQuotas && data.languageWeights && languages.length > 0) {
-      const quotas = allocateLanguageQuotas(languages, data.languageWeights, count);
-      return { tracks: enforceLanguageQuotas(diversified, quotas, count), dateSeed, error: null };
-    }
-    return { tracks: diversified.slice(0, count), dateSeed, error: null };
+    const tracks = selectTracksWithLanguageQuotas(
+      diversified,
+      count,
+      languages,
+      data.languageWeights,
+      data.languageQuotas,
+    );
+    return { tracks, dateSeed, error: null };
   });
 
 

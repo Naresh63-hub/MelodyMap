@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { allocateLanguageQuotas, enforceLanguageQuotas } from "./language-quotas";
+import {
+  allocateLanguageQuotas,
+  enforceLanguageQuotas,
+  selectTracksWithLanguageQuotas,
+} from "./language-quotas";
+import { getDynamicQueries } from "./music.functions";
 
 describe("language-quotas (Task 9)", () => {
   describe("allocateLanguageQuotas (Hare-Niemeyer with min-1 guarantee)", () => {
@@ -136,6 +141,96 @@ describe("language-quotas (Task 9)", () => {
       const quotas = { Telugu: 7, Hindi: 3 };
       const result = enforceLanguageQuotas(candidates, quotas, 10);
       expect(result).toHaveLength(10);
+    });
+  });
+
+  describe("Server flag defaults: languageQuotas absent => unchanged output", () => {
+    const fixedCandidates = [
+      { id: "cand-1", title: "Song 1", artist: "Artist 1", languageCode: "te" },
+      { id: "cand-2", title: "Song 2", artist: "Artist 2", languageCode: "hi" },
+      { id: "cand-3", title: "Song 3", artist: "Artist 3", languageCode: "hi" },
+      { id: "cand-4", title: "Song 4", artist: "Artist 4", languageCode: "hi" },
+      { id: "cand-5", title: "Song 5", artist: "Artist 5", languageCode: "hi" },
+      { id: "cand-6", title: "Song 6", artist: "Artist 6", languageCode: "te" },
+      { id: "cand-7", title: "Song 7", artist: "Artist 7", languageCode: "te" },
+      { id: "cand-8", title: "Song 8", artist: "Artist 8", languageCode: "hi" },
+      { id: "cand-9", title: "Song 9", artist: "Artist 9", languageCode: "te" },
+      { id: "cand-10", title: "Song 10", artist: "Artist 10", languageCode: "hi" },
+      { id: "cand-11", title: "Song 11", artist: "Artist 11", languageCode: "te" },
+      { id: "cand-12", title: "Song 12", artist: "Artist 12", languageCode: "hi" },
+      { id: "cand-13", title: "Song 13", artist: "Artist 13", languageCode: "te" },
+      { id: "cand-14", title: "Song 14", artist: "Artist 14", languageCode: "te" },
+    ];
+
+    it("calling candidate selection without languageQuotas produces identical output to main (unmodified slice)", () => {
+      const languages = ["Telugu", "Hindi"];
+      const languageWeights = { Telugu: 90, Hindi: 10 };
+      const count = 8;
+
+      // On main, candidate selection without languageQuotas simply does candidates.slice(0, count)
+      const expectedMainOutput = fixedCandidates.slice(0, count);
+
+      // Call without languageQuotas (omitted/undefined)
+      const outputAbsent = selectTracksWithLanguageQuotas(
+        fixedCandidates,
+        count,
+        languages,
+        languageWeights,
+        undefined,
+      );
+
+      // Must match main exactly
+      expect(outputAbsent).toEqual(expectedMainOutput);
+      expect(outputAbsent.map((t) => t.id)).toEqual(expectedMainOutput.map((t) => t.id));
+
+      // Also when explicitly false
+      const outputFalse = selectTracksWithLanguageQuotas(
+        fixedCandidates,
+        count,
+        languages,
+        languageWeights,
+        false,
+      );
+      expect(outputFalse).toEqual(expectedMainOutput);
+
+      // When languageQuotas is true, it changes the order to fulfill 90/10 ratio
+      const outputTrue = selectTracksWithLanguageQuotas(
+        fixedCandidates,
+        count,
+        languages,
+        languageWeights,
+        true,
+      );
+      expect(outputTrue).not.toEqual(expectedMainOutput);
+      const teluguCount = outputTrue.filter((t) => t.languageCode === "te").length;
+      expect(teluguCount).toBe(7); // 90% of 8 slots = 7 Telugu
+    });
+
+    it("calling getDynamicQueries without languageQuotas produces identical query languages as main", () => {
+      const languages = ["Telugu", "Hindi", "Tamil", "English"];
+      const artists = ["Arijit Singh", "Sid Sriram"];
+      const languageWeights = { Telugu: 90, Hindi: 10 };
+
+      // On main, langs.slice(0, 3) was used for mood and supplementary queries: ["Telugu", "Hindi", "Tamil"]
+      // Without languageQuotas, it must produce queries for Telugu, Hindi, and Tamil (not restricted by languageWeights)
+      const resultWithoutQuota = getDynamicQueries(languages, artists, {
+        mood: "Chill",
+        languageWeights,
+        languageQuotas: undefined,
+      });
+
+      const hasTamilInGeneral = resultWithoutQuota.newQueries.some((q) => q.startsWith("Tamil "));
+      expect(hasTamilInGeneral).toBe(true);
+
+      // When languageQuotas is true, only languages with positive allocated quotas are queried (Telugu, Hindi)
+      const resultWithQuota = getDynamicQueries(languages, artists, {
+        mood: "Chill",
+        languageWeights,
+        languageQuotas: true,
+      });
+
+      const hasTamilWithQuota = resultWithQuota.newQueries.some((q) => q.startsWith("Tamil "));
+      expect(hasTamilWithQuota).toBe(false);
     });
   });
 });

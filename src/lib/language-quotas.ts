@@ -1,5 +1,6 @@
 import { getTrackLanguage } from "./language-artists";
 import type { TrackLike } from "./track-dedup";
+import { getRecFlag } from "./rec-flags";
 
 export interface QuotaAllocationResult {
   [language: string]: number;
@@ -177,3 +178,24 @@ export function enforceLanguageQuotas<T extends TrackLike>(
 
   return selected.slice(0, targetCount);
 }
+
+/**
+ * Applies language quotas to candidate tracks if and only if enabled.
+ * If languageQuotas is absent (undefined) or false, returns candidates.slice(0, count),
+ * maintaining strict parity with main.
+ */
+export function selectTracksWithLanguageQuotas<T extends TrackLike>(
+  candidates: T[],
+  count: number,
+  languages: string[],
+  languageWeights?: Record<string, number> | null,
+  languageQuotas?: boolean | undefined,
+): T[] {
+  const isEnabled = languageQuotas ?? getRecFlag("languageQuotas");
+  if (isEnabled && languageWeights && languages.length > 0) {
+    const quotas = allocateLanguageQuotas(languages, languageWeights, count);
+    return enforceLanguageQuotas(candidates, quotas, count);
+  }
+  return candidates.slice(0, count);
+}
+
