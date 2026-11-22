@@ -4,6 +4,7 @@ import {
   getEffectiveBiquadGains,
   computeFadeCurve,
   isSourceWebAudioEligible,
+  CDN_CORS_ELIGIBILITY_MAP,
 } from "./web-audio-equalizer";
 import { EQUALIZER_PRESETS, type EqualizerSettings } from "./equalizer";
 
@@ -140,11 +141,30 @@ describe("web-audio-equalizer (Task 11)", () => {
     it("rejects JioSaavn CDNs lacking CORS headers", () => {
       expect(isSourceWebAudioEligible("https://aac.saavncdn.com/123/abc.mp4")).toBe(false);
       expect(isSourceWebAudioEligible("https://c.saavncdn.com/456/def.mp4")).toBe(false);
+      expect(isSourceWebAudioEligible("https://preview.saavncdn.com/789/preview.mp4")).toBe(false);
     });
 
-    it("permits verified CORS-enabled external providers (Audius, Archive.org)", () => {
+    it("rejects Jamendo storage CDNs lacking CORS headers", () => {
+      expect(isSourceWebAudioEligible("https://prod-1.storage.jamendo.com/download/track/1885558/mp32/")).toBe(false);
+      expect(isSourceWebAudioEligible("https://mp3d.jamendo.com/stream/track.mp3")).toBe(false);
+    });
+
+    it("rejects Internet Archive media streams lacking CORS headers", () => {
+      expect(isSourceWebAudioEligible("https://archive.org/download/test/song.mp3")).toBe(false);
+      expect(isSourceWebAudioEligible("https://ia800201.us.archive.org/0/items/test/song.mp3")).toBe(false);
+    });
+
+    it("permits verified CORS-enabled external providers (Audius)", () => {
       expect(isSourceWebAudioEligible("https://audius.co/tracks/123/stream")).toBe(true);
-      expect(isSourceWebAudioEligible("https://archive.org/download/test/song.mp3")).toBe(true);
+      expect(isSourceWebAudioEligible("https://creatornode.audius.co/tracks/cidstream/baeaaaiq")).toBe(true);
+      expect(isSourceWebAudioEligible("https://discoveryprovider.audius.co/v1/tracks/trending")).toBe(true);
+    });
+
+    it("exposes measured CDN_CORS_ELIGIBILITY_MAP with verified provider entries", () => {
+      expect(CDN_CORS_ELIGIBILITY_MAP["saavncdn.com"]).toBe(false);
+      expect(CDN_CORS_ELIGIBILITY_MAP["audius.co"]).toBe(true);
+      expect(CDN_CORS_ELIGIBILITY_MAP["archive.org"]).toBe(false);
+      expect(CDN_CORS_ELIGIBILITY_MAP["prod-1.storage.jamendo.com"]).toBe(false);
     });
 
     it("rejects empty or invalid URLs", () => {

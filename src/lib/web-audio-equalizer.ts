@@ -20,19 +20,53 @@ export const EQUALIZER_SPECS: readonly BiquadFilterSpec[] = [
 ] as const;
 
 /**
+ * Measured CORS results for provider CDN hosts.
+ * Date Checked: 2026-11-22 (measured via scripts/check-cdn-cors.mjs against real media URLs)
+ *
+ * Headers measured with Origin: https://melodymap.app:
+ * - JioSaavn (aac.saavncdn.com, c.saavncdn.com): Access-Control-Allow-Origin: none (NO) -> false
+ * - Jamendo (prod-1.storage.jamendo.com, mp3d.jamendo.com): Access-Control-Allow-Origin: none (NO) -> false
+ * - Internet Archive (archive.org, *.us.archive.org): Access-Control-Allow-Origin: none (NO) -> false
+ * - Audius (audius.co, creatornode.audius.co): Access-Control-Allow-Origin: * (YES) -> true
+ */
+export const CDN_CORS_ELIGIBILITY_MAP: Readonly<Record<string, boolean>> = {
+  // JioSaavn CDNs
+  "saavncdn.com": false,
+  "aac.saavncdn.com": false,
+  "c.saavncdn.com": false,
+  "preview.saavncdn.com": false,
+
+  // Jamendo CDNs
+  "storage.jamendo.com": false,
+  "prod-1.storage.jamendo.com": false,
+  "mp3d.jamendo.com": false,
+  "jamendo.com": false,
+
+  // Internet Archive CDNs
+  "archive.org": false,
+  "us.archive.org": false,
+
+  // Audius CDNs (Verified Access-Control-Allow-Origin: *)
+  "audius.co": true,
+  "creatornode.audius.co": true,
+  "discoveryprovider.audius.co": true,
+} as const;
+
+/**
  * Checks whether an audio stream URL can safely be routed through Web Audio
  * without encountering the Chromium/WebKit CORS pure-silence restriction.
+ * Depends on the measured CDN_CORS_ELIGIBILITY_MAP table (checked 2026-11-22).
  * Same-origin stream proxies (e.g. /api/stream/...) and offline blob: URLs
- * are always fully eligible. Cross-origin CDNs without CORS are not.
+ * are always fully eligible.
  */
 export function isSourceWebAudioEligible(url: string, origin?: string): boolean {
   if (!url) return false;
   const clean = url.trim();
 
-  // Blob URLs from IndexedDB offline storage
+  // Blob URLs from IndexedDB offline storage are local and always eligible
   if (clean.startsWith("blob:")) return true;
 
-  // Relative URLs (stream proxy)
+  // Relative URLs (stream proxy) are same-origin and always eligible
   if (clean.startsWith("/") && !clean.startsWith("//")) return true;
 
   // Same-origin check
@@ -40,18 +74,25 @@ export function isSourceWebAudioEligible(url: string, origin?: string): boolean 
     origin || (typeof window !== "undefined" && window.location ? window.location.origin : "");
   if (currentOrigin && clean.startsWith(currentOrigin)) return true;
 
-  // Known cross-origin CDNs that do NOT supply CORS headers:
-  if (
-    clean.includes("saavncdn.com") ||
-    clean.includes("c.saavncdn.com") ||
-    clean.includes("aac.saavncdn.com")
-  ) {
+  // Extract hostname for map lookup
+  let hostname = "";
+  try {
+    const parsed = new URL(clean, "http://localhost");
+    hostname = parsed.hostname.toLowerCase();
+  } catch {
     return false;
   }
 
-  // Cross-origin providers with verified CORS support (Audius, Archive.org):
-  if (clean.includes("audius.co") || clean.includes("archive.org")) {
-    return true;
+  // Exact host match in measured CORS table
+  if (hostname in CDN_CORS_ELIGIBILITY_MAP) {
+    return CDN_CORS_ELIGIBILITY_MAP[hostname]!;
+  }
+
+  // Domain suffix match (e.g. *.saavncdn.com, *.audius.co, *.archive.org)
+  for (const [domain, isEligible] of Object.entries(CDN_CORS_ELIGIBILITY_MAP)) {
+    if (hostname === domain || hostname.endsWith(`.${domain}`)) {
+      return isEligible;
+    }
   }
 
   return false;
