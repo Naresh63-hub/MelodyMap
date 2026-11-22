@@ -35,6 +35,7 @@ export interface PlaybackTelemetryEvent {
 export interface TelemetryRewardConfig {
   fastSkip: number; // < 10s
   midSkip: number; // 10s - 25s
+  slowSkip?: number; // 25s to 50% of the track
   lateSkip: number; // > 50%
   milestone10s: number;
   milestone25s: number;
@@ -51,6 +52,7 @@ export interface TelemetryRewardConfig {
 export const DEFAULT_REWARD_CONFIG: TelemetryRewardConfig = {
   fastSkip: -1.2,
   midSkip: -0.6,
+  slowSkip: -0.3,
   lateSkip: 0.1, // late skip after >50% duration still shows engagement
   milestone10s: 0.1,
   milestone25s: 0.2,
@@ -76,7 +78,7 @@ export function calculateTelemetryReward(
       if (event.positionSeconds < 10) return config.fastSkip;
       if (event.positionSeconds < 25) return config.midSkip;
       if (event.fractionPlayed >= 0.5) return config.lateSkip;
-      return -0.3;
+      return config.slowSkip ?? -0.3;
 
     case "COMPLETED":
       return config.completed;
