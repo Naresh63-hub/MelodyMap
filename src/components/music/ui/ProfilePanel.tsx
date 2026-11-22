@@ -111,7 +111,7 @@ export const ProfilePanel = memo(function ProfilePanel({
   ];
 
   return (
-    <div className="flex-1 overflow-y-auto px-3.5 py-5 sm:px-6 lg:px-8 space-y-4 sm:space-y-5 pb-8 sm:pb-12 max-w-2xl mx-auto w-full animate-fade-in relative">
+    <div className="px-3.5 py-5 sm:px-6 lg:px-8 space-y-4 sm:space-y-5 pb-8 sm:pb-12 max-w-2xl mx-auto w-full animate-fade-in relative">
       {/* User Hero Section */}
       <div className="flex flex-col items-center text-center space-y-2.5 pt-1">
         <div className="relative group shrink-0">

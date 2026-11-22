@@ -127,9 +127,9 @@ public class MediaPlaybackService extends Service {
 
         String action = intent != null ? intent.getAction() : null;
         if (action == null) {
-            // Sticky restart (e.g. process death): re-show with last known info.
-            handlePlay(null);
-            return START_STICKY;
+            // Service was restarted by OS with no intent: do NOT auto-play. Stop and exit cleanly.
+            stopForegroundService();
+            return START_NOT_STICKY;
         }
 
         switch (action) {
@@ -176,7 +176,7 @@ public class MediaPlaybackService extends Service {
                 handlePlay(intent != null ? intent.getStringExtra(EXTRA_PAYLOAD) : null);
                 break;
         }
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     // ─── Playback-state handling ─────────────────────────────────────────

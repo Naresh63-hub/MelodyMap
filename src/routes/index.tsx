@@ -4170,7 +4170,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       return;
     }
 
-    void load(track.id, track.previewUrl, 0, track.title, track.artist);
+    // Audio is paused/idle: cue the track so it is ready to play at 0:00 without auto-starting
+    cue(track.id, 0, track.previewUrl, track.title, track.artist);
     // Intentionally keyed on current?.id: reload only when the track changes, not on every
     // `current` object identity change (would interrupt active mobile playback).
     // eslint-disable-next-line react-hooks/exhaustive-deps
