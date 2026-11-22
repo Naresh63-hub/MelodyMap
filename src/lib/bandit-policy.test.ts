@@ -9,6 +9,9 @@ import {
   setBanditRngSource,
   X5_RESET_KEY,
   sortByScoreWithMovieTieBreaker,
+  BANDIT_STORAGE_KEY,
+  BANDIT_BACKUP6_STORAGE_KEY,
+  restoreBackup6,
   type SessionContext,
   type BanditModelState,
 } from "./bandit-policy";
@@ -706,6 +709,54 @@ describe("ThompsonSamplingPolicy Recommender", () => {
       expect(migrated.B[7]![7]).toBe(1.0);
       expect(migrated.B[6]![0]).toBe(0.0);
       expect(migrated.B[7]![1]).toBe(0.0);
+    });
+
+    it("Task 2: backs up pre-migration 6-dim model state and restoreBackup6 returns exact original", () => {
+      const original6: BanditModelState = {
+        version: 1,
+        dimension: 6,
+        B: Array.from({ length: 6 }, (_, i) =>
+          Array.from({ length: 6 }, (_, j) => (i === j ? 1.0 : 0.0)),
+        ),
+        B_inv: Array.from({ length: 6 }, (_, i) =>
+          Array.from({ length: 6 }, (_, j) => (i === j ? 1.0 : 0.0)),
+        ),
+        f: [0.5, 0.4, 0.6, 0.5, 0.3, 0.5],
+        mu: [0.5, 0.4, 0.6, 0.5, 0.3, 0.5],
+        totalUpdates: 42,
+        lastUpdated: 123456789,
+      };
+
+      try {
+        safeStorage.removeItem(BANDIT_STORAGE_KEY);
+        safeStorage.removeItem(BANDIT_BACKUP6_STORAGE_KEY);
+        safeStorage.setItem(BANDIT_STORAGE_KEY, JSON.stringify(original6));
+
+        // When a policy loads from storage, it migrates 6 -> 8
+        const testPolicy = new ThompsonSamplingPolicy();
+        testPolicy.loadFromStorage(true);
+
+        expect(testPolicy.getModelState().dimension).toBe(8);
+        expect(testPolicy.getModelState().totalUpdates).toBe(42);
+
+        // The pre-migration backup must exist
+        const backupRaw = safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY);
+        expect(backupRaw).toBeTruthy();
+        expect(JSON.parse(backupRaw!).dimension).toBe(6);
+
+        // restoreBackup6() restores it and returns the exact original state
+        const restored = restoreBackup6();
+        expect(restored).toEqual(original6);
+        expect(safeStorage.getItem(BANDIT_STORAGE_KEY)).toBe(JSON.stringify(original6));
+
+        // Backup is idempotent: does not overwrite existing backup if another 6-dim load occurs
+        safeStorage.setItem(BANDIT_STORAGE_KEY, JSON.stringify({ ...original6, totalUpdates: 999 }));
+        testPolicy.loadFromStorage(true);
+        expect(JSON.parse(safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY)!).totalUpdates).toBe(42);
+      } finally {
+        safeStorage.removeItem(BANDIT_STORAGE_KEY);
+        safeStorage.removeItem(BANDIT_BACKUP6_STORAGE_KEY);
+      }
     });
 
     it("flags-off regression: with flags OFF, x6 and x7 are 0 and rankings are regression-safe", () => {

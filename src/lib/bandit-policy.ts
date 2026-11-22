@@ -61,7 +61,8 @@ export interface RecommendationPolicy {
 }
 
 export const FEATURE_DIM = 8;
-const BANDIT_STORAGE_KEY = "melodymap.bandit_state.v1";
+export const BANDIT_STORAGE_KEY = "melodymap.bandit_state.v1";
+export const BANDIT_BACKUP6_STORAGE_KEY = "melodymap.bandit_state.v1.backup6";
 export const DISCOUNT_GAMMA_STORAGE_KEY = "melodymap.discount_gamma";
 export const X5_RESET_KEY = "melodymap.rec_x5_reset_done.v1";
 const REGULARIZATION_LAMBDA = 1.0;
@@ -700,6 +701,13 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
 
     // Dimension 6 -> 8 migration:
     if (state.dimension === 6) {
+      try {
+        const existingBackup = safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY);
+        if (!existingBackup) {
+          safeStorage.setItem(BANDIT_BACKUP6_STORAGE_KEY, JSON.stringify(state));
+        }
+      } catch {}
+
       const migratedB: number[][] = Array.from({ length: FEATURE_DIM }, (_, i) =>
         Array.from({ length: FEATURE_DIM }, (_, j) => {
           if (i < 6 && j < 6) return state.B[i]?.[j] ?? (i === j ? REGULARIZATION_LAMBDA : 0.0);
@@ -793,13 +801,21 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     };
   }
 
-  private loadFromStorage(): void {
-    if (typeof window === "undefined") return;
+  public loadFromStorage(force = false): void {
+    if (typeof window === "undefined" && !force) return;
     try {
       const raw = safeStorage.getItem(BANDIT_STORAGE_KEY);
       if (!raw) return;
       const state = JSON.parse(raw) as BanditModelState;
       if (state && (state.dimension === this.dimension || state.dimension === 6) && Array.isArray(state.B)) {
+        if (state.dimension === 6) {
+          try {
+            const existingBackup = safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY);
+            if (!existingBackup) {
+              safeStorage.setItem(BANDIT_BACKUP6_STORAGE_KEY, raw);
+            }
+          } catch {}
+        }
         this.setModelState(state);
       }
       if (getRecFlag("languageFeature")) {
@@ -808,8 +824,8 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     } catch {}
   }
 
-  private saveToStorage(): void {
-    if (typeof window === "undefined") return;
+  public saveToStorage(force = false): void {
+    if (typeof window === "undefined" && !force) return;
     try {
       const state = this.getModelState();
       safeStorage.setItem(BANDIT_STORAGE_KEY, JSON.stringify(state));
@@ -818,6 +834,27 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
 }
 
 export const thompsonSamplingPolicy = new ThompsonSamplingPolicy();
+
+/**
+ * Restores the raw pre-migration 6-dimension bandit model state from the backup
+ * storage key into the active bandit model storage key.
+ * Returns the exact original 6-dimension state, or null if no backup exists.
+ */
+export function restoreBackup6(): BanditModelState | null {
+  try {
+    const raw = safeStorage.getItem(BANDIT_BACKUP6_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BanditModelState;
+    if (!parsed || !Array.isArray(parsed.B)) return null;
+    safeStorage.setItem(BANDIT_STORAGE_KEY, raw);
+    try {
+      safeStorage.removeItem(X5_RESET_KEY);
+    } catch {}
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Sort candidates by score, using movie/soundtrack album presence as a tie-breaker

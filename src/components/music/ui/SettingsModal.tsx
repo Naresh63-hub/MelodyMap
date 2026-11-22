@@ -47,7 +47,12 @@ import {
 } from "@/lib/library";
 import { summarizeMetrics, resetRecMetrics, getLanguageFeatureStd } from "@/lib/rec-metrics";
 import { buildMetricsExport } from "@/lib/rec-metrics-export";
-import { getDiscountGamma, setDiscountGamma } from "@/lib/bandit-policy";
+import {
+  getDiscountGamma,
+  setDiscountGamma,
+  restoreBackup6,
+  thompsonSamplingPolicy,
+} from "@/lib/bandit-policy";
 import {
   getRecFlag,
   setRecFlag,
@@ -1018,6 +1023,36 @@ export function SettingsModal({
                           1.0 (Uniform)
                         </button>
                       </div>
+                    </div>
+
+                    <div className="h-px bg-chip" />
+
+                    <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground">Pre-Migration Model</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Restore saved 6-dimension state prior to 8-dimension migration
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (window.confirm("Restore pre-migration 6-dimension recommendation model?")) {
+                            const restored = restoreBackup6();
+                            if (restored) {
+                              thompsonSamplingPolicy.loadFromStorage();
+                              alert("Pre-migration model restored.");
+                            } else {
+                              alert("No pre-migration model backup found.");
+                            }
+                          }
+                        }}
+                        className="rounded-full text-xs font-semibold px-3 cursor-pointer shrink-0"
+                      >
+                        Restore pre-migration model
+                      </Button>
                     </div>
                   </div>
 
