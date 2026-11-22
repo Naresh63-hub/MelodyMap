@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
 import { explainPick } from "./rec-reasons";
 import type { SessionContext } from "./bandit-policy";
 
@@ -155,5 +157,43 @@ describe("explainPick (Truthful recommendation reason badges)", () => {
     };
     expect(explainPick(track, baseCtx, "made-for-you")).toBeUndefined();
     expect(explainPick(track, null, "search")).toBeUndefined();
+  });
+
+  it("returns undefined when no liked/downloaded artist, not trending, and not late-night chill", () => {
+    const ctx: SessionContext = {
+      hourOfDay: 14, // daytime (not late night)
+      likedTracks: [{ id: "l1", title: "Song 1", artist: "Artist A" }],
+      downloadedTracks: [{ id: "d1", title: "Song 2", artist: "Artist B" }],
+    };
+    const track = {
+      id: "u1",
+      title: "Midday Pop Hit",
+      artist: "Completely Unrelated Artist C",
+    };
+    // source is not "trending", artist is neither Artist A nor Artist B, hour is 14 -> must be undefined
+    expect(explainPick(track, ctx, "made-for-you")).toBeUndefined();
+    expect(explainPick(track, ctx, "daily-mix")).toBeUndefined();
+    expect(explainPick(track, ctx, "autodj-radio")).toBeUndefined();
+  });
+
+  it("source-text test: fails if any generic fallback string is present in rec-reasons.ts", () => {
+    const sourceFilePath = path.resolve(__dirname, "rec-reasons.ts");
+    const sourceCode = fs.readFileSync(sourceFilePath, "utf-8");
+
+    const forbiddenStrings = [
+      "Based on your taste",
+      "Recommended for you",
+      "Top pick",
+      "Popular choice",
+      "You might like",
+      "Similar to what you love",
+      "Because you listen to music",
+    ];
+
+    for (const forbidden of forbiddenStrings) {
+      expect(sourceCode.toLowerCase()).not.toContain(forbidden.toLowerCase());
+    }
+
+    expect(sourceCode).toContain("return undefined;");
   });
 });
