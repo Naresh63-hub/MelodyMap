@@ -1197,7 +1197,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           undoRef.current = {
             timeout: setTimeout(() => setUndoLabel(null), 8000),
             restore: () => {
-              if (track) playSong(track, queueRef.current);
+              if (track) playSong(track, queueRef.current, getTrackSource(track.id));
             },
           };
         }
@@ -1472,7 +1472,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           (t) => t.id !== track.id && isOriginalSong(t) && hasPlayableDuration(t),
         );
         const newQueue = [track, ...filteredRadio];
-        startQueue(newQueue, 0, "radio");
+        startQueue(newQueue, 0, "autodj-radio");
         setMessage(`Started Radio for "${track.title}" (${newQueue.length} songs)`);
       } catch (err) {
         console.error("Failed to start song radio:", err);
@@ -1501,7 +1501,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     });
   }, []);
 
-  const enqueue = useCallback((tracks: Track[]) => {
+  const enqueue = useCallback((tracks: Track[], source?: string) => {
+    if (source) {
+      tagTrackSource(tracks, source);
+    }
     setQueue((prev) => {
       const batch = dedupeTracks(tracks);
       const newTracks = batch.filter((t) => !trackExistsIn(prev, t as TrackLike));
@@ -1543,6 +1546,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           let fresh = applyExploreFilters(pool);
           if (fresh.length === 0) fresh = pool;
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+          tagTrackSource(ranked, "new-releases");
           setMixTracks((prev) => {
             const next = { ...prev, newrelease: ranked };
             writeHomeCache({ mixTracks: next });
@@ -1616,6 +1620,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           }
           const ranked = thompsonSamplingPolicy.rankCandidates(fresh, getSessionContext());
+          tagTrackSource(ranked, "mix");
           setMixTracks((prev) => ({ ...prev, [kind]: ranked }));
           markFeedDisplayed(ranked);
         }
@@ -2545,6 +2550,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           }
         }
 
+        tagTrackSource(tracks, "mood");
         setMoodTracks(tracks);
 
         if (tracks.length > 0) {
@@ -3087,6 +3093,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
       // 6. Insert freshly analyzed tracks immediately at the expanded reveal boundary & prune stale queued tail
       if (analyzedBatch.length > 0) {
+        tagTrackSource(analyzedBatch, "trending");
         setTrendingList((prev) => {
           const visibleFloor = Math.min(prev.length, Math.max(15, (targetPage - 1) * 15));
           const visibleHead = prev.slice(0, visibleFloor);
@@ -3433,6 +3440,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               }
             }
           }
+          tagTrackSource(filtered, t === "podcasts" ? "podcasts" : "search");
           setResults(
             dedupeTracks(filtered, {
               likedIds: likedIdsRef.current,
@@ -3523,6 +3531,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             }
           }
         }
+        tagTrackSource(incoming, "search");
         setResults((prev) =>
           dedupeTracks([...prev, ...incoming], {
             likedIds: likedIdsRef.current,
@@ -4048,14 +4057,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     (ep: PodcastEpisode, allEpisodes: PodcastEpisode[], idx: number) => {
       const tracks = allEpisodes.map(episodeToTrack);
       const target = tracks[idx] || episodeToTrack(ep);
-      playSong(target, tracks);
+      playSong(target, tracks, "podcasts");
     },
     [playSong],
   );
 
   const handlePlayPodcastHistory = useCallback(
     (track: Track, allHistory: Track[]) => {
-      playSong(track, allHistory);
+      playSong(track, allHistory, "podcasts");
     },
     [playSong],
   );
@@ -4438,11 +4447,28 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       : undefined;
 
-    if (cleanRecs.length) setRecs(cleanRecs);
-    if (cleanTrending.length) setTrendingList(cleanTrending);
-    if (cleanOldSongs.length) setOldSongsList(cleanOldSongs);
-    if (cleanMixTracks) setMixTracks(cleanMixTracks);
-    if (cleanDailyMix.length) setDailyMixTracks(cleanDailyMix);
+    if (cleanRecs.length) {
+      tagTrackSource(cleanRecs, "made-for-you");
+      setRecs(cleanRecs);
+    }
+    if (cleanTrending.length) {
+      tagTrackSource(cleanTrending, "trending");
+      setTrendingList(cleanTrending);
+    }
+    if (cleanOldSongs.length) {
+      tagTrackSource(cleanOldSongs, "old-songs");
+      setOldSongsList(cleanOldSongs);
+    }
+    if (cleanMixTracks) {
+      if (cleanMixTracks.discover) tagTrackSource(cleanMixTracks.discover, "mix");
+      if (cleanMixTracks.newrelease) tagTrackSource(cleanMixTracks.newrelease, "new-releases");
+      if (cleanMixTracks.explore) tagTrackSource(cleanMixTracks.explore, "mix");
+      setMixTracks(cleanMixTracks);
+    }
+    if (cleanDailyMix.length) {
+      tagTrackSource(cleanDailyMix, "daily-mix");
+      setDailyMixTracks(cleanDailyMix);
+    }
 
     // Initial load: Only fetch recommendations on startup if cached feed is completely empty or missing a section.
     // Preserves user's songs across app launches without auto-refreshing (refreshes only on manual pull-down or Refresh tap).
@@ -4603,7 +4629,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     currentTrack: current,
     playbackPosition: player.position,
     isPlaying: player.isPlaying,
-    onPlaySong: (track) => playSong(track),
+    onPlaySong: (track) => playSong(track, undefined, "jam"),
     onSeek: (seconds) => player.seek(seconds),
     onPause: () => player.pause(),
     onResume: () => player.play(),
@@ -4957,7 +4983,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                             }
                             return;
                           }
-                          startQueue(sectionTracks, i);
+                          const source = getTrackSource(track.id) ?? (sectionTracks === dailyMixTracks ? "daily-mix" : "made-for-you");
+                          startQueue(sectionTracks, i, source);
                         }}
                         onToggleLike={handleToggleLike}
                         onOpenOptions={(t) => setOptionsTrack(t)}
@@ -5041,7 +5068,14 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       }
                       return;
                     }
-                    startQueue(sectionTracks, i);
+                    const source =
+                      getTrackSource(track.id) ??
+                      (sectionTracks === trendingList
+                        ? "trending"
+                        : sectionTracks === oldSongsList
+                          ? "old-songs"
+                          : "new-releases");
+                    startQueue(sectionTracks, i, source);
                   }}
                   onOpenOptions={(t) => setOptionsTrack(t)}
                   onToggleLike={handleToggleLike}
@@ -5133,7 +5167,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 onRefresh={() => {
                   if (mix !== "replay") void loadMix(mix);
                 }}
-                onPlayAll={() => startQueue(visibleMix, 0, mix ? `mix-${mix}` : "mix")}
+                onPlayAll={() => startQueue(visibleMix, 0, "mix")}
                 onPlay={(track, i) => {
                   if (current?.id === track.id) {
                     if (player.isPlaying) {
@@ -5143,13 +5177,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     }
                     return;
                   }
-                  startQueue(visibleMix, i, mix ? `mix-${mix}` : "mix");
+                  startQueue(visibleMix, i, "mix");
                 }}
                 onToggleLike={handleToggleLike}
                 onToggleDislike={handleToggleDislike}
                 onArtistClick={openArtist}
                 onAddToPlaylist={handleAddToPlaylist}
-                onAddToQueue={(track) => enqueue([track])}
+                onAddToQueue={(track) => enqueue([track], "mix")}
                 onCreatePlaylistWith={(track) => {
                   setCreatePlaylistTrack(track);
                 }}
@@ -5247,7 +5281,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     }
                     return;
                   }
-                  startQueue(tracks, i, "library");
+                  startQueue(tracks, i, tracks === history ? "history" : "library");
                 }}
               />
               </div>
@@ -5536,11 +5570,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onDownload={(t) =>
             downloadedIds.has(t.id) ? setDeleteConfirmTrack(t) : void handleDownload(t)
           }
-          onAddToQueue={(t) => enqueue([t])}
+          onAddToQueue={(t) => enqueue([t], getTrackSource(t.id))}
           onStartRadio={(t) => void handleStartSongRadio(t)}
           onOpenLyrics={(t) => {
             if (!current || current.id !== t.id) {
-              playSong(t);
+              playSong(t, undefined, getTrackSource(t.id));
             }
             setShowLyrics(true);
           }}
