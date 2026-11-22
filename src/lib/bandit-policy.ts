@@ -517,10 +517,23 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
 
   /**
    * Sample parameter vector w* ~ N(mu, v^2 B^-1) via Cholesky decomposition.
+   * Dimensions whose feature flag is OFF are not sampled (set to 0.0) so the draw
+   * order and RNG variates remain 100% identical to main for the first 6 dimensions.
    */
   public sampleWeights(varianceScale = EXPLORATION_VARIANCE_V): number[] {
     const L = choleskyDecomposition(this.B_inv);
-    const z = Array.from({ length: this.dimension }, () => standardNormal());
+    const z = new Array<number>(this.dimension);
+
+    // First 6 dimensions (0..5) are always active, matching main
+    for (let i = 0; i < 6; i++) {
+      z[i] = standardNormal();
+    }
+
+    // Coordinate 6 is active only when artistRecentSkipFeature is on
+    z[6] = getRecFlag("artistRecentSkipFeature") ? standardNormal() : 0.0;
+
+    // Coordinate 7 is active only when noveltyMomentumFeature is on
+    z[7] = getRecFlag("noveltyMomentumFeature") ? standardNormal() : 0.0;
 
     if (!L) {
       // Fallback: independent Gaussian noise around mean
