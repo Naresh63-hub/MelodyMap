@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import {
   Sliders,
   Sparkles,
@@ -54,6 +54,8 @@ import {
   getRecConfigChangedAt,
   isDevModeEnabled,
   setDevModeEnabled,
+  REC_FLAG_DEFS,
+  type RecFlagName,
 } from "@/lib/rec-flags";
 import {
   getSponsorBlockEnabled,
@@ -164,8 +166,7 @@ export function SettingsModal({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Recommendation Experiments State
-  const [singlePassRankingOn, setSinglePassRankingOn] = useState(() => getRecFlag("singlePassRanking"));
-  const [trainOnFullTrackOn, setTrainOnFullTrackOn] = useState(() => getRecFlag("trainOnFullTrack"));
+  const [flagsState, setFlagsState] = useState<Record<RecFlagName, boolean>>(() => getAllRecFlags());
   const [gammaValue, setGammaValue] = useState(() => getDiscountGamma());
   const [devMode, setDevMode] = useState(() => isDevModeEnabled());
   const [versionTapCount, setVersionTapCount] = useState(0);
@@ -963,45 +964,29 @@ export function SettingsModal({
                   </div>
 
                   <div className="space-y-3.5 pt-1">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <Label htmlFor="flag-single-pass" className="text-sm font-semibold text-foreground cursor-pointer">
-                          Single-Pass Ranking
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Rank full candidate pool once after seed collection instead of per-page
-                        </p>
-                      </div>
-                      <Switch
-                        id="flag-single-pass"
-                        checked={singlePassRankingOn}
-                        onCheckedChange={(val) => {
-                          setSinglePassRankingOn(val);
-                          setRecFlag("singlePassRanking", val);
-                        }}
-                      />
-                    </div>
-
-                    <div className="h-px bg-chip" />
-
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <Label htmlFor="flag-full-track" className="text-sm font-semibold text-foreground cursor-pointer">
-                          Train on Full Track
-                        </Label>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Use full track metadata from playback cache for bandit training instead of stubs
-                        </p>
-                      </div>
-                      <Switch
-                        id="flag-full-track"
-                        checked={trainOnFullTrackOn}
-                        onCheckedChange={(val) => {
-                          setTrainOnFullTrackOn(val);
-                          setRecFlag("trainOnFullTrack", val);
-                        }}
-                      />
-                    </div>
+                    {REC_FLAG_DEFS.map((def, idx) => (
+                      <Fragment key={def.name}>
+                        {idx > 0 && <div className="h-px bg-chip" />}
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <Label htmlFor={`flag-${def.name}`} className="text-sm font-semibold text-foreground cursor-pointer">
+                              {def.label}
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {def.description}
+                            </p>
+                          </div>
+                          <Switch
+                            id={`flag-${def.name}`}
+                            checked={flagsState[def.name]}
+                            onCheckedChange={(val) => {
+                              setFlagsState((prev) => ({ ...prev, [def.name]: val }));
+                              setRecFlag(def.name, val);
+                            }}
+                          />
+                        </div>
+                      </Fragment>
+                    ))}
 
                     <div className="h-px bg-chip" />
 

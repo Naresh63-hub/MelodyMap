@@ -5,11 +5,12 @@ import {
   setDiscountGamma,
   getDiscountGamma,
   DISCOUNT_GAMMA_STORAGE_KEY,
+  buildTrainingContext,
   type SessionContext,
   type BanditModelState,
 } from "./bandit-policy";
 import { safeStorage } from "./safe-storage";
-import { setRecFlag, getRecConfigChangedAt } from "./rec-flags";
+import { setRecFlag, getRecFlag, getRecConfigChangedAt } from "./rec-flags";
 import type { PlaybackTelemetryEvent } from "./telemetry";
 import type { TrackLike } from "./track-dedup";
 
@@ -485,6 +486,163 @@ describe("ThompsonSamplingPolicy Recommender", () => {
       } finally {
         extractSpy.mockRestore();
         setRecFlag("trainOnFullTrack", true);
+      }
+    });
+  });
+
+  describe("Leak-free training context (flag: leakFreeTrainingContext)", () => {
+    it("rewinds currentTrack to predecessorTrack and strips post-event mutations in buildTrainingContext", () => {
+      const predTrack: TrackLike = { id: "track-pred", title: "Pred Song", artist: "Pred Artist" };
+      const eventTrack: TrackLike = { id: "track-ev", title: "Event Song", artist: "Event Artist" };
+
+      const ctx: SessionContext = {
+        currentTrack: eventTrack,
+        predecessorTrack: predTrack,
+        recentHistory: [eventTrack, predTrack],
+        likedIds: new Set(["track-ev", "other-1"]),
+        likedTracks: [eventTrack, { id: "other-1", title: "Other", artist: "Other" }],
+        downloadedIds: new Set(["track-ev"]),
+        downloadedTracks: [eventTrack],
+        dislikedIds: new Set(["track-ev"]),
+        dislikedTracks: [eventTrack],
+        stats: {
+          "track-ev": {
+            plays: 2,
+            completions: 1,
+            skips: 1,
+            track: eventTrack,
+          } as any,
+        },
+      };
+
+      // 1. Completion event
+      const compEv: PlaybackTelemetryEvent = {
+        id: "ev-c",
+        trackId: "track-ev",
+        title: "Event Song",
+        artist: "Event Artist",
+        eventType: "COMPLETED",
+        positionSeconds: 200,
+        durationSeconds: 200,
+        fractionPlayed: 1.0,
+        timestamp: Date.now(),
+      };
+      const cleanedComp = buildTrainingContext(compEv, ctx);
+      expect(cleanedComp.currentTrack?.id).toBe("track-pred");
+      expect(cleanedComp.stats?.["track-ev"]?.plays).toBe(1);
+      expect(cleanedComp.stats?.["track-ev"]?.completions).toBe(0);
+
+      // 2. Liked event
+      const likeEv: PlaybackTelemetryEvent = {
+        ...compEv,
+        id: "ev-l",
+        eventType: "LIKED",
+      };
+      const cleanedLike = buildTrainingContext(likeEv, ctx);
+      expect(cleanedLike.likedIds?.has("track-ev")).toBe(false);
+      expect(cleanedLike.likedTracks?.some((t) => t.id === "track-ev")).toBe(false);
+
+      // 3. Downloaded event
+      const dlEv: PlaybackTelemetryEvent = {
+        ...compEv,
+        id: "ev-d",
+        eventType: "DOWNLOADED",
+      };
+      const cleanedDl = buildTrainingContext(dlEv, ctx);
+      expect(cleanedDl.downloadedIds?.has("track-ev")).toBe(false);
+      expect(cleanedDl.downloadedTracks?.some((t) => t.id === "track-ev")).toBe(false);
+
+      // 4. Disliked event
+      const disEv: PlaybackTelemetryEvent = {
+        ...compEv,
+        id: "ev-dis",
+        eventType: "DISLIKED",
+      };
+      const cleanedDis = buildTrainingContext(disEv, ctx);
+      expect(cleanedDis.dislikedIds?.has("track-ev")).toBe(false);
+      expect(cleanedDis.dislikedTracks?.some((t) => t.id === "track-ev")).toBe(false);
+    });
+
+    it("with flag ON, training feature vector matches pre-event ranker context", () => {
+      setRecFlag("leakFreeTrainingContext", true);
+      const extractSpy = vi.spyOn(policy, "extractFeatureVector");
+      try {
+        const predTrack: TrackLike = { id: "pred", title: "P", artist: "PA" };
+        const eventTrack: TrackLike = { id: "cand", title: "C", artist: "CA" };
+
+        // Post-event context as produced at onEnd:
+        // currentTrack was set to eventTrack, and eventTrack was added to likedIds
+        const postEventCtx: SessionContext = {
+          currentTrack: eventTrack,
+          predecessorTrack: predTrack,
+          likedIds: new Set(["cand"]),
+          likedTracks: [eventTrack],
+        };
+
+        const event: PlaybackTelemetryEvent = {
+          id: "ev-like-test",
+          trackId: "cand",
+          title: "C",
+          artist: "CA",
+          eventType: "LIKED",
+          positionSeconds: 10,
+          durationSeconds: 100,
+          fractionPlayed: 0.1,
+          timestamp: Date.now(),
+        };
+
+        policy.recordFeedback(event, postEventCtx);
+
+        // Pre-event context as the ranker saw it before the track played and was liked:
+        const preEventCtx: SessionContext = {
+          currentTrack: predTrack,
+          predecessorTrack: predTrack,
+          likedIds: new Set([]),
+          likedTracks: [],
+        };
+        const expectedX = policy.extractFeatureVector(eventTrack, preEventCtx);
+
+        // extractSpy was called with cleaned context
+        const trainedContext = extractSpy.mock.calls[0]?.[1];
+        expect(trainedContext?.currentTrack?.id).toBe("pred");
+        expect(trainedContext?.likedIds?.has("cand")).toBe(false);
+
+        const trainedX = extractSpy.mock.results[0]?.value;
+        expect(trainedX).toEqual(expectedX);
+      } finally {
+        extractSpy.mockRestore();
+        setRecFlag("leakFreeTrainingContext", false);
+      }
+    });
+
+    it("with flag OFF (default), recordFeedback uses raw context unchanged", () => {
+      expect(getRecFlag("leakFreeTrainingContext")).toBe(false);
+      const extractSpy = vi.spyOn(policy, "extractFeatureVector");
+      try {
+        const eventTrack: TrackLike = { id: "cand", title: "C", artist: "CA" };
+        const rawCtx: SessionContext = {
+          currentTrack: eventTrack,
+          likedIds: new Set(["cand"]),
+        };
+        const event: PlaybackTelemetryEvent = {
+          id: "ev-default-off",
+          trackId: "cand",
+          title: "C",
+          artist: "CA",
+          eventType: "LIKED",
+          positionSeconds: 10,
+          durationSeconds: 100,
+          fractionPlayed: 0.1,
+          timestamp: Date.now(),
+        };
+
+        policy.recordFeedback(event, rawCtx);
+
+        const usedContext = extractSpy.mock.calls[0]?.[1];
+        expect(usedContext?.currentTrack?.id).toBe("cand");
+        expect(usedContext?.likedIds?.has("cand")).toBe(true);
+      } finally {
+        extractSpy.mockRestore();
       }
     });
   });

@@ -17,6 +17,7 @@ import {
 
 export interface SessionContext {
   currentTrack?: TrackLike | null | undefined;
+  predecessorTrack?: TrackLike | null | undefined;
   hourOfDay?: number | undefined; // 0-23
   discoveryPercent?: number | undefined; // 0-100
   recentHistory?: TrackLike[] | undefined;
@@ -209,6 +210,83 @@ function matVecMul(M: number[][], v: number[]): number[] {
 }
 
 const PRIOR_MU: number[] = [0.1, 0.5, 0.5, 0.5, 0.2, 0.3];
+
+/**
+ * Strips post-event mutations and rewinds `currentTrack` to the predecessor track
+ * so bandit training features match what the ranker evaluated before the event.
+ */
+export function buildTrainingContext(
+  event: PlaybackTelemetryEvent,
+  ctx: SessionContext
+): SessionContext {
+  const result: SessionContext = { ...ctx };
+
+  // 1. Resolve predecessor track for currentTrack
+  if (ctx.currentTrack && ctx.currentTrack.id === event.trackId) {
+    if (ctx.predecessorTrack && ctx.predecessorTrack.id !== event.trackId) {
+      result.currentTrack = ctx.predecessorTrack;
+    } else if (ctx.recentHistory && ctx.recentHistory.length > 0) {
+      const prev = ctx.recentHistory.find((t) => t.id && t.id !== event.trackId);
+      result.currentTrack = prev ?? null;
+    } else {
+      result.currentTrack = null;
+    }
+  }
+
+  // 2. Remove event track from liked sets if LIKED
+  if (event.eventType === "LIKED") {
+    if (result.likedIds) {
+      const nextLiked = new Set(result.likedIds);
+      nextLiked.delete(event.trackId);
+      result.likedIds = nextLiked;
+    }
+    if (result.likedTracks) {
+      result.likedTracks = result.likedTracks.filter((t) => t.id !== event.trackId);
+    }
+  }
+
+  // 3. Remove event track from disliked sets if DISLIKED
+  if (event.eventType === "DISLIKED") {
+    if (result.dislikedIds) {
+      const nextDisliked = new Set(result.dislikedIds);
+      nextDisliked.delete(event.trackId);
+      result.dislikedIds = nextDisliked;
+    }
+    if (result.dislikedTracks) {
+      result.dislikedTracks = result.dislikedTracks.filter((t) => t.id !== event.trackId);
+    }
+  }
+
+  // 4. Remove event track from downloaded sets if DOWNLOADED
+  if (event.eventType === "DOWNLOADED") {
+    if (result.downloadedIds) {
+      const nextDownloaded = new Set(result.downloadedIds);
+      nextDownloaded.delete(event.trackId);
+      result.downloadedIds = nextDownloaded;
+    }
+    if (result.downloadedTracks) {
+      result.downloadedTracks = result.downloadedTracks.filter((t) => t.id !== event.trackId);
+    }
+  }
+
+  // 5. Clean event track's stats entry of this event's contribution
+  if (result.stats && result.stats[event.trackId]) {
+    const existing = result.stats[event.trackId];
+    const newEntry = { ...existing };
+    if (event.eventType === "COMPLETED") {
+      newEntry.plays = Math.max(0, (newEntry.plays ?? 1) - 1);
+      newEntry.completions = Math.max(0, (newEntry.completions ?? 1) - 1);
+    } else if (event.eventType === "SKIPPED") {
+      newEntry.skips = Math.max(0, (newEntry.skips ?? 1) - 1);
+    }
+    result.stats = {
+      ...result.stats,
+      [event.trackId]: newEntry,
+    };
+  }
+
+  return result;
+}
 
 /**
  * Contextual Thompson Sampling Recommender Policy.
@@ -493,10 +571,14 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
       artist: event.artist,
     };
 
-    const ctx = context ?? {
+    const rawCtx = context ?? {
       hourOfDay: event.context?.hourOfDay ?? new Date().getHours(),
       discoveryPercent: event.context?.discoverySetting ?? 40,
     };
+
+    const ctx = getRecFlag("leakFreeTrainingContext")
+      ? buildTrainingContext(event, rawCtx)
+      : rawCtx;
 
     // stats holds the full Track (language, album, ...). The stub only has id/title/artist.
     const useFullTrack = getRecFlag("trainOnFullTrack");

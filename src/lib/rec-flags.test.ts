@@ -32,11 +32,13 @@ describe("rec-flags", () => {
     memory.clear();
   });
 
-  it("defaults to true for all flags matching current shipped behavior", () => {
+  it("defaults to true for all flags matching current shipped behavior, and false for new experiment flags", () => {
     expect(DEFAULT_FLAGS.singlePassRanking).toBe(true);
     expect(DEFAULT_FLAGS.trainOnFullTrack).toBe(true);
+    expect(DEFAULT_FLAGS.leakFreeTrainingContext).toBe(false);
     expect(getRecFlag("singlePassRanking")).toBe(true);
     expect(getRecFlag("trainOnFullTrack")).toBe(true);
+    expect(getRecFlag("leakFreeTrainingContext")).toBe(false);
   });
 
   it("sets a flag to false and reads false back", () => {
@@ -56,6 +58,7 @@ describe("rec-flags", () => {
     expect(flags).toEqual({
       singlePassRanking: true,
       trainOnFullTrack: false,
+      leakFreeTrainingContext: false,
     });
   });
 

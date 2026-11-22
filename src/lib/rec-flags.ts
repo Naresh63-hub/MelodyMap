@@ -1,11 +1,45 @@
 import { safeStorage } from "./safe-storage";
 
-export type RecFlagName = "singlePassRanking" | "trainOnFullTrack";
+export type RecFlagName =
+  | "singlePassRanking"
+  | "trainOnFullTrack"
+  | "leakFreeTrainingContext";
 
-export const DEFAULT_FLAGS: Record<RecFlagName, boolean> = {
-  singlePassRanking: true,
-  trainOnFullTrack: true,
-};
+export interface RecFlagDef {
+  name: RecFlagName;
+  label: string;
+  description: string;
+  defaultValue: boolean;
+}
+
+export const REC_FLAG_DEFS: RecFlagDef[] = [
+  {
+    name: "singlePassRanking",
+    label: "Single-Pass Ranking",
+    description: "Rank full candidate pool once after seed collection instead of per-page",
+    defaultValue: true,
+  },
+  {
+    name: "trainOnFullTrack",
+    label: "Train on Full Track",
+    description: "Use full track metadata from playback cache for bandit training instead of stubs",
+    defaultValue: true,
+  },
+  {
+    name: "leakFreeTrainingContext",
+    label: "Leak-Free Training Context",
+    description: "Rewind predecessor track and strip post-event mutations during bandit training",
+    defaultValue: false,
+  },
+];
+
+export const DEFAULT_FLAGS: Record<RecFlagName, boolean> = REC_FLAG_DEFS.reduce(
+  (acc, def) => {
+    acc[def.name] = def.defaultValue;
+    return acc;
+  },
+  {} as Record<RecFlagName, boolean>,
+);
 
 function flagStorageKey(name: RecFlagName): string {
   return `melodymap.flag.${name}`;
@@ -73,8 +107,9 @@ export function setRecFlag(name: RecFlagName, value: boolean): void {
 }
 
 export function getAllRecFlags(): Record<RecFlagName, boolean> {
-  return {
-    singlePassRanking: getRecFlag("singlePassRanking"),
-    trainOnFullTrack: getRecFlag("trainOnFullTrack"),
-  };
+  const flags = {} as Record<RecFlagName, boolean>;
+  for (const def of REC_FLAG_DEFS) {
+    flags[def.name] = getRecFlag(def.name);
+  }
+  return flags;
 }

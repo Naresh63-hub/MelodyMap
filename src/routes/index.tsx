@@ -955,6 +955,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
   const getSessionContext = useCallback((): SessionContext => {
     return {
       currentTrack: currentRef.current,
+      predecessorTrack: previousTrackRef.current,
       hourOfDay: new Date().getHours(),
       discoveryPercent: settings.discovery ?? 40,
       recentHistory: history.slice(0, 15),
