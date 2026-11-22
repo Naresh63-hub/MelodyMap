@@ -173,6 +173,7 @@ import { initRecMetrics, recordLanguageFeatureStd, computeBatchLanguageStd } fro
 import { sortByScoreWithMovieTieBreaker } from "@/lib/bandit-policy";
 import { extractTasteArtists, interleaveTasteTracks } from "@/lib/autodj-taste-mix";
 import { explainPick } from "@/lib/rec-reasons";
+import { buildOfflineMix } from "@/lib/offline-mix";
 import { getRecFlag } from "@/lib/rec-flags";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
@@ -317,6 +318,7 @@ function MusicApp() {
   const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
   const [searchFilter, setSearchFilter] = useState<SearchFilter>("all");
   const [recs, setRecs] = useState<Track[]>([]);
+  const [offlineMix, setOfflineMix] = useState<Track[]>([]);
   const [trendingList, setTrendingList] = useState<Track[]>([]);
   const [oldSongsList, setOldSongsList] = useState<Track[]>([]);
   const [historyQuery, setHistoryQuery] = useState("");
@@ -2141,6 +2143,19 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       recsGenerationRef.current += 1;
       setExploreExhausted(false);
       setRecLoading(true);
+
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        try {
+          const mix = await buildOfflineMix({
+            history,
+            ctx: getSessionContext(),
+          });
+          setOfflineMix(mix);
+        } finally {
+          setRecLoading(false);
+        }
+        return;
+      }
       const isExplicitRefresh = Boolean(refreshNonce);
       if (isExplicitRefresh) {
         homeRefreshPageRef.current = (homeRefreshPageRef.current % 5) + 1;
@@ -2442,6 +2457,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       } catch (err) {
         console.warn("[loadHomeFeeds] failed to load fresh recommendations:", err);
+        try {
+          const mix = await buildOfflineMix({
+            history,
+            ctx: getSessionContext(),
+          });
+          if (mix.length > 0) {
+            setOfflineMix(mix);
+          }
+        } catch {}
       } finally {
         setRecLoading(false);
       }
@@ -5070,6 +5094,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       <MobileHomeSections
                         dailyMix={dailyMixTracks}
                         recommended={recs}
+                        offlineMix={offlineMix}
                         dailyMixLoading={dailyMixLoading}
                         recLoading={recLoading}
                         onRefreshDailyMix={handleRefreshDailyMix}

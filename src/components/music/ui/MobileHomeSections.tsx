@@ -1,4 +1,4 @@
-import { MoreHorizontal, MoreVertical, Music2, Pause, Play, RotateCw, Sparkles, Users } from "lucide-react";
+import { MoreHorizontal, MoreVertical, Music2, Pause, Play, RotateCw, Sparkles, Users, WifiOff } from "lucide-react";
 import { useRef, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { getOptimizedThumbnailUrl } from "@/lib/network-mode";
@@ -48,6 +48,7 @@ function TrackThumbnail({
 type Props = {
   dailyMix?: Track[] | undefined;
   recommended: Track[];
+  offlineMix?: Track[] | undefined;
   userLanguages?: string[] | undefined;
   onPlayTrack: (track: Track, tracks: Track[], index: number) => void;
   onToggleLike: (track: Track) => void;
@@ -408,6 +409,7 @@ function SectionHeader({
 export function MobileHomeSections({
   dailyMix,
   recommended,
+  offlineMix,
   trending,
   userLanguages = [],
   onPlayTrack,
@@ -489,6 +491,29 @@ export function MobileHomeSections({
 
   return (
     <div className="space-y-7">
+      {/* 0. Offline Mix (active when offline or network fails) */}
+      {offlineMix && offlineMix.length > 0 && (
+        <section className="animate-fade-in">
+          <SectionHeader
+            title="Offline Mix"
+            subtitle="Downloaded songs & history"
+            icon={WifiOff}
+          />
+          <VerticalSongList
+            tracks={offlineMix}
+            currentId={currentId}
+            isPlaying={isPlaying}
+            onPlayTrack={onPlayTrack}
+            onOpenOptions={onOpenOptions}
+            onToggleLike={onToggleLike}
+            likedIds={likedIds}
+            downloadedIds={downloadedIds}
+            downloadingIds={downloadingIds}
+            downloadProgress={downloadProgress}
+          />
+        </section>
+      )}
+
       {/* 1. Daily Mix (JioSaavn Square Cards) */}
       {(visibleDailyMix.length > 0 || (dailyMixLoading && quickFilterIds.length === 0)) && (
         <section className="animate-fade-in">
