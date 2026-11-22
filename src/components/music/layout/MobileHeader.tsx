@@ -1,11 +1,12 @@
-import { Menu, Radio, User } from "lucide-react";
-import { StreakBadge } from "@/components/music/ui/StreakBadge";
+import { Menu, Radio, Search, User } from "lucide-react";
 import { MusicWaveBanner } from "@/components/music/ui/MusicWaveBanner";
+import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 
 type Props = {
   tab?: string;
   onOpenMenu?: () => void;
+  onOpenSearch?: () => void;
   onOpenSettings?: () => void;
   userInitial?: string;
   userAvatar?: string | null;
@@ -18,6 +19,7 @@ type Props = {
 export function MobileHeader({
   tab = "foryou",
   onOpenMenu,
+  onOpenSearch,
   onOpenSettings: _onOpenSettings,
   userInitial,
   userAvatar,
@@ -97,7 +99,21 @@ export function MobileHeader({
       </div>
 
       <div className="flex items-center gap-2">
-        <StreakBadge />
+        {/* Quick Search Action */}
+        {onOpenSearch && (
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("selection");
+              onOpenSearch();
+            }}
+            aria-label="Search songs, artists, podcasts"
+            title="Search"
+            className="flex h-9 w-9 sm:h-9.5 sm:w-9.5 shrink-0 items-center justify-center rounded-full bg-card hover:bg-card/90 border border-hair text-foreground/80 hover:text-foreground active:scale-95 transition-all shadow-xs min-h-[38px] min-w-[38px] cursor-pointer"
+          >
+            <Search className="h-4.5 w-4.5" />
+          </button>
+        )}
 
         {/* Live Jam badge if active session is running */}
         {onOpenJam && jamActive && (

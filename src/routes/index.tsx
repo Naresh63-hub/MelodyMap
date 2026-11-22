@@ -4851,6 +4851,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             tab={tab}
             onOpenMenu={() => setDrawerOpen(true)}
             onOpenSettings={() => setShowSettings((v) => !v)}
+            onOpenSearch={() => {
+              setTab("search");
+              setTimeout(() => {
+                const el = document.getElementById("main-search-input");
+                if (el) el.focus();
+              }, 80);
+            }}
             userInitial={
               (auth.profile?.display_name && auth.profile.display_name !== "Google Listener"
                 ? auth.profile.display_name[0]
