@@ -172,6 +172,7 @@ import { tagTrackSource, getTrackSource } from "@/lib/rec-source";
 import { initRecMetrics, recordLanguageFeatureStd, computeBatchLanguageStd } from "@/lib/rec-metrics";
 import { sortByScoreWithMovieTieBreaker } from "@/lib/bandit-policy";
 import { extractTasteArtists, interleaveTasteTracks } from "@/lib/autodj-taste-mix";
+import { explainPick } from "@/lib/rec-reasons";
 import { getRecFlag } from "@/lib/rec-flags";
 import { runStartupMigrations } from "@/lib/startup-migration";
 import { safeStorage } from "@/lib/safe-storage";
@@ -2414,10 +2415,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
         if (settledRecs.length > 0) {
           tagTrackSource(settledRecs, "made-for-you");
-          setRecs(settledRecs);
-          markFeedDisplayed(settledRecs);
-          writeHomeCache({ recs: settledRecs });
-          recordSeenTrackIdentities(settledRecs);
+          const sessionCtx = getSessionContext();
+          const recsWithReasons = settledRecs.map((t) => ({
+            ...t,
+            recommendationReason: explainPick(t, sessionCtx, "made-for-you"),
+          }));
+          setRecs(recsWithReasons);
+          markFeedDisplayed(recsWithReasons);
+          writeHomeCache({ recs: recsWithReasons });
+          recordSeenTrackIdentities(recsWithReasons);
         }
       } catch (err) {
         console.warn("[loadHomeFeeds] failed to load fresh recommendations:", err);
@@ -2859,8 +2865,13 @@ function savePodcastResumePosition(trackId: string, pos: number) {
 
           if (diversifiedBatch.length > 0) {
             tagTrackSource(diversifiedBatch, "made-for-you");
+            const sessionCtx = getSessionContext();
+            const batchWithReasons = diversifiedBatch.map((t) => ({
+              ...t,
+              recommendationReason: explainPick(t, sessionCtx, "made-for-you"),
+            }));
             setRecs((prev) => {
-              const batchToAdd = diversifiedBatch.filter(
+              const batchToAdd = batchWithReasons.filter(
                 (cand) => !prev.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
               );
               if (batchToAdd.length === 0) return prev;
@@ -2868,8 +2879,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               writeHomeCache({ recs: updated });
               return updated;
             });
-            markFeedDisplayed(diversifiedBatch);
-            recordSeenTrackIdentities(diversifiedBatch);
+            markFeedDisplayed(batchWithReasons);
+            recordSeenTrackIdentities(batchWithReasons);
             setExploreExhausted(false);
           } else if (targetPage >= 8) {
             setExploreExhausted(true);

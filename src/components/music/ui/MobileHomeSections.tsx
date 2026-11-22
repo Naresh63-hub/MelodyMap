@@ -309,6 +309,14 @@ function VerticalSongList({
               <p className="truncate text-xs text-muted-foreground font-normal leading-tight mt-0.5">
                 {trackSubtitle(track)}
               </p>
+              {track.recommendationReason && (
+                <span
+                  aria-label={`Recommendation reason: ${track.recommendationReason}`}
+                  className="inline-block max-w-[200px] truncate text-[10px] font-medium text-primary/90 bg-primary/10 rounded-md px-1.5 py-0.5 mt-1 border border-primary/20"
+                >
+                  {track.recommendationReason}
+                </span>
+              )}
             </button>
 
             {/* Song duration time & like button matching reference image */}

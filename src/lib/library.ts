@@ -11,6 +11,7 @@ export type Track = {
   duration: string;
   thumbnail: string;
   reason?: string | undefined;
+  recommendationReason?: string | undefined;
   /** Direct audio URL (e.g. Audius stream, Jamendo MP3, Archive, podcast) — bypasses stream proxy. */
   previewUrl?: string | undefined;
   /** Source provider */
