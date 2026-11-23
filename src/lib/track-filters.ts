@@ -190,7 +190,7 @@ export const DEVOTIONAL_REGEX =
  * Rejects speeches, discourses, web series, dialogues, scenes, and promos.
  */
 export const SPOKEN_AND_PROMO_REGEX =
-  /\b(speech|speeches|pravachanam|pravachan|discourse|web\s*series|kadapa|short\s*film|promo|first\s*look|motion\s*poster|glimpse|press\s*meet|audio\s*launch|dialogue\s*promo|dialogue|interview|scene|scenes)\b/i;
+  /\b(speech|speeches|pravachanam|pravachan|discourse|web\s*series|kadapa|short\s*film|promo|first\s*look|motion\s*poster|glimpse|press\s*meet|audio\s*launch|dialogue\s*promo|dialogue|interview|scene|scenes|secrets\s+of|making\s+of|talk\s*show)\b/i;
 
 /**
  * Titles that name a COLLECTION rather than a song — mood/era/star playlists
@@ -228,11 +228,11 @@ export function isOriginalSong(track: {
   const album = track.album || "";
   const subtitle = track.subtitle || "";
 
-  // 1. Remixes, covers, mixes, mashups, karaoke, lofi
+  // 1. Remixes, covers, mixes, mashups, karaoke, lofi, or raw handles (@creator)
   if (NON_ORIGINAL_TRACK_REGEX.test(title)) return false;
   if (album && NON_ORIGINAL_TRACK_REGEX.test(album)) return false;
   if (subtitle && NON_ORIGINAL_TRACK_REGEX.test(subtitle)) return false;
-  if (artist && (NON_ORIGINAL_TRACK_REGEX.test(artist) || NON_ORIGINAL_ARTIST_REGEX.test(artist))) return false;
+  if (artist && (artist.trim().startsWith("@") || NON_ORIGINAL_TRACK_REGEX.test(artist) || NON_ORIGINAL_ARTIST_REGEX.test(artist))) return false;
 
   // 2. Reject cheap local compilations & holiday festival CDs
   if (LOCAL_COMPILATION_REGEX.test(title)) return false;

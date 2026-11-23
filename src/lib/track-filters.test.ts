@@ -89,11 +89,14 @@ describe("isOriginalSong", () => {
     expect(isOriginalSong({ title: "Mangli Yellamma Bonalu", artist: "Mangli" })).toBe(false);
   });
 
-  it("rejects speeches, web series, promos, and discourses", () => {
+  it("rejects speeches, web series, promos, discourses, and commentary/handles", () => {
     expect(isOriginalSong({ title: "Kadapa Web Series", artist: "RGV" })).toBe(false);
     expect(isOriginalSong({ title: "Kadapa Web Series Promo Song", artist: "Director" })).toBe(false);
     expect(isOriginalSong({ title: "Director Speech at Audio Launch", artist: "Anchor" })).toBe(false);
     expect(isOriginalSong({ title: "Chaganti Koteswara Rao Pravachanam", artist: "Chaganti" })).toBe(false);
+    expect(isOriginalSong({ title: "Secrets of Hit Songs", artist: "@secretsofhitsongs" })).toBe(false);
+    expect(isOriginalSong({ title: "Real Song Title", artist: "@creatorchannel" })).toBe(false);
+    expect(isOriginalSong({ title: "Making of Balagam", artist: "Balagam" })).toBe(false);
   });
 
   it("approves genuine studio film soundtracks and singles (Spotify standard)", () => {

@@ -87,7 +87,7 @@ export async function searchAudius(
             id: `audius:${t.id}`,
             canonicalTrackId: `audius:${t.id}`,
             title: t.title,
-            artist: t.user?.name || t.user?.handle || "Audius Artist",
+            artist: (t.user?.name || t.user?.handle || "Audius Artist").replace(/^@+/, "").trim(),
             album: t.genre ? `${t.genre} Single` : "Audius Release",
             duration: formatDuration(t.duration),
             durationSeconds: Math.round(t.duration),

@@ -49,6 +49,7 @@ const NON_MOVIE_ALBUM_PATTERNS: RegExp[] = [
 
 /** Channel / label signatures that must never be shown as an artist. */
 const CHANNEL_OR_LABEL_PATTERNS: RegExp[] = [
+  /^@/i,
   /\bvevo\b/i,
   /vevo$/i,
   /-\s*topic$/i,
