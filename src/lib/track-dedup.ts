@@ -24,6 +24,7 @@ export interface TrackLike {
   reason?: string | undefined;
   previewUrl?: string | undefined;
   source?: string | undefined;
+  durationSeconds?: number | null | undefined;
 }
 
 // ─── Normalization & Fuzzy Distance ─────────────────────────────────

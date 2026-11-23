@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOriginalSong, isMusicTrack } from "./track-filters";
+import { isOriginalSong, isMusicTrack, parseDurationSeconds } from "./track-filters";
 
 describe("isOriginalSong", () => {
   it("approves original songs", () => {
@@ -110,6 +110,39 @@ describe("isMusicTrack with isOriginalSong integration", () => {
     expect(isMusicTrack({ title: "Tum Hi Ho (DJ Mix)", artist: "Arijit Singh", duration: "3:30" })).toBe(false);
     expect(isMusicTrack({ title: "Pachchadanamey", album: "Classics Of Telugu Cinema", duration: "4:15" })).toBe(false);
     expect(isMusicTrack({ title: "Tum Hi Ho", artist: "Arijit Singh", duration: "3:30" })).toBe(true);
+  });
+
+  it("handles durationSeconds and millisecond durations", () => {
+    expect(isMusicTrack({ title: "Butta Bomma", artist: "Armaan Malik", durationSeconds: 198 })).toBe(true);
+    expect(isMusicTrack({ title: "Butta Bomma", artist: "Armaan Malik", duration: 198000 })).toBe(true);
+    expect(isMusicTrack({ title: "Too Long Mix", artist: "DJ", durationSeconds: 601 })).toBe(false);
+  });
+});
+
+describe("parseDurationSeconds", () => {
+  it("parses colon format strings", () => {
+    expect(parseDurationSeconds("3:30")).toBe(210);
+    expect(parseDurationSeconds("04:15")).toBe(255);
+    expect(parseDurationSeconds("1:02:15")).toBe(3735);
+  });
+
+  it("parses numeric strings and numbers", () => {
+    expect(parseDurationSeconds(210)).toBe(210);
+    expect(parseDurationSeconds("210")).toBe(210);
+  });
+
+  it("normalizes millisecond numbers and strings >= 10000", () => {
+    expect(parseDurationSeconds(210000)).toBe(210);
+    expect(parseDurationSeconds("210000")).toBe(210);
+  });
+
+  it("handles invalid or zero values safely", () => {
+    expect(parseDurationSeconds(0)).toBe(0);
+    expect(parseDurationSeconds("0:00")).toBe(0);
+    expect(parseDurationSeconds("")).toBe(0);
+    expect(parseDurationSeconds(undefined)).toBe(0);
+    expect(parseDurationSeconds(null)).toBe(0);
+    expect(parseDurationSeconds("invalid")).toBe(0);
   });
 });
 

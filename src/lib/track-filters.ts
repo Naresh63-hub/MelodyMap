@@ -139,13 +139,28 @@ export const PODCAST_POSITIVE_KEYWORDS = [
 
 /**
  * Unified duration string parser (e.g. "3:45", "1:02:15", "45", or 225) -> seconds.
+ * Automatically normalizes millisecond values (>= 10,000) to seconds.
  */
 export function parseDurationSeconds(dur: string | number | undefined | null): number {
   if (dur == null) return 0;
-  if (typeof dur === "number") return Number.isFinite(dur) ? Math.max(0, Math.floor(dur)) : 0;
-  const parts = dur.split(":").map((p) => Number(p.trim()));
-  if (parts.some((n) => Number.isNaN(n))) return 0;
-  return parts.reduce((acc, n) => acc * 60 + n, 0);
+  if (typeof dur === "number") {
+    if (!Number.isFinite(dur) || dur <= 0) return 0;
+    if (dur >= 10000) return Math.floor(dur / 1000);
+    return Math.floor(dur);
+  }
+  const str = String(dur).trim();
+  if (!str) return 0;
+  if (str.includes(":")) {
+    const parts = str.split(":").map((p) => Number(p.trim()));
+    if (parts.some((n) => Number.isNaN(n))) return 0;
+    return parts.reduce((acc, n) => acc * 60 + n, 0);
+  }
+  const parsed = Number(str);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    if (parsed >= 10000) return Math.floor(parsed / 1000);
+    return Math.floor(parsed);
+  }
+  return 0;
 }
 
 /**
@@ -251,7 +266,7 @@ export function isOriginalSong(track: {
 export const MAX_TRACK_DURATION_SECONDS = 600;
 
 export function isMusicTrack(
-  track: { title?: string | undefined; artist?: string | undefined; album?: string | undefined; duration?: string | number | undefined } | null | undefined,
+  track: { title?: string | undefined; artist?: string | undefined; album?: string | undefined; duration?: string | number | undefined; durationSeconds?: number | undefined } | null | undefined,
   allowLong?: boolean | unknown,
   allowUnknownDuration?: boolean | unknown,
 ): boolean {
@@ -268,7 +283,8 @@ export function isMusicTrack(
   if (JUNK_MEDIA_KEYWORDS.some((kw) => title.includes(kw) || artist.includes(kw))) return false;
   if (!isAllowLong && COMPILATION_KEYWORDS.some((kw) => title.includes(kw))) return false;
 
-  const secs = parseDurationSeconds(track.duration);
+  const durInput = track.durationSeconds ?? track.duration;
+  const secs = parseDurationSeconds(durInput);
   const maxCap = isAllowLong ? 7200 : MAX_TRACK_DURATION_SECONDS;
   // Unknown duration (secs === 0): allow for library hydration if requested, otherwise exclude from fresh search
   if (secs <= 0) return isAllowUnknown;

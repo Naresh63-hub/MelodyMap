@@ -23,6 +23,8 @@ import { areSameTrack, cleanSongTitle, norm, normalizeArtistAlias, stringSimilar
 import { MAX_TRACK_DURATION_SECONDS, parseDurationSeconds } from "./track-filters";
 import type { Track } from "./types";
 
+export { MAX_TRACK_DURATION_SECONDS } from "./track-filters";
+
 export interface FeedExclusions {
   /** Track IDs already shown in this session's recommendation feeds. */
   previouslyDisplayedIds?: ReadonlySet<string> | undefined;
@@ -104,15 +106,25 @@ export function trackIdOf(candidate: unknown): string | null {
  * known and satisfies 0 < durationSeconds <= 600 (10 minutes).
  * 10:00 exactly is ALLOWED; 10:01 is REJECTED; unknown duration is REJECTED.
  */
+export type PlayableDurationTrack =
+  | {
+      duration?: string | number | null | undefined;
+      durationSeconds?: number | null | undefined;
+    }
+  | Partial<TrackLike>;
+
 export function hasPlayableDuration(
-  track: { duration?: string | number | null | undefined } | null | undefined,
+  track: PlayableDurationTrack | null | undefined,
 ): boolean {
   if (!track) return false;
-  const d = track.duration;
-  if (typeof d === "number") {
-    return Number.isFinite(d) && d > 0 && d <= MAX_TRACK_DURATION_SECONDS;
+  let secs = 0;
+  if (typeof track.durationSeconds === "number" && Number.isFinite(track.durationSeconds) && track.durationSeconds > 0) {
+    secs = track.durationSeconds >= 10000
+      ? Math.floor(track.durationSeconds / 1000)
+      : Math.floor(track.durationSeconds);
+  } else {
+    secs = parseDurationSeconds(track.duration ?? undefined);
   }
-  const secs = parseDurationSeconds(d ?? undefined);
   return secs > 0 && secs <= MAX_TRACK_DURATION_SECONDS;
 }
 

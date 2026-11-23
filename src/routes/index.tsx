@@ -159,6 +159,7 @@ import {
   filterFeedCandidates,
   hasPlayableDuration,
   isFuzzySameSong,
+  MAX_TRACK_DURATION_SECONDS,
   sameSong,
 } from "@/lib/feed-freshness";
 import {
@@ -1386,11 +1387,20 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
       }
 
-      // Hard rule: music tracks need a known duration <= 600s to enter playback.
-      if (!isPodcastTrack(track) && !hasPlayableDuration(track)) {
-        setMessage("Track duration exceeds 10 minutes or is unplayable");
-        setTimeout(() => setMessage(null), 3000);
-        return;
+      // Hard rule: music tracks known to exceed 10 minutes (600s) cannot enter single-track playback.
+      // Unknown durations (0 / empty / loading) are permitted so streaming can resolve metadata on load.
+      if (!isPodcastTrack(track)) {
+        const durSecs =
+          typeof track.durationSeconds === "number" && Number.isFinite(track.durationSeconds) && track.durationSeconds > 0
+            ? (track.durationSeconds >= 10000
+                ? Math.floor(track.durationSeconds / 1000)
+                : Math.floor(track.durationSeconds))
+            : parseDurationSeconds(track.duration ?? undefined);
+        if (durSecs > MAX_TRACK_DURATION_SECONDS) {
+          setMessage("Track duration exceeds 10 minutes");
+          setTimeout(() => setMessage(null), 3000);
+          return;
+        }
       }
 
       // 1. Reset progress and seek position for clean single-track start

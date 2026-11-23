@@ -112,6 +112,20 @@ describe("Feed freshness: session exclusion set and duration gate", () => {
     expect(fresh.map((t) => t.id)).toEqual(["valid"]);
   });
 
+  it("I. handles durationSeconds and millisecond durations seamlessly", () => {
+    // durationSeconds with undefined or empty duration string
+    expect(hasPlayableDuration({ id: "ds1", title: "Song 1", artist: "Artist", durationSeconds: 210 })).toBe(true);
+    expect(hasPlayableDuration({ id: "ds2", title: "Song 2", artist: "Artist", duration: "", durationSeconds: 180 })).toBe(true);
+    // duration in milliseconds (e.g., 210,000 ms = 210s)
+    expect(hasPlayableDuration({ id: "ms1", title: "Song 3", artist: "Artist", duration: 210000 })).toBe(true);
+    expect(hasPlayableDuration({ id: "ms2", title: "Song 4", artist: "Artist", duration: "210000" })).toBe(true);
+    expect(hasPlayableDuration({ id: "ms3", title: "Song 5", artist: "Artist", durationSeconds: 210000 })).toBe(true);
+    // rejects durations exceeding 600 seconds
+    expect(hasPlayableDuration({ id: "over1", title: "Song 6", artist: "Artist", durationSeconds: 601 })).toBe(false);
+    expect(hasPlayableDuration({ id: "over2", title: "Song 7", artist: "Artist", duration: 601 })).toBe(false);
+    expect(hasPlayableDuration({ id: "zero", title: "Song 8", artist: "Artist", durationSeconds: 0 })).toBe(false);
+  });
+
   it("current track and recently played tracks are excluded from fresh candidates", () => {
     const current = mkTrack("now", "3:00");
     const recent = [mkTrack("r1", "3:00"), mkTrack("r2", "4:00")];
