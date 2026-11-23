@@ -20,6 +20,7 @@
  */
 
 import { areSameTrack, cleanSongTitle, norm, normalizeArtistAlias, stringSimilarity, type TrackLike } from "./track-dedup";
+import { isChannelOrLabelName } from "./track-metadata";
 import { MAX_TRACK_DURATION_SECONDS, parseDurationSeconds } from "./track-filters";
 import type { Track } from "./types";
 
@@ -45,38 +46,28 @@ export interface FeedExclusions {
 }
 
 /**
- * Same LOGICAL song check: areSameTrack() (title similarity + duration tolerance)
- * as the core signal, with artist similarity >= 0.9 as an additional identity
- * safeguard when both artist fields are populated. This is a heuristic
- * threshold, not a guarantee: unusually similar artist names could still merge.
- * When artist metadata is missing on either side, the fallback to title +
- * duration means identical titles with near-identical durations CAN merge.
- * Artist name alone never merges two songs (the gate is conjunctive with
- * areSameTrack).
+ * Same LOGICAL song check: delegates to the unified areSameTrack() multi-factor
+ * identity matcher (incorporating title similarity, version gating, generic title
+ * protection, movie/album grouping, and artist alias/label containment).
  */
 export function sameSong(a: TrackLike, b: TrackLike): boolean {
   if (!a || !b) return false;
   if (a.id && b.id && a.id === b.id) return true;
-  if (!areSameTrack(a, b)) return false;
-  const artistA = norm(a.artist || "");
-  const artistB = norm(b.artist || "");
-  if (!artistA || !artistB) return true; // metadata missing: title + duration decide (see caveat above)
-  // Heuristic gate (additional safeguard, not a correctness guarantee):
-  // "Arijit Singh" vs "Arijit Singh - Topic" merges (norm strips "topic");
-  // "Love" by Artist A vs "Love" by Artist B stays distinct in practice.
-  return stringSimilarity(artistA, artistB) >= 0.9;
+  return areSameTrack(a, b);
 }
 
 /**
  * Robust cross-section and queue deduplication check:
  * Matches identical songs across different providers or upload versions
  * (e.g. YouTube video with intro/dialogue vs JioSaavn studio track),
- * even when durations differ slightly.
+ * even when durations differ slightly or artist names differ between
+ * singer/composer/movie credits.
  */
 export function isFuzzySameSong(a: TrackLike, b: TrackLike): boolean {
   if (!a || !b) return false;
   if (a.id && b.id && a.id === b.id) return true;
   if (sameSong(a, b)) return true;
+  if (areSameTrack(a, b)) return true;
   const titleA = norm(cleanSongTitle(a.title) || a.title);
   const titleB = norm(cleanSongTitle(b.title) || b.title);
   if (!titleA || !titleB) return false;
@@ -84,7 +75,14 @@ export function isFuzzySameSong(a: TrackLike, b: TrackLike): boolean {
     const artA = normalizeArtistAlias(a.artist);
     const artB = normalizeArtistAlias(b.artist);
     if (!artA || !artB) return true;
-    if (artA === artB || stringSimilarity(artA, artB) >= 0.75) {
+    if (
+      artA === artB ||
+      stringSimilarity(artA, artB) >= 0.75 ||
+      artA.includes(artB) ||
+      artB.includes(artA) ||
+      isChannelOrLabelName(a.artist) ||
+      isChannelOrLabelName(b.artist)
+    ) {
       return true;
     }
   }

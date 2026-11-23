@@ -921,16 +921,16 @@ export function topArtists(stats: Stats, likes: Track[], limit = 12, downloads?:
     }
   }
 
-  // Downloads indicate explicit user commitment: give positive weight
+  // Downloads indicate highest explicit user commitment: give prioritized positive weight
   const downloadCountPerArtist = new Map<string, number>();
   for (const t of downloads || []) {
     if (!t.artist) continue;
     const normA = t.artist.toLowerCase().trim();
     if (!displayMap.has(normA)) displayMap.set(normA, t.artist);
     const count = downloadCountPerArtist.get(normA) || 0;
-    if (count < 3) {
+    if (count < 4) {
       downloadCountPerArtist.set(normA, count + 1);
-      score.set(normA, (score.get(normA) ?? 0) + 3.0);
+      score.set(normA, (score.get(normA) ?? 0) + 4.0);
     }
   }
 

@@ -963,7 +963,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
       currentTrack: currentRef.current,
       predecessorTrack: previousTrackRef.current,
       hourOfDay: new Date().getHours(),
-      discoveryPercent: settings.discovery ?? 40,
+      discoveryPercent: settings.discovery ?? 50,
       recentHistory: history.slice(0, 15),
       stats,
       sessionCompletions: sessionCompletionsRef.current,
@@ -2223,7 +2223,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     artists: topArtists(stats, likes, 12, downloadedTracks),
                     downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
                     refreshNonce: nonce,
-                    discovery: settings.discovery ?? 40,
+                    discovery: settings.discovery ?? 50,
                     affinityArtists: affinity.affinityArtists,
                     penalizedArtists: affinity.penalizedArtists,
                     clientHour,
@@ -2261,7 +2261,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
                 refreshNonce: nonce,
-                discovery: settings.discovery ?? 40,
+                discovery: settings.discovery ?? 50,
                 affinityArtists: affinity.affinityArtists,
                 penalizedArtists: affinity.penalizedArtists,
                 clientHour,
@@ -2361,7 +2361,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             languageQuotas: getRecFlag("languageQuotas"),
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 refreshNonce: `${nonce}-alt`,
-                discovery: settings.discovery ?? 40,
+                discovery: settings.discovery ?? 50,
                 clientHour,
                 exclude: safePrevRecLabels,
                 recentSeenIds: safeCombinedExcludeIds,
@@ -2408,11 +2408,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               ? nonDailyCandidates.filter((t) => !isQueued(t))
               : nonDailyCandidates;
 
+          const familiarArtists = [
+            ...affinity.affinityArtists,
+            ...downloadedTracks.map((d) => d.artist),
+            ...likes.map((l) => l.artist),
+          ].filter(Boolean);
           const ranked = thompsonSamplingPolicy.rankCandidates(
             dedupeTracks(poolToRank),
             getSessionContext(),
           );
-          const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+          const distributed = applyDiscoveryDistribution(ranked, familiarArtists, settings.discovery ?? 50);
           cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
             maxPerArtist: 2,
             maxPerAlbum: 1,
@@ -2422,11 +2427,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         } else {
           const nonQueueCandidates = nonDailyCandidates.filter((t) => !isQueued(t));
           const poolToRank = nonQueueCandidates.length >= 8 ? nonQueueCandidates : nonDailyCandidates;
+          const familiarArtists = [
+            ...affinity.affinityArtists,
+            ...downloadedTracks.map((d) => d.artist),
+            ...likes.map((l) => l.artist),
+          ].filter(Boolean);
           const ranked = thompsonSamplingPolicy.rankCandidates(
             dedupeTracks(poolToRank),
             getSessionContext(),
           );
-          const distributed = applyDiscoveryDistribution(ranked, affinity.affinityArtists, settings.discovery ?? 40);
+          const distributed = applyDiscoveryDistribution(ranked, familiarArtists, settings.discovery ?? 50);
           cleanFinalRecs = dedupeTracks(diversifyTrackList(distributed, {
             maxPerArtist: 2,
             maxPerAlbum: 1,
@@ -2707,7 +2717,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         return 0;
       });
       const ranked = thompsonSamplingPolicy.rankCandidates(sortedByMetadata, getSessionContext());
-      const distributed = applyDiscoveryDistribution(ranked, affinityArtists, settings.discovery ?? 40);
+      const familiarPool = [
+        ...affinityArtists,
+        ...downloadedTracks.map((d) => d.artist),
+        ...likes.map((l) => l.artist),
+      ].filter(Boolean);
+      const distributed = applyDiscoveryDistribution(ranked, familiarPool, settings.discovery ?? 50);
       const trulyNew = distributed.filter(
         (cand) => !currentSectionTracks.some((p) => p.id === cand.id || isFuzzySameSong(p, cand)),
       );
@@ -2785,7 +2800,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
                 refreshNonce: `${baseNonce}-more-p${targetPage}-d${depth}`,
-                discovery: settings.discovery ?? 40,
+                discovery: settings.discovery ?? 50,
                 affinityArtists: affinity.affinityArtists,
                 penalizedArtists: affinity.penalizedArtists,
                 clientHour,
@@ -3020,7 +3035,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 artists: topArtists(stats, likes, 12, downloadedTracks),
                 downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
                 refreshNonce: `${baseNonce}-rec`,
-                discovery: settings.discovery ?? 40,
+                discovery: settings.discovery ?? 50,
                 affinityArtists: affinity.affinityArtists,
                 penalizedArtists: affinity.penalizedArtists,
                 clientHour,
@@ -3346,7 +3361,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             artists: topArtists(stats, likes, 12, downloadedTracks),
             downloadedArtists: downloadedTracks.map((d) => d.artist).filter(Boolean),
             refreshNonce: nonce,
-            discovery: settings.discovery ?? 40,
+            discovery: settings.discovery ?? 50,
             affinityArtists: affinity.affinityArtists,
             penalizedArtists: affinity.penalizedArtists,
             clientHour,
@@ -3439,7 +3454,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                     candidateTracks = interleaveTasteTracks(
                       candidateTracks,
                       acceptableTaste,
-                      settings.discovery ?? 40,
+                      settings.discovery ?? 50,
                       15,
                     );
                   }

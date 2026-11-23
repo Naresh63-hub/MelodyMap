@@ -81,6 +81,35 @@ export const LANGUAGE_ARTISTS: Record<string, string[]> = {
 };
 
 /**
+ * Key composers and music directors per language.
+ * Used by recommendation query generators to discover diverse songs across
+ * multiple singers composed by varied music directors.
+ */
+export const COMPOSERS_BY_LANGUAGE: Record<string, string[]> = {
+  Telugu: [
+    "Devi Sri Prasad", "S. Thaman", "Anirudh Ravichander", "M.M. Keeravaani",
+    "Mickey J Meyer", "Bheems Ceciroleo", "Hesham Abdul Wahab", "G.V. Prakash Kumar",
+    "Vivek Sagar", "Chaitan Bharadwaj"
+  ],
+  Hindi: [
+    "A.R. Rahman", "Pritam", "Sachin-Jigar", "Amit Trivedi", "Vishal Mishra"
+  ],
+  Tamil: [
+    "Anirudh Ravichander", "A.R. Rahman", "Yuvan Shankar Raja", "Harris Jayaraj",
+    "Santhosh Narayanan", "Ilaiyaraaja", "G.V. Prakash Kumar"
+  ],
+  Malayalam: [
+    "Sushin Shyam", "Hesham Abdul Wahab", "Gopi Sundar", "Shaan Rahman"
+  ],
+  Kannada: [
+    "Arjun Janya", "Charan Raj", "B. Ajaneesh Loknath"
+  ],
+  Marathi: [
+    "Ajay-Atul"
+  ],
+};
+
+/**
  * Infer the language of a track from its artist name(s) using the map above.
  *
  * Returns the language ONLY when the matched artist is unambiguous — i.e. the

@@ -1,4 +1,4 @@
-import { LANGUAGE_ARTISTS } from "./language-artists";
+import { LANGUAGE_ARTISTS, COMPOSERS_BY_LANGUAGE } from "./language-artists";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -290,8 +290,8 @@ export function getDynamicQueries(
   const generalNewQ: string[] = [];
   const generalOldQ: string[] = [];
 
-  // 1. High-priority queries for user's affinity + favorited artists (delving into discographies)
-  // When user is starting fresh or has few artists, seed from the top language artists pool!
+  // 1. Familiar queries for user's affinity + downloaded + favorited artists
+  // When user is starting fresh or has few artists, seed from the top language artists pool
   const effectiveUserArtists = filteredUserArtists.length > 0
     ? filteredUserArtists
     : langArtistPool.slice(0, 6);
@@ -299,34 +299,21 @@ export function getDynamicQueries(
   const priorityArtists = [...new Set([...filteredAffinityArtists, ...effectiveUserArtists])];
   const langQualifier = primaryLang ? ` ${primaryLang}` : "";
   if (priorityArtists.length > 0) {
-    for (const art of priorityArtists.slice(0, 6)) {
-      userNewQ.push(`${art}${langQualifier} movie songs`);
+    // Generate 1 targeted query per familiar artist to avoid flooding the batch with a single artist
+    for (const art of priorityArtists.slice(0, 8)) {
       userNewQ.push(`${art}${langQualifier} songs`);
-      userNewQ.push(`${art}${langQualifier} album songs`);
-      userOldQ.push(`${art}${langQualifier} movie songs`);
       userOldQ.push(`${art}${langQualifier} melodies`);
     }
-  }
-
-  // 2. Exploration / Related artists queries: discover fresh artists outside existing favorites
-  const discovery = options?.discovery ?? 40;
-  const explorePool = filteredRelatedArtists.length > 0
-    ? filteredRelatedArtists
-    : shuffleArray(langArtistPool.filter((a) => !priorityArtists.some((p) => p.toLowerCase() === a.toLowerCase()))).slice(0, 6);
-
-  if (explorePool.length > 0) {
-    for (const art of explorePool.slice(0, 4)) {
-      generalNewQ.push(`${art}${langQualifier} movie songs`);
-      generalNewQ.push(`${art}${langQualifier} songs`);
-      generalOldQ.push(`${art}${langQualifier} movie songs`);
-      generalOldQ.push(`${art}${langQualifier} melodies`);
+    // If fewer than 3 artists, add movie soundtrack queries to maintain healthy candidate volume
+    if (priorityArtists.length < 3) {
+      for (const art of priorityArtists) {
+        userNewQ.push(`${art}${langQualifier} movie songs`);
+      }
     }
   }
 
-  // 3. Circadian & Mood Anchor queries (clean studio hits)
-  const normMood = (options?.mood || "").toLowerCase().trim();
-  const moodEnvelope = normMood ? MOOD_ENVELOPES[normMood] : undefined;
-
+  // 2. Exploration: discover fresh composers & music directors outside existing favorites
+  const prioritySet = new Set(priorityArtists.map((p) => p.toLowerCase().trim()));
   const flagQuotasOn = options?.languageQuotas ?? getRecFlag("languageQuotas");
   const queryLangs: string[] = [];
   if (flagQuotasOn && options?.languageWeights && Object.keys(options.languageWeights).length > 0) {
@@ -336,6 +323,45 @@ export function getDynamicQueries(
     }
   }
   const effectiveQueryLangs = queryLangs.length > 0 ? queryLangs : langs.slice(0, 3);
+
+  // Discover songs from diverse composers (brings multiple new playback singers on the soundtrack)
+  for (const lang of effectiveQueryLangs) {
+    const composers = COMPOSERS_BY_LANGUAGE[lang] || [];
+    const freshComposers = shuffleArray(composers.filter((c) => !prioritySet.has(c.toLowerCase().trim())));
+    for (const comp of freshComposers.slice(0, 2)) {
+      generalNewQ.push(`${comp} ${lang} musical hits`);
+      generalNewQ.push(`${comp} ${lang} soundtrack songs`);
+      generalOldQ.push(`${comp} ${lang} melodies`);
+    }
+  }
+
+  // 3. Exploration: discover fresh singers outside existing favorites
+  for (const lang of effectiveQueryLangs) {
+    const singers = LANGUAGE_ARTISTS[lang] || [];
+    const freshSingers = shuffleArray(singers.filter((s) => !prioritySet.has(s.toLowerCase().trim())));
+    for (const singer of freshSingers.slice(0, 3)) {
+      generalNewQ.push(`${singer} ${lang} movie songs`);
+      generalNewQ.push(`${singer} ${lang} songs`);
+      generalOldQ.push(`${singer} ${lang} melodies`);
+    }
+  }
+
+  // 4. Exploration / Related artists queries: discover fresh artists from external graph
+  const explorePool = filteredRelatedArtists.length > 0
+    ? filteredRelatedArtists.filter((a) => !prioritySet.has(a.toLowerCase().trim()))
+    : [];
+
+  if (explorePool.length > 0) {
+    for (const art of explorePool.slice(0, 4)) {
+      generalNewQ.push(`${art}${langQualifier} movie songs`);
+      generalNewQ.push(`${art}${langQualifier} songs`);
+      generalOldQ.push(`${art}${langQualifier} melodies`);
+    }
+  }
+
+  // 5. Circadian & Mood Anchor queries (clean studio hits)
+  const normMood = (options?.mood || "").toLowerCase().trim();
+  const moodEnvelope = normMood ? MOOD_ENVELOPES[normMood] : undefined;
 
   if (moodEnvelope && moodEnvelope.queryThemes.length > 0) {
     for (const theme of moodEnvelope.queryThemes) {
@@ -352,17 +378,11 @@ export function getDynamicQueries(
     }
   }
 
-  // 4. Supplementary queries across active languages (pure artist & soundtrack searches)
-  const otherArtists = shuffleArray(langArtistPool.filter((a) => !priorityArtists.includes(a)));
+  // 6. Soundtracks & New release hits across active languages
   for (const lang of effectiveQueryLangs) {
     const langPrefix = `${lang} `;
-    for (const art of otherArtists.slice(0, 3)) {
-      generalNewQ.push(`${langPrefix}${art} movie songs`);
-      generalNewQ.push(`${art} ${langPrefix}songs`);
-      generalOldQ.push(`${langPrefix}${art} movie songs`);
-      generalOldQ.push(`${art} ${langPrefix}melodies`);
-    }
-
+    generalNewQ.push(`${langPrefix}movie songs ${CURRENT_YEAR}`);
+    generalNewQ.push(`${langPrefix}soundtrack songs ${CURRENT_YEAR}`);
     for (const theme of shuffleArray(DIVERSE_THEMES).slice(0, 2)) {
       generalNewQ.push(`${langPrefix}${theme}`);
     }
@@ -1089,7 +1109,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
       const downloadedArtists = (data.downloadedArtists ?? []).filter(Boolean);
       const artists = [
         ...new Set(
-          [...(data.affinityArtists ?? []), ...downloadedArtists, ...likedArtists, ...(data.artists ?? [])]
+          [...downloadedArtists, ...(data.affinityArtists ?? []), ...likedArtists, ...(data.artists ?? [])]
             .map((s) => s.trim())
             .filter((a): a is string => !!a),
         ),
@@ -1190,7 +1210,7 @@ export const recommendTracks = createServerFn({ method: "POST" })
       const downloadedArtists = (data.downloadedArtists ?? []).filter(Boolean);
       const artists = [
         ...new Set(
-          [...(data.affinityArtists ?? []), ...downloadedArtists, ...likedArtists, ...(data.artists ?? [])]
+          [...downloadedArtists, ...(data.affinityArtists ?? []), ...likedArtists, ...(data.artists ?? [])]
             .map((s) => s.trim())
             .filter((a): a is string => !!a),
         ),

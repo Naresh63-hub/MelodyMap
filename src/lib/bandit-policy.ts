@@ -398,13 +398,17 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
     if (isDisliked || isPenalized) {
       x[3] = 0.02; // Severely penalized: strong negative preference
     } else {
-      // Check liked and downloaded status for artist affinity boost
+      // Check liked and downloaded status for artist and track affinity boost
       const isLikedArtist = context.likedTracks
         ? context.likedTracks.some((l) => normalizeArtistAlias(l.artist) === normArtist)
         : false;
       const isDownloadedArtist = context.downloadedTracks
         ? context.downloadedTracks.some((d) => normalizeArtistAlias(d.artist) === normArtist)
         : false;
+      const isDownloadedTrack = Boolean(
+        (context.downloadedIds && context.downloadedIds.has(candidateId)) ||
+        (context.downloadedTracks && context.downloadedTracks.some((d) => areSameTrack(d, candidate))),
+      );
 
       let totalPlays = 0;
       let completions = 0;
@@ -432,14 +436,18 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
 
       if (totalPlays > 0 || skips > 0) {
         // Behavioral affinity incorporating completions, replays, likes, downloads and skips
-        const positiveMass = completions * 1.5 + replays * 2.0 + (isLikedArtist ? 1.0 : 0) + (isDownloadedArtist ? 1.5 : 0);
+        const positiveMass =
+          completions * 1.5 +
+          replays * 2.0 +
+          (isLikedArtist ? 1.0 : 0) +
+          (isDownloadedArtist ? 2.0 : 0);
         const negativeMass = totalPlays + skips * 2.0 + 1;
         const ratio = positiveMass / negativeMass;
         // If the artist has repeated skips and zero completions, damp ratio heavily
         const skipDampening = (skips >= 2 && completions === 0) ? Math.max(0.01, 1.0 / (skips + 1)) : 1.0;
         x[3] = Math.max(0.0, Math.min(1.0, ratio * skipDampening));
       } else if (isDownloadedArtist) {
-        x[3] = 0.75; // Downloaded artist prior: strong positive
+        x[3] = 0.75; // Downloaded artist prior: strong positive (exceeds liked artist prior 0.70)
       } else if (isLikedArtist) {
         x[3] = 0.70; // Liked artist prior: strong positive
       } else {

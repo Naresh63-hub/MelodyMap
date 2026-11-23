@@ -78,6 +78,54 @@ describe("areSameTrack", () => {
     };
     expect(areSameTrack(a, b)).toBe(true);
   });
+
+  it("matches duplicate track when one lists singer and one lists movie name in artist field", () => {
+    const a = {
+      id: "saavn_1",
+      title: "Nijame Ne Chebuthunna",
+      artist: "Sid Sriram",
+      duration: "3:34",
+    };
+    const b = {
+      id: "yt_2",
+      title: "Nijame Ne Chebuthunna",
+      artist: "Ooru Peru Bhairavakona",
+      duration: "3:34",
+    };
+    expect(areSameTrack(a, b)).toBe(true);
+  });
+
+  it("matches duplicate track when one lists primary singer and one lists composer + singer", () => {
+    const a = {
+      id: "track_a",
+      title: "Nijame Ne Chebuthunna",
+      artist: "Sid Sriram",
+      duration: "3:34",
+    };
+    const b = {
+      id: "track_b",
+      title: "Nijame Ne Chebuthunna",
+      artist: "Shekhar Chandra, Sid Sriram",
+      duration: "3:35",
+    };
+    expect(areSameTrack(a, b)).toBe(true);
+  });
+
+  it("matches duplicate track with distinctive title and duration within 4s even with differing credits", () => {
+    const a = {
+      id: "song_1",
+      title: "Samajavaragamana",
+      artist: "Sid Sriram",
+      duration: "3:42",
+    };
+    const b = {
+      id: "song_2",
+      title: "Samajavaragamana",
+      artist: "S. Thaman",
+      duration: "3:44",
+    };
+    expect(areSameTrack(a, b)).toBe(true);
+  });
 });
 
 describe("dedupeTracks", () => {

@@ -262,6 +262,25 @@ export function extractTrackMovieOrAlbum(track?: { album?: string | undefined; t
   return "";
 }
 
+const GENERIC_TITLES = new Set([
+  "love", "intro", "outro", "theme", "interlude", "reprise", "remix",
+  "instrumental", "track 1", "track 2", "song", "forever", "stay", "home",
+  "hello", "goodbye", "hero", "baby", "smile", "rain", "dance", "you",
+  "hold on", "one", "alone", "run", "dream", "dreams", "time", "alive",
+  "fire", "magic", "night", "nights", "crazy", "angel", "without you",
+  "with you", "falling", "fly", "paradise", "memories", "sugar", "happy",
+  "sorry", "shine", "closer", "sweet", "beautiful", "stars", "summer",
+  "winter", "ghost", "breath", "breathe", "free", "destiny", "desire",
+  "hope", "peace", "tears", "sunshine", "sunrise", "moonlight", "prelude",
+  "meditation", "ambient", "relax", "sleep", "piano", "guitar", "beat",
+]);
+
+export function isGenericTitle(cleanTitle: string): boolean {
+  const n = norm(cleanTitle);
+  if (!n || n.length < 5) return true;
+  return GENERIC_TITLES.has(n);
+}
+
 /**
  * Multi-factor similarity score between two tracks (0.0 to 1.0).
  * Weighted across Title, Artist, Version signature, Duration, and Movie/Album.
@@ -301,44 +320,62 @@ export function calculateTrackSimilarity(a: TrackLike, b: TrackLike): number {
   const hasBothDurations = durA > 0 && durB > 0;
   const durationDiff = hasBothDurations ? Math.abs(durA - durB) : -1;
 
-  // 3. Movie/album soundtrack matching:
+  const genericA = isGenericTitle(cleanA);
+  const genericB = isGenericTitle(cleanB);
+  const eitherGeneric = genericA || genericB;
+
+  // Generic short titles ("Love", "Stay", "Hero", "Sunrise", etc.) MUST NOT merge across different artists
+  if (eitherGeneric && normArtA !== normArtB && artistScore < 0.95) {
+    return 0.2;
+  }
+
+  // 3. Movie/album soundtrack matching (including when movie name appears as artist credit):
   const movieA = extractTrackMovieOrAlbum(a);
   const movieB = extractTrackMovieOrAlbum(b);
   const movieMatches = Boolean(
-    movieA &&
+    (movieA &&
       movieB &&
       (movieA === movieB ||
         stringSimilarity(movieA, movieB) >= 0.8 ||
         movieA.includes(movieB) ||
-        movieB.includes(movieA)),
+        movieB.includes(movieA))) ||
+    (movieA && normArtB && (movieA === normArtB || movieA.includes(normArtB) || normArtB.includes(movieA))) ||
+    (movieB && normArtA && (movieB === normArtA || movieB.includes(normArtA) || normArtA.includes(movieB))),
   );
 
   // Case A: Identical or near-identical movie soundtrack song:
   // e.g. "Rambai Neemeeda Narayana" from "Raju Weds Rambai"
-  // even if one lists playback singer and one lists composer, same movie + song title + length => duplicate!
+  // even if one lists playback singer and one lists composer or movie, same movie + song title + length => duplicate!
   if (
     movieMatches &&
     titleScore >= 0.82 &&
-    (durationDiff === -1 || durationDiff <= 4)
+    (durationDiff === -1 || durationDiff <= 5)
   ) {
     return 0.95;
   }
 
-  // Case B: Re-uploaded by different channel/label or matching artist tokens
+  // Case B: Re-uploaded by different channel/label, artist containment, or token overlap
+  const tokensA = tokenizeSorted(normArtA);
+  const tokensB = tokenizeSorted(normArtB);
+  const tokensOverlap = tokensA.length > 0 && tokensB.length > 0 && tokensA.some((t) => tokensB.includes(t));
+  const artistContained = Boolean(normArtA && normArtB && (normArtA.includes(normArtB) || normArtB.includes(normArtA)));
+
   if (
-    titleScore >= 0.90 &&
-    hasBothDurations &&
-    durationDiff <= 3 &&
+    titleScore >= 0.88 &&
+    (durationDiff === -1 || durationDiff <= 5) &&
     (isChannelOrLabelName(a.artist) ||
       isChannelOrLabelName(b.artist) ||
       artistScore >= 0.5 ||
-      (normArtA && normArtB && (normArtA.includes(normArtB) || normArtB.includes(normArtA))))
+      artistContained ||
+      tokensOverlap)
   ) {
     return 0.95;
   }
 
-  // Case C: Exact/near-exact title and duration match (e.g. 3:24 vs 3:24)
-  if (titleScore >= 0.94 && hasBothDurations && durationDiff <= 2) {
+  // Case C: Exact/near-exact title and duration match for DISTINCTIVE titles
+  // Distinctive songs (not short generic titles like "Love" or "Stay") with matching duration (<= 4s)
+  // are the same recording even if credit tags differ (e.g. singer vs composer vs movie credit).
+  if (!eitherGeneric && titleScore >= 0.90 && hasBothDurations && durationDiff <= 4) {
     return 0.95;
   }
 

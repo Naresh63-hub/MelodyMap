@@ -168,6 +168,18 @@ describe("Feed freshness: session exclusion set and duration gate", () => {
     expect(fresh.map((t) => t.id)).toEqual(["tseries_1", "other_1"]);
   });
 
+  it("same song with differing artist names (e.g. movie credit vs singer) appears only once", () => {
+    const exclusions = buildExclusions([], [], [], undefined);
+    const singerVersion: Track = { ...mkTrack("saavn_sid", "3:34", "Sid Sriram"), title: "Nijame Ne Chebuthunna" };
+    const movieVersion: Track = { ...mkTrack("yt_movie", "3:34", "Ooru Peru Bhairavakona"), title: "Nijame Ne Chebuthunna" };
+    const composerVersion: Track = { ...mkTrack("yt_comp", "3:35", "Shekhar Chandra, Sid Sriram"), title: "Nijame Ne Chebuthunna" };
+    const differentSong: Track = { ...mkTrack("diff_1", "3:40", "Sid Sriram"), title: "Samajavaragamana" };
+
+    const fresh = filterFeedCandidates([singerVersion, movieVersion, composerVersion, differentSong], exclusions);
+    expect(fresh).toHaveLength(2);
+    expect(fresh.map((t) => t.id)).toEqual(["saavn_sid", "diff_1"]);
+  });
+
   it("a different-ID re-upload of a LIKED song is excluded from recommendations", () => {
     const likedOriginal: Track = { ...mkTrack("like_1", "4:22", "Arijit Singh"), title: "Tum Hi Ho" };
     const exclusions = buildExclusions([], [likedOriginal], [], undefined);

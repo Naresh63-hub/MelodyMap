@@ -486,12 +486,12 @@ export class ContextEngineSession {
       }
     }
 
-    // 4. Process downloaded songs (strong positive taste signal)
+    // 4. Process downloaded songs (highest commitment positive taste signal)
     if (options?.downloads) {
       for (const d of options.downloads) {
         if (!d.artist) continue;
         const { key } = touch(d.artist);
-        scores[key]!.net += 2.5;
+        scores[key]!.net += 3.5;
       }
     }
 
