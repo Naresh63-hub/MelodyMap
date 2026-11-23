@@ -1,4 +1,4 @@
-import { Menu, Radio, Search, User } from "lucide-react";
+import { Dices, Menu, Radio, Search, User } from "lucide-react";
 import { MusicWaveBanner } from "@/components/music/ui/MusicWaveBanner";
 import { triggerHaptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ type Props = {
   onOpenJam?: () => void;
   jamActive?: boolean;
   jamParticipantsCount?: number;
+  onSurpriseMe?: () => void;
+  surpriseLoading?: boolean;
 };
 
 export function MobileHeader({
@@ -27,6 +29,8 @@ export function MobileHeader({
   onOpenJam,
   jamActive = false,
   jamParticipantsCount = 1,
+  onSurpriseMe,
+  surpriseLoading = false,
 }: Props) {
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -99,6 +103,23 @@ export function MobileHeader({
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Surprise Me / Serendipity 1-Tap Exploration */}
+        {onSurpriseMe && (
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic("selection");
+              onSurpriseMe();
+            }}
+            disabled={surpriseLoading}
+            aria-label="Surprise Me (Serendipity)"
+            title="Surprise Me — Discover fresh music"
+            className="flex h-9 w-9 sm:h-9.5 sm:w-9.5 shrink-0 items-center justify-center rounded-full bg-card hover:bg-card/90 border border-hair text-primary hover:text-primary active:scale-95 transition-all shadow-xs min-h-[38px] min-w-[38px] cursor-pointer disabled:opacity-50"
+          >
+            <Dices className={cn("h-4.5 w-4.5", surpriseLoading && "animate-spin")} />
+          </button>
+        )}
+
         {/* Quick Search Action */}
         {onOpenSearch && (
           <button

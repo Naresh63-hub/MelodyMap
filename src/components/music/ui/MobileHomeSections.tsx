@@ -47,6 +47,7 @@ function TrackThumbnail({
 
 type Props = {
   dailyMix?: Track[] | undefined;
+  freshVoices?: Track[] | undefined;
   recommended: Track[];
   offlineMix?: Track[] | undefined;
   userLanguages?: string[] | undefined;
@@ -62,8 +63,10 @@ type Props = {
   isPlaying: boolean;
   loading?: boolean | undefined;
   dailyMixLoading?: boolean | undefined;
+  freshVoicesLoading?: boolean | undefined;
   recLoading?: boolean | undefined;
   onRefreshDailyMix?: (() => void) | undefined;
+  onRefreshFreshVoices?: (() => void) | undefined;
   onRefreshMadeForYou?: (() => void) | undefined;
   /** Active genre/mood quick filter ids (state lives in the home route). */
   quickFilterIds?: readonly string[] | undefined;
@@ -400,6 +403,7 @@ function SectionHeader({
  */
 export function MobileHomeSections({
   dailyMix,
+  freshVoices,
   recommended,
   offlineMix,
   trending,
@@ -416,8 +420,10 @@ export function MobileHomeSections({
   isPlaying,
   loading = false,
   dailyMixLoading = false,
+  freshVoicesLoading = false,
   recLoading = false,
   onRefreshDailyMix,
+  onRefreshFreshVoices,
   onRefreshMadeForYou,
   quickFilterIds = [],
   onToggleQuickFilter,
@@ -426,6 +432,7 @@ export function MobileHomeSections({
 }: Props) {
   // Genre & mood quick filters narrow sections instantly
   const visibleDailyMix = filterTracksByQuickFilters(dailyMix ?? [], quickFilterIds);
+  const visibleFreshVoices = filterTracksByQuickFilters(freshVoices ?? [], quickFilterIds);
   const visibleRecommended = filterTracksByQuickFilters(recommended, quickFilterIds);
 
   const topArtists = useMemo(() => {
@@ -453,7 +460,7 @@ export function MobileHomeSections({
     );
   }
 
-  const hasAny = visibleDailyMix.length > 0 || visibleRecommended.length > 0;
+  const hasAny = visibleDailyMix.length > 0 || visibleFreshVoices.length > 0 || visibleRecommended.length > 0;
 
   const filterBar = null;
 
@@ -543,7 +550,44 @@ export function MobileHomeSections({
         </section>
       )}
 
-      {/* 2. Top Artists (JioSaavn Circular Avatars) */}
+      {/* 2. Fresh Voices (Dedicated Emerging & Breakthrough Discovery Rail) */}
+      {(visibleFreshVoices.length > 0 || (freshVoicesLoading && quickFilterIds.length === 0)) && (
+        <section className="animate-fade-in">
+          <SectionHeader
+            title="Fresh Voices"
+            subtitle="Emerging singers & new sounds"
+            icon={Sparkles}
+            onRefresh={onRefreshFreshVoices}
+            refreshing={freshVoicesLoading}
+          />
+          {visibleFreshVoices.length > 0 ? (
+            <HorizontalScrollRow
+              tracks={visibleFreshVoices}
+              currentId={currentId}
+              isPlaying={isPlaying}
+              onPlayTrack={onPlayTrack}
+              onToggleLike={onToggleLike}
+              onOpenOptions={onOpenOptions}
+              likedIds={likedIds}
+              downloadedIds={downloadedIds}
+              downloadingIds={downloadingIds}
+              downloadProgress={downloadProgress}
+            />
+          ) : (
+            <div className="flex gap-3 overflow-hidden -mx-4 px-4 pb-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="w-[138px] shrink-0 space-y-2">
+                  <div className="aspect-square w-full rounded-xl bg-card border border-hair animate-pulse" />
+                  <div className="h-3 w-3/4 rounded bg-chip animate-pulse" />
+                  <div className="h-2.5 w-1/2 rounded bg-card animate-pulse" />
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* 3. Top Artists (JioSaavn Circular Avatars) */}
       {onArtistClick && topArtists.length > 0 && (
         <section className="animate-fade-in">
           <SectionHeader

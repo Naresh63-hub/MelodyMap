@@ -21,7 +21,7 @@
 
 import { areSameTrack, cleanSongTitle, norm, normalizeArtistAlias, stringSimilarity, type TrackLike } from "./track-dedup";
 import { isChannelOrLabelName } from "./track-metadata";
-import { MAX_TRACK_DURATION_SECONDS, parseDurationSeconds } from "./track-filters";
+import { MAX_TRACK_DURATION_SECONDS, parseDurationSeconds, isOriginalSong } from "./track-filters";
 import type { Track } from "./types";
 
 export { MAX_TRACK_DURATION_SECONDS } from "./track-filters";
@@ -174,6 +174,7 @@ export function filterFeedCandidates<T extends TrackLike>(
 
     // 1. Duration filter: only 0 < secs <= 600
     if (!hasPlayableDuration(t)) continue;
+    if (!isOriginalSong(t)) continue;
 
     // 2. In-pool logical duplicate removal: first valid occurrence wins
     if (out.some((existing) => sameSong(existing, t))) continue;

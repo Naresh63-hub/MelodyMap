@@ -1,9 +1,10 @@
 import type { TrackLike } from "./track-dedup";
-import { normalizeArtistAlias, areSameTrack } from "./track-dedup";
+import { normalizeArtistAlias, areSameTrack, extractTrackMovieOrAlbum } from "./track-dedup";
 import { safeStorage } from "./safe-storage";
 import { getRecFlag, touchRecConfigChangedAt } from "./rec-flags";
 import { getTrackLanguage } from "./language-artists";
 import { getArtistRecentSkipHealth } from "./artist-recent";
+import type { UserTasteProfile } from "./taste-profile";
 import {
   detectTrackEnergy,
   calculateEnergyCompatibility,
@@ -38,6 +39,7 @@ export interface SessionContext {
   penalizedArtists?: Set<string> | string[] | undefined;
   preferredLanguages?: string[] | undefined;
   primaryLanguage?: string | undefined;
+  tasteProfile?: UserTasteProfile | undefined;
 }
 
 export interface BanditModelState {
@@ -345,12 +347,13 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
       const candidateText = `${candidate.title || ""} ${candidate.artist || ""}`;
       alignmentScore = calculateMoodCompatibility(context.activeMood, candidateEnergy, candidateText);
     } else {
-      // Circadian alignment fallback
+      // Circadian alignment fallback (incorporating empirical taste profile if available)
       const hour = context.hourOfDay ?? new Date().getHours();
-      const tempCtx = getTemporalContext(hour);
-      if (tempCtx.energy === "gentle" || tempCtx.energy === "low") {
+      const empiricalEnergy = context.tasteProfile?.currentHourEmpiricalEnergy;
+      const targetEnergy = empiricalEnergy ?? getTemporalContext(hour).energy;
+      if (targetEnergy === "gentle" || targetEnergy === "low" || targetEnergy === "chill") {
         alignmentScore = candidateEnergy === "chill" ? 1.0 : candidateEnergy === "medium" ? 0.6 : 0.2;
-      } else if (tempCtx.energy === "high") {
+      } else if (targetEnergy === "high") {
         alignmentScore = candidateEnergy === "high" ? 1.0 : candidateEnergy === "medium" ? 0.7 : 0.3;
       } else {
         alignmentScore = candidateEnergy === "medium" ? 0.9 : 0.6;
@@ -415,6 +418,14 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
       let skips = 0;
       let replays = 0;
 
+      const isTopComposer = Boolean(
+        context.tasteProfile?.topComposers?.some((c) => normalizeArtistAlias(c.name) === normArtist),
+      );
+      const trackMovie = extractTrackMovieOrAlbum(candidate);
+      const isTopSoundtrack = Boolean(
+        trackMovie && context.tasteProfile?.topSoundtracks?.some((s) => s.name.toLowerCase().trim() === trackMovie),
+      );
+
       if (context.stats) {
         for (const item of Object.values(context.stats)) {
           const itemNormArtist = normalizeArtistAlias(item.track?.artist);
@@ -440,7 +451,9 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
           completions * 1.5 +
           replays * 2.0 +
           (isLikedArtist ? 1.0 : 0) +
-          (isDownloadedArtist ? 2.0 : 0);
+          (isDownloadedArtist ? 2.0 : 0) +
+          (isTopComposer ? 1.5 : 0) +
+          (isTopSoundtrack ? 1.5 : 0);
         const negativeMass = totalPlays + skips * 2.0 + 1;
         const ratio = positiveMass / negativeMass;
         // If the artist has repeated skips and zero completions, damp ratio heavily
@@ -450,6 +463,8 @@ export class ThompsonSamplingPolicy implements RecommendationPolicy {
         x[3] = 0.75; // Downloaded artist prior: strong positive (exceeds liked artist prior 0.70)
       } else if (isLikedArtist) {
         x[3] = 0.70; // Liked artist prior: strong positive
+      } else if (isTopComposer || isTopSoundtrack) {
+        x[3] = 0.65; // High prior for top composers / soundtrack from taste profile
       } else {
         x[3] = 0.35; // Neutral unplayed prior
       }

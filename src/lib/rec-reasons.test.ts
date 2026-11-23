@@ -176,6 +176,86 @@ describe("explainPick (Truthful recommendation reason badges)", () => {
     expect(explainPick(track, ctx, "autodj-radio")).toBeUndefined();
   });
 
+  it("returns 'From a composer you enjoy' when candidate is a known composer in liked or taste profile", () => {
+    const ctx: SessionContext = {
+      ...baseCtx,
+      likedTracks: [{ id: "l1", title: "Song 1", artist: "Devi Sri Prasad" }],
+    };
+    const track = {
+      id: "c1",
+      title: "New Film Track",
+      artist: "Devi Sri Prasad",
+    };
+    expect(explainPick(track, ctx, "made-for-you")).toBe("Because you liked Devi Sri Prasad");
+
+    // When in tasteProfile.topComposers but not in likedTracks:
+    const ctxComposer: any = {
+      ...baseCtx,
+      likedTracks: [],
+      tasteProfile: {
+        topComposers: [{ name: "S. Thaman", score: 8.5 }],
+      },
+    };
+    const track2 = {
+      id: "c2",
+      title: "Soundtrack Theme",
+      artist: "S. Thaman",
+    };
+    expect(explainPick(track2, ctxComposer, "made-for-you")).toBe("From a composer you enjoy");
+  });
+
+  it("returns 'Similar to your downloaded songs' when candidate shares a soundtrack album with a downloaded song", () => {
+    const ctx: SessionContext = {
+      ...baseCtx,
+      downloadedTracks: [{ id: "d1", title: "Song 1", artist: "Singer X", album: "Pushpa" }],
+    };
+    const track = {
+      id: "c1",
+      title: "Another Pushpa Song",
+      artist: "Singer Y",
+      album: "Pushpa",
+    };
+    expect(explainPick(track, ctx, "made-for-you")).toBe("Similar to your downloaded songs");
+  });
+
+  it("returns 'From your favorite soundtrack' when movie matches top soundtracks in taste profile", () => {
+    const ctx: any = {
+      ...baseCtx,
+      tasteProfile: {
+        topSoundtracks: [{ name: "rrr", score: 9.0 }],
+      },
+    };
+    const track = {
+      id: "t1",
+      title: "Dosti",
+      artist: "Singer Z",
+      album: "RRR",
+    };
+    expect(explainPick(track, ctx, "made-for-you")).toBe("From your favorite soundtrack");
+  });
+
+  it("returns 'Discover a new singer' when source is discover", () => {
+    const track = {
+      id: "disc1",
+      title: "Fresh Track",
+      artist: "Unexplored Artist",
+    };
+    expect(explainPick(track, baseCtx, "discover")).toBe("Discover a new singer");
+  });
+
+  it("returns 'Based on your listening mood' when active mood matches track energy and keywords", () => {
+    const ctx: SessionContext = {
+      ...baseCtx,
+      activeMood: "Late Night Chill",
+    };
+    const track = {
+      id: "m1",
+      title: "Chill Acoustic Lo-Fi Ballad",
+      artist: "Ambient Artist",
+    };
+    expect(explainPick(track, ctx, "made-for-you")).toBe("Based on your listening mood");
+  });
+
   it("source-text test: fails if any generic fallback string is present in rec-reasons.ts", () => {
     const sourceFilePath = path.resolve(__dirname, "rec-reasons.ts");
     const sourceCode = fs.readFileSync(sourceFilePath, "utf-8");

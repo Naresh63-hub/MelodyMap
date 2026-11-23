@@ -9,6 +9,13 @@ import { resolveAiModelId } from "./ai-gateway.server";
 import { getTemporalContext, MOOD_ENVELOPES } from "./context-engine";
 import { isLanguageConsistent, isOldEraTrack } from "./library";
 import { isOriginalSong } from "./track-filters";
+import { hasPlayableDuration } from "./feed-freshness";
+import {
+  getCollaboratorSingersForSinger,
+  getCollaboratorSingersForComposer,
+  getModernEraBridges,
+  generateSoundtrackCrossPollinationQueries,
+} from "./collaboration-discovery";
 import {
   allocateLanguageQuotas,
   enforceLanguageQuotas,
@@ -217,6 +224,8 @@ const RecommendInput = z.object({
   downloadedArtists: z.array(z.string()).max(30).optional(),
   exclude: z.array(z.string()).max(1000).default([]).optional(),
   recentSeenIds: z.array(z.string()).max(1000).default([]).optional(),
+  topComposers: z.array(z.string()).max(20).default([]).optional(),
+  topSoundtracks: z.array(z.string()).max(20).default([]).optional(),
 });
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -246,6 +255,9 @@ export function getDynamicQueries(
     primaryLanguage?: string | undefined;
     languageWeights?: Record<string, number> | undefined;
     languageQuotas?: boolean | undefined;
+    topComposers?: string[] | undefined;
+    topSoundtracks?: string[] | undefined;
+    likedTracks?: readonly any[] | undefined;
   },
 ): { newQueries: string[]; oldQueries: string[] } {
   let langs = languages.map((l) => l.trim()).filter(Boolean);
@@ -346,6 +358,51 @@ export function getDynamicQueries(
     }
   }
 
+  // 3b. Exploration: discover songs composed by user's preferred music directors & soundtracks
+  if (options?.topComposers && options.topComposers.length > 0) {
+    for (const comp of options.topComposers.slice(0, 3)) {
+      generalNewQ.push(`${comp} musical hits`);
+      generalNewQ.push(`${comp} soundtrack songs`);
+      generalOldQ.push(`${comp} classic melodies`);
+    }
+  }
+  if (options?.topSoundtracks && options.topSoundtracks.length > 0) {
+    for (const st of options.topSoundtracks.slice(0, 3)) {
+      generalNewQ.push(`${st} movie songs`);
+      generalNewQ.push(`${st} soundtrack songs`);
+    }
+  }
+
+  // 3c. The "Composer & Singer Network Bridge" (Collaboration Discovery)
+  // Find other singers who frequently collaborate with the same composers user enjoys
+  for (const art of priorityArtists.slice(0, 4)) {
+    const bridgeSingers = getCollaboratorSingersForSinger(art, prioritySet);
+    for (const bs of bridgeSingers.slice(0, 2)) {
+      generalNewQ.push(`${bs}${langQualifier} songs`);
+      generalNewQ.push(`${bs}${langQualifier} movie songs`);
+    }
+  }
+
+  // 3d. "Era Bridging" (Connecting Nostalgia to Contemporary Voices)
+  // For classic golden-era artists, introduce modern singers sharing the same vocal timbre
+  for (const art of priorityArtists) {
+    const modernBridges = getModernEraBridges(art);
+    for (const mb of modernBridges) {
+      if (!prioritySet.has(mb.toLowerCase().trim())) {
+        generalNewQ.push(`${mb}${langQualifier} new songs`);
+        generalNewQ.push(`${mb}${langQualifier} latest hits`);
+      }
+    }
+  }
+
+  // 3e. Soundtrack Cross-Pollination (Discover Within the Same Film)
+  if (options?.likedTracks && options.likedTracks.length > 0) {
+    const stQueries = generateSoundtrackCrossPollinationQueries(options.likedTracks, 3);
+    for (const q of stQueries) {
+      generalNewQ.push(q);
+    }
+  }
+
   // 4. Exploration / Related artists queries: discover fresh artists from external graph
   const explorePool = filteredRelatedArtists.length > 0
     ? filteredRelatedArtists.filter((a) => !prioritySet.has(a.toLowerCase().trim()))
@@ -388,19 +445,34 @@ export function getDynamicQueries(
     }
   }
 
+  const discoveryPercent = options?.discovery ?? 50;
+
   return {
-    newQueries: interleaveQueries(userNewQ, shuffleArray(generalNewQ)),
-    oldQueries: interleaveQueries(userOldQ, shuffleArray(generalOldQ)),
+    newQueries: interleaveQueries(userNewQ, shuffleArray(generalNewQ), discoveryPercent),
+    oldQueries: interleaveQueries(userOldQ, shuffleArray(generalOldQ), discoveryPercent),
   };
 }
 
-/** Interleave primary (familiar) and exploratory (new singer/genre) queries for rich catalog exploration */
-function interleaveQueries(primary: string[], exploratory: string[]): string[] {
+/** Interleave primary (familiar) and exploratory (new singer/genre) queries according to discovery ratio */
+function interleaveQueries(primary: string[], exploratory: string[], discoveryPercent = 50): string[] {
   const out: string[] = [];
-  const maxLen = Math.max(primary.length, exploratory.length);
+  if (primary.length === 0) return exploratory;
+  if (exploratory.length === 0) return primary;
+
+  const exploreRatio = Math.max(0.1, Math.min(0.9, discoveryPercent / 100));
+  let pIdx = 0;
+  let eIdx = 0;
+  const maxLen = primary.length + exploratory.length;
+
   for (let i = 0; i < maxLen; i++) {
-    if (i < primary.length) out.push(primary[i]!);
-    if (i < exploratory.length) out.push(exploratory[i]!);
+    const targetIsExplore = (eIdx / (out.length + 1)) < exploreRatio;
+    if ((targetIsExplore || pIdx >= primary.length) && eIdx < exploratory.length) {
+      out.push(exploratory[eIdx++]!);
+    } else if (pIdx < primary.length) {
+      out.push(primary[pIdx++]!);
+    } else if (eIdx < exploratory.length) {
+      out.push(exploratory[eIdx++]!);
+    }
   }
   return out;
 }
@@ -523,6 +595,8 @@ async function getLocalPicks(data: {
   languageWeights?: Record<string, number> | undefined;
   languageQuotas?: boolean | undefined;
   recentSeenIds?: string[] | undefined;
+  topComposers?: string[] | undefined;
+  topSoundtracks?: string[] | undefined;
 }): Promise<Track[]> {
   const count = data.count ?? 28;
   const page = Math.max(1, data.page ?? 1);
@@ -540,6 +614,7 @@ async function getLocalPicks(data: {
   // Filter out any excluded / recently played / liked / penalized / cross-language tracks
   const isCandidateValid = (t: Track, relaxRecentSeen = false, relaxExclusions = false) => {
     if (!t || !t.id) return false;
+    if (!hasPlayableDuration(t)) return false;
     if (!relaxRecentSeen && recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase().trim())) return false;
     if (!relaxExclusions && matchesExclusionSet(t.title, t.artist, t.id, excludeSet)) return false;
     if (!relaxExclusions && matchesExclusionSet(t.title, t.artist, t.id, likedSet)) return false;
@@ -689,6 +764,9 @@ async function getLocalPicks(data: {
     primaryLanguage: data.primaryLanguage,
     languageWeights: data.languageWeights,
     languageQuotas: data.languageQuotas,
+    topComposers: data.topComposers,
+    topSoundtracks: data.topSoundtracks,
+    likedTracks: (data.liked ?? []).map((l) => ({ title: l.split(" — ")[0] || l, artist: extractArtistFromLabel(l) })),
   });
 
   const nonceNum =
@@ -1138,6 +1216,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         primaryLanguage: data.primaryLanguage,
         languageWeights: data.languageWeights,
         languageQuotas: data.languageQuotas,
+        topComposers: data.topComposers,
+        topSoundtracks: data.topSoundtracks,
       });
       return { tracks, error: null };
     }
@@ -1239,6 +1319,8 @@ export const recommendTracks = createServerFn({ method: "POST" })
         primaryLanguage: data.primaryLanguage,
         languageWeights: data.languageWeights,
         languageQuotas: data.languageQuotas,
+        topComposers: data.topComposers,
+        topSoundtracks: data.topSoundtracks,
       });
       return { tracks, error: null };
     };
@@ -1958,6 +2040,72 @@ export const newSongs = createServerFn({ method: "POST" })
     }
 
     return { tracks: out.slice(0, count), error: null };
+  });
+
+const FreshVoicesInput = z.object({
+  languages: z.array(z.string()).max(30).default([]),
+  excludeArtists: z.array(z.string()).max(100).default([]),
+  count: z.number().min(1).max(50).optional(),
+  page: z.number().min(1).max(50).optional(),
+  refreshNonce: z.union([z.string(), z.number()]).optional(),
+  recentSeenIds: z.array(z.string()).max(1000).optional(),
+});
+
+/**
+ * Fresh Voices: dedicated discovery rail featuring emerging playback singers,
+ * indie breakthrough singles, and rising voices in the listener's selected languages.
+ * Strictly excludes familiar artists.
+ */
+export const freshVoices = createServerFn({ method: "POST" })
+  .validator((input: unknown) => FreshVoicesInput.parse(input))
+  .handler(async ({ data }) => {
+    const count = data.count ?? 20;
+    const page = data.page ?? 1;
+    const langs = data.languages.map((l) => l.trim()).filter(Boolean);
+    const excludeArtists = data.excludeArtists.map((a) => a.trim()).filter(Boolean);
+    const recentSeenSet = new Set((data.recentSeenIds || []).map((id) => id.toLowerCase()));
+
+    const { generateFreshVoicesQueries, filterFreshVoicesTracks } =
+      await import("./collaboration-discovery");
+
+    const queries = generateFreshVoicesQueries(langs, excludeArtists, 8);
+    const out: Track[] = [];
+    const seen = new Set<string>();
+
+    try {
+      const { searchSaavn } = await import("./providers/saavn");
+      const qOffset = ((page - 1) * 3) % queries.length;
+      const selectedQueries = queries.slice(qOffset, qOffset + 4);
+      if (selectedQueries.length < 3) {
+        selectedQueries.push(...queries.slice(0, 3 - selectedQueries.length));
+      }
+
+      for (const q of selectedQueries) {
+        if (out.length >= count * 2) break;
+        try {
+          const hits = await searchSaavn(q, { limit: 12, page: 1 });
+          for (const t of hits) {
+            if (!seen.has(t.id) && isOriginalSong(t) && hasPlayableDuration(t)) {
+              if (recentSeenSet.size > 0 && recentSeenSet.has(t.id.toLowerCase())) continue;
+              seen.add(t.id);
+              out.push(t as Track);
+            }
+          }
+        } catch (searchErr) {
+          console.warn("[freshVoices] query failed for:", q, searchErr);
+        }
+      }
+    } catch (err) {
+      console.warn("[freshVoices] provider search notice:", err);
+    }
+
+    const filtered = filterFreshVoicesTracks(out, excludeArtists);
+    const tagged = filtered.map((t) => ({
+      ...t,
+      recommendationReason: "Discover a new singer",
+    }));
+
+    return { tracks: tagged.slice(0, count), error: null };
   });
 
 
