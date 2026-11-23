@@ -542,7 +542,7 @@ export function diversifyTrackList<T extends TrackLike>(
   // Pool candidates
   const candidates: Array<{ track: T; artist: string; album: string }> = deduped.map((t) => ({
     track: t,
-    artist: extractPrimaryArtist(t.artist),
+    artist: normalizeArtistAlias(t.artist) || extractPrimaryArtist(t.artist),
     album: extractTrackMovieOrAlbum(t),
   }));
 

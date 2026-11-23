@@ -1,5 +1,5 @@
 import type { TrackLike } from "./track-dedup";
-import { normalizeArtistAlias } from "./track-dedup";
+import { normalizeArtistAlias, extractPrimaryArtist } from "./track-dedup";
 import { safeStorage } from "./safe-storage";
 
 export type TimeOfDay = "morning" | "afternoon" | "evening" | "night";
@@ -658,19 +658,34 @@ export class ContextEngineSession {
 export function applyDiscoveryDistribution<T extends TrackLike>(
   tracks: T[],
   familiarArtists: string[],
-  discoveryPercent = 40,
+  discoveryPercent = 50,
 ): T[] {
   if (tracks.length <= 1) return tracks;
 
-  const familiarNormSet = new Set(familiarArtists.map((a) => a.toLowerCase().trim()).filter(Boolean));
+  const familiarNormSet = new Set(
+    familiarArtists
+      .flatMap((a) => {
+        const raw = a.toLowerCase().trim();
+        const alias = normalizeArtistAlias(a);
+        const primary = extractPrimaryArtist(a).toLowerCase().trim();
+        return [raw, alias, primary];
+      })
+      .filter(Boolean),
+  );
   if (familiarNormSet.size === 0) return tracks;
 
   const familiar: T[] = [];
   const exploratory: T[] = [];
 
   for (const t of tracks) {
-    const art = (t.artist || "").toLowerCase().trim();
-    if (familiarNormSet.has(art)) {
+    const raw = (t.artist || "").toLowerCase().trim();
+    const alias = normalizeArtistAlias(t.artist);
+    const primary = extractPrimaryArtist(t.artist).toLowerCase().trim();
+    if (
+      familiarNormSet.has(raw) ||
+      (alias && familiarNormSet.has(alias)) ||
+      (primary && familiarNormSet.has(primary))
+    ) {
       familiar.push(t);
     } else {
       exploratory.push(t);
