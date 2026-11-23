@@ -369,9 +369,20 @@ export function getDynamicQueries(
   }
 
   return {
-    newQueries: [...userNewQ, ...shuffleArray(generalNewQ)],
-    oldQueries: [...userOldQ, ...shuffleArray(generalOldQ)],
+    newQueries: interleaveQueries(userNewQ, shuffleArray(generalNewQ)),
+    oldQueries: interleaveQueries(userOldQ, shuffleArray(generalOldQ)),
   };
+}
+
+/** Interleave primary (familiar) and exploratory (new singer/genre) queries for rich catalog exploration */
+function interleaveQueries(primary: string[], exploratory: string[]): string[] {
+  const out: string[] = [];
+  const maxLen = Math.max(primary.length, exploratory.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (i < primary.length) out.push(primary[i]!);
+    if (i < exploratory.length) out.push(exploratory[i]!);
+  }
+  return out;
 }
 
 /** Shuffle array randomly with Fisher-Yates algorithm */
