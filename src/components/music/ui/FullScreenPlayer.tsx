@@ -25,6 +25,7 @@ import {
   Music2,
   Copy,
   Check,
+  Share2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrubBar } from "@/components/music/ScrubBar";
@@ -72,6 +73,7 @@ type Props = {
   onOpenShortcuts?: () => void;
   onOpenOptions?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
+  onShare?: ((track: Track, lyricsSnippet?: string | undefined) => void) | undefined;
   onArtistClick?: (artist: string, track?: Track) => void;
   onPodcastChannelClick?: (track: Track) => void;
   canNext: boolean;
@@ -188,6 +190,7 @@ export function FullScreenPlayer({
   onOpenShortcuts,
   onOpenOptions,
   onAddToPlaylist,
+  onShare,
   onArtistClick,
   onPodcastChannelClick,
   canNext,
@@ -513,6 +516,22 @@ export function FullScreenPlayer({
                       {copiedLyrics ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
                     </button>
                   )}
+                  {onShare && !lyricsState.isInstrumental && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const activeLine =
+                          currentLyricIndex >= 0 && lyricsState.syncedLyrics[currentLyricIndex]
+                            ? lyricsState.syncedLyrics[currentLyricIndex]?.text
+                            : lyricsState.plainLyrics?.split("\n").filter(Boolean)[0];
+                        onShare(track, activeLine);
+                      }}
+                      title="Share story card with lyrics"
+                      className="p-1 rounded-full text-[#746A85] dark:text-muted-foreground hover:text-[#211536] dark:hover:text-foreground hover:bg-[#F1EBFF] dark:hover:bg-chip transition-colors cursor-pointer"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                   {onOpenLyrics && (
                     <button
                       type="button"
@@ -662,6 +681,17 @@ export function FullScreenPlayer({
                   className="flex h-10 w-10 items-center justify-center rounded-full bg-white dark:bg-card border border-[#E5DDF5] dark:border-hair text-[#746A85] dark:text-muted-foreground hover:text-[#211536] dark:hover:text-foreground hover:bg-[#F1EBFF] dark:hover:bg-chip active:scale-90 transition-all cursor-pointer"
                 >
                   <Plus className="h-5 w-5" />
+                </button>
+              )}
+              {onShare && (
+                <button
+                  type="button"
+                  onClick={() => onShare(track)}
+                  aria-label="Share story card"
+                  title="Share story card"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-white dark:bg-card border border-[#E5DDF5] dark:border-hair text-[#746A85] dark:text-muted-foreground hover:text-[#211536] dark:hover:text-foreground hover:bg-[#F1EBFF] dark:hover:bg-chip active:scale-90 transition-all cursor-pointer"
+                >
+                  <Share2 className="h-4.5 w-4.5" />
                 </button>
               )}
             </div>

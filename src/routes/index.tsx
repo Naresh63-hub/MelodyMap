@@ -120,6 +120,7 @@ import {
   newSongs,
   moodPicks,
   freshVoices,
+  generateMelodyDjQueue,
 } from "@/lib/music.functions";
 import { getRecentlySeenIdentities, recordSeenTrackIdentities } from "@/lib/explore-history";
 import {
@@ -258,6 +259,7 @@ function MusicApp() {
   const runDailyMix = useServerFn(getDailyMix);
   const runNewSongs = useServerFn(newSongs);
   const runFreshVoices = useServerFn(freshVoices);
+  const runMelodyDj = useServerFn(generateMelodyDjQueue);
 
 
   const auth = useAuth();
@@ -388,6 +390,7 @@ function MusicApp() {
   const freshVoicesTracksRef = useRef<Track[]>(freshVoicesTracks);
   freshVoicesTracksRef.current = freshVoicesTracks;
   const [surpriseLoading, setSurpriseLoading] = useState(false);
+  const [djLoading, setDjLoading] = useState(false);
   const [quickFilters, setQuickFilters] = useState<string[]>([]);
   const [quickFilterTracks, setQuickFilterTracks] = useState<Track[]>([]);
   const [quickFilterLoading, setQuickFilterLoading] = useState(false);
@@ -419,6 +422,7 @@ function MusicApp() {
   const [optionsTrack, setOptionsTrack] = useState<Track | null>(null);
   const [showSleepTimer, setShowSleepTimer] = useState(false);
   const [shareTrack, setShareTrack] = useState<Track | null>(null);
+  const [shareLyricSnippet, setShareLyricSnippet] = useState<string | undefined>(undefined);
   const [downloadedIds, setDownloadedIds] = useState<Set<string>>(new Set());
   const [downloadedTracks, setDownloadedTracks] = useState<Track[]>([]);
   const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set());
@@ -2689,6 +2693,42 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     }
   }, [surpriseLoading, history, likes, downloadedTracks, stats, runFreshVoices, settings.languages, startQueue]);
 
+  const handleLaunchDj = useCallback(
+    async (prompt: string) => {
+      if (!prompt.trim() || djLoading) return;
+      setDjLoading(true);
+      setMessage(`🎧 Melody DJ spinning: "${prompt}"...`);
+      try {
+        const res = await runMelodyDj({
+          data: {
+            prompt,
+            languages: settings.languages,
+            count: 20,
+          },
+        });
+
+        if (res.tracks && res.tracks.length > 0) {
+          const djTracks = res.tracks as Track[];
+          tagTrackSource(djTracks, "dj");
+          startQueue(djTracks, 0, "dj");
+          setShowFullScreen(true);
+          setMessage(`🎧 Now spinning Melody DJ: ${res.title}`);
+          setTimeout(() => setMessage(null), 4000);
+        } else {
+          setMessage(`Could not find songs for "${prompt}". Try another vibe!`);
+          setTimeout(() => setMessage(null), 3000);
+        }
+      } catch (err) {
+        console.warn("[handleLaunchDj] error spinning DJ:", err);
+        setMessage("Melody DJ ran into a hiccup. Try another prompt!");
+        setTimeout(() => setMessage(null), 3000);
+      } finally {
+        setDjLoading(false);
+      }
+    },
+    [djLoading, runMelodyDj, settings.languages, startQueue],
+  );
+
   const handleRefreshTrending = useCallback(async () => {
     await loadExploreFeeds(Date.now(), "trending");
   }, [loadExploreFeeds]);
@@ -4238,6 +4278,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         }
         if (shareTrack) {
           setShareTrack(null);
+          setShareLyricSnippet(undefined);
           return;
         }
         if (createPlaylistTrack) {
@@ -5515,6 +5556,8 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                 hasMore={Boolean(searchContinuation) || results.length >= 10}
                 loadingMore={loadingMoreSearch}
                 onLoadMore={() => void loadMoreResults()}
+                onLaunchDj={handleLaunchDj}
+                djLoading={djLoading}
               />
               </div>
             )}
@@ -5918,6 +5961,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             onOpenShortcuts={() => setShowShortcuts(true)}
             onOpenOptions={(t) => setOptionsTrack(t)}
             onAddToPlaylist={(t) => setCreatePlaylistTrack(t)}
+            onShare={(t, snippet) => {
+              setShareLyricSnippet(snippet);
+              setShareTrack(t);
+            }}
             onPodcastChannelClick={(t) =>
               openPodcastShow({ id: t.podcastId, title: t.album || t.artist })
             }
@@ -5951,7 +5998,10 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           }}
           onOpenSleepTimer={() => setShowSleepTimer(true)}
           onGoToArtist={(artist, t) => openArtist(artist, t ?? optionsTrack ?? undefined)}
-          onShare={(t) => setShareTrack(t)}
+          onShare={(t) => {
+            setShareLyricSnippet(undefined);
+            setShareTrack(t);
+          }}
           onDeleteFromLibrary={(t) => {
             if (likedIds.has(t.id)) handleToggleLike(t);
           }}
@@ -5986,7 +6036,11 @@ function savePodcastResumePosition(trackId: string, pos: number) {
         <ShareModal
           open={!!shareTrack}
           track={shareTrack}
-          onClose={() => setShareTrack(null)}
+          lyricsSnippet={shareLyricSnippet}
+          onClose={() => {
+            setShareTrack(null);
+            setShareLyricSnippet(undefined);
+          }}
         />
 
         {/* CONFIRM DELETE DOWNLOAD MODAL (2-STEP CONFIRMATION) */}

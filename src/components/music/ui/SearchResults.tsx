@@ -22,6 +22,7 @@ import { isTrackLiked } from "@/lib/track-dedup";
 import { HeartLikeButton } from "@/components/music/ui/HeartLikeButton";
 import { RecentSearchesSection } from "@/components/music/ui/RecentSearchesSection";
 import { TOP_JIOSAAVN_ARTISTS } from "@/lib/artists-data";
+import { MelodyDjCard } from "@/components/music/ui/MelodyDjCard";
 import {
   Dialog,
   DialogContent,
@@ -59,6 +60,8 @@ type Props = {
   userLikes?: Track[];
   userLanguages?: string[];
   onOpenLanguages?: () => void;
+  onLaunchDj?: ((prompt: string) => Promise<void> | void) | undefined;
+  djLoading?: boolean | undefined;
 };
 
 export function SearchResults(props: Props) {
@@ -86,6 +89,8 @@ export function SearchResults(props: Props) {
     onClearRecentSearches,
     userLanguages,
     onOpenLanguages,
+    onLaunchDj,
+    djLoading,
   } = props;
 
   const [internalFilter, setInternalFilter] = useState<SearchFilter>("all");
@@ -242,6 +247,11 @@ export function SearchResults(props: Props) {
     return (
       <div className="space-y-6 animate-fade-in pt-2">
         {languagePickerDialog}
+
+        {/* Melody DJ AI Vibe Card */}
+        {onLaunchDj && (
+          <MelodyDjCard onLaunchDj={onLaunchDj} loading={Boolean(djLoading)} />
+        )}
 
         {/* Recent Searches (stores last 5 searched artist or song terms locally) */}
         <RecentSearchesSection

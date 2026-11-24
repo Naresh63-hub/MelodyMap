@@ -2109,6 +2109,63 @@ export const freshVoices = createServerFn({ method: "POST" })
   });
 
 
+const MelodyDjInput = z.object({
+  prompt: z.string().min(1).max(200),
+  languages: z.array(z.string()).default([]),
+  count: z.number().min(5).max(30).optional(),
+});
+
+/**
+ * Melody DJ: Generates a bespoke curated queue matching the listener's natural language vibe prompt.
+ */
+export const generateMelodyDjQueue = createServerFn({ method: "POST" })
+  .validator((input: unknown) => MelodyDjInput.parse(input))
+  .handler(async ({ data }) => {
+    const { parseDjPrompt, buildDjQueries, formatDjTracks } = await import("./melody-dj");
+    const { isOriginalSong } = await import("./track-filters");
+    const { hasPlayableDuration } = await import("./feed-freshness");
+
+    const parsed = parseDjPrompt(data.prompt, data.languages);
+    const queries = buildDjQueries(parsed);
+    const count = data.count ?? 20;
+
+    const out: Track[] = [];
+    const seen = new Set<string>();
+
+    try {
+      const { searchSaavn } = await import("./providers/saavn");
+      for (const q of queries) {
+        if (out.length >= count * 2) break;
+        try {
+          const hits = await searchSaavn(q, { limit: 12, page: 1 });
+          for (const t of hits) {
+            if (!seen.has(t.id) && isOriginalSong(t) && hasPlayableDuration(t)) {
+              seen.add(t.id);
+              out.push(t as Track);
+            }
+          }
+        } catch (searchErr) {
+          console.warn("[generateMelodyDjQueue] query notice:", q, searchErr);
+        }
+      }
+    } catch (err) {
+      console.warn("[generateMelodyDjQueue] provider notice:", err);
+    }
+
+    const cleaned = formatDjTracks(out, parsed, count);
+    const tagged = cleaned.map((t) => ({
+      ...t,
+      recommendationReason: `Melody DJ: ${parsed.title}`,
+    }));
+
+    return {
+      tracks: tagged,
+      title: parsed.title,
+      energy: parsed.energy,
+      error: null,
+    };
+  });
+
 const LanguagePicksInput = z.object({
   languages: z.array(z.string()).max(30).default([]),
   artists: z.array(z.string()).max(50).default([]),
