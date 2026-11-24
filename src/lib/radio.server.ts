@@ -61,6 +61,97 @@ export async function getRadioTracks(
     const primaryLang = languages[0] || "";
     const langSuffix = primaryLang ? ` ${primaryLang}` : "";
 
+    const seenIds = new Set<string>();
+    const seenTitles = new Set<string>();
+    if (normalizedSeedTitle) {
+      seenTitles.add(normalizedSeedTitle);
+    }
+
+    const interleavedCandidates: Track[] = [];
+
+    // =========================================================================
+    // Phase 1: The "Brain" (YouTube Co-Listening Graph) on initial page load
+    // Taps the neural co-listening graph (RDAMVM queue) for natural flow.
+    // =========================================================================
+    if (page === 1) {
+      try {
+        const { fetchYouTubeRadioGraph } = await import("./youtube-radio.server");
+        const ytCandidates = await fetchYouTubeRadioGraph({
+          videoId,
+          title: cleanTitle,
+          artist,
+        });
+
+        if (ytCandidates.length >= 3) {
+          // 1. Language consistency pre-filter on candidate metadata
+          const filteredCandidates = languages.length > 0
+            ? ytCandidates.filter((c) => isLanguageConsistent({ title: c.title, artist: c.artist }, languages))
+            : ytCandidates;
+
+          // 2. Exclude seed song title
+          const validYtCandidates = filteredCandidates.filter((c) => {
+            const cTitleNorm = norm(c.title);
+            return !normalizedSeedTitle || (!cTitleNorm.includes(normalizedSeedTitle) && !normalizedSeedTitle.includes(cTitleNorm));
+          });
+
+          // 3. Resolve candidates via JioSaavn ("The Muscle") for 320kbps studio master audio & synced lyrics
+          const resolveBatch = validYtCandidates.slice(0, 10);
+          const resolvedPromises = resolveBatch.map(async (c) => {
+            try {
+              const res = await searchSaavn(`${c.title} ${c.artist}`, { limit: 1 });
+              return res[0] ?? null;
+            } catch {
+              return null;
+            }
+          });
+
+          const resolvedRaw = await Promise.all(resolvedPromises);
+
+          for (const t of resolvedRaw) {
+            if (!t || !t.id || seenIds.has(t.id)) continue;
+            const tTitleNorm = norm(t.title);
+            if (seenTitles.has(tTitleNorm)) continue;
+            if (languages.length > 0 && !isLanguageConsistent(t, languages)) continue;
+            if (!isOriginalSong(t)) continue;
+
+            seenIds.add(t.id);
+            seenTitles.add(tTitleNorm);
+
+            interleavedCandidates.push({
+              id: t.id,
+              title: t.title,
+              artist: t.artist,
+              duration: t.duration,
+              thumbnail: t.thumbnail,
+              album: t.album,
+              previewUrl: t.previewUrl,
+              languageCode: t.languageCode,
+            });
+          }
+        }
+      } catch (err) {
+        // Fallback transparently to native catalog discography queries
+        console.debug?.("[getRadioTracks] YouTube brain bypassed:", err);
+      }
+    }
+
+    // If YouTube Brain already satisfied the full track limit, diversify and return immediately!
+    if (interleavedCandidates.length >= limit) {
+      const diversified = diversifyTrackList(interleavedCandidates, {
+        maxPerArtist: 2,
+        maxPerAlbum: 1,
+        minArtistSpacing: 2,
+        minAlbumSpacing: 3,
+      });
+      if (diversified.length >= Math.min(limit, 5)) {
+        return { tracks: diversified.slice(0, limit) };
+      }
+    }
+
+    // =========================================================================
+    // Phase 2: Native JioSaavn Catalog & Co-Artists (Full Engine / Fallback)
+    // Runs when YouTube Brain is unavailable, timed out, or needs top-up tracks.
+    // =========================================================================
     // Build deep, taste-weighted catalog queries across movie albums, discography & co-artists:
     // Focus strictly on original movie soundtracks in user's selected language(s)
     const queries: { query: string; limit: number; page?: number }[] = [];
@@ -116,15 +207,8 @@ export async function getRadioTracks(
     );
     const searchResults = await Promise.all(searchPromises);
 
-    const seenIds = new Set<string>();
-    const seenTitles = new Set<string>();
-    if (normalizedSeedTitle) {
-      seenTitles.add(normalizedSeedTitle);
-    }
-
     // Interleave query results round-robin to ensure diversity across queries,
     // rather than letting the seed artist query fill the entire initial quota!
-    const interleavedCandidates: Track[] = [];
     const maxBatchLen = Math.max(...searchResults.map((b) => b.length), 0);
 
     for (let i = 0; i < maxBatchLen; i++) {
