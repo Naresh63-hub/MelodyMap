@@ -1,15 +1,364 @@
 /**
- * Curated Master Stories Catalog
+ * Curated Master Stories & Audiobooks Catalog
  * Handpicked, studio-grade audio story series in Telugu, Hindi, and English.
+ * Inspired by Kuku FM & Pocket FM: Thrillers, Suspense, Audiobooks, Epics, Warriors, and Bedtime Classics.
  * Zero duplicate clutter, full chapter numbering, and direct CDN audio streams.
  */
 
 import type { StorySeries, StoryCategory, StoryLanguage } from "./story.types";
 
 export const MASTER_STORIES_CATALOG: StorySeries[] = [
-  // --------------------------------------------------------------------------
-  // 1. 🕉️ EPICS: The Stories of Mahabharata (English / Universal Audio Drama)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // 1. 🔥 THRILLER & SUSPENSE: Cheekatlo Suryudu - Yandamuri Veerendranath (Telugu)
+  // ==========================================================================
+  {
+    id: "story:yandamuri-cheekatlo-suryudu-te",
+    title: "చీకట్లో సూర్యుడు (Cheekatlo Suryudu)",
+    narrator: "యండమూరి వీరేంద్రనాథ్ (TeluguOne Audio)",
+    language: "Telugu",
+    category: "thriller",
+    coverUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80",
+    description:
+      "ప్రముఖ నవలా చక్రవర్తి యండమూరి వీరేంద్రనాథ్ కలం నుండి జాలువారిన సంచలనాత్మక సైకలాజికల్ క్రైమ్ థ్రిల్లర్ ఆడియోబుక్. ప్రతి క్షణం ఊపిరి బిగబట్టించే సస్పెన్స్.",
+    rating: 4.96,
+    totalChapters: 5,
+    featured: true,
+    tags: ["యండమూరి", "క్రైమ్", "థ్రిల్లర్", "Telugu Audiobook", "Suspense", "Yandamuri"],
+    chapters: [
+      {
+        id: "story:ch:cs-1",
+        seriesId: "story:yandamuri-cheekatlo-suryudu-te",
+        chapterNumber: 1,
+        title: "అధ్యాయం 1: చీకట్లో సూర్యుడు - మిస్టరీ ఆరంభం",
+        duration: "12:01",
+        durationSeconds: 721,
+        streamUrl: "https://audio4.redcircle.com/episodes/f64cfd34-e497-4182-975f-9f7b365e0c51/stream.mp3",
+        synopsis: "ఒక చీకటి రాత్రి, అర్థంకాని నేరం మరియు హంతకుడి జాడ కోసం మొదలైన విచారణ.",
+      },
+      {
+        id: "story:ch:cs-2",
+        seriesId: "story:yandamuri-cheekatlo-suryudu-te",
+        chapterNumber: 2,
+        title: "అధ్యాయం 2: రహస్య ఆనవాళ్ళు - రెండో సాక్ష్యం",
+        duration: "11:12",
+        durationSeconds: 672,
+        streamUrl: "https://audio4.redcircle.com/episodes/7e687fcc-191c-45e8-8999-2a55e12722cd/stream.mp3",
+        synopsis: "ఊహించని ఆధారాలు బయటపడటంతో కేసు సరికొత్త మలుపు తిరుగుతుంది.",
+      },
+      {
+        id: "story:ch:cs-3",
+        seriesId: "story:yandamuri-cheekatlo-suryudu-te",
+        chapterNumber: 3,
+        title: "అధ్యాయం 3: మానసిక యుద్ధం - నేరగాడి వ్యూహం",
+        duration: "12:34",
+        durationSeconds: 754,
+        streamUrl: "https://audio4.redcircle.com/episodes/6c6469cc-030b-4ef8-995a-e354083dd032/stream.mp3",
+        synopsis: "పోలీసులకు నిందితుడికి మధ్య మొదలైన తీవ్రమైన మైండ్ గేమ్‌లు.",
+      },
+      {
+        id: "story:ch:cs-4",
+        seriesId: "story:yandamuri-cheekatlo-suryudu-te",
+        chapterNumber: 4,
+        title: "అధ్యాయం 4: పద్మవ్యూహం - సత్యశోధన",
+        duration: "12:14",
+        durationSeconds: 734,
+        streamUrl: "https://audio4.redcircle.com/episodes/3ecf2027-9105-4c3d-9df8-f15408c92368/stream.mp3",
+        synopsis: "అందరూ నమ్మిన వ్యక్తి అసలు రూపం వెలుగులోకి రావడం.",
+      },
+      {
+        id: "story:ch:cs-5",
+        seriesId: "story:yandamuri-cheekatlo-suryudu-te",
+        chapterNumber: 5,
+        title: "అధ్యాయం 5: ఉత్కంఠభరిత ముగింపు - వెలుగులోకి సూర్యుడు",
+        duration: "10:10",
+        durationSeconds: 610,
+        streamUrl: "https://audio4.redcircle.com/episodes/5cf4fec9-7319-42fe-9bf9-b1c79877e991/stream.mp3",
+        synopsis: "అన్ని చిక్కుముడులు వీడి అసలు హంతకుడు పట్టుబడే అద్భుతమైన క్లైమాక్స్.",
+      },
+    ],
+  },
+
+  // ==========================================================================
+  // 2. 🔥 THRILLER & SUSPENSE: Horror Nights With Amit Deondi (Hindi)
+  // ==========================================================================
+  {
+    id: "story:horror-nights-hi",
+    title: "हॉरर नाइट्स - डार्क मिस्ट्रीज (Horror Nights)",
+    narrator: "अमित देयोंदी (Audio Pitara)",
+    language: "Hindi",
+    category: "thriller",
+    coverUrl: "https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=600&auto=format&fit=crop&q=80",
+    description:
+      "रोंगटे खड़े कर देने वाली सच्ची और काल्पनिक खौफनाक दास्तानें। अंधेरी रातों के अनसुलझे रहस्य और डरावनी आवाज़ों का रोंगटे खड़े करने वाला ऑडियो ड्रामा।",
+    rating: 4.94,
+    totalChapters: 5,
+    featured: true,
+    tags: ["Horror", "Suspense", "Hindi Horror", "Audio Drama", "Kuku FM style", "Thriller"],
+    chapters: [
+      {
+        id: "story:ch:hn-1",
+        seriesId: "story:horror-nights-hi",
+        chapterNumber: 1,
+        title: "कहानी 1: हॉन्टेड क्रिसमस - हवेली का रहस्य (Part 1)",
+        duration: "15:07",
+        durationSeconds: 907,
+        streamUrl: "https://traffic.megaphone.fm/CPP2022181212.mp3?updated=1734962809",
+        synopsis: "पुरानी सुनसान हवेली में सर्दियों की रात और अजीबोगरीब कदमों की चाप।",
+      },
+      {
+        id: "story:ch:hn-2",
+        seriesId: "story:horror-nights-hi",
+        chapterNumber: 2,
+        title: "कहानी 2: खौफनाक साया - गहराती परछाई (Part 2)",
+        duration: "14:37",
+        durationSeconds: 877,
+        streamUrl: "https://traffic.megaphone.fm/CPP4342892647.mp3?updated=1735130015",
+        synopsis: "कमरे की दीवारों पर दिखने वाले अजीब संकेत और बंद दरवाजों का खुद खुलना।",
+      },
+      {
+        id: "story:ch:hn-3",
+        seriesId: "story:horror-nights-hi",
+        chapterNumber: 3,
+        title: "कहानी 3: रूहानी आवाजें - अंधेरे का खेल (Part 3)",
+        duration: "14:57",
+        durationSeconds: 897,
+        streamUrl: "https://traffic.megaphone.fm/CPP9968750427.mp3?updated=1735193848",
+        synopsis: "अतीत के एक भयानक हादसे का सच सामने आना और रूहों का आक्रोश।",
+      },
+      {
+        id: "story:ch:hn-4",
+        seriesId: "story:horror-nights-hi",
+        chapterNumber: 4,
+        title: "कहानी 4: अनसुलझा खौफ - बचने की जद्दोजहद (Part 4)",
+        duration: "13:55",
+        durationSeconds: 835,
+        streamUrl: "https://traffic.megaphone.fm/CPP6870397683.mp3?updated=1735218304",
+        synopsis: "उस खौफनाक रात से जिंदा निकलने की कोशिश और रहस्यमयी तांत्रिक शक्ति।",
+      },
+      {
+        id: "story:ch:hn-5",
+        seriesId: "story:horror-nights-hi",
+        chapterNumber: 5,
+        title: "कहानी 5: अंतिम प्रहार - खौफ का अंत (Part 5)",
+        duration: "19:23",
+        durationSeconds: 1163,
+        streamUrl: "https://traffic.megaphone.fm/CPP8570516928.mp3?updated=1735297857",
+        synopsis: "हवेली के अंतिम रहस्य का पर्दाफाश और सब कुछ बदल देने वाला अंत।",
+      },
+    ],
+  },
+
+  // ==========================================================================
+  // 3. 🔥 THRILLER & MYSTERY: Bethala Kathalu (Telugu)
+  // ==========================================================================
+  {
+    id: "story:bethala-kathalu-te",
+    title: "బేతాళ కథలు (Bethala Kathalu - Mystery Thrillers)",
+    narrator: "సురేష్ కుమార్ (Suresh Kumar)",
+    language: "Telugu",
+    category: "thriller",
+    coverUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80",
+    description:
+      "విక్రమార్క మహారాజు మరియు శవంలో ఆవహించిన బేతాళుని మధ్య సాగే విచిత్ర, రసవత్తర మరియు గగుర్పొడిచే కథా సంభాషణలు. ప్రతి కథలోనూ ఒక చిక్కుప్రశ్న.",
+    rating: 4.93,
+    totalChapters: 5,
+    tags: ["బేతాళ కథలు", "విక్రమార్కుడు", "తెలుగు", "సస్పెన్స్", "Mystery"],
+    chapters: [
+      {
+        id: "story:ch:bk-1",
+        seriesId: "story:bethala-kathalu-te",
+        chapterNumber: 1,
+        title: "కథ 1: విక్రమార్కుడు మరియు విచిత్ర బేతాళ సవాల్",
+        duration: "06:11",
+        durationSeconds: 371,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2021-8-19/219281072-44100-2-2d46d05024c6.m4a",
+        synopsis: "శ్మశాన వాటికలో బేతాళుని భుజాన వేసుకున్న విక్రమార్కుడు మరియు మొదటి చిక్కుప్రశ్న.",
+      },
+      {
+        id: "story:ch:bk-2",
+        seriesId: "story:bethala-kathalu-te",
+        chapterNumber: 2,
+        title: "కథ 2: మంత్రగాడి కుట్ర మరియు రాకుమారి",
+        duration: "06:20",
+        durationSeconds: 380,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2021-8-19/219273797-44100-2-90654789aca1e.m4a",
+        synopsis: "కపట మంత్రగాడు రాకుమారిని బలి ఇవ్వాలని చేసిన కుతంత్రం మరియు ధీరోదాత్త తీర్పు.",
+      },
+      {
+        id: "story:ch:bk-3",
+        seriesId: "story:bethala-kathalu-te",
+        chapterNumber: 3,
+        title: "కథ 3: ముగ్గురు ప్రేమికులు మరియు ప్రాణత్యాగం",
+        duration: "05:35",
+        durationSeconds: 335,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2021-8-4/216601390-44100-2-481f583b7780b.m4a",
+        synopsis: "ఒకే కన్య కోసం ప్రాణాలు అర్పించిన ముగ్గురు యువకులలో ఎవరి త్యాగం గొప్పది?",
+      },
+      {
+        id: "story:ch:bk-4",
+        seriesId: "story:bethala-kathalu-te",
+        chapterNumber: 4,
+        title: "కథ 4: వింత దొంగతనం మరియు పండితుడి న్యాయం",
+        duration: "11:11",
+        durationSeconds: 671,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2021-7-15/212663475-44100-2-477ef80365354.m4a",
+        synopsis: "ఎవరికీ దొరకకుండా జరిగిన దొంగతనాన్ని కేవలం బుద్ధిబలంతో చేధించిన వైనం.",
+      },
+      {
+        id: "story:ch:bk-5",
+        seriesId: "story:bethala-kathalu-te",
+        chapterNumber: 5,
+        title: "కథ 5: మాయా దీవి మరియు అదృశ్య నగరం",
+        duration: "09:08",
+        durationSeconds: 548,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2021-7-7/210846448-44100-2-75d745edcb106.m4a",
+        synopsis: "సాగర గర్భంలో దాగి ఉన్న మాయా నగరం మరియు బేతాళుని చివరి సంభాషణ.",
+      },
+    ],
+  },
+
+  // ==========================================================================
+  // 4. 💡 AUDIOBOOKS & GROWTH: Book Journey Insider (Hindi Audiobooks)
+  // ==========================================================================
+  {
+    id: "story:book-journey-hi",
+    title: "बुक जर्नी इनसाइडर - बेस्टसेलर ऑडियोबुक्स (Hindi Audiobooks)",
+    narrator: "Book Journey Insider",
+    language: "Hindi",
+    category: "audiobooks",
+    coverUrl: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=600&auto=format&fit=crop&q=80",
+    description:
+      "दुनिया की सबसे लोकप्रिय किताबों के संपूर्ण हिंदी ऑडियोबुक सारांश। जीवन में सफलता, आदतें बदलने, धन कमाने और मानसिक शांति के व्यावहारिक उपाय।",
+    rating: 4.97,
+    totalChapters: 5,
+    featured: true,
+    tags: ["Audiobook", "Hindi Audiobook", "Self-Help", "Motivation", "Kuku FM style", "Mindset"],
+    chapters: [
+      {
+        id: "story:ch:bj-1",
+        seriesId: "story:book-journey-hi",
+        chapterNumber: 1,
+        title: "ऑडियोबुक 1: The First 20 Hours - कोई भी नया हुनर तेजी से सीखें",
+        duration: "28:14",
+        durationSeconds: 1694,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2026-10-20/437210636-44100-2-c35b77dd608c2.mp3",
+        synopsis: "जोश कॉफ़मैन की मशहूर किताब का ऑडियो सारांश: मात्र 20 घंटों में किसी भी नए कौशल में महारत कैसे हासिल करें।",
+      },
+      {
+        id: "story:ch:bj-2",
+        seriesId: "story:book-journey-hi",
+        chapterNumber: 2,
+        title: "ऑडियोबुक 2: How to Sleep Well - गहरी नींद और मानसिक ऊर्जा",
+        duration: "26:16",
+        durationSeconds: 1576,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2026-10-18/437067819-44100-2-bdaa8d7ee84b4.mp3",
+        synopsis: "डॉ. नील स्टेनली की पुस्तक: जीवन में तनावमुक्त रहने और कार्यकुशलता बढ़ाने के लिए उत्तम नींद का विज्ञान।",
+      },
+      {
+        id: "story:ch:bj-3",
+        seriesId: "story:book-journey-hi",
+        chapterNumber: 3,
+        title: "ऑडियोबुक 3: The Power of 30 Small Habits - 30 छोटी आदतें, बड़े नतीजे",
+        duration: "31:56",
+        durationSeconds: 1916,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2026-10-14/436710836-44100-2-3b6cb8168ff3f8.mp3",
+        synopsis: "दैनिक जीवन की 30 ऐसी सूक्ष्म आदतें जो आपकी सोच, स्वास्थ्य और आर्थिक स्थिति को पूरी तरह बदल सकती हैं।",
+      },
+      {
+        id: "story:ch:bj-4",
+        seriesId: "story:book-journey-hi",
+        chapterNumber: 4,
+        title: "ऑडियोबुक 4: Life After 21 Days - 21 दिन में जीवन रूपांतरण",
+        duration: "29:53",
+        durationSeconds: 1793,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2026-10-11/436497298-44100-2-18a07984235ec.mp3",
+        synopsis: "माइंडसेट, अनुशासन और नए संकल्पों को अपनी स्थायी दिनचर्या बनाने का 21 दिवसीय व्यावहारिक फॉर्मूला।",
+      },
+      {
+        id: "story:ch:bj-5",
+        seriesId: "story:book-journey-hi",
+        chapterNumber: 5,
+        title: "ऑडियोबुक 5: The Let Them Theory - लोगों की परवाह करना छोड़ें",
+        duration: "32:45",
+        durationSeconds: 1965,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2026-10-7/436150993-44100-2-30a7719c1e2588.mp3",
+        synopsis: "मेल रॉबिंस का प्रसिद्ध सिद्धांत: 'लेट देम' अपनाकर अनावश्यक मानसिक तनाव और दूसरों के नियंत्रण से मुक्ति पाएं।",
+      },
+    ],
+  },
+
+  // ==========================================================================
+  // 5. 💡 AUDIOBOOKS & WISDOM: Nanna Neethi Kathalu (Telugu)
+  // ==========================================================================
+  {
+    id: "story:nanna-neethi-te",
+    title: "నాన్న నీతి కథలు (Nanna Neethi Kathalu - Life Wisdom)",
+    narrator: "నాన్న నీతి కథామాలిక (Nanna Stories)",
+    language: "Telugu",
+    category: "audiobooks",
+    coverUrl: "https://images.unsplash.com/photo-1476820865390-c52aeebb9891?w=600&auto=format&fit=crop&q=80",
+    description:
+      "జీవితాన్ని తీర్చిదిద్దే అపురూపమైన తెలుగు నీతి మరియు వ్యక్తిత్వ వికాస కథలు. అనుభవాలు, బంధాలు, మానవతా విలువలు మరియు ఆత్మీయ సంభాషణలు.",
+    rating: 4.95,
+    totalChapters: 5,
+    tags: ["నీతి కథలు", "తెలుగు ఆడియో", "జీవిత సత్యాలు", "కుటుంబం", "ప్రేరణ"],
+    chapters: [
+      {
+        id: "story:ch:nn-1",
+        seriesId: "story:nanna-neethi-te",
+        chapterNumber: 1,
+        title: "కథ 1: మతాబుల మతలబు - జీవితంలో వెలుగులు",
+        duration: "08:19",
+        durationSeconds: 499,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2024-4-29/379133664-44100-2-04f66433e3753.m4a",
+        synopsis: "క్షణికమైన ఆర్భాటాల కంటే నిరంతరం నిలిచే అంతర్గత వెలుగే నిజమైన సంపద అని చాటే కథ.",
+      },
+      {
+        id: "story:ch:nn-2",
+        seriesId: "story:nanna-neethi-te",
+        chapterNumber: 2,
+        title: "కథ 2: పదహారు వేల రూపాయలు - విలువల పాఠం",
+        duration: "06:01",
+        durationSeconds: 361,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/staging/2024-4-28/379023003-44100-2-e1edcf4715341.m4a",
+        synopsis: "డబ్బు కంటే నమ్మకం, నిజాయితీ జీవితంలో ఎంతటి ఉన్నత స్థానానికి చేర్చుతాయో తెలిపే నిజజీవిత కథ.",
+      },
+      {
+        id: "story:ch:nn-3",
+        seriesId: "story:nanna-neethi-te",
+        chapterNumber: 3,
+        title: "కథ 3: నిర్వాసుడి మోక్షప్రాప్తి - అంతర్గత శాంతి",
+        duration: "08:31",
+        durationSeconds: 511,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/production/2023-2-15/318221752-48000-2-2421e4492c99b.mp3",
+        synopsis: "కోరికలను అదుపులో ఉంచుకుని నిరాడంబరంగా జీవించడంలోనే మోక్షం ఉందని తెలిపే ఆధ్యాత్మిక కథ.",
+      },
+      {
+        id: "story:ch:nn-4",
+        seriesId: "story:nanna-neethi-te",
+        chapterNumber: 4,
+        title: "కథ 4: మొక్కలు మన పిల్లలలాంటివి - కరివేపాకు కథ",
+        duration: "14:25",
+        durationSeconds: 865,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/production/2023-1-27/315099961-44100-2-fdb01cb8f26b5.mp3",
+        synopsis: "ప్రకృతిని, చెట్లను పిల్లల్లాగే ప్రేమతో పెంచితే అవి ఇచ్చే చల్లని నీడను వివరించే హృద్యమైన కథ.",
+      },
+      {
+        id: "story:ch:nn-5",
+        seriesId: "story:nanna-neethi-te",
+        chapterNumber: 5,
+        title: "కథ 5: పిల్లలు దగ్గరుండటమే మేలా? - తల్లిదండ్రుల అనురాగం",
+        duration: "12:16",
+        durationSeconds: 736,
+        streamUrl: "https://d3ctxlq1ktw2nl.cloudfront.net/production/2023-1-26/314924924-44100-2-d930f468e54e2.mp3",
+        synopsis: "వృద్ధాప్యంలో తల్లిదండ్రులకు కావాల్సింది సంపద కాదు, పిల్లల చిన్న ఆత్మీయ పలకరింపు అని తెలిపే కథనం.",
+      },
+    ],
+  },
+
+  // ==========================================================================
+  // 6. 🕉️ EPICS: The Stories of Mahabharata (English / Universal Audio Drama)
+  // ==========================================================================
   {
     id: "story:mahabharata-drama-en",
     title: "The Stories of Mahabharata",
@@ -87,9 +436,9 @@ export const MASTER_STORIES_CATALOG: StorySeries[] = [
     ],
   },
 
-  // --------------------------------------------------------------------------
-  // 2. 🕉️ EPICS: Sampoorna Ramayanam & Ayodhyakanda (Telugu)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // 7. 🕉️ EPICS: Sampoorna Ramayanam & Ayodhyakanda (Telugu)
+  // ==========================================================================
   {
     id: "story:ramayana-telugu",
     title: "సంపూర్ణ రామాయణం (Sampoorna Ramayanam)",
@@ -157,9 +506,9 @@ export const MASTER_STORIES_CATALOG: StorySeries[] = [
     ],
   },
 
-  // --------------------------------------------------------------------------
-  // 3. ⚔️ WARRIORS: Chhatrapati Shivaji Maharaj - The Grand Saga (Hindi)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // 8. ⚔️ WARRIORS: Chhatrapati Shivaji Maharaj - The Grand Saga (Hindi)
+  // ==========================================================================
   {
     id: "story:shivaji-maharaj-hi",
     title: "छत्रपति शिवाजी महाराज - स्वराज गाथा",
@@ -227,9 +576,9 @@ export const MASTER_STORIES_CATALOG: StorySeries[] = [
     ],
   },
 
-  // --------------------------------------------------------------------------
-  // 4. ⚔️ WARRIORS: Vikram & Betal Thrilling Tales (Hindi / Studio Drama)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // 9. ⚔️ WARRIORS: Vikram & Betal Thrilling Tales (Hindi / Studio Drama)
+  // ==========================================================================
   {
     id: "story:vikram-betal-hi",
     title: "विक्रम और बेताल - शौर्य एवं नीति गाथा",
@@ -296,9 +645,9 @@ export const MASTER_STORIES_CATALOG: StorySeries[] = [
     ],
   },
 
-  // --------------------------------------------------------------------------
-  // 5. 🧸 KIDS: Chandamama Kathalu (Telugu)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // 10. 🧸 KIDS: Chandamama Kathalu (Telugu)
+  // ==========================================================================
   {
     id: "story:chandamama-te",
     title: "చందమామ కథలు (Chandamama Kathalu)",
@@ -366,9 +715,9 @@ export const MASTER_STORIES_CATALOG: StorySeries[] = [
     ],
   },
 
-  // --------------------------------------------------------------------------
-  // 6. 🧸 KIDS: Panchatantra Stories (Telugu / Baalgatha)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // 11. 🧸 KIDS: Panchatantra Stories (Telugu / Baalgatha)
+  // ==========================================================================
   {
     id: "story:panchatantra-te",
     title: "పంచతంత్ర నీతి కథలు (Baalgatha Telugu)",
@@ -435,9 +784,78 @@ export const MASTER_STORIES_CATALOG: StorySeries[] = [
     ],
   },
 
-  // --------------------------------------------------------------------------
-  // 7. 👑 BIOGRAPHY: Dr. APJ Abdul Kalam - Wings of Fire (Hindi / Universal)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // 12. 🧸 KIDS: Akbar Birbal & Gonu Jha Folktales (Hindi)
+  // ==========================================================================
+  {
+    id: "story:akbar-birbal-hi",
+    title: "अकबर बीरबल और गोनू झा के किस्से (Akbar Birbal Folktales)",
+    narrator: "कुलबेली (Kulbeli Folk Troupe)",
+    language: "Hindi",
+    category: "kids",
+    coverUrl: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=600&auto=format&fit=crop&q=80",
+    description:
+      "बीरबल और गोनू झा की हाजिरजवाबी, तीक्ष्ण बुद्धि और रोचक लोककथाएं। बच्चों और बड़ों को समान रूप से गुदगुदाने वाली मजेदार कहानियां।",
+    rating: 4.92,
+    totalChapters: 5,
+    tags: ["Akbar Birbal", "बीरबल", "गोनू झा", "Kids", "Moral Stories", "Hindi Stories"],
+    chapters: [
+      {
+        id: "story:ch:ab-1",
+        seriesId: "story:akbar-birbal-hi",
+        chapterNumber: 1,
+        title: "किस्सा 1: गोनू झा के मनोरंजक किस्से - चतुराई का मुकाबला",
+        duration: "07:32",
+        durationSeconds: 452,
+        streamUrl: "https://play.hubhopper.com/1738f3919731144d8af67eb2730e3301.mp3?s=rss-feed&v=02f33d9e0aac",
+        synopsis: "पंडितों की बड़ी सभा में गोनू झा ने अपनी अद्वितीय बुद्धि से सबको निरुत्तर किया।",
+      },
+      {
+        id: "story:ch:ab-2",
+        seriesId: "story:akbar-birbal-hi",
+        chapterNumber: 2,
+        title: "किस्सा 2: दूध से भागने वाली बिल्ली - अनोखी युक्ति",
+        duration: "10:17",
+        durationSeconds: 617,
+        streamUrl: "https://play.hubhopper.com/d7ba7aa1032cd1cc9b2bd2af41a889c0.mp3?s=rss-feed&v=6b49396862bd",
+        synopsis: "दूध पीने से डरने वाली बिल्ली की मजेदार कहानी जिसने दरबारियों को लोटपोट कर दिया।",
+      },
+      {
+        id: "story:ch:ab-3",
+        seriesId: "story:akbar-birbal-hi",
+        chapterNumber: 3,
+        title: "किस्सा 3: गोनू झा का बैल - बुद्धि का चमत्कार",
+        duration: "08:54",
+        durationSeconds: 534,
+        streamUrl: "https://play.hubhopper.com/ae5fe156e32ce485b6bf402b6bbbe718.mp3?s=rss-feed&v=b3d39c773a42",
+        synopsis: "असंभव को संभव बना दिखाने वाली हास्यप्रद लोककथा।",
+      },
+      {
+        id: "story:ch:ab-4",
+        seriesId: "story:akbar-birbal-hi",
+        chapterNumber: 4,
+        title: "किस्सा 4: बीरबल की परीक्षा - समझदार कौन?",
+        duration: "09:57",
+        durationSeconds: 597,
+        streamUrl: "https://play.hubhopper.com/678112229fbbf80c85cf4285559fc42b.mp3?s=rss-feed&v=3215bddd0fc8",
+        synopsis: "बादशाह अकबर द्वारा ली गई कठिन परीक्षा और बीरबल का लाजवाब उत्तर।",
+      },
+      {
+        id: "story:ch:ab-5",
+        seriesId: "story:akbar-birbal-hi",
+        chapterNumber: 5,
+        title: "किस्सा 5: गोनू झा की चतुराई - लालची का अंत",
+        duration: "03:43",
+        durationSeconds: 223,
+        streamUrl: "https://play.hubhopper.com/b09a134030062306764cb988c6db0150.mp3?s=rss-feed&v=1fa3718d44c2",
+        synopsis: "धोखेबाज व्यापारी को सबक सिखाने की अत्यंत रोचक और बुद्धिमत्तापूर्ण कथा।",
+      },
+    ],
+  },
+
+  // ==========================================================================
+  // 13. 👑 BIOGRAPHY: Dr. APJ Abdul Kalam - Wings of Fire (Hindi / Universal)
+  // ==========================================================================
   {
     id: "story:kalam-wings-fire",
     title: "Dr. APJ Abdul Kalam: Wings of Fire (अग्नि की उड़ान)",
@@ -495,9 +913,9 @@ export const MASTER_STORIES_CATALOG: StorySeries[] = [
     ],
   },
 
-  // --------------------------------------------------------------------------
-  // 8. 👑 BIOGRAPHY: Swami Vivekananda - The Lion of Vedanta (English)
-  // --------------------------------------------------------------------------
+  // ==========================================================================
+  // 14. 👑 BIOGRAPHY: Swami Vivekananda - The Lion of Vedanta (English)
+  // ==========================================================================
   {
     id: "story:vivekananda-en",
     title: "Swami Vivekananda: The Lion of Vedanta",
@@ -592,4 +1010,24 @@ export function getStoriesCatalog(options?: {
  */
 export function getStorySeriesById(id: string): StorySeries | undefined {
   return MASTER_STORIES_CATALOG.find((s) => s.id === id);
+}
+
+/**
+ * Returns catalog counts grouped by language.
+ */
+export function getStoryLanguageCounts(): Record<StoryLanguage, number> {
+  const counts: Record<StoryLanguage, number> = {
+    All: MASTER_STORIES_CATALOG.length,
+    Telugu: 0,
+    Hindi: 0,
+    English: 0,
+  };
+
+  for (const s of MASTER_STORIES_CATALOG) {
+    if (s.language === "Telugu") counts.Telugu += 1;
+    else if (s.language === "Hindi") counts.Hindi += 1;
+    else if (s.language === "English") counts.English += 1;
+  }
+
+  return counts;
 }

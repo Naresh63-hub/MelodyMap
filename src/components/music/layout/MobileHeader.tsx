@@ -41,24 +41,26 @@ export function MobileHeader({
 
   const getTitle = () => {
     if (tab === "foryou") return getGreeting();
-    if (tab === "stories") return "Audio Stories";
+    if (tab === "explore") return "Melody Music";
+    if (tab === "stories") return "Melody Stories";
+    if (tab === "podcasts") return "Melody Podcasts";
     if (tab === "languages") return "Languages";
-    if (tab === "podcasts") return "Podcasts";
     if (tab === "playlists") return "Playlists";
     if (tab === "library") return "Your Library";
     if (tab === "likes") return "Favourites";
     if (tab === "history") return "Recently Played";
     if (tab === "downloads") return "Downloaded Songs";
-    if (tab === "mixes") return "Mixes";
+    if (tab === "mixes") return "Melody Mixes";
     return "MelodyMap";
   };
 
   const getSubtitle = () => {
-    if (tab === "foryou") return "Let's find your perfect vibe";
-    if (tab === "stories") return "Epics · Warriors · Bedtime Tales";
-    if (tab === "podcasts") return "Learn · Feel · Be Inspired";
+    if (tab === "foryou") return "Melody Music · Personalised for your vibe";
+    if (tab === "explore") return "Melody Music · Charts & New Releases";
+    if (tab === "stories") return "Melody Stories · Epics & Bedtime Dramas";
+    if (tab === "podcasts") return "Melody Podcasts · Conversations & Knowledge";
     if (tab === "languages") return "Explore Music in Your Language";
-    if (tab === "mixes") return "Curated for your vibe";
+    if (tab === "mixes") return "Melody Mixes · Curated for your vibe";
     if (tab === "downloads") return "Available offline";
     return "";
   };

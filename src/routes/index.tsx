@@ -2,12 +2,15 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Compass,
   Loader2,
   Menu,
-  Search,
-  X,
+  Music2,
   RefreshCw,
   RotateCw,
+  Search,
+  Sparkles,
+  X,
 } from "lucide-react";
 import { Sidebar, type NavTab } from "@/components/music/layout/Sidebar";
 import { MobileNav } from "@/components/music/layout/MobileNav";
@@ -5345,6 +5348,12 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                       {/* Greeting & Moods */}
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25">
+                              <Music2 className="h-3 w-3" />
+                              Melody Music
+                            </span>
+                          </div>
                           <h1 suppressHydrationWarning className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
                             Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, <span className="text-animated-gradient">{auth.profile?.display_name?.split(" ")[0] || "Listener"}</span>
                           </h1>
@@ -5448,11 +5457,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               <div className={cn("space-y-5 pt-1", tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
                 <div className="flex items-center justify-between pb-1">
                   <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25">
+                        <Compass className="h-3 w-3" />
+                        Melody Music
+                      </span>
+                    </div>
                     <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
                       Explore & Discover
                     </h1>
                     <p className="text-xs text-muted-foreground font-normal mt-0.5">
-                      Top charts, fresh releases & golden classics
+                      Top charts, fresh releases & golden classics in Melody Music
                     </p>
                   </div>
 

@@ -20,6 +20,7 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  User,
   X,
 } from "lucide-react";
 
@@ -450,7 +451,7 @@ export function PodcastsPanel({
                         }
                       }}
                       className={cn(
-                        "relative shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-card border border-hair-strong shadow-xs group/thumb cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 transition-transform",
+                        "relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-xl sm:rounded-2xl overflow-hidden bg-card border border-hair-strong shadow-xs group/thumb cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 transition-transform",
                         isCurrentEp && "ring-2 ring-primary shadow-md",
                       )}
                       aria-label={isThisPlaying ? `Pause ${ep.title}` : `Play ${ep.title}`}
@@ -490,6 +491,15 @@ export function PodcastsPanel({
 
                     {/* Episode Metadata */}
                     <div className="flex-1 min-w-0">
+                      {ep.guestName && (
+                        <div className="mb-1">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-[10px] font-semibold text-amber-500">
+                            <User className="h-3 w-3" />
+                            <span>Ft. {ep.guestName}</span>
+                          </span>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-2">
                         <h3
                           onClick={() => {
@@ -582,9 +592,15 @@ export function PodcastsPanel({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">Podcasts</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25">
+              <Mic className="h-3 w-3" />
+              Melody Podcasts
+            </span>
+          </div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">Melody Podcasts</h1>
           <p className="text-xs text-foreground/50 mt-0.5">
-            Discover audio shows and series in{" "}
+            Discover creator conversations, audio shows & series in{" "}
             <span className="text-foreground font-medium">{selectedLanguage}</span>
           </p>
         </div>

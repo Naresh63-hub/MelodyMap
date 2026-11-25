@@ -8,8 +8,10 @@ import type { Track } from "../library";
 export type StoryCategory =
   | "epics"
   | "warriors"
-  | "biographies"
+  | "thriller"
+  | "audiobooks"
   | "kids"
+  | "biographies"
   | "spiritual";
 
 export type StoryLanguage = "Telugu" | "Hindi" | "English" | "All";

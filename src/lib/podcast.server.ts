@@ -260,6 +260,170 @@ export async function searchPodcasts(options: {
   }
 }
 
+/** In-memory cache for matched episode thumbnails to avoid redundant searches */
+const episodeThumbnailCache = new Map<string, string>();
+
+/**
+ * Extracts guest name from episode title (e.g. "Ft. Ambati Rayudu" or "Ramya Krishnan ON Raw Talks")
+ */
+export function extractGuestName(title: string): string | undefined {
+  if (!title) return undefined;
+  // Match "Ft. Name" or "ft Name"
+  const ftMatch = title.match(/(?:ft\.?|featuring)\s+([A-Za-z0-9\.\s]+?)(?:\||\/|\-|\!|\?|\n|$)/i);
+  if (ftMatch && ftMatch[1]) {
+    const clean = ftMatch[1].trim();
+    if (clean.length > 2 && clean.length < 35 && !/^(raw talks|the ranveer show|episode|ep\b)/i.test(clean)) {
+      return clean;
+    }
+  }
+  // Strip leading emojis and match "Name ON [Show]"
+  const stripped = title.replace(/^[\p{Emoji}\s\p{Punctuation}]+/gu, "");
+  const onMatch = stripped.match(/^([A-Za-z\s]{4,30})\s+ON\s+(?:RAW TALKS|TRS|THE RANVEER SHOW)/i);
+  if (onMatch && onMatch[1]) {
+    return onMatch[1].trim();
+  }
+  return undefined;
+}
+
+/**
+ * Searches YouTube for video uploads of a podcast show and enriches episodes with unique YouTube video thumbnails.
+ */
+export async function enrichEpisodesWithYouTubeThumbnails(
+  episodes: PodcastEpisode[],
+  podcastTitle: string,
+): Promise<PodcastEpisode[]> {
+  if (!episodes || episodes.length === 0) return episodes;
+
+  // First pass: attach guestName and check memory cache for thumbnails
+  let needsSearch = false;
+  for (const ep of episodes) {
+    if (!ep.guestName) {
+      ep.guestName = extractGuestName(ep.title);
+    }
+    const cachedThumb = episodeThumbnailCache.get(ep.title);
+    if (cachedThumb) {
+      ep.artworkUrl = cachedThumb;
+    } else {
+      needsSearch = true;
+    }
+  }
+
+  if (!needsSearch) {
+    return episodes;
+  }
+
+  // Fetch YouTube candidates with timeout protection
+  try {
+    const cleanTitle = podcastTitle
+      .replace(/podcast|show|telugu|hindi|business/gi, "")
+      .trim();
+    const query = `${cleanTitle} podcast episodes`;
+
+    const res = await fetch("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      },
+      body: JSON.stringify({
+        context: {
+          client: { clientName: "WEB", clientVersion: "2.20240801.00.00", hl: "en", gl: "IN" },
+        },
+        query,
+      }),
+      signal: AbortSignal.timeout(4000), // Fast 4-second timeout protection
+    });
+
+    if (!res.ok) return episodes;
+
+    const data = (await res.json()) as Record<string, unknown>;
+    const contents = (
+      (data?.["contents"] as Record<string, unknown>)?.[
+        "twoColumnSearchResultsRenderer"
+      ] as Record<string, unknown>
+    )?.["primaryContents"] as Record<string, unknown>;
+
+    const section = (
+      contents?.["sectionListRenderer"] as Record<string, unknown>
+    )?.["contents"] as Array<Record<string, unknown>>;
+
+    const itemSection = section?.[0]?.["itemSectionRenderer"] as Record<string, unknown>;
+    const items = (itemSection?.["contents"] as Array<Record<string, unknown>>) || [];
+
+    const candidates: Array<{ title: string; thumbUrl: string; videoId: string }> = [];
+
+    for (const item of items) {
+      const v = (item?.["videoRenderer"] || item?.["compactVideoRenderer"]) as Record<string, unknown> | undefined;
+      if (!v || !v["videoId"]) continue;
+
+      const videoId = String(v["videoId"]);
+      const titleRuns = (v["title"] as Record<string, unknown>)?.["runs"] as Array<{ text: string }> | undefined;
+      const title = titleRuns ? titleRuns.map((r) => r.text).join("") : "";
+
+      const thumbs = (v["thumbnail"] as Record<string, unknown>)?.["thumbnails"] as Array<{ url: string }> | undefined;
+      const thumbUrl = thumbs && thumbs.length > 0 ? thumbs[thumbs.length - 1]!.url : `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+      if (title && thumbUrl) {
+        candidates.push({ title, thumbUrl, videoId });
+      }
+    }
+
+    if (candidates.length === 0) return episodes;
+
+    // Helper to normalize text for fuzzy keyword overlap
+    const norm = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const stopWords = new Set(["raw", "talks", "with", "telugu", "podcast", "the", "and", "for", "show", "hindi"]);
+
+    for (const ep of episodes) {
+      if (episodeThumbnailCache.has(ep.title)) continue;
+
+      const epNorm = norm(ep.title);
+      const epWords = epNorm.split(" ").filter((w) => w.length > 2 && !stopWords.has(w));
+      const epNumMatch = ep.title.match(/\b(?:ep|episode)\s*[-:]?\s*(\d+)\b/i);
+
+      let bestCandidate: (typeof candidates)[0] | null = null;
+      let maxScore = 0;
+
+      for (const cand of candidates) {
+        const candNorm = norm(cand.title);
+        let score = 0;
+
+        for (const w of epWords) {
+          if (candNorm.includes(w)) {
+            score++;
+          }
+        }
+
+        const candNumMatch = cand.title.match(/\b(?:ep|episode)\s*[-:]?\s*(\d+)\b/i);
+        if (epNumMatch && candNumMatch && epNumMatch[1] === candNumMatch[1]) {
+          score += 4;
+        }
+
+        if (score > maxScore && score >= 2) {
+          maxScore = score;
+          bestCandidate = cand;
+        }
+      }
+
+      if (bestCandidate) {
+        ep.artworkUrl = bestCandidate.thumbUrl;
+        episodeThumbnailCache.set(ep.title, bestCandidate.thumbUrl);
+      }
+    }
+
+    return episodes;
+  } catch {
+    return episodes;
+  }
+}
+
 /**
  * Retrieves the full episode list for a specific Podcast Show.
  */
@@ -293,7 +457,7 @@ export async function getPodcastEpisodes(podcastId: string, limit = 50): Promise
       "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=300&h=300&fit=crop";
     const defaultTitle = showInfo?.collectionName || "Podcast";
 
-    return episodesData.map((ep) => {
+    const rawEpisodes: PodcastEpisode[] = episodesData.map((ep) => {
       const durSecs = Math.round((ep.trackTimeMillis || 0) / 1000);
       return {
         id: `podcast:ep:${ep.trackId}`,
@@ -309,6 +473,8 @@ export async function getPodcastEpisodes(podcastId: string, limit = 50): Promise
         provider: "itunes" as const,
       };
     });
+
+    return enrichEpisodesWithYouTubeThumbnails(rawEpisodes, defaultTitle);
   } catch (err) {
     console.warn("[podcast] Episode lookup notice:", err);
     return [];
@@ -405,7 +571,7 @@ export async function getPodcastShow(options: {
       externalUrl: showInfo?.collectionViewUrl,
     };
 
-    const episodes: PodcastEpisode[] = episodesData.map((ep) => {
+    const rawEpisodes: PodcastEpisode[] = episodesData.map((ep) => {
       const durSecs = Math.round((ep.trackTimeMillis || 0) / 1000);
       return {
         id: `podcast:ep:${ep.trackId}`,
@@ -421,6 +587,8 @@ export async function getPodcastShow(options: {
         provider: "itunes" as const,
       };
     });
+
+    const episodes = await enrichEpisodesWithYouTubeThumbnails(rawEpisodes, defaultTitle);
 
     return { show, episodes };
   } catch (err) {

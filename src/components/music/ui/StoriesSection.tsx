@@ -11,7 +11,11 @@ import {
   Smile,
   Award,
 } from "lucide-react";
-import { MASTER_STORIES_CATALOG, getStoriesCatalog } from "@/lib/stories/stories-catalog";
+import {
+  MASTER_STORIES_CATALOG,
+  getStoriesCatalog,
+  getStoryLanguageCounts,
+} from "@/lib/stories/stories-catalog";
 import type { StorySeries, StoryCategory, StoryLanguage, StoryChapter } from "@/lib/stories/story.types";
 import { StorySeriesModal } from "./StorySeriesModal";
 
@@ -23,19 +27,53 @@ interface Props {
 
 const CATEGORIES: { id: StoryCategory | "all"; label: string; icon: typeof Sparkles }[] = [
   { id: "all", label: "All Stories", icon: Sparkles },
-  { id: "epics", label: "🕉️ Epics & Mythology", icon: Flame },
+  { id: "thriller", label: "🔥 Thriller & Suspense", icon: Flame },
+  { id: "audiobooks", label: "💡 Audiobooks & Growth", icon: Award },
+  { id: "epics", label: "🕉️ Epics & Mythology", icon: Sparkles },
   { id: "warriors", label: "⚔️ Great Warriors", icon: Shield },
   { id: "kids", label: "🧸 Kids & Bedtime", icon: Smile },
-  { id: "biographies", label: "👑 Biographies", icon: Award },
+  { id: "biographies", label: "👑 Biographies", icon: BookOpen },
 ];
 
 const LANGUAGES: StoryLanguage[] = ["All", "Telugu", "Hindi", "English"];
+
+const LANGUAGE_CARDS: {
+  lang: "Telugu" | "Hindi" | "English";
+  title: string;
+  nativeTitle: string;
+  description: string;
+  gradient: string;
+}[] = [
+  {
+    lang: "Telugu",
+    title: "Telugu Stories & Audiobooks",
+    nativeTitle: "తెలుగు కథలు & ఆడియో బుక్స్",
+    description: "యండమూరి క్రైమ్ థ్రిల్లర్స్, చాగంటి రామాయణం, బేతాళ & చందమామ కథలు",
+    gradient: "from-amber-600/30 via-orange-600/20 to-purple-900/40 border-amber-500/30",
+  },
+  {
+    lang: "Hindi",
+    title: "Hindi Thrillers & Kahaniyaan",
+    nativeTitle: "हिंदी कहानियां & ऑडियोबुक्स",
+    description: "हॉरर नाइट्स, शिवाजी महाराज, विक्रम बेताल, अकबर बीरबल और बुक समरी",
+    gradient: "from-rose-600/30 via-red-600/20 to-indigo-900/40 border-rose-500/30",
+  },
+  {
+    lang: "English",
+    title: "English Audio Dramas",
+    nativeTitle: "Classic Dramas & Epics",
+    description: "The Stories of Mahabharata drama, Swami Vivekananda philosophy",
+    gradient: "from-indigo-600/30 via-violet-600/20 to-purple-900/40 border-indigo-500/30",
+  },
+];
 
 export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapter }: Props) {
   const [selectedCategory, setSelectedCategory] = useState<StoryCategory | "all">("all");
   const [selectedLanguage, setSelectedLanguage] = useState<StoryLanguage>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSeries, setActiveSeries] = useState<StorySeries | null>(null);
+
+  const languageCounts = useMemo(() => getStoryLanguageCounts(), []);
 
   const filteredStories = useMemo(() => {
     return getStoriesCatalog({
@@ -45,10 +83,14 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
     });
   }, [selectedCategory, selectedLanguage, searchQuery]);
 
-  // Featured story for hero banner
+  // Featured story for hero banner (prioritizes featured series)
   const featuredStory = useMemo(() => {
-    return MASTER_STORIES_CATALOG.find((s) => s.featured) || MASTER_STORIES_CATALOG[0]!;
-  }, []);
+    return (
+      filteredStories.find((s) => s.featured) ||
+      MASTER_STORIES_CATALOG.find((s) => s.featured) ||
+      MASTER_STORIES_CATALOG[0]!
+    );
+  }, [filteredStories]);
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
@@ -69,7 +111,9 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
             <div className="space-y-3 max-w-xl text-center md:text-left">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-semibold text-[#A78BFA]">
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Featured Masterpiece Drama</span>
+                <span className="font-bold text-white tracking-wide">Melody Stories</span>
+                <span className="text-white/40">•</span>
+                <span>Audio Drama Theatre</span>
                 <span className="text-white/40">•</span>
                 <span>{featuredStory.language}</span>
               </div>
@@ -132,8 +176,17 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
         </div>
       )}
 
-      {/* Control Bar: Search & Language Pills */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      {/* Section Branding & Control Bar */}
+      <div className="space-y-3">
+        {(!featuredStory || searchQuery || selectedCategory !== "all") && (
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/25">
+              <BookOpen className="h-3 w-3" />
+              Melody Stories
+            </span>
+          </div>
+        )}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#746A85] dark:text-muted-foreground pointer-events-none" />
@@ -141,30 +194,80 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search epics, warriors, characters, or narrators..."
+            placeholder="Search thrillers, crime, epics, audiobooks, or authors..."
             className="w-full pl-10 pr-4 py-2.5 rounded-full bg-white dark:bg-card border border-[#E5DDF5] dark:border-hair text-xs sm:text-sm text-[#211536] dark:text-foreground placeholder-[#746A85] dark:placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#8B5CF6] transition-all"
           />
         </div>
 
-        {/* Language Filter Pills */}
+        {/* Language Filter Pills with Badge Counts */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           <Globe2 className="h-4 w-4 text-[#746A85] dark:text-muted-foreground shrink-0 mr-1" />
-          {LANGUAGES.map((lang) => (
-            <button
-              key={lang}
-              type="button"
-              onClick={() => setSelectedLanguage(lang)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                selectedLanguage === lang
-                  ? "bg-[#8B5CF6] text-white shadow-sm"
-                  : "bg-white dark:bg-card border border-[#E5DDF5] dark:border-hair text-[#746A85] dark:text-muted-foreground hover:bg-[#F1EBFF] dark:hover:bg-chip hover:text-[#211536] dark:hover:text-foreground"
-              }`}
-            >
-              {lang}
-            </button>
-          ))}
+          {LANGUAGES.map((lang) => {
+            const count = languageCounts[lang];
+            const isSelected = selectedLanguage === lang;
+
+            return (
+              <button
+                key={lang}
+                type="button"
+                onClick={() => setSelectedLanguage(lang)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isSelected
+                    ? "bg-[#8B5CF6] text-white shadow-sm"
+                    : "bg-white dark:bg-card border border-[#E5DDF5] dark:border-hair text-[#746A85] dark:text-muted-foreground hover:bg-[#F1EBFF] dark:hover:bg-chip hover:text-[#211536] dark:hover:text-foreground"
+                }`}
+              >
+                <span>{lang}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                    isSelected ? "bg-white/20 text-white" : "bg-chip text-foreground/60"
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
+      </div>
+
+      {/* Language Quick Browse Cards (Visible when browsing All and no active search) */}
+      {selectedLanguage === "All" && !searchQuery && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+          {LANGUAGE_CARDS.map((card) => {
+            const count = languageCounts[card.lang];
+            return (
+              <div
+                key={card.lang}
+                onClick={() => setSelectedLanguage(card.lang)}
+                className={`group p-4 sm:p-5 rounded-2xl bg-gradient-to-br ${card.gradient} border backdrop-blur-sm cursor-pointer hover:scale-[1.02] active:scale-[0.99] transition-all relative overflow-hidden`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                      {card.nativeTitle}
+                    </span>
+                    <h3 className="text-base sm:text-lg font-bold text-foreground group-hover:text-primary transition-colors">
+                      {card.title}
+                    </h3>
+                  </div>
+                  <span className="px-2.5 py-0.5 rounded-full bg-card/80 text-[11px] font-bold text-foreground/80 border border-hair shrink-0">
+                    {count} Series
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-foreground/70 line-clamp-2 leading-relaxed">
+                  {card.description}
+                </p>
+                <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-primary">
+                  <span>Explore {card.lang} Stories</span>
+                  <span className="group-hover:translate-x-1 transition-transform">→</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Category Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
@@ -193,10 +296,14 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
       {/* Stories Grid */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-[#211536] dark:text-foreground">
-            {selectedCategory === "all"
-              ? "All Curated Series"
-              : CATEGORIES.find((c) => c.id === selectedCategory)?.label || "Stories"}
+          <h2 className="text-lg font-bold text-[#211536] dark:text-foreground flex items-center gap-2">
+            <span>
+              {selectedCategory === "all"
+                ? selectedLanguage === "All"
+                  ? "All Curated Audio Stories & Books"
+                  : `${selectedLanguage} Stories & Audiobooks`
+                : CATEGORIES.find((c) => c.id === selectedCategory)?.label || "Stories"}
+            </span>
           </h2>
           <span className="text-xs text-[#746A85] dark:text-muted-foreground">
             {filteredStories.length} series available
@@ -210,7 +317,7 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
               No stories match your filters
             </h3>
             <p className="text-xs text-[#746A85] dark:text-muted-foreground max-w-md mx-auto">
-              Try switching your language or category filter to discover other legendary sagas.
+              Try switching your language or category filter to discover other audio dramas.
             </p>
           </div>
         ) : (
@@ -243,28 +350,31 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
 
                   {/* Play Overlay Button */}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="flex items-center justify-center h-12 w-12 rounded-full bg-[#8B5CF6] text-white shadow-lg shadow-[#8B5CF6]/50 scale-90 group-hover:scale-100 transition-transform">
+                    <div className="h-12 w-12 rounded-full bg-[#8B5CF6] text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 active:scale-95 transition-transform">
                       <Play className="h-5 w-5 fill-white ml-0.5" />
-                    </span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Details Footer */}
-                <div className="p-3.5 flex flex-col flex-1 justify-between space-y-2">
+                {/* Series Info */}
+                <div className="p-3 sm:p-4 flex flex-col flex-1 justify-between gap-2">
                   <div>
-                    <h3 className="text-xs sm:text-sm font-bold text-[#211536] dark:text-foreground line-clamp-1 group-hover:text-[#8B5CF6] transition-colors">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-[#8B5CF6]">
+                      {series.category.toUpperCase()}
+                    </span>
+                    <h3 className="text-sm font-bold text-[#211536] dark:text-foreground line-clamp-2 leading-snug group-hover:text-[#8B5CF6] transition-colors">
                       {series.title}
                     </h3>
-                    <p className="text-[11px] text-[#746A85] dark:text-muted-foreground line-clamp-1 mt-0.5">
-                      {series.narrator}
-                    </p>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-[#746A85] dark:text-muted-foreground pt-1 border-t border-[#E5DDF5] dark:border-hair">
-                    <span className="capitalize">{series.category}</span>
-                    <span className="font-semibold text-[#8B5CF6]">
-                      {series.totalChapters} Ch.
-                    </span>
+                  <div className="space-y-1">
+                    <p className="text-xs text-[#746A85] dark:text-muted-foreground line-clamp-1">
+                      {series.narrator}
+                    </p>
+                    <div className="flex items-center justify-between text-[11px] text-[#746A85] dark:text-muted-foreground pt-1 border-t border-[#E5DDF5] dark:border-hair">
+                      <span>{series.totalChapters} episodes</span>
+                      <span className="text-[#8B5CF6] font-medium">Listen →</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -273,7 +383,7 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
         )}
       </div>
 
-      {/* Series Detail Modal */}
+      {/* Series Detail & Chapter Modal */}
       <StorySeriesModal
         series={activeSeries}
         currentTrackId={currentTrackId}

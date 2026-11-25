@@ -4,6 +4,8 @@ import {
   searchPodcasts,
   getPodcastEpisodes,
   getPodcastShow,
+  extractGuestName,
+  enrichEpisodesWithYouTubeThumbnails,
 } from "./podcast.server";
 import {
   getCuratedPodcasters,
@@ -532,6 +534,91 @@ describe("Podcast Subsystem", () => {
       expect(res.episodes.length).toBe(1);
       expect(res.episodes[0]?.id).toBe("podcast:ep:8001");
       expect(res.episodes[0]?.duration).toBe("1:00:00");
+    });
+  });
+
+  describe("extractGuestName & YouTube Thumbnail Enrichment", () => {
+    it("extracts guest names from various episode title formats", () => {
+      expect(
+        extractGuestName("😂🔥 EESARI BOUNDARIES LEKUNDAAAA!! | Ft. Ambati Rayudu | Raw Talks With VK"),
+      ).toBe("Ambati Rayudu");
+      expect(
+        extractGuestName("‼️🚨 THAPPU EKKADA JARUGUTHUNDHIII?! | Ft. Dr. Moinoddin | Raw Talks With VK"),
+      ).toBe("Dr. Moinoddin");
+      expect(
+        extractGuestName("🔥 READY. SET. SHOOTTTT! | World Champion at 21! | Ft. Esha Singh | RAW TALKS WITH VK"),
+      ).toBe("Esha Singh");
+      expect(
+        extractGuestName("🔥🤩RAMYA KRISHNAN ON RAW TALKSSSS!!! | RAW TALKS WITH VK"),
+      ).toBe("RAMYA KRISHNAN");
+      expect(
+        extractGuestName("Episode 12: General Discussion On Life"),
+      ).toBeUndefined();
+    });
+
+    it("enriches episodes with YouTube thumbnails when matched", async () => {
+      const mockEpisodes: PodcastEpisode[] = [
+        {
+          id: "podcast:ep:101",
+          podcastId: "podcast:show:1666577596",
+          podcastTitle: "Raw Talks With Vamshi Kurapati",
+          title: "😂🔥 EESARI BOUNDARIES LEKUNDAAAA!! | Ft. Ambati Rayudu | Raw Talks With VK",
+          artworkUrl: "https://example.com/default-show-cover.jpg",
+          audioUrl: "https://example.com/ep101.mp3",
+          duration: "2:18:07",
+          durationSeconds: 8287,
+          provider: "itunes",
+        },
+      ];
+
+      globalThis.fetch = vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              contents: {
+                twoColumnSearchResultsRenderer: {
+                  primaryContents: {
+                    sectionListRenderer: {
+                      contents: [
+                        {
+                          itemSectionRenderer: {
+                            contents: [
+                              {
+                                videoRenderer: {
+                                  videoId: "H1mNqDx3ltc",
+                                  title: {
+                                    runs: [
+                                      {
+                                        text: "😂🔥 EESARI BOUNDARIES LEKUNDAAAA!! | Ft. Ambati Rayudu | Raw Talks With VK",
+                                      },
+                                    ],
+                                  },
+                                  thumbnail: {
+                                    thumbnails: [{ url: "https://i.ytimg.com/vi/H1mNqDx3ltc/hq720.jpg" }],
+                                  },
+                                },
+                              },
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            }),
+        }),
+      );
+
+      const enriched = await enrichEpisodesWithYouTubeThumbnails(
+        mockEpisodes,
+        "Raw Talks With Vamshi Kurapati",
+      );
+
+      expect(enriched.length).toBe(1);
+      expect(enriched[0]?.artworkUrl).toBe("https://i.ytimg.com/vi/H1mNqDx3ltc/hq720.jpg");
+      expect(enriched[0]?.guestName).toBe("Ambati Rayudu");
     });
   });
 });

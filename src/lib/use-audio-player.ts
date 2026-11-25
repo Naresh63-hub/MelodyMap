@@ -1126,6 +1126,13 @@ export function useAudioPlayer(options: {
           currentDirectUrlRef.current &&
           audio.src.includes(currentDirectUrlRef.current)
         ) {
+          if (hasFullLengthDirectSource(activeId)) {
+            // Direct full-length sources (story:, podcast:, saavn:) cannot fall back to the YouTube stream proxy.
+            // Attempt mid-song reconnection from last known position.
+            console.warn("[MelodyMap] Direct CDN source interrupted, attempting reconnect for", activeId);
+            triggerReconnect();
+            return;
+          }
           console.warn("[MelodyMap] Direct CDN source failed, falling back to stream proxy for", activeId);
           currentDirectUrlRef.current = null;
           const fallbackProxyUrl = streamUrl(

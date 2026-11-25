@@ -1,11 +1,11 @@
-import { BookOpen, Compass, Home, Library as LibraryIcon, Mic } from "lucide-react";
+import { BookOpen, Compass, Library as LibraryIcon, Mic, Music2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { NavTab } from "./Sidebar";
 import { triggerHaptic } from "@/lib/haptics";
 
-/** Mobile bottom navigation tabs (5 tabs: Home, Explore, Podcasts, Stories, Library) */
-export const MOBILE_TABS: Array<{ id: NavTab; label: string; icon: typeof Home }> = [
-  { id: "foryou", label: "Home", icon: Home },
+/** Mobile bottom navigation tabs (5 tabs: Music, Explore, Podcasts, Stories, Library) */
+export const MOBILE_TABS: Array<{ id: NavTab; label: string; icon: typeof Music2 }> = [
+  { id: "foryou", label: "Music", icon: Music2 },
   { id: "explore", label: "Explore", icon: Compass },
   { id: "podcasts", label: "Podcasts", icon: Mic },
   { id: "stories", label: "Stories", icon: BookOpen },

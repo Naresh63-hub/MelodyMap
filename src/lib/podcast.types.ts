@@ -38,6 +38,7 @@ export interface PodcastEpisode {
   languageCode?: string | undefined;
   provider: "itunes" | "rss";
   externalUrl?: string | undefined;
+  guestName?: string | undefined;
 }
 
 export interface NormalizedPodcastLanguage {

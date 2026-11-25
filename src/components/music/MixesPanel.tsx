@@ -105,9 +105,9 @@ export function MixesPanel({
           <div className="space-y-1">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-sm">
               <Sparkles className="h-3 w-3" />
-              Featured Mix
+              Melody Mixes
             </span>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight font-display">Mood Mixes</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight font-display">Melody Mood Mixes</h2>
             <p className="text-xs sm:text-sm text-white/85">Curated for your vibe & daily soundtrack</p>
           </div>
           <button

@@ -46,11 +46,11 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     label: "Discover",
     items: [
-      { id: "foryou", label: "For you", icon: Sparkles, shortcut: "1" },
+      { id: "foryou", label: "Melody Music", icon: Sparkles, shortcut: "1" },
       { id: "explore", label: "Explore", icon: Compass, shortcut: "2" },
-      { id: "stories", label: "Stories", icon: BookOpen, shortcut: "3" },
-      { id: "mixes", label: "Mixes", icon: Layers, shortcut: "4" },
-      { id: "podcasts", label: "Podcasts", icon: Mic, shortcut: "5" },
+      { id: "stories", label: "Melody Stories", icon: BookOpen, shortcut: "3" },
+      { id: "mixes", label: "Melody Mixes", icon: Layers, shortcut: "4" },
+      { id: "podcasts", label: "Melody Podcasts", icon: Mic, shortcut: "5" },
       { id: "languages", label: "Languages", icon: Globe2, shortcut: "6" },
       { id: "search", label: "Search", icon: Search, shortcut: "/" },
     ],
