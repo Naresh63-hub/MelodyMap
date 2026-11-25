@@ -18,6 +18,9 @@ export interface Podcast {
   episodeCount?: number | undefined;
   provider: "itunes" | "rss";
   externalUrl?: string | undefined;
+  isFeatured?: boolean | undefined;
+  badge?: string | undefined;
+  tagline?: string | undefined;
 }
 
 export interface PodcastEpisode {

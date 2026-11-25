@@ -41,6 +41,7 @@ export function MobileHeader({
 
   const getTitle = () => {
     if (tab === "foryou") return getGreeting();
+    if (tab === "stories") return "Audio Stories";
     if (tab === "languages") return "Languages";
     if (tab === "podcasts") return "Podcasts";
     if (tab === "playlists") return "Playlists";
@@ -54,6 +55,7 @@ export function MobileHeader({
 
   const getSubtitle = () => {
     if (tab === "foryou") return "Let's find your perfect vibe";
+    if (tab === "stories") return "Epics · Warriors · Bedtime Tales";
     if (tab === "podcasts") return "Learn · Feel · Be Inspired";
     if (tab === "languages") return "Explore Music in Your Language";
     if (tab === "mixes") return "Curated for your vibe";

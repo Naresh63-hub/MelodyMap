@@ -5,6 +5,11 @@ import {
   getPodcastEpisodes,
   getPodcastShow,
 } from "./podcast.server";
+import {
+  getCuratedPodcasters,
+  getCuratedSeedQueries,
+  TOP_REGIONAL_CREATORS,
+} from "./podcast-curated";
 import { episodeToTrack, type PodcastEpisode } from "./podcast.types";
 import { isPodcastTrack } from "./track-filters";
 import { hasPlayableDuration } from "./feed-freshness";
@@ -271,6 +276,83 @@ describe("Podcast Subsystem", () => {
       const podcasts = await searchPodcasts({ language: "Telugu" });
       // MUST NOT substitute Joe Rogan or English shows!
       expect(podcasts).toEqual([]);
+    });
+
+    it("prioritizes and tags curated regional creators when browsing without query", async () => {
+      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes("/lookup?id=")) {
+          return Promise.resolve({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                resultCount: 2,
+                results: [
+                  {
+                    collectionId: 1666577596,
+                    collectionName: "Raw Talks With Vamshi Kurapati",
+                    artistName: "Vamshi Kurapati",
+                    artworkUrl600: "https://example.com/rawtalks.jpg",
+                    primaryGenreName: "Business",
+                    trackCount: 45,
+                    feedUrl: "https://example.com/feed.xml",
+                  },
+                ],
+              }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              resultCount: 1,
+              results: [
+                {
+                  collectionId: 9999,
+                  collectionName: "Standard Telugu Podcast",
+                  artistName: "Host",
+                  artworkUrl600: "https://example.com/standard.jpg",
+                  primaryGenreName: "Society",
+                  trackCount: 10,
+                  feedUrl: "https://example.com/feed2.xml",
+                },
+              ],
+            }),
+        });
+      });
+
+      const podcasts = await searchPodcasts({ language: "Telugu" });
+      expect(podcasts.length).toBe(2);
+      expect(podcasts[0]?.title).toBe("Raw Talks With Vamshi Kurapati");
+      expect(podcasts[0]?.isFeatured).toBe(true);
+      expect(podcasts[0]?.badge).toContain("#1 Telugu");
+      expect(podcasts[1]?.title).toBe("Standard Telugu Podcast");
+    });
+  });
+
+  describe("Curated Regional Podcasters Catalog", () => {
+    it("features Raw Talks with VK for Telugu", () => {
+      const telugu = getCuratedPodcasters("Telugu");
+      expect(telugu.some((c) => c.name.includes("Raw Talks") && c.creator.includes("Vamshi"))).toBe(true);
+    });
+
+    it("features The Ranveer Show and Raj Shamani for Hindi", () => {
+      const hindi = getCuratedPodcasters("Hindi");
+      expect(hindi.some((c) => c.name.includes("Ranveer"))).toBe(true);
+      expect(hindi.some((c) => c.name.includes("Raj Shamani"))).toBe(true);
+    });
+
+    it("filters curated creators by topic", () => {
+      const bizTelugu = getCuratedPodcasters("Telugu", "Business & Finance");
+      expect(bizTelugu[0]?.name).toBe("Raw Talks with VK");
+
+      const comedyTelugu = getCuratedPodcasters("Telugu", "Comedy");
+      expect(comedyTelugu.some((c) => c.name.includes("Mouli") || c.name.includes("Chai Bisket"))).toBe(true);
+    });
+
+    it("generates valid seed search queries", () => {
+      const seeds = getCuratedSeedQueries("Telugu");
+      expect(seeds.length).toBeGreaterThan(0);
+      expect(seeds[0]).toBe("raw talks vamshi");
     });
   });
 

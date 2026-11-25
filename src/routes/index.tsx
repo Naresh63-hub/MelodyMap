@@ -72,6 +72,8 @@ const JamSessionModal = lazy(() =>
 import { MixesPanel, type MixId } from "@/components/music/MixesPanel";
 import { PlaylistsPanel } from "@/components/music/PlaylistsPanel";
 import { PodcastsPanel } from "@/components/music/ui/PodcastsPanel";
+import { StoriesSection } from "@/components/music/ui/StoriesSection";
+import { chapterToTrack, type StoryChapter, type StorySeries } from "@/lib/stories/story.types";
 import { AddToPlaylistModal } from "@/components/music/ui/AddToPlaylistModal";
 import { ExploreSections } from "@/components/music/ui/ExploreSections";
 import { episodeToTrack, type PodcastEpisode } from "@/lib/podcast.types";
@@ -4454,6 +4456,15 @@ function savePodcastResumePosition(trackId: string, pos: number) {
     [playSong],
   );
 
+  const handlePlayStoryChapter = useCallback(
+    (chapter: StoryChapter, series: StorySeries) => {
+      const tracks = series.chapters.map((ch) => chapterToTrack(ch, series));
+      const target = chapterToTrack(chapter, series);
+      playSong(target, tracks, "story");
+    },
+    [playSong],
+  );
+
   const handlePlayPodcastHistory = useCallback(
     (track: Track, allHistory: Track[]) => {
       playSong(track, allHistory, "podcasts");
@@ -5605,6 +5616,17 @@ function savePodcastResumePosition(trackId: string, pos: number) {
               </div>
             )}
 
+            {/* STORIES TAB */}
+            {tab === "stories" && (
+              <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
+                <StoriesSection
+                  currentTrackId={current?.id}
+                  isPlaying={player.isPlaying}
+                  onPlayChapter={handlePlayStoryChapter}
+                />
+              </div>
+            )}
+
             {/* PODCASTS TAB */}
             {tab === "podcasts" && (
               <div className={cn(tabDirection === 'right' ? "animate-slide-right" : "animate-slide-left")}>
@@ -5931,7 +5953,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
             duration={player.duration}
             volume={volume}
             playbackSpeed={player.playbackSpeed}
-            playlistName={tab === "podcasts" ? "Podcasts" : tab === "languages" ? "Languages" : "My Favourites"}
+            playlistName={tab === "stories" ? "Audio Stories" : tab === "podcasts" ? "Podcasts" : tab === "languages" ? "Languages" : "My Favourites"}
             shuffle={shuffle}
             repeatMode={repeatMode}
             onToggleShuffle={toggleShuffle}

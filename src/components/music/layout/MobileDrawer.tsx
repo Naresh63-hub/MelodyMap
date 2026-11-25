@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Clock,
   Compass,
   Download,
@@ -72,6 +73,7 @@ export function MobileDrawer({
       items: [
         { id: "foryou" as NavTab, label: "Home (For You)", icon: Sparkles },
         { id: "explore" as NavTab, label: "Explore & Charts", icon: Compass },
+        { id: "stories" as NavTab, label: "Audio Stories", icon: BookOpen },
         { id: "languages" as NavTab, label: "Languages & Artists", icon: Globe2 },
         { id: "podcasts" as NavTab, label: "Podcasts & Shows", icon: Mic },
         { id: "mixes" as NavTab, label: "Personal Mixes", icon: Layers },

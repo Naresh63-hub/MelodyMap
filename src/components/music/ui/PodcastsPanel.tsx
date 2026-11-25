@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   Compass,
+  Crown,
   GraduationCap,
   Headphones,
   Heart,
@@ -29,6 +30,7 @@ import {
   getPodcastShowServerFn,
 } from "@/lib/music.functions";
 import type { Podcast, PodcastEpisode } from "@/lib/podcast.types";
+import { getCuratedPodcasters } from "@/lib/podcast-curated";
 import type { Track } from "@/lib/library";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +104,9 @@ export function PodcastsPanel({
   const [shows, setShows] = useState<Podcast[]>([]);
   const [loadingShows, setLoadingShows] = useState(false);
   const [showsError, setShowsError] = useState<string | null>(null);
+
+  // Curated regional top podcasters (Raw Talks with VK, The Ranveer Show, Mouli Talks, etc.)
+  const curatedCreators = getCuratedPodcasters(selectedLanguage, selectedTopic);
 
   // Level 2: Selected Show & Episode state
   const [selectedShow, setSelectedShow] = useState<Podcast | null>(null);
@@ -805,6 +810,52 @@ export function PodcastsPanel({
         </div>
       )}
 
+      {/* Top Regional Creators Spotlight */}
+      {!debouncedQuery && curatedCreators.length > 0 && (
+        <div className="space-y-2.5 pt-1">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground/70 flex items-center gap-1.5">
+              <Crown className="h-3.5 w-3.5 text-amber-500 fill-amber-500/20" />
+              Top {selectedLanguage} Podcasters
+            </h2>
+            <span className="text-[11px] text-muted-foreground font-medium">Most Popular</span>
+          </div>
+
+          <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 overscroll-x-contain">
+            {curatedCreators.map((creator) => (
+              <button
+                key={creator.id}
+                type="button"
+                onClick={() =>
+                  void handleSelectShowByChannel({
+                    id: `podcast:show:${creator.id}`,
+                    title: creator.name,
+                  })
+                }
+                className="group shrink-0 flex items-center gap-3 p-2.5 pr-4 rounded-2xl bg-card hover:bg-card/90 border border-hair-strong hover:border-amber-500/40 shadow-xs hover:shadow-md transition-all text-left cursor-pointer active:scale-98"
+              >
+                <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-purple-600/20 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-500 shadow-inner group-hover:scale-105 transition-transform">
+                  <Mic className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 max-w-[170px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                      {creator.name}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-foreground/50 truncate font-medium">{creator.creator}</p>
+                  {creator.badge && (
+                    <span className="inline-block text-[9px] font-bold text-amber-500 uppercase tracking-wider mt-0.5">
+                      {creator.badge}
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Shows Grid / Popular Podcasts (Screen 7) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -894,12 +945,22 @@ export function PodcastsPanel({
                       {show.category}
                     </span>
                   )}
+                  {show.badge && (
+                    <span className="absolute top-1.5 left-1.5 text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white shadow-xs backdrop-blur-sm">
+                      {show.badge}
+                    </span>
+                  )}
                 </div>
 
                 <h3 className="text-xs font-semibold text-foreground leading-tight line-clamp-1 group-hover:text-primary transition-colors">
                   {show.title}
                 </h3>
                 <p className="text-[11px] text-foreground/50 line-clamp-1 mt-0.5">{show.publisher}</p>
+                {show.tagline && (
+                  <p className="text-[10px] text-amber-500/90 font-medium line-clamp-1 mt-0.5">
+                    {show.tagline}
+                  </p>
+                )}
                 {show.episodeCount !== undefined && show.episodeCount > 0 && (
                   <span className="text-[10px] text-foreground/35 mt-1">
                     {show.episodeCount} episodes

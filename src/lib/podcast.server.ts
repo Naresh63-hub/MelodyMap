@@ -6,6 +6,7 @@
 
 import type { Track } from "./library";
 import type { Podcast, PodcastEpisode, NormalizedPodcastLanguage } from "./podcast.types";
+import { getCuratedPodcasters } from "./podcast-curated";
 
 /**
  * Normalizes user-facing language strings into ISO codes and regional iTunes store country codes.
@@ -155,27 +156,63 @@ export async function searchPodcasts(options: {
     searchTerm = normLang.name === "English" ? "podcast" : `${normLang.name} podcast`;
   }
 
-  const url = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&media=podcast&entity=podcast&country=${normLang.country}&limit=${limit}`;
+  const searchUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&media=podcast&entity=podcast&country=${normLang.country}&limit=${limit}`;
+
+  // If browsing without a text query, fetch curated top regional creators in parallel
+  const curatedList = !cleanQuery ? getCuratedPodcasters(normLang.name, cleanTopic) : [];
+  const curatedMap = new Map(curatedList.map((c) => [c.id, c]));
+  const lookupIds = curatedList.slice(0, 4).map((c) => c.id).filter(Boolean);
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "MelodyMap/1.0",
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(8000),
-    });
+    const fetchPromises: [Promise<Response>, Promise<Response | null>] = [
+      fetch(searchUrl, {
+        headers: {
+          "User-Agent": "MelodyMap/1.0",
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(8000),
+      }),
+      lookupIds.length > 0
+        ? fetch(
+            `https://itunes.apple.com/lookup?id=${encodeURIComponent(lookupIds.join(","))}&entity=podcast&country=${normLang.country}`,
+            {
+              headers: {
+                "User-Agent": "MelodyMap/1.0",
+                Accept: "application/json",
+              },
+              signal: AbortSignal.timeout(6000),
+            },
+          ).catch(() => null)
+        : Promise.resolve(null),
+    ];
 
-    if (!res.ok) return [];
+    const [searchRes, lookupRes] = await Promise.all(fetchPromises);
 
-    const data = (await res.json()) as { results?: ItunesPodcastResult[] };
-    if (!data.results || !Array.isArray(data.results)) return [];
+    if (!searchRes || !searchRes.ok) return [];
+
+    const searchData = (await searchRes.json()) as { results?: ItunesPodcastResult[] };
+    const searchItems = Array.isArray(searchData?.results) ? searchData.results : [];
+
+    let lookupItems: ItunesPodcastResult[] = [];
+    if (lookupRes && lookupRes.ok) {
+      try {
+        const lookupData = (await lookupRes.json()) as { results?: ItunesPodcastResult[] };
+        if (Array.isArray(lookupData?.results)) {
+          lookupItems = lookupData.results;
+        }
+      } catch {
+        lookupItems = [];
+      }
+    }
+
+    // Curated items take priority at the top of the feed
+    const combinedItems = [...lookupItems, ...searchItems];
 
     const seenIds = new Set<string>();
     const seenTitles = new Set<string>();
     const podcasts: Podcast[] = [];
 
-    for (const item of data.results) {
+    for (const item of combinedItems) {
       if (!item.collectionId || !item.collectionName) continue;
       const id = `podcast:show:${item.collectionId}`;
       const title = item.collectionName.trim();
@@ -193,6 +230,8 @@ export async function searchPodcasts(options: {
       seenIds.add(id);
       seenTitles.add(titleKey);
 
+      const curatedMeta = curatedMap.get(String(item.collectionId));
+
       podcasts.push({
         id,
         title,
@@ -208,6 +247,9 @@ export async function searchPodcasts(options: {
         episodeCount: item.trackCount,
         provider: "itunes",
         externalUrl: item.collectionViewUrl,
+        isFeatured: Boolean(curatedMeta?.isFeatured),
+        badge: curatedMeta?.badge,
+        tagline: curatedMeta?.tagline,
       });
     }
 

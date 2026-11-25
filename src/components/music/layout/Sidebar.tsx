@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -25,6 +26,7 @@ export type NavTab =
   | "foryou"
   | "explore"
   | "mixes"
+  | "stories"
   | "podcasts"
   | "languages"
   | "search"
@@ -46,9 +48,10 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: "foryou", label: "For you", icon: Sparkles, shortcut: "1" },
       { id: "explore", label: "Explore", icon: Compass, shortcut: "2" },
-      { id: "mixes", label: "Mixes", icon: Layers, shortcut: "3" },
-      { id: "podcasts", label: "Podcasts", icon: Mic, shortcut: "4" },
-      { id: "languages", label: "Languages", icon: Globe2, shortcut: "5" },
+      { id: "stories", label: "Stories", icon: BookOpen, shortcut: "3" },
+      { id: "mixes", label: "Mixes", icon: Layers, shortcut: "4" },
+      { id: "podcasts", label: "Podcasts", icon: Mic, shortcut: "5" },
+      { id: "languages", label: "Languages", icon: Globe2, shortcut: "6" },
       { id: "search", label: "Search", icon: Search, shortcut: "/" },
     ],
   },
