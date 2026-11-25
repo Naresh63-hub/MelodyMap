@@ -16,6 +16,7 @@ describe("track-stream-policy", () => {
     expect(hasFullLengthDirectSource("jamendo:123")).toBe(true);
     expect(hasFullLengthDirectSource("archive:gate27")).toBe(true);
     expect(hasFullLengthDirectSource("podcast:ep-9")).toBe(true);
+    expect(hasFullLengthDirectSource("story:ch-1")).toBe(true);
   });
 
   it("marks catalog (YouTube id) tracks as proxy-only", () => {

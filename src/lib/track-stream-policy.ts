@@ -12,8 +12,9 @@
  *  - catalog tracks        → ALWAYS the proxy URL (full-length resolution)
  *  - audius/jamendo/archive → direct URL (already full-length, provider-authorized)
  *  - podcast:*              → direct URL (episode media, needs its own host)
+ *  - story:*                → direct URL (story chapters, direct CDN audio)
  */
-const FULL_LENGTH_DIRECT_PREFIXES = ["saavn:", "audius:", "jamendo:", "archive:", "podcast:"];
+const FULL_LENGTH_DIRECT_PREFIXES = ["saavn:", "audius:", "jamendo:", "archive:", "podcast:", "story:"];
 
 /** True when `track.id` belongs to a provider whose direct URL is a full-length track. */
 export function hasFullLengthDirectSource(id: string | null | undefined): boolean {

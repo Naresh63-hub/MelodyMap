@@ -423,18 +423,22 @@ export function PodcastsPanel({
                 const isCurrentEp = currentTrackId === ep.id;
                 const isThisPlaying = isCurrentEp && isPlaying;
                 const dateLabel = formatDate(ep.publishedAt);
+                const epArtwork =
+                  ep.artworkUrl ||
+                  selectedShow.artworkUrl ||
+                  "https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=300&h=300&fit=crop";
 
                 return (
                   <div
                     key={ep.id}
                     className={cn(
-                      "group p-3 md:p-4 rounded-xl transition-colors flex items-start gap-3.5",
+                      "group p-3 md:p-3.5 rounded-2xl transition-all flex items-start gap-3.5 sm:gap-4",
                       isCurrentEp
-                        ? "bg-chip border border-primary/30"
+                        ? "bg-primary/10 border border-primary/30 shadow-xs"
                         : "hover:bg-chip-subtle border border-transparent",
                     )}
                   >
-                    {/* Play / Status Control */}
+                    {/* Episode Artwork Thumbnail with Interactive Play/Pause Overlay */}
                     <button
                       type="button"
                       onClick={() => {
@@ -446,35 +450,65 @@ export function PodcastsPanel({
                         }
                       }}
                       className={cn(
-                        "shrink-0 mt-0.5 h-10 w-10 rounded-full flex items-center justify-center transition-transform active:scale-95",
-                        isThisPlaying
-                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                          : isCurrentEp
-                            ? "bg-foreground text-background"
-                            : "bg-chip-strong text-foreground hover:bg-primary hover:text-primary-foreground",
+                        "relative shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-card border border-hair-strong shadow-xs group/thumb cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-95 transition-transform",
+                        isCurrentEp && "ring-2 ring-primary shadow-md",
                       )}
-                      title={isThisPlaying ? "Pause" : "Play"}
+                      aria-label={isThisPlaying ? `Pause ${ep.title}` : `Play ${ep.title}`}
+                      title={isThisPlaying ? "Pause episode" : "Play episode"}
                     >
-                      {isThisPlaying ? (
-                        <Pause className="h-4 w-4 fill-current" />
-                      ) : (
-                        <Play className="h-4 w-4 fill-current ml-0.5" />
-                      )}
+                      <img
+                        src={epArtwork}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover group-hover/thumb:scale-105 transition-transform duration-200"
+                      />
+
+                      {/* Play/Pause state or hover overlay */}
+                      <div
+                        className={cn(
+                          "absolute inset-0 flex items-center justify-center transition-all",
+                          isThisPlaying
+                            ? "bg-black/60 backdrop-blur-[1px] opacity-100"
+                            : isCurrentEp
+                              ? "bg-black/45 opacity-100"
+                              : "bg-black/40 opacity-0 group-hover/thumb:opacity-100",
+                        )}
+                      >
+                        {isThisPlaying ? (
+                          <div className="flex items-end gap-0.5 h-4">
+                            <span className="w-1 bg-primary animate-pulse" />
+                            <span className="w-1 bg-primary animate-pulse delay-75" />
+                            <span className="w-1 bg-primary animate-pulse delay-150" />
+                          </div>
+                        ) : (
+                          <div className="h-8 w-8 rounded-full bg-white text-black flex items-center justify-center shadow-md transform group-active/thumb:scale-90 transition-transform">
+                            <Play className="h-3.5 w-3.5 fill-current ml-0.5" />
+                          </div>
+                        )}
+                      </div>
                     </button>
 
                     {/* Episode Metadata */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <h3
+                          onClick={() => {
+                            if (isCurrentEp) {
+                              if (isPlaying) onPause?.();
+                              else onResume?.();
+                            } else {
+                              onPlayEpisode(ep, episodes, idx);
+                            }
+                          }}
                           className={cn(
-                            "text-sm font-medium leading-snug line-clamp-1",
-                            isCurrentEp ? "text-primary" : "text-foreground group-hover:text-foreground",
+                            "text-sm font-semibold leading-snug line-clamp-1 cursor-pointer transition-colors",
+                            isCurrentEp ? "text-primary" : "text-foreground group-hover:text-primary",
                           )}
                         >
                           {ep.title}
                         </h3>
                         {isThisPlaying && (
-                          <div className="flex items-end gap-0.5 h-3">
+                          <div className="flex items-end gap-0.5 h-3 shrink-0">
                             <span className="w-0.5 h-3 bg-primary animate-pulse" />
                             <span className="w-0.5 h-2 bg-primary animate-pulse delay-75" />
                             <span className="w-0.5 h-3.5 bg-primary animate-pulse delay-150" />
@@ -488,19 +522,48 @@ export function PodcastsPanel({
                         </p>
                       )}
 
-                      <div className="flex items-center gap-3 mt-2 text-[11px] text-foreground/40">
+                      <div className="flex items-center gap-3 mt-2 text-[11px] text-foreground/40 font-medium">
                         {dateLabel && (
                           <span className="inline-flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             {dateLabel}
                           </span>
                         )}
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-chip-strong text-foreground/70">
                           <Clock className="h-3 w-3" />
                           {ep.duration || "Full Episode"}
                         </span>
                       </div>
                     </div>
+
+                    {/* Quick Play Button on Right */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isCurrentEp) {
+                          if (isPlaying) onPause?.();
+                          else onResume?.();
+                        } else {
+                          onPlayEpisode(ep, episodes, idx);
+                        }
+                      }}
+                      className={cn(
+                        "hidden sm:flex shrink-0 self-center h-9 w-9 rounded-full items-center justify-center transition-all cursor-pointer active:scale-95",
+                        isThisPlaying
+                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                          : isCurrentEp
+                            ? "bg-primary/20 text-primary border border-primary/40"
+                            : "bg-chip text-foreground/60 hover:bg-primary hover:text-primary-foreground opacity-0 group-hover:opacity-100",
+                      )}
+                      aria-label={isThisPlaying ? "Pause" : "Play"}
+                      title={isThisPlaying ? "Pause episode" : "Play episode"}
+                    >
+                      {isThisPlaying ? (
+                        <Pause className="h-4 w-4 fill-current" />
+                      ) : (
+                        <Play className="h-4 w-4 fill-current ml-0.5" />
+                      )}
+                    </button>
                   </div>
                 );
               })}
