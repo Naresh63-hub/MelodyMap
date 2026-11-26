@@ -6,6 +6,7 @@ import {
   saveEqualizerSettings,
   type EqualizerPreset,
   type EqualizerSettings,
+  type SpatialAudioMode,
 } from "@/lib/equalizer";
 import {
   fetchSponsorBlockSegments,
@@ -692,6 +693,17 @@ export function useAudioPlayer(options: {
       }
     },
     [equalizerSettings, applyEqualizerGains, streamUrl, setStream],
+  );
+
+  const setSpatialMode = useCallback(
+    (spatialMode: SpatialAudioMode) => {
+      const next: EqualizerSettings = {
+        ...equalizerSettings,
+        spatialMode,
+      };
+      applyEqualizerGains(next);
+    },
+    [equalizerSettings, applyEqualizerGains],
   );
 
   const triggerReconnect = useCallback(() => {
@@ -1661,6 +1673,7 @@ export function useAudioPlayer(options: {
     toggleEqualizer,
     setCrossfadeDuration,
     setAudioQuality,
+    setSpatialMode,
     load,
     cue,
     play,

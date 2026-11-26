@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { X, Play, Pause, Clock, Star, BookOpen, Volume2, Globe2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { X, Play, Pause, Clock, Star, BookOpen, Volume2, Globe2, Bookmark } from "lucide-react";
 import type { StorySeries, StoryChapter } from "@/lib/stories/story.types";
+import { getAllChapterProgress, getStoryBookmarks } from "@/lib/stories/story-bookmarks";
 
 interface Props {
   series: StorySeries | null;
@@ -20,6 +21,14 @@ export function StorySeriesModal({
   if (!series) return null;
 
   const [activeChapterIndex, setActiveChapterIndex] = useState<number>(0);
+
+  const chapterProgress = useMemo(() => {
+    return series ? getAllChapterProgress(series.id) : {};
+  }, [series?.id]);
+
+  const bookmarks = useMemo(() => {
+    return series ? getStoryBookmarks(series.id) : [];
+  }, [series?.id]);
 
   const handlePlayAll = () => {
     if (series.chapters.length > 0) {
@@ -137,6 +146,13 @@ export function StorySeriesModal({
               {series.chapters.map((chapter, idx) => {
                 const isCurrent = currentTrackId === chapter.id;
                 const isCurrentPlaying = isCurrent && isPlaying;
+                const prog = chapterProgress[chapter.id];
+                const hasProg = !!prog && prog.positionSeconds > 0;
+                const progPercent =
+                  hasProg && prog.durationSeconds > 0
+                    ? Math.min(100, Math.round((prog.positionSeconds / prog.durationSeconds) * 100))
+                    : 0;
+                const hasBookmark = bookmarks.some((b) => b.chapterId === chapter.id);
 
                 return (
                   <div
@@ -145,7 +161,7 @@ export function StorySeriesModal({
                       setActiveChapterIndex(idx);
                       onPlayChapter(chapter, series);
                     }}
-                    className={`group flex items-center justify-between p-3 sm:p-3.5 rounded-xl border transition-all cursor-pointer ${
+                    className={`relative group flex items-center justify-between p-3 sm:p-3.5 rounded-xl border transition-all cursor-pointer overflow-hidden ${
                       isCurrent
                         ? "bg-[#F1EBFF] dark:bg-[#8B5CF6]/20 border-[#8B5CF6] shadow-sm"
                         : "bg-white/50 dark:bg-white/[0.03] border-[#E5DDF5] dark:border-white/5 hover:bg-[#F1EBFF]/60 dark:hover:bg-white/[0.07] hover:border-[#8B5CF6]/40"
@@ -186,9 +202,26 @@ export function StorySeriesModal({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 text-xs font-mono text-[#746A85] dark:text-muted-foreground">
+                      {hasBookmark && (
+                        <Bookmark className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                      )}
+                      {hasProg && progPercent < 95 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#8B5CF6]/15 text-[#8B5CF6] font-sans font-semibold">
+                          {progPercent}%
+                        </span>
+                      )}
                       <Clock className="h-3 w-3" />
                       <span>{chapter.duration}</span>
                     </div>
+
+                    {hasProg && progPercent > 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black/5 dark:bg-white/5">
+                        <div
+                          className="h-full bg-[#8B5CF6]"
+                          style={{ width: `${progPercent}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}

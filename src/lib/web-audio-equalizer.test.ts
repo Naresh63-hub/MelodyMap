@@ -49,6 +49,26 @@ describe("web-audio-equalizer (Task 11)", () => {
       expect(getEffectiveBiquadGains(settings, false)).toEqual([7, 6, 5, 3, 1, 0, 0, 0, 0, 0]);
     });
 
+    it("maps audiophile presets (Concert Hall, Studio Monitor, Bass Monster, Vocal Booster, Car Audio, Late Night)", () => {
+      expect(EQUALIZER_PRESETS.concert_hall.name).toBe("Concert Hall");
+      expect(EQUALIZER_PRESETS.concert_hall.gains).toEqual([4, 3, 2, 0, -1, 1, 2, 4, 5, 4]);
+
+      expect(EQUALIZER_PRESETS.studio_monitor.name).toBe("Studio Monitor");
+      expect(EQUALIZER_PRESETS.studio_monitor.gains).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+      expect(EQUALIZER_PRESETS.bass_monster.name).toBe("Bass Monster");
+      expect(EQUALIZER_PRESETS.bass_monster.gains).toEqual([8, 7, 5, 2, 0, -1, 0, 1, 2, 3]);
+
+      expect(EQUALIZER_PRESETS.vocal_booster.name).toBe("Vocal Booster");
+      expect(EQUALIZER_PRESETS.vocal_booster.gains).toEqual([-2, -1, 0, 2, 5, 6, 4, 2, 1, 0]);
+
+      expect(EQUALIZER_PRESETS.car_audio.name).toBe("Car Audio");
+      expect(EQUALIZER_PRESETS.car_audio.gains).toEqual([7, 6, 4, 1, -1, 1, 2, 3, 5, 6]);
+
+      expect(EQUALIZER_PRESETS.late_night.name).toBe("Late Night Acoustics");
+      expect(EQUALIZER_PRESETS.late_night.gains).toEqual([2, 2, 1, 0, 0, 1, 1, 0, -2, -3]);
+    });
+
     it("clamps gains to [-12, +12] range", () => {
       const settings: EqualizerSettings = {
         enabled: true,

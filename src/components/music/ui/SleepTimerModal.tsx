@@ -83,7 +83,7 @@ export function SleepTimerModal({
 
   const formatDisplayMinutes = () => {
     if (isStopAtTrackEnd) {
-      return "End of song";
+      return "End of track";
     }
     if (isActive) {
       return formattedRemaining;
@@ -171,7 +171,7 @@ export function SleepTimerModal({
           </div>
         </div>
 
-        {/* Finish Current Song Option */}
+        {/* Finish Current Song / Chapter Option */}
         <div className="mb-4">
           <button
             type="button"
@@ -193,10 +193,10 @@ export function SleepTimerModal({
           >
             <div className="flex items-center gap-2">
               <Disc className="h-4 w-4 text-primary" />
-              <span>Finish Current Song</span>
+              <span>End of Song / Chapter</span>
             </div>
             <span className="text-[11px] font-normal text-muted-foreground">
-              {isStopAtTrackEnd ? "Active (Stops at end)" : "Stop at track end"}
+              {isStopAtTrackEnd ? "Active (Stops at end)" : "Stop at chapter / track end"}
             </span>
           </button>
         </div>

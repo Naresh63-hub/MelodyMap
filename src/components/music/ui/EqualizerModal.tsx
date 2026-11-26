@@ -16,6 +16,7 @@ import {
   type AudioQuality,
   type EqualizerPreset,
   type EqualizerSettings,
+  type SpatialAudioMode,
 } from "@/lib/equalizer";
 import { cn } from "@/lib/utils";
 
@@ -28,10 +29,17 @@ type Props = {
   onToggleEnabled: (enabled?: boolean) => void;
   onCrossfadeChange: (seconds: number) => void;
   onQualityChange: (quality: AudioQuality) => void;
+  onSpatialModeChange?: ((mode: SpatialAudioMode) => void) | undefined;
 };
 
 const PRESET_LIST: EqualizerPreset[] = [
+  "bass_monster",
   "bass_boost",
+  "concert_hall",
+  "studio_monitor",
+  "vocal_booster",
+  "car_audio",
+  "late_night",
   "vocal_boost",
   "treble_boost",
   "rock",
@@ -53,6 +61,7 @@ export function EqualizerModal({
   onToggleEnabled,
   onCrossfadeChange,
   onQualityChange,
+  onSpatialModeChange,
 }: Props) {
   const [tab, setTab] = useState<"eq" | "fx">("eq");
 
@@ -223,6 +232,48 @@ export function EqualizerModal({
                 <span>4s</span>
                 <span>6s</span>
                 <span>8s (Full DJ)</span>
+              </div>
+            </div>
+
+            {/* 3D Spatial Audio & Acoustic Stage */}
+            <div className="p-4 rounded-xl bg-card border border-border space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-xs sm:text-sm font-semibold text-foreground">
+                  3D Spatial Audio & Acoustic Immersion
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Simulates binaural acoustic soundstage widening and room reverberation for headphones and external speakers.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { id: "off", label: "Standard", desc: "Original Stereo" },
+                  { id: "wide", label: "Wide Stage", desc: "Expanded Field" },
+                  { id: "concert", label: "Concert Hall", desc: "Acoustic Reverb" },
+                  { id: "intimate", label: "Intimate Studio", desc: "Near-field warm" },
+                ].map((s) => {
+                  const active = (settings.spatialMode || "off") === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => onSpatialModeChange?.(s.id as SpatialAudioMode)}
+                      className={cn(
+                        "p-2.5 rounded-xl border text-left transition-all",
+                        active
+                          ? "bg-primary/15 border-primary/40 text-foreground"
+                          : "bg-surface-hover border-border text-muted-foreground hover:bg-surface-hover-strong hover:text-foreground"
+                      )}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold">{s.label}</span>
+                        {active && <Check className="h-3 w-3 text-primary" />}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground block">{s.desc}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

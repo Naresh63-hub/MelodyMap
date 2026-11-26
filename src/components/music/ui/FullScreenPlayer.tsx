@@ -26,6 +26,8 @@ import {
   Copy,
   Check,
   Share2,
+  Bookmark,
+  BookmarkCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrubBar } from "@/components/music/ScrubBar";
@@ -39,6 +41,8 @@ import { useTrackLyrics, findActiveLyricIndex } from "@/lib/use-track-lyrics";
 import { extractArtworkColor, estimateArtworkColor, type ArtworkColorTheme } from "@/lib/artwork-color";
 import { triggerHaptic } from "@/lib/haptics";
 import { isPodcastTrack } from "@/lib/track-filters";
+import { isStoryTrack } from "@/lib/stories/story.types";
+import { saveStoryBookmark } from "@/lib/stories/story-bookmarks";
 
 type Props = {
   track: Track | null;
@@ -81,7 +85,7 @@ type Props = {
   getAnalyser?: () => AnalyserNode | null;
 };
 
-const SPEEDS = [1, 1.25, 1.5, 2];
+const SPEEDS = [0.75, 1, 1.25, 1.5, 1.75, 2];
 
 type FloatingNote = {
   symbol: string;
@@ -215,6 +219,23 @@ export function FullScreenPlayer({
 
   const [showLiveLyrics, setShowLiveLyrics] = useState(false);
   const [copiedLyrics, setCopiedLyrics] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  const isStory = isStoryTrack(track);
+
+  const handleBookmark = () => {
+    if (!track) return;
+    saveStoryBookmark({
+      chapterId: track.id,
+      seriesId: track.podcastId || track.album || "story",
+      seriesTitle: track.album || "Audio Story",
+      chapterTitle: track.title,
+      chapterNumber: 1,
+      positionSeconds: position,
+    });
+    setBookmarked(true);
+    void triggerHaptic("success");
+    setTimeout(() => setBookmarked(false), 2500);
+  };
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const lyricLineRefs = useRef<(HTMLElement | null)[]>([]);
   const userScrollingLyricsRef = useRef(false);
@@ -824,22 +845,43 @@ export function FullScreenPlayer({
             </button>
           </div>
 
-          {/* Screen 9: Centered Signature Lyrics Pill Button (Single Lyrics Button) */}
+          {/* Screen 9: Centered Signature Lyrics or Story Bookmark Pill Button */}
           <div className="flex justify-center pt-2 pb-0.5">
-            <button
-              type="button"
-              onClick={() => setShowLiveLyrics((prev) => !prev)}
-              aria-label={showLiveLyrics ? "Hide lyrics" : "Show lyrics"}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs border",
-                showLiveLyrics
-                  ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-purple-500/30"
-                  : "bg-[#F1EBFF] dark:bg-primary/15 text-[#8B5CF6] dark:text-primary border-[#E5DDF5] dark:border-primary/30 hover:bg-[#E5DDF5] dark:hover:bg-primary/25"
-              )}
-            >
-              <Music2 className="h-3.5 w-3.5" />
-              <span>Lyrics</span>
-            </button>
+            {isStory ? (
+              <button
+                type="button"
+                onClick={handleBookmark}
+                aria-label={bookmarked ? "Moment bookmarked" : "Bookmark this chapter moment"}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs border",
+                  bookmarked
+                    ? "bg-emerald-600 text-white border-emerald-500 shadow-emerald-500/30"
+                    : "bg-[#F1EBFF] dark:bg-primary/15 text-[#8B5CF6] dark:text-primary border-[#E5DDF5] dark:border-primary/30 hover:bg-[#E5DDF5] dark:hover:bg-primary/25"
+                )}
+              >
+                {bookmarked ? (
+                  <BookmarkCheck className="h-3.5 w-3.5 text-white" />
+                ) : (
+                  <Bookmark className="h-3.5 w-3.5" />
+                )}
+                <span>{bookmarked ? "Bookmarked!" : "Bookmark Moment"}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowLiveLyrics((prev) => !prev)}
+                aria-label={showLiveLyrics ? "Hide lyrics" : "Show lyrics"}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-xs border",
+                  showLiveLyrics
+                    ? "bg-[#8B5CF6] text-white border-[#8B5CF6] shadow-purple-500/30"
+                    : "bg-[#F1EBFF] dark:bg-primary/15 text-[#8B5CF6] dark:text-primary border-[#E5DDF5] dark:border-primary/30 hover:bg-[#E5DDF5] dark:hover:bg-primary/25"
+                )}
+              >
+                <Music2 className="h-3.5 w-3.5" />
+                <span>Lyrics</span>
+              </button>
+            )}
           </div>
 
           {/* Bottom Toolbar Row: Evenly distributed Speed, EQ, Timer, Help, Queue */}
@@ -848,6 +890,8 @@ export function FullScreenPlayer({
             <button
               type="button"
               onClick={cycleSpeed}
+              title="Playback speed: 0.75x, 1x, 1.25x, 1.5x, 1.75x, 2x"
+              aria-label={`Playback speed ${playbackSpeed}x`}
               className="flex items-center gap-1.5 rounded-full bg-[#F1EBFF] dark:bg-chip border border-[#E5DDF5] dark:border-hair px-2.5 py-1 text-xs font-medium text-[#211536] dark:text-secondary-foreground hover:bg-[#E5DDF5] dark:hover:bg-chip-strong hover:text-[#8B5CF6] dark:hover:text-foreground transition-all cursor-pointer"
             >
               <Gauge className="h-3.5 w-3.5 text-[#746A85] dark:text-muted-foreground" />

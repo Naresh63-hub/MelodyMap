@@ -18,6 +18,12 @@ export type EqualizerPreset =
   | "classical"
   | "acoustic"
   | "hiphop"
+  | "concert_hall"
+  | "studio_monitor"
+  | "bass_monster"
+  | "vocal_booster"
+  | "car_audio"
+  | "late_night"
   | "custom";
 
 export const EQUALIZER_FREQUENCIES = [
@@ -78,6 +84,30 @@ export const EQUALIZER_PRESETS: Record<EqualizerPreset, { name: string; gains: n
     name: "Hip Hop",
     gains: [6, 6, 4, 1, -1, 0, 1, 2, 4, 4],
   },
+  concert_hall: {
+    name: "Concert Hall",
+    gains: [4, 3, 2, 0, -1, 1, 2, 4, 5, 4],
+  },
+  studio_monitor: {
+    name: "Studio Monitor",
+    gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+  bass_monster: {
+    name: "Bass Monster",
+    gains: [8, 7, 5, 2, 0, -1, 0, 1, 2, 3],
+  },
+  vocal_booster: {
+    name: "Vocal Booster",
+    gains: [-2, -1, 0, 2, 5, 6, 4, 2, 1, 0],
+  },
+  car_audio: {
+    name: "Car Audio",
+    gains: [7, 6, 4, 1, -1, 1, 2, 3, 5, 6],
+  },
+  late_night: {
+    name: "Late Night Acoustics",
+    gains: [2, 2, 1, 0, 0, 1, 1, 0, -2, -3],
+  },
   custom: {
     name: "Custom",
     gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -85,6 +115,7 @@ export const EQUALIZER_PRESETS: Record<EqualizerPreset, { name: string; gains: n
 };
 
 export type AudioQuality = "saver" | "standard" | "high";
+export type SpatialAudioMode = "off" | "wide" | "concert" | "intimate";
 
 export type EqualizerSettings = {
   enabled: boolean;
@@ -92,6 +123,7 @@ export type EqualizerSettings = {
   gains: number[];
   crossfade: number; // in seconds (0 = off, 1-8)
   quality: AudioQuality;
+  spatialMode?: SpatialAudioMode | undefined;
 };
 
 export const DEFAULT_EQUALIZER_SETTINGS: EqualizerSettings = {
@@ -100,6 +132,7 @@ export const DEFAULT_EQUALIZER_SETTINGS: EqualizerSettings = {
   gains: EQUALIZER_PRESETS.bass_boost.gains,
   crossfade: 3,
   quality: "high",
+  spatialMode: "off",
 };
 
 const STORAGE_KEY = "melodymap.equalizer.v2";

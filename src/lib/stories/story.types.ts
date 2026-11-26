@@ -64,3 +64,16 @@ export function chapterToTrack(chapter: StoryChapter, series: StorySeries): Trac
     podcastId: series.id,
   };
 }
+
+/**
+ * Checks whether a given track represents an audio story / audiobook chapter.
+ */
+export function isStoryTrack(track?: Track | null): boolean {
+  if (!track) return false;
+  return (
+    track.id.startsWith("story:") ||
+    Boolean(track.podcastId?.startsWith("story:")) ||
+    Boolean(track.podcastId?.startsWith("story:series:"))
+  );
+}
+

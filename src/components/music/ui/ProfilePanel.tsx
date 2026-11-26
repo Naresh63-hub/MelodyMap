@@ -1,19 +1,25 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useState, useEffect, useMemo } from "react";
 import {
   Camera,
   ChevronRight,
+  Crown,
   Download,
+  Flame,
   Heart,
   HelpCircle,
   Info,
   ListMusic,
   LogOut,
   Settings,
+  Sparkles,
+  Trophy,
   User,
 } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
 import type { NavTab } from "../layout/Sidebar";
 import { CURRENT_APP_VERSION, getCurrentAppVersion } from "@/lib/app-update";
+import { getStreakData, getTopListenerPercentile, evaluateUserBadges } from "@/lib/streak";
+import { BadgesModal } from "./BadgesModal";
 
 interface ProfilePanelProps {
   userName?: string | undefined;
@@ -47,12 +53,28 @@ export const ProfilePanel = memo(function ProfilePanel({
   onOpenInstallApp,
 }: ProfilePanelProps) {
   const [appVersion, setAppVersion] = useState(CURRENT_APP_VERSION);
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
+
+  const streakData = useMemo(() => getStreakData(), []);
+  const rank = useMemo(() => getTopListenerPercentile(streakData), [streakData]);
+  const badges = useMemo(() => evaluateUserBadges(streakData), [streakData]);
+  const unlockedBadgesCount = useMemo(() => badges.filter((b) => b.unlocked).length, [badges]);
 
   useEffect(() => {
     void getCurrentAppVersion().then(setAppVersion);
   }, []);
 
   const menuItems = [
+    {
+      id: "badges",
+      label: "Achievements & Badges",
+      icon: Trophy,
+      badge: `${unlockedBadgesCount}/${badges.length}`,
+      onClick: () => {
+        triggerHaptic("selection");
+        setShowBadgesModal(true);
+      },
+    },
     {
       id: "playlists",
       label: "Playlists",
@@ -162,6 +184,41 @@ export const ProfilePanel = memo(function ProfilePanel({
         </div>
       </div>
 
+      {/* Listener Status & Badges Showcase Card */}
+      <div
+        onClick={() => {
+          triggerHaptic("selection");
+          setShowBadgesModal(true);
+        }}
+        className="relative overflow-hidden rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-amber-500/15 via-purple-500/15 to-indigo-500/15 border border-amber-500/30 hover:border-amber-500/50 shadow-xs hover:shadow-md transition-all cursor-pointer group"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-500 text-black flex items-center justify-center shadow-md shadow-amber-500/20 shrink-0 group-hover:scale-105 transition-transform">
+              <Crown className="h-6 w-6 fill-black" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-500">
+                  {rank.label}
+                </span>
+                <span className="text-muted-foreground/40">•</span>
+                <span className="text-[10px] font-bold text-foreground/70">
+                  {streakData.currentStreak}d Streak 🔥
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-foreground leading-snug">
+                {rank.badgeTitle}
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                {unlockedBadgesCount} trophies unlocked • Tap to view all
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
+        </div>
+      </div>
+
       {/* Menu Navigation Items */}
       <div className="rounded-2xl border border-[#E9DDFB] dark:border-border bg-white dark:bg-card divide-y divide-[#E9DDFB] dark:divide-border overflow-hidden shadow-xs">
         {menuItems.map(({ id, label, icon: Icon, badge, onClick }) => (
@@ -250,6 +307,9 @@ export const ProfilePanel = memo(function ProfilePanel({
           </button>
         )}
       </div>
+
+      {/* Badges & Achievements Modal */}
+      <BadgesModal open={showBadgesModal} onClose={() => setShowBadgesModal(false)} />
     </div>
   );
 });

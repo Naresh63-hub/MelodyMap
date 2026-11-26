@@ -19,6 +19,7 @@ import { MiniPlayer } from "@/components/music/layout/MiniPlayer";
 import { MobileHeader } from "@/components/music/layout/MobileHeader";
 import { MobileHomeSections } from "@/components/music/ui/MobileHomeSections";
 import { MoodCardsSection, type MoodItem } from "@/components/music/ui/MoodCardsSection";
+import { AmbientRadarBanner } from "@/components/music/ui/AmbientRadarBanner";
 import { MoodDetailView } from "@/components/music/ui/MoodDetailView";
 import { MobileLibrary } from "@/components/music/ui/MobileLibrary";
 import { MobileQueue } from "@/components/music/ui/MobileQueue";
@@ -5378,6 +5379,16 @@ function savePodcastResumePosition(trackId: string, pos: number) {
                         </div>
                       </div>
 
+                      {/* Real-time Time & Weather-Aware Ambient Radar Banner */}
+                      <AmbientRadarBanner
+                        onSelectMood={(item) => void handleSelectMood(item)}
+                        onQuickVibe={(theme) => {
+                          setQuery(theme);
+                          void searchFor(theme, "songs", "all");
+                          setTab("search");
+                        }}
+                      />
+
                       {/* 1-Tap Mood & Vibe Selector (Spotify / YouTube Music style) */}
                       <MoodCardsSection
                         activeMood={activeMood}
@@ -6141,6 +6152,7 @@ function savePodcastResumePosition(trackId: string, pos: number) {
           onToggleEnabled={player.toggleEqualizer}
           onCrossfadeChange={player.setCrossfadeDuration}
           onQualityChange={player.setAudioQuality}
+          onSpatialModeChange={player.setSpatialMode}
         />
 
         {/* SETTINGS & AI RECOMMENDATION TUNING MODAL */}
