@@ -10,12 +10,18 @@ import {
   Shield,
   Smile,
   Award,
+  Clock,
+  RotateCcw,
 } from "lucide-react";
 import {
   MASTER_STORIES_CATALOG,
   getStoriesCatalog,
   getStoryLanguageCounts,
 } from "@/lib/stories/stories-catalog";
+import {
+  getAllChapterProgress,
+  formatSecondsToTimestamp,
+} from "@/lib/stories/story-bookmarks";
 import type { StorySeries, StoryCategory, StoryLanguage, StoryChapter } from "@/lib/stories/story.types";
 import { StorySeriesModal } from "./StorySeriesModal";
 
@@ -35,10 +41,10 @@ const CATEGORIES: { id: StoryCategory | "all"; label: string; icon: typeof Spark
   { id: "biographies", label: "👑 Biographies", icon: BookOpen },
 ];
 
-const LANGUAGES: StoryLanguage[] = ["All", "Telugu", "Hindi", "English"];
+const LANGUAGES: StoryLanguage[] = ["All", "Telugu", "Hindi", "English", "Tamil"];
 
 const LANGUAGE_CARDS: {
-  lang: "Telugu" | "Hindi" | "English";
+  lang: "Telugu" | "Hindi" | "English" | "Tamil";
   title: string;
   nativeTitle: string;
   description: string;
@@ -55,14 +61,21 @@ const LANGUAGE_CARDS: {
     lang: "Hindi",
     title: "Hindi Thrillers & Kahaniyaan",
     nativeTitle: "हिंदी कहानियां & ऑडियोबुक्स",
-    description: "हॉरर नाइट्स, शिवाजी महाराज, विक्रम बेताल, अकबर बीरबल और बुक समरी",
+    description: "हॉरर नाइट्स, शिवाजी महाराज, विक्रम बेताल, प्रेमचंद और बुक समरी",
     gradient: "from-rose-600/30 via-red-600/20 to-indigo-900/40 border-rose-500/30",
+  },
+  {
+    lang: "Tamil",
+    title: "Tamil Audio Novels & Stories",
+    nativeTitle: "தமிழ் கதைகள் & நாவல்கள்",
+    description: "குறிஞ்சி மலர் நாவல், கதை கேட்கும் நேரம் மற்றும் சரித்திர காவியங்கள்",
+    gradient: "from-emerald-600/30 via-teal-600/20 to-purple-900/40 border-emerald-500/30",
   },
   {
     lang: "English",
     title: "English Audio Dramas",
     nativeTitle: "Classic Dramas & Epics",
-    description: "The Stories of Mahabharata drama, Swami Vivekananda philosophy",
+    description: "The Stories of Mahabharata drama, Swami Vivekananda philosophy, Wings of Fire",
     gradient: "from-indigo-600/30 via-violet-600/20 to-purple-900/40 border-indigo-500/30",
   },
 ];
@@ -91,6 +104,35 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
       MASTER_STORIES_CATALOG[0]!
     );
   }, [filteredStories]);
+
+  // In-progress story chapters for "Continue Listening / Jump Back In"
+  const inProgressItems = useMemo(() => {
+    const progressMap = getAllChapterProgress();
+    const entries = Object.values(progressMap)
+      .filter((p) => p.positionSeconds > 10 && p.durationSeconds > 0 && p.positionSeconds < p.durationSeconds - 10)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 4);
+
+    return entries
+      .map((prog) => {
+        const series = MASTER_STORIES_CATALOG.find((s) => s.id === prog.seriesId);
+        if (!series) return null;
+        const chapter = series.chapters.find((ch) => ch.id === prog.chapterId);
+        if (!chapter) return null;
+        return {
+          series,
+          chapter,
+          progress: prog,
+          percent: Math.min(100, Math.round((prog.positionSeconds / prog.durationSeconds) * 100)),
+        };
+      })
+      .filter(Boolean) as {
+        series: StorySeries;
+        chapter: StoryChapter;
+        progress: (typeof entries)[number];
+        percent: number;
+      }[];
+  }, [currentTrackId]);
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
@@ -232,9 +274,67 @@ export function StoriesSection({ currentTrackId, isPlaying = false, onPlayChapte
       </div>
       </div>
 
+      {/* Jump Back In / Continue Listening */}
+      {inProgressItems.length > 0 && !searchQuery && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base sm:text-lg font-bold text-[#211536] dark:text-foreground flex items-center gap-2">
+              <Clock className="h-4 w-4 text-[#8B5CF6]" />
+              <span>Continue Listening</span>
+            </h2>
+            <span className="text-xs text-[#746A85] dark:text-muted-foreground">
+              Pick up where you left off
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {inProgressItems.map(({ series, chapter, progress, percent }) => {
+              return (
+                <div
+                  key={chapter.id}
+                  onClick={() => onPlayChapter(chapter, series)}
+                  className="group flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-card border border-[#E5DDF5] dark:border-hair hover:border-[#8B5CF6]/50 shadow-sm hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
+                >
+                  <div className="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900">
+                    <img
+                      src={series.coverUrl}
+                      alt={series.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <div className="h-7 w-7 rounded-full bg-[#8B5CF6] text-white flex items-center justify-center shadow-md">
+                        <Play className="h-3.5 w-3.5 fill-white ml-0.5" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <span className="text-[10px] font-bold text-[#8B5CF6] uppercase tracking-wide">
+                      {series.language} • Ep {chapter.chapterNumber}
+                    </span>
+                    <h4 className="text-xs font-bold text-[#211536] dark:text-foreground truncate group-hover:text-[#8B5CF6] transition-colors">
+                      {chapter.title}
+                    </h4>
+                    <div className="flex items-center justify-between text-[10px] text-[#746A85] dark:text-muted-foreground">
+                      <span>{formatSecondsToTimestamp(progress.positionSeconds)}</span>
+                      <span>{percent}%</span>
+                    </div>
+                    {/* Progress Bar */}
+                    <div className="w-full h-1 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] rounded-full"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Language Quick Browse Cards (Visible when browsing All and no active search) */}
       {selectedLanguage === "All" && !searchQuery && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
           {LANGUAGE_CARDS.map((card) => {
             const count = languageCounts[card.lang];
             return (

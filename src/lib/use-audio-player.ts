@@ -794,9 +794,19 @@ export function useAudioPlayer(options: {
         let freshUrl: string;
         if (currentDirectUrlRef.current && hasFullLengthDirectSource(tid)) {
           const direct = currentDirectUrlRef.current;
-          freshUrl = direct.includes("?")
-            ? `${direct}&_reconnect=${Date.now()}`
-            : `${direct}?_reconnect=${Date.now()}`;
+          const isSignedCdn =
+            tid.startsWith("story:") ||
+            tid.startsWith("podcast:") ||
+            direct.includes("cloudfront.net") ||
+            direct.includes("megaphone.fm") ||
+            direct.includes("buzzsprout.com");
+          if (isSignedCdn) {
+            freshUrl = direct;
+          } else {
+            freshUrl = direct.includes("?")
+              ? `${direct}&_reconnect=${Date.now()}`
+              : `${direct}?_reconnect=${Date.now()}`;
+          }
         } else {
           freshUrl = `${streamUrl(tid)}&_reconnect=${Date.now()}`;
         }

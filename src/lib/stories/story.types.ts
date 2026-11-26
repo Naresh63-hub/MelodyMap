@@ -14,7 +14,7 @@ export type StoryCategory =
   | "biographies"
   | "spiritual";
 
-export type StoryLanguage = "Telugu" | "Hindi" | "English" | "All";
+export type StoryLanguage = "Telugu" | "Hindi" | "English" | "Tamil" | "All";
 
 export interface StoryChapter {
   id: string; // e.g. "story:ch:mahabharata-1"
@@ -32,7 +32,7 @@ export interface StorySeries {
   id: string; // e.g. "story:series:mahabharata"
   title: string;
   narrator: string; // e.g. "Sudipta Bhawmik", "Chaganti Koteswara Rao"
-  language: "Telugu" | "Hindi" | "English";
+  language: "Telugu" | "Hindi" | "English" | "Tamil";
   category: StoryCategory;
   coverUrl: string;
   description: string;

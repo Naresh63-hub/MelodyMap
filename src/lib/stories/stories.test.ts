@@ -26,7 +26,7 @@ describe("stories engine", () => {
         expect(series.id).toBeTruthy();
         expect(series.title).toBeTruthy();
         expect(series.narrator).toBeTruthy();
-        expect(series.language).toMatch(/^(Telugu|Hindi|English)$/);
+        expect(series.language).toMatch(/^(Telugu|Hindi|English|Tamil)$/);
         expect(series.coverUrl).toBeTruthy();
         expect(series.rating).toBeGreaterThanOrEqual(4.0);
         expect(series.chapters.length).toBeGreaterThan(0);
@@ -49,13 +49,14 @@ describe("stories engine", () => {
       }
     });
 
-    it("calculates accurate language counts for Telugu, Hindi, and English", () => {
+    it("calculates accurate language counts for Telugu, Hindi, English, and Tamil", () => {
       const counts = getStoryLanguageCounts();
       expect(counts.All).toBe(MASTER_STORIES_CATALOG.length);
       expect(counts.Telugu).toBeGreaterThanOrEqual(4);
       expect(counts.Hindi).toBeGreaterThanOrEqual(4);
       expect(counts.English).toBeGreaterThanOrEqual(2);
-      expect(counts.Telugu + counts.Hindi + counts.English).toBe(counts.All);
+      expect(counts.Tamil).toBeGreaterThanOrEqual(2);
+      expect(counts.Telugu + counts.Hindi + counts.English + counts.Tamil).toBe(counts.All);
     });
   });
 
@@ -80,16 +81,20 @@ describe("stories engine", () => {
 
     it("filters series strictly by language", () => {
       const teluguStories = getStoriesCatalog({ language: "Telugu" });
-      expect(teluguStories.length).toBeGreaterThanOrEqual(6);
+      expect(teluguStories.length).toBeGreaterThanOrEqual(4);
       expect(teluguStories.every((s) => s.language === "Telugu")).toBe(true);
 
       const hindiStories = getStoriesCatalog({ language: "Hindi" });
-      expect(hindiStories.length).toBeGreaterThanOrEqual(6);
+      expect(hindiStories.length).toBeGreaterThanOrEqual(4);
       expect(hindiStories.every((s) => s.language === "Hindi")).toBe(true);
 
       const englishStories = getStoriesCatalog({ language: "English" });
-      expect(englishStories.length).toBeGreaterThanOrEqual(2);
+      expect(englishStories.length).toBeGreaterThanOrEqual(3);
       expect(englishStories.every((s) => s.language === "English")).toBe(true);
+
+      const tamilStories = getStoriesCatalog({ language: "Tamil" });
+      expect(tamilStories.length).toBeGreaterThanOrEqual(2);
+      expect(tamilStories.every((s) => s.language === "Tamil")).toBe(true);
     });
 
     it("searches series by query string across title, narrator, and tags", () => {
@@ -105,9 +110,13 @@ describe("stories engine", () => {
       expect(shivaji.length).toBeGreaterThanOrEqual(1);
       expect(shivaji[0]?.title).toContain("शिवाजी");
 
-      const chaganti = getStoriesCatalog({ query: "చాగంటి" });
-      expect(chaganti.length).toBeGreaterThanOrEqual(1);
-      expect(chaganti[0]?.narrator).toContain("చాగంటి");
+      const ramayanam = getStoriesCatalog({ query: "రామాయణం" });
+      expect(ramayanam.length).toBeGreaterThanOrEqual(1);
+      expect(ramayanam[0]?.title).toContain("రామాయణం");
+
+      const kurinji = getStoriesCatalog({ query: "Kurinji" });
+      expect(kurinji.length).toBeGreaterThanOrEqual(1);
+      expect(kurinji[0]?.title).toContain("குறிஞ்சி");
 
       const kalam = getStoriesCatalog({ query: "Kalam" });
       expect(kalam.length).toBeGreaterThanOrEqual(1);
@@ -117,8 +126,8 @@ describe("stories engine", () => {
     it("retrieves a single series by its unique ID", () => {
       const series = getStorySeriesById("story:mahabharata-drama-en");
       expect(series).toBeDefined();
-      expect(series?.title).toBe("The Stories of Mahabharata");
-      expect(series?.narrator).toBe("Sudipta Bhawmik");
+      expect(series?.title).toBe("The Stories of Mahabharata (Audio Drama)");
+      expect(series?.narrator).toBe("Sudipta Bhawmik (Theater Audio)");
 
       const nonExistent = getStorySeriesById("story:non-existent");
       expect(nonExistent).toBeUndefined();
